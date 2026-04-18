@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noch — Premium Café & Retail</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0052CC;      /* Cobalt Blue */
+            --secondary: #FF9500;    /* Orange */
+            --accent: #E91E63;       /* Pink */
+            --white: #FFFFFF;
+            --beige: #F5E6D3;        /* Warm beige background */
+            --dark: #2C2C2C;         /* Dark text */
+            --light-text: #666666;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--beige);
+            color: var(--dark);
+            line-height: 1.7;
+        }
+
+        /* ===== HEADER ===== */
+        header {
+            background: var(--white);
+            border-bottom: 1px solid rgba(0, 82, 204, 0.1);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -1px;
+        }
+
+        nav {
+            display: flex;
+            gap: 3rem;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 400;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+            position: relative;
+        }
+
+        nav a:hover {
+            color: var(--primary);
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--beige);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover {
+            background: var(--primary);
+            color: var(--white);
+            transform: scale(1.05);
+        }
+
+        /* ===== HERO SECTION ===== */
+        .hero {
+            background: var(--white);
+            padding: 4rem 2rem;
+            min-height: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .hero-content p {
+            font-size: 1.1rem;
+            color: var(--light-text);
+            margin-bottom: 2rem;
+            font-weight: 300;
+            max-width: 500px;
+        }
+
+        .cta-primary {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: var(--secondary);
+            color: var(--white);
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 149, 0, 0.2);
+        }
+
+        .cta-primary:hover {
+            background: #E88A00;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 149, 0, 0.3);
+        }
+
+        .hero-mascot {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .nochi-character {
+            width: 280px;
+            height: 280px;
+            background: radial-gradient(circle at 30% 30%, rgba(255, 149, 0, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 200px;
+            animation: gentle-bounce 4s ease-in-out infinite;
+        }
+
+        @keyframes gentle-bounce {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+        }
+
+        /* ===== COLLECTION SECTION ===== */
+        .collection {
+            background: var(--beige);
+            padding: 5rem 2rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .section-header p {
+            font-size: 1rem;
+            color: var(--light-text);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .category-card {
+            background: var(--white);
+            padding: 3rem 2rem;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .category-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 82, 204, 0.1);
+        }
+
+        .category-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .category-card h3 {
+            font-size: 1.4rem;
+            color: var(--primary);
+            margin-bottom: 0.7rem;
+            font-weight: 600;
+        }
+
+        .category-card p {
+            color: var(--light-text);
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+
+        /* ===== PRODUCTS SECTION ===== */
+        .products {
+            background: var(--white);
+            padding: 5rem 2rem;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 2.5rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .product-card {
+            background: var(--beige);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .product-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 180px;
+            background: var(--white);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .product-name {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-desc {
+            font-size: 0.85rem;
+            color: var(--light-text);
+            margin-bottom: 1.2rem;
+            font-weight: 300;
+        }
+
+        .product-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .add-btn {
+            background: var(--secondary);
+            color: var(--white);
+            border: none;
+            padding: 0.6rem 1.3rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            flex-grow: 1;
+        }
+
+        .add-btn:hover {
+            background: #E88A00;
+            transform: scale(1.02);
+        }
+
+        /* ===== CTA SECTION ===== */
+        .cta-section {
+            background: var(--primary);
+            color: var(--white);
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .cta-content h2 {
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .cta-content p {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            font-weight: 300;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-secondary {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: var(--white);
+            color: var(--primary);
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .cta-secondary:hover {
+            background: var(--secondary);
+            color: var(--white);
+            transform: translateY(-2px);
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background: var(--white);
+            color: var(--dark);
+            padding: 3rem 2rem;
+            text-align: center;
+            border-top: 1px solid rgba(0, 82, 204, 0.1);
+        }
+
+        footer p {
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            color: var(--light-text);
+            font-weight: 300;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .social-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--beige);
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .social-btn:hover {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .hero-container {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .hero-content h1 {
+                font-size: 2.2rem;
+            }
+
+            nav {
+                gap: 1.5rem;
+                font-size: 0.9rem;
+            }
+
+            .nochi-character {
+                width: 200px;
+                height: 200px;
+                font-size: 140px;
+            }
+
+            .section-header h2 {
+                font-size: 1.8rem;
+            }
+
+            .category-grid,
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <div class="logo">Noch</div>
+        <nav>
+            <a href="#home">Shop</a>
+            <a href="#collection">Collection</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </nav>
+        <div class="header-icons">
+            <button class="icon-btn">🔍</button>
+            <button class="icon-btn">❤️</button>
+            <button class="icon-btn">🛒</button>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1>Discover Premium Crafted Moments</h1>
+                <p>From carefully sourced beverages to handpicked essentials — every product is chosen to bring warmth and joy to your day.</p>
+                <button class="cta-primary"><span>Explore Now</span></button>
+            </div>
+            <div class="hero-mascot">
+                <div class="nochi-character">🐰</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- COLLECTION SECTION -->
+    <section class="collection" id="collection">
+        <div class="section-header">
+            <h2>Shop by Collection</h2>
+            <p>Curated selections for every moment</p>
+        </div>
+        <div class="category-grid">
+            <div class="category-card">
+                <div class="category-icon">☕</div>
+                <h3>Beverages</h3>
+                <p>Premium coffee, tea & artisan drinks</p>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🍰</div>
+                <h3>Food & Bakery</h3>
+                <p>Fresh treats made daily</p>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🎁</div>
+                <h3>Merchandise</h3>
+                <p>Exclusive Noch branded items</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRODUCTS SECTION -->
+    <section class="products">
+        <div class="section-header">
+            <h2>Featured Selection</h2>
+            <p>Our most loved items</p>
+        </div>
+        <div class="product-grid">
+            <div class="product-card">
+                <div class="product-image">☕</div>
+                <div class="product-name">Single Origin Coffee</div>
+                <div class="product-desc">Medium roast, smooth finish</div>
+                <div class="product-footer">
+                    <span class="price">$14.99</span>
+                    <button class="add-btn">Add</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🍵</div>
+                <div class="product-name">Organic Green Tea</div>
+                <div class="product-desc">Delicate, fresh leaf blend</div>
+                <div class="product-footer">
+                    <span class="price">$9.99</span>
+                    <button class="add-btn">Add</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🥐</div>
+                <div class="product-name">Butter Croissants</div>
+                <div class="product-desc">Baked fresh daily</div>
+                <div class="product-footer">
+                    <span class="price">$7.99</span>
+                    <button class="add-btn">Add</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🍪</div>
+                <div class="product-name">Artisan Cookies</div>
+                <div class="product-desc">Handmade with love</div>
+                <div class="product-footer">
+                    <span class="price">$8.49</span>
+                    <button class="add-btn">Add</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🥤</div>
+                <div class="product-name">Cold Brew Kit</div>
+                <div class="product-desc">Concentrate, ready to mix</div>
+                <div class="product-footer">
+                    <span class="price">$16.99</span>
+                    <button class="add-btn">Add</button>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🎁</div>
+                <div class="product-name">Noch Gift Set</div>
+                <div class="product-desc">Perfect starter collection</div>
+                <div class="product-footer">
+                    <span class="price">$34.99</span>
+                    <button class="add-btn">Add</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA SECTION -->
+    <section class="cta-section">
+        <div class="cta-content">
+            <h2>Membership Perks Await</h2>
+            <p>Join our community and receive exclusive discounts, early access to new products, and special rewards.</p>
+            <button class="cta-secondary">Become a Member</button>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <h3 style="color: var(--primary); margin-bottom: 0.5rem;">Noch</h3>
+        <p>Crafted moments, premium quality</p>
+        <p>© 2026 Noch. All rights reserved.</p>
+        <div class="social-links">
+            <button class="social-btn">f</button>
+            <button class="social-btn">𝕏</button>
+            <button class="social-btn">📷</button>
+            <button class="social-btn">▶</button>
+        </div>
+    </footer>
+</body>
+</html>

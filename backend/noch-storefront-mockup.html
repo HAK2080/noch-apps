@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noch Omni - Modern Storefront Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0052CC;      /* Cobalt Blue */
+            --secondary: #FF9500;    /* Orange */
+            --accent: #E91E63;       /* Pink */
+            --white: #FFFFFF;
+            --light-pink: #FFF0F5;
+            --light-blue: #F0F4FF;
+            --dark-navy: #001A4D;
+            --gray: #F5F5F5;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--white);
+            color: var(--dark-navy);
+            line-height: 1.6;
+        }
+
+        /* ===== HEADER ===== */
+        header {
+            background: var(--white);
+            border-bottom: 2px solid var(--light-blue);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 82, 204, 0.1);
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+            letter-spacing: -2px;
+        }
+
+        nav {
+            display: flex;
+            gap: 2rem;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: var(--dark-navy);
+            font-weight: 500;
+            transition: color 0.3s;
+            position: relative;
+        }
+
+        nav a:hover {
+            color: var(--secondary);
+        }
+
+        nav a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--secondary);
+            transition: width 0.3s;
+        }
+
+        nav a:hover::after {
+            width: 100%;
+        }
+
+        .header-icons {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--light-pink);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+        }
+
+        .icon-btn:hover {
+            background: var(--accent);
+            color: var(--white);
+            transform: scale(1.1);
+        }
+
+        /* ===== HERO SECTION ===== */
+        .hero {
+            background: linear-gradient(135deg, var(--light-pink) 0%, rgba(255, 149, 0, 0.1) 50%, var(--white) 100%);
+            padding: 4rem 2rem;
+            text-align: center;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255, 149, 0, 0.1) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-weight: 900;
+            letter-spacing: -3px;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            color: var(--dark-navy);
+            margin-bottom: 2rem;
+            font-weight: 300;
+        }
+
+        .hero-nochi {
+            font-size: 5rem;
+            margin: 1rem 0;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* ===== BUTTONS ===== */
+        .cta-btn {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: var(--secondary);
+            color: var(--white);
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
+        }
+
+        .cta-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            transition: left 0.3s;
+            z-index: 0;
+        }
+
+        .cta-btn:hover::before {
+            left: 100%;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255, 149, 0, 0.4);
+        }
+
+        .cta-btn span {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== CATEGORY SECTION ===== */
+        .categories {
+            padding: 3rem 2rem;
+            background: var(--gray);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 3rem;
+            font-weight: 900;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .category-card {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+            box-shadow: 0 4px 12px rgba(0, 82, 204, 0.1);
+        }
+
+        .category-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-10px);
+            box-shadow: 0 12px 30px rgba(233, 30, 99, 0.2);
+        }
+
+        .category-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .category-card h3 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .category-card p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        /* ===== PRODUCTS SECTION ===== */
+        .products {
+            padding: 3rem 2rem;
+            background: var(--white);
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .product-card {
+            background: var(--white);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+            border: 2px solid var(--light-blue);
+        }
+
+        .product-card:hover {
+            box-shadow: 0 12px 35px rgba(0, 82, 204, 0.2);
+            transform: translateY(-8px);
+            border-color: var(--accent);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 250px;
+            background: linear-gradient(135deg, var(--light-blue) 0%, var(--light-pink) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-image::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 149, 0, 0.1);
+            transition: left 0.3s;
+        }
+
+        .product-card:hover .product-image::after {
+            left: 100%;
+        }
+
+        .product-info {
+            padding: 1.5rem;
+        }
+
+        .product-name {
+            font-size: 1.2rem;
+            color: var(--primary);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-desc {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .product-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .price {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--accent);
+        }
+
+        .add-btn {
+            background: var(--secondary);
+            color: var(--white);
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .add-btn:hover {
+            background: var(--primary);
+            transform: scale(1.05);
+        }
+
+        /* ===== COLOR PALETTE SECTION ===== */
+        .palette {
+            padding: 3rem 2rem;
+            background: var(--light-blue);
+        }
+
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .color-swatch {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .swatch-color {
+            width: 100%;
+            height: 150px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 1rem;
+            font-weight: 600;
+            color: var(--white);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .swatch-label {
+            background: var(--white);
+            padding: 1rem;
+            text-align: center;
+            color: var(--dark-navy);
+            font-weight: 600;
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background: var(--primary);
+            color: var(--white);
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        footer p {
+            margin-bottom: 1rem;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .social-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: var(--white);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .social-btn:hover {
+            background: var(--secondary);
+            transform: scale(1.1);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            nav {
+                gap: 1rem;
+                font-size: 0.9rem;
+            }
+
+            .category-grid,
+            .product-grid,
+            .palette-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <div class="logo">Noch</div>
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#products">Shop</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+        </nav>
+        <div class="header-icons">
+            <button class="icon-btn">🔍</button>
+            <button class="icon-btn">❤️</button>
+            <button class="icon-btn">🛒</button>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Noch Omni</h1>
+            <p>All-in-one Management Platform</p>
+            <div class="hero-nochi">🐰</div>
+            <p style="font-size: 1.1rem; color: #666;">Discover our curated collection of premium products</p>
+            <button class="cta-btn"><span>Start Shopping Now</span></button>
+        </div>
+    </section>
+
+    <!-- CATEGORIES -->
+    <section class="categories">
+        <h2 class="section-title">Shop by Category</h2>
+        <div class="category-grid">
+            <div class="category-card">
+                <div class="category-icon">☕</div>
+                <h3>Beverages</h3>
+                <p>Fresh coffee, tea & more</p>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🍰</div>
+                <h3>Food & Bakery</h3>
+                <p>Delicious treats daily</p>
+            </div>
+            <div class="category-card">
+                <div class="category-icon">🎁</div>
+                <h3>Merchandise</h3>
+                <p>Exclusive Noch products</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- PRODUCTS -->
+    <section class="products" id="products">
+        <h2 class="section-title">Featured Products</h2>
+        <div class="product-grid">
+            <div class="product-card">
+                <div class="product-image">☕</div>
+                <div class="product-info">
+                    <div class="product-name">Premium Coffee Blend</div>
+                    <div class="product-desc">Single origin, medium roast</div>
+                    <div class="product-footer">
+                        <span class="price">$12.99</span>
+                        <button class="add-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🍵</div>
+                <div class="product-info">
+                    <div class="product-name">Green Tea Selection</div>
+                    <div class="product-desc">Organic, fresh leaf tea</div>
+                    <div class="product-footer">
+                        <span class="price">$8.99</span>
+                        <button class="add-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🥐</div>
+                <div class="product-info">
+                    <div class="product-name">Fresh Croissants</div>
+                    <div class="product-desc">Baked daily, butter goodness</div>
+                    <div class="product-footer">
+                        <span class="price">$6.99</span>
+                        <button class="add-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🍪</div>
+                <div class="product-info">
+                    <div class="product-name">Artisan Cookies</div>
+                    <div class="product-desc">Handmade with love</div>
+                    <div class="product-footer">
+                        <span class="price">$7.99</span>
+                        <button class="add-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🥤</div>
+                <div class="product-info">
+                    <div class="product-name">Cold Brew Concentrate</div>
+                    <div class="product-desc">Ready to mix, premium blend</div>
+                    <div class="product-footer">
+                        <span class="price">$14.99</span>
+                        <button class="add-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="product-card">
+                <div class="product-image">🎁</div>
+                <div class="product-info">
+                    <div class="product-name">Noch Gift Set</div>
+                    <div class="product-desc">Perfect for gifting</div>
+                    <div class="product-footer">
+                        <span class="price">$29.99</span>
+                        <button class="add-btn">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- COLOR PALETTE -->
+    <section class="palette">
+        <h2 class="section-title">Brand Color Palette</h2>
+        <div class="palette-grid">
+            <div class="color-swatch">
+                <div class="swatch-color" style="background: #0052CC;">Cobalt Blue</div>
+                <div class="swatch-label">#0052CC</div>
+            </div>
+            <div class="color-swatch">
+                <div class="swatch-color" style="background: #FF9500;">Orange</div>
+                <div class="swatch-label">#FF9500</div>
+            </div>
+            <div class="color-swatch">
+                <div class="swatch-color" style="background: #E91E63;">Pink</div>
+                <div class="swatch-label">#E91E63</div>
+            </div>
+            <div class="color-swatch">
+                <div class="swatch-color" style="background: #001A4D;">Dark Navy</div>
+                <div class="swatch-label">#001A4D</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <h3>Noch Omni</h3>
+        <p>All-in-one Management Platform</p>
+        <p>© 2026 Noch. All rights reserved.</p>
+        <div class="social-links">
+            <button class="social-btn">f</button>
+            <button class="social-btn">𝕏</button>
+            <button class="social-btn">📷</button>
+            <button class="social-btn">▶️</button>
+        </div>
+    </footer>
+</body>
+</html>
