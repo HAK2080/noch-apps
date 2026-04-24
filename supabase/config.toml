@@ -1,0 +1,23 @@
+[functions.auto-research]
+verify_jwt = false
+
+[functions.analyze-brand]
+verify_jwt = false
+
+[functions.generate-content]
+verify_jwt = false
+
+[functions.process-sales-data]
+verify_jwt = false
+
+[functions.extract-inventory]
+verify_jwt = false
+
+[functions.check-web-prices]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.process-reminders]
+verify_jwt = false
