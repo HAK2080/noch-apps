@@ -34,6 +34,8 @@ const FEATURE_GROUPS = [
       { key: 'cost_calculator', label: 'Cost Calculator' },
       { key: 'staff_salaries', label: 'Staff Salaries' },
       { key: 'reports', label: 'Reports' },
+      { key: 'expenses', label: 'Expenses — Submit & View Own' },
+      { key: 'expenses_approve', label: 'Expenses — Approve & Dashboard' },
     ],
   },
   {
@@ -128,7 +130,7 @@ export default function RoleManager() {
 
   const handleApprove = async (staff) => {
     try {
-      await approveRoleChange(staff.id)
+      await approveRoleChange(staff.id, staff.role_requested)
       setRequests(prev => prev.filter(r => r.id !== staff.id))
       toast.success(`${staff.full_name} approved for ${staff.role_requested}`)
     } catch (err) {

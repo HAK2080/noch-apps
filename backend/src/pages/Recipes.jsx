@@ -167,13 +167,14 @@ export default function Recipes() {
         await updateRecipe(editingRecipe.id, updates)
         toast.success(t('recipeSaved'))
       } else {
-        await createRecipe(payload)
+        const { created_by, ...createPayload } = payload
+        await createRecipe(createPayload)
         toast.success(t('recipeCreated'))
       }
       setShowForm(false)
       setEditingRecipe(null)
       load()
-    } catch { toast.error(t('error')) }
+    } catch (err) { toast.error(err.message || t('error')) }
   }
 
   const handleArchive = async (id) => {

@@ -40,7 +40,16 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
   })
   const [saving, setSaving] = useState(false)
   const [showPin, setShowPin] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [sendWhatsAppInvite, setSendWhatsAppInvite] = useState(!isEdit)
+  const [email, setEmail] = useState(isEdit ? (staff.email || '') : '')
+  const [password, setPassword] = useState('')
+  const [provisionMode, setProvisionMode] = useState('password') // 'password' | 'invite'
+  const [resetMode, setResetMode] = useState('set') // 'set' | 'email'
+  const [newPassword, setNewPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const photoRef = useRef(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -51,16 +60,40 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
     setUploadingPhoto(true)
     try {
       const ext = file.name.split('.').pop()
-      const path = `staff/${Date.now()}.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('attachments').upload(path, file, { upsert: true })
+      const path = `${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('staff-photos').upload(path, file, { upsert: true })
       if (uploadErr) throw uploadErr
-      const { data } = supabase.storage.from('attachments').getPublicUrl(path)
+      const { data } = supabase.storage.from('staff-photos').getPublicUrl(path)
       set('photo_url', data.publicUrl)
       toast.success('Photo uploaded')
     } catch (err) {
       toast.error(err.message || 'Upload failed')
     } finally {
       setUploadingPhoto(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (resetMode === 'set' && newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters'); return
+    }
+    setResetting(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-staff-password', {
+        body: { staffId: staff.id, newPassword: resetMode === 'set' ? newPassword : undefined, mode: resetMode },
+      })
+      if (error) {
+        let msg = error.message
+        try { const b = await error.context?.json(); msg = b?.error || msg } catch {}
+        throw new Error(msg)
+      }
+      if (data?.error) throw new Error(data.error)
+      toast.success(resetMode === 'set' ? 'Password updated' : 'Reset email sent')
+      setNewPassword('')
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -89,10 +122,27 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
       }
 
       if (isEdit) {
+        if (email.trim()) payload.email = email.trim()
         await updateProfile(staff.id, payload)
       } else {
-        await createStaffProfile(form.full_name.trim(), form.telegram_chat_id.trim())
-        // updateProfile for extra fields would need the new id — handled by onSave reload
+        if (!email.trim()) { toast.error('Email required for login'); setSaving(false); return }
+        if (provisionMode === 'password' && password.length < 6) {
+          toast.error('Password must be at least 6 characters'); setSaving(false); return
+        }
+        const { data, error } = await supabase.functions.invoke('provision-staff', {
+          body: { email: email.trim(), password, mode: provisionMode, profile: payload },
+        })
+        if (error || data?.error) throw new Error(data?.error || error.message)
+
+        if (sendWhatsAppInvite && payload.phone) {
+          const digits = payload.phone.replace(/\D/g, '')
+          const loginUrl = 'https://apps.noch.cloud'
+          const credsBlock = provisionMode === 'password'
+            ? `Login: ${loginUrl}\nEmail: ${email.trim()}\nPassword: ${password}\n\n`
+            : `Check your email (${email.trim()}) for a link to set your password, then log in at:\n${loginUrl}\n\n`
+          const msg = `Hi ${payload.full_name} 👋\n\nYou've been added to the Noch team.\n\n${credsBlock}To receive tasks & reminders on Telegram, also tap Start here:\nhttps://t.me/Noch_bot\n\n— noch omni`
+          window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, '_blank')
+        }
       }
       toast.success(isEdit ? 'Updated' : 'Staff added')
       onSave()
@@ -226,11 +276,177 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
             <p className="text-xs text-noch-muted mt-1">4-6 digit PIN for POS terminal login</p>
           </div>
 
+          {/* Login account management — only on Edit */}
+          {isEdit && (
+            <div className="border border-noch-border rounded-xl p-3 space-y-3 bg-noch-dark/40">
+              <p className="text-xs text-noch-muted uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                <Shield size={11} /> Login Account
+              </p>
+              <div>
+                <label className="label">Email</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="staff@noch.ly"
+                  autoComplete="off"
+                />
+                {email && (
+                  <p className="text-xs text-noch-muted mt-1">Changing email here only updates the profile record — use Supabase dashboard to change the auth login email.</p>
+                )}
+              </div>
+              <div>
+                <label className="label">Reset Password</label>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetMode('set')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${resetMode === 'set' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
+                  >
+                    Set New Password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResetMode('email')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${resetMode === 'email' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
+                  >
+                    Send Reset Email
+                  </button>
+                </div>
+                {resetMode === 'set' ? (
+                  <div className="flex gap-2">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      className="input flex-1 font-mono"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="New password (min 6 chars)"
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowNewPassword(p => !p)} className="px-3 text-noch-muted hover:text-white">
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewPassword(Math.random().toString(36).slice(2, 10))}
+                      className="px-3 text-xs text-noch-green border border-noch-green/30 rounded-lg hover:bg-noch-green/10"
+                    >
+                      Gen
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-noch-muted">Will send a password reset link to their email.</p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={resetting || (resetMode === 'set' && newPassword.length < 6)}
+                  className="mt-2 w-full px-3 py-2 rounded-lg text-xs border border-noch-border text-noch-muted hover:text-white hover:border-noch-green/40 transition-colors disabled:opacity-40"
+                >
+                  {resetting ? 'Processing...' : resetMode === 'set' ? 'Update Password' : 'Send Reset Email'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Login credentials — only on Add */}
+          {!isEdit && (
+            <div className="border border-noch-border rounded-xl p-3 space-y-3 bg-noch-dark/40">
+              <p className="text-xs text-noch-muted uppercase tracking-wider font-semibold">Login Credentials</p>
+              <div>
+                <label className="label">Email *</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="staff@noch.ly"
+                  autoComplete="off"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Account Setup</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProvisionMode('password')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${provisionMode === 'password' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
+                  >
+                    Set Password Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProvisionMode('invite')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${provisionMode === 'invite' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
+                  >
+                    Email Invite Link
+                  </button>
+                </div>
+              </div>
+              {provisionMode === 'password' && (
+                <div>
+                  <label className="label">Password * <span className="text-noch-muted font-normal">(min 6 chars)</span></label>
+                  <div className="flex gap-2">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      className="input flex-1 font-mono"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      minLength={6}
+                      autoComplete="new-password"
+                      placeholder="At least 6 characters"
+                    />
+                    <button type="button" onClick={() => setShowPassword(p => !p)} className="px-3 text-noch-muted hover:text-white">
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPassword(Math.random().toString(36).slice(2, 10))}
+                      className="px-3 text-xs text-noch-green border border-noch-green/30 rounded-lg hover:bg-noch-green/10"
+                      title="Generate random password"
+                    >
+                      Gen
+                    </button>
+                  </div>
+                </div>
+              )}
+              {provisionMode === 'invite' && (
+                <p className="text-xs text-noch-muted">Staff will receive an email with a link to set their own password.</p>
+              )}
+            </div>
+          )}
+
           {/* Telegram */}
           <div>
             <label className="label">Telegram Chat ID</label>
             <input className="input" value={form.telegram_chat_id} onChange={e => set('telegram_chat_id', e.target.value)} placeholder="e.g. 123456789" />
           </div>
+
+          {/* Auto-invite toggle — only on Add */}
+          {!isEdit && (
+            <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${form.phone ? 'border-noch-border hover:border-noch-green/40' : 'border-noch-border/40 opacity-60 cursor-not-allowed'}`}>
+              <input
+                type="checkbox"
+                checked={sendWhatsAppInvite && !!form.phone}
+                disabled={!form.phone}
+                onChange={e => setSendWhatsAppInvite(e.target.checked)}
+                className="w-4 h-4 accent-noch-green mt-0.5"
+              />
+              <div className="flex-1">
+                <p className="text-sm text-white font-medium flex items-center gap-1.5">
+                  <Send size={13} className="text-noch-green" />
+                  Send WhatsApp invite with Telegram bot link
+                </p>
+                <p className="text-xs text-noch-muted mt-0.5">
+                  {form.phone
+                    ? `Opens WhatsApp to ${form.phone} with a welcome message + t.me/Noch_bot link`
+                    : 'Add a phone number above to enable this'}
+                </p>
+              </div>
+            </label>
+          )}
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-noch-border mt-4">

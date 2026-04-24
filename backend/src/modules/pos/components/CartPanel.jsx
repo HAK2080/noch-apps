@@ -87,7 +87,7 @@ export default function CartPanel({ items = [], onUpdateQty, onRemove, onDiscoun
   const canVoidOrder = can('pos', 'void_order')
 
   const [discountType, setDiscountType] = useState('pct') // 'pct' | 'flat'
-  const [discountValue, setDiscountValue] = useState('10')
+  const [discountValue, setDiscountValue] = useState('')
   const [showDiscount, setShowDiscount] = useState(false)
 
   const MAX_DISCOUNT_PCT = canDiscountAny ? Infinity : 10

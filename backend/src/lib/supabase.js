@@ -84,15 +84,15 @@ export async function getStaffProfiles() {
   return data
 }
 
-export async function createStaffProfile(name, telegramChatId) {
+export async function createStaffProfile(nameOrPayload, telegramChatId) {
   const id = crypto.randomUUID()
-  const { data, error } = await supabase
-    .from('profiles')
-    .insert({ id, full_name: name, telegram_chat_id: telegramChatId || null, role: 'staff' })
-    .select()
-    .single()
+  const payload = typeof nameOrPayload === 'string'
+    ? { full_name: nameOrPayload, telegram_chat_id: telegramChatId || null }
+    : { ...nameOrPayload }
+  const row = { id, role: 'staff', ...payload }
+  const { error } = await supabase.from('profiles').insert(row)
   if (error) throw error
-  return data
+  return row
 }
 
 export async function updateProfile(id, updates) {
@@ -100,10 +100,9 @@ export async function updateProfile(id, updates) {
     .from('profiles')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .select()
-    .single()
+    .select('id')
   if (error) throw error
-  return data
+  if (!data || data.length === 0) throw new Error('Save blocked — check permissions (RLS). Contact admin.')
 }
 
 export async function deleteProfile(id) {
@@ -258,11 +257,10 @@ export async function getDashboardAlerts() {
       .neq('status', 'done')
       .order('due_date', { ascending: true, nullsFirst: false }),
 
-    // Low stock items (qty below threshold)
+    // Low stock items — fetch all stock, filter in JS below
     supabase
       .from('stock')
-      .select('id, qty_available, min_threshold, unit, ingredient:ingredients(id, name, name_ar, category)')
-      .filter('qty_available', 'lt', supabase.rpc ? undefined : 0), // handled below
+      .select('id, qty_available, min_threshold, unit, ingredient:ingredients(id, name, name_ar, category)'),
 
     // Pending online orders
     supabase
@@ -2070,9 +2068,8 @@ export const requestRoleChange = async (staffId, requestedRole) => {
   const { error } = await supabase.from('profiles').update({ role_requested: requestedRole, role_approved: false }).eq('id', staffId)
   if (error) throw error
 }
-export const approveRoleChange = async (staffId) => {
-  const { data } = await supabase.from('profiles').select('role_requested').eq('id', staffId).single()
-  const { error } = await supabase.from('profiles').update({ role: data.role_requested, role_requested: null, role_approved: true }).eq('id', staffId)
+export const approveRoleChange = async (staffId, role) => {
+  const { error } = await supabase.from('profiles').update({ role, role_requested: null, role_approved: true }).eq('id', staffId)
   if (error) throw error
 }
 export const denyRoleChange = async (staffId) => {

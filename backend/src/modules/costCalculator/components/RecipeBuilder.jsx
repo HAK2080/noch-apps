@@ -5,9 +5,10 @@ import {
   createRecipe, updateRecipe, getRecipe
 } from '../../../lib/supabase'
 import {
-  Plus, Trash2, Save, ArrowLeft, X, GripVertical, Calculator, TrendingUp
+  Plus, Trash2, Save, ArrowLeft, X, GripVertical, Calculator, TrendingUp, ShoppingBag
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { getPOSBranches, getPOSProducts, createPOSProduct, updatePOSProduct } from '../../pos/lib/pos-supabase'
 
 export default function RecipeBuilder() {
   const { id } = useParams()
@@ -25,6 +26,7 @@ export default function RecipeBuilder() {
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState([])
   const [saving, setSaving] = useState(false)
+  const [showSaveAsProduct, setShowSaveAsProduct] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -409,7 +411,7 @@ export default function RecipeBuilder() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <button
           onClick={handleSave}
           disabled={saving}
@@ -418,6 +420,16 @@ export default function RecipeBuilder() {
           <Save className="w-4 h-4" />
           {saving ? 'Saving...' : isEditing ? 'Update Recipe' : 'Save Recipe'}
         </button>
+        {isEditing && totalCost > 0 && (
+          <button
+            onClick={() => setShowSaveAsProduct(true)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: 'rgba(74,222,128,0.1)', color: '#4ADE80', border: '1px solid rgba(74,222,128,0.25)' }}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            Save as Product
+          </button>
+        )}
         <button
           onClick={handleDrop}
           className="neon-btn-danger flex items-center gap-2"
@@ -425,6 +437,109 @@ export default function RecipeBuilder() {
           <X className="w-4 h-4" />
           {isEditing ? 'Cancel' : 'Drop'}
         </button>
+      </div>
+
+      {showSaveAsProduct && (
+        <SaveAsProductModal
+          recipeName={name}
+          recipeId={id}
+          calculatedCost={totalCost}
+          onClose={() => setShowSaveAsProduct(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function SaveAsProductModal({ recipeName, recipeId, calculatedCost, onClose }) {
+  const [branches, setBranches] = useState([])
+  const [branchId, setBranchId] = useState('')
+  const [salePrice, setSalePrice] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    getPOSBranches().then(b => { setBranches(b); if (b.length > 0) setBranchId(b[0].id) }).catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
+    if (!branchId) return toast.error('Select a branch')
+    if (!salePrice || parseFloat(salePrice) <= 0) return toast.error('Enter a sale price')
+    setSaving(true)
+    try {
+      // Check if a product with this recipe already exists in this branch
+      const existing = await getPOSProducts(branchId)
+      const match = existing.find(p => p.cost_recipe_id === recipeId)
+      const payload = {
+        name: recipeName,
+        price: parseFloat(salePrice),
+        cost_price: parseFloat(calculatedCost.toFixed(3)),
+        cost_recipe_id: recipeId,
+        branch_id: branchId,
+        is_active: true,
+      }
+      if (match) {
+        await updatePOSProduct(match.id, { price: payload.price, cost_price: payload.cost_price, cost_recipe_id: recipeId })
+        toast.success(`Updated "${recipeName}" in Products`)
+      } else {
+        await createPOSProduct(payload)
+        toast.success(`"${recipeName}" saved as product`)
+      }
+      onClose()
+    } catch (err) {
+      toast.error(err.message || 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const margin = salePrice && parseFloat(salePrice) > 0
+    ? ((parseFloat(salePrice) - calculatedCost) / parseFloat(salePrice) * 100).toFixed(1)
+    : null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: '#131318', border: '1px solid #1E2030' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-bold flex items-center gap-2"><ShoppingBag size={16} className="text-noch-green" /> Save as Product</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm py-2 border-b" style={{ borderColor: '#1E2030' }}>
+            <span className="text-zinc-400">Recipe</span>
+            <span className="text-white font-medium">{recipeName}</span>
+          </div>
+          <div className="flex justify-between text-sm py-2 border-b" style={{ borderColor: '#1E2030' }}>
+            <span className="text-zinc-400">Calculated Cost</span>
+            <span className="text-noch-green font-bold">{calculatedCost.toFixed(3)} LYD</span>
+          </div>
+
+          {branches.length > 1 && (
+            <div>
+              <label className="label">Branch</label>
+              <select value={branchId} onChange={e => setBranchId(e.target.value)} className="input">
+                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="label">Sale Price (LYD) *</label>
+            <input type="number" value={salePrice} onChange={e => setSalePrice(e.target.value)} className="input" placeholder="8.500" step="0.001" min="0" autoFocus />
+            {margin !== null && (
+              <p className={`text-xs mt-1 font-semibold ${parseFloat(margin) >= 50 ? 'text-emerald-400' : parseFloat(margin) >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
+                {margin}% gross margin · profit {(parseFloat(salePrice) - calculatedCost).toFixed(3)} LYD
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} className="btn-secondary flex-1 text-sm">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 text-sm">
+            {saving ? 'Saving…' : 'Save to Products'}
+          </button>
+        </div>
       </div>
     </div>
   )

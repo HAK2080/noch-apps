@@ -6,26 +6,19 @@ import LanguageToggle from '../components/shared/LanguageToggle'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const { signIn, signUp } = useAuth()
+  const { signIn } = useAuth()
   const { t, lang } = useLanguage()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     try {
-      if (isSignUp) {
-        await signUp(email, password)
-        toast.success(lang === 'ar' ? 'تم إنشاء الحساب! سجّل دخولك الآن.' : 'Account created! Please sign in.')
-        setIsSignUp(false)
-      } else {
-        await signIn(email, password)
-        navigate('/')
-      }
+      await signIn(email, password)
+      navigate('/')
     } catch (err) {
       toast.error(err.message || t('loginError'))
     } finally {
@@ -44,11 +37,7 @@ export default function Login() {
 
         {/* Card */}
         <div className="card">
-          <h2 className="text-white font-semibold text-center mb-5">
-            {isSignUp
-              ? (lang === 'ar' ? 'إنشاء حساب' : 'Create Account')
-              : t('login')}
-          </h2>
+          <h2 className="text-white font-semibold text-center mb-5">{t('login')}</h2>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
@@ -69,7 +58,7 @@ export default function Login() {
                 className="input"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                autoComplete="current-password"
                 required
                 minLength={6}
               />
@@ -79,20 +68,15 @@ export default function Login() {
               disabled={loading}
               className="btn-primary w-full mt-2"
             >
-              {loading ? t('loading') : isSignUp
-                ? (lang === 'ar' ? 'إنشاء الحساب' : 'Create Account')
-                : t('loginBtn')}
+              {loading ? t('loading') : t('loginBtn')}
             </button>
           </form>
 
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="w-full text-center text-noch-muted text-sm mt-4 hover:text-white transition-colors"
-          >
-            {isSignUp
-              ? (lang === 'ar' ? 'عندك حساب؟ سجّل دخول' : 'Already have an account? Sign in')
-              : (lang === 'ar' ? 'ما عندكش حساب؟ سجّل' : "Don't have an account? Sign up")}
-          </button>
+          <p className="text-center text-noch-muted text-xs mt-4">
+            {lang === 'ar'
+              ? 'هذا النظام داخلي — تواصل مع الإدارة للحصول على حساب'
+              : 'Internal system — contact admin to get an account'}
+          </p>
         </div>
 
         <div className="flex justify-center mt-6">

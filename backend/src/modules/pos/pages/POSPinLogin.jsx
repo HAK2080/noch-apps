@@ -48,7 +48,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         setPin('')
         return
       }
-      toast.success(`Welcome, ${data[0].full_name} 👋`)
+      toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)
       onSuccess(data[0])
     } catch (err) {
       setError('Verification failed')
@@ -73,7 +73,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           const { data } = await supabase.from('profiles').select('id, full_name, role, app_role_id, photo_url').eq('pin_code', hashed).eq('is_active', true).limit(1)
           setVerifying(false)
           if (data?.length) {
-            toast.success(`Welcome, ${data[0].full_name} 👋`)
+            toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)
             onSuccess(data[0])
           } else {
             setError('Incorrect PIN')

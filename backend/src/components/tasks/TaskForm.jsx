@@ -72,6 +72,7 @@ export default function TaskForm({ task, onSave, onCancel }) {
       is_group: form.is_group,
       has_attachments: pendingFiles.length > 0,
       notifyTelegram: canNotify && notifyTelegram,
+      created_by: user?.id || null,
     }
     onSave(payload, pendingFiles)
   }

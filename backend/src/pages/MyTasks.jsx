@@ -58,7 +58,9 @@ export default function MyTasks() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-white font-bold text-xl">{t('myTasks')}</h1>
-        <p className="text-noch-muted text-sm">{lang === 'ar' ? `أهلاً ${profile?.full_name}` : `Welcome, ${profile?.full_name}`}</p>
+        {profile?.full_name && (
+          <p className="text-noch-muted text-sm">{lang === 'ar' ? `أهلاً ${profile.full_name}` : `Welcome, ${profile.full_name}`}</p>
+        )}
       </div>
 
       {loading ? (

@@ -1,7 +1,7 @@
 {
   "name": "noch-task-manager",
   "private": true,
-  "version": "3.2.0",
+  "version": "3.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.88.0",
     "@supabase/supabase-js": "^2.101.1",
     "@zxing/browser": "^0.1.5",
+    "dotenv": "^17.4.2",
     "html5-qrcode": "^2.3.8",
     "idb": "^8.0.3",
     "lucide-react": "^1.7.0",

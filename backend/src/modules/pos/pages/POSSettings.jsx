@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList } from 'lucide-react'
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift } from '../lib/pos-supabase'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected,
@@ -294,6 +294,25 @@ export default function POSSettings() {
               className="btn-primary text-xs px-3 py-1"
             >
               Manage
+            </button>
+          </div>
+        </div>
+
+        {/* Stock Check quick link */}
+        <div className="card mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ClipboardList size={16} className="text-noch-green" />
+              <div>
+                <h2 className="text-white font-semibold">Weekly Stock Check</h2>
+                <p className="text-noch-muted text-xs mt-0.5">Critical / Important / Low priority items</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/pos/${branchId}/stock-check`)}
+              className="btn-primary text-xs px-3 py-1"
+            >
+              Open
             </button>
           </div>
         </div>

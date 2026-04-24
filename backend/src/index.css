@@ -3,82 +3,183 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --accent: #4ADE80;
+    --accent-dim: #22C55E;
+    --accent-glow: rgba(74, 222, 128, 0.10);
+    --accent-border: rgba(74, 222, 128, 0.20);
+    --bg: #09090B;
+    --surface: #0F1013;
+    --card: #131318;
+    --border: #1E2030;
+    --border-bright: #2D3050;
+    --text: #F4F4F5;
+    --muted: #71717A;
+  }
+
   * {
     box-sizing: border-box;
   }
 
   body {
     margin: 0;
-    background-color: #0A0A0A;
-    color: #F9FAFB;
-    font-family: 'Cairo', sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', 'Cairo', sans-serif;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Space Grotesk', 'Outfit', 'Cairo', sans-serif;
+    letter-spacing: -0.025em;
   }
 
   #root {
     min-height: 100svh;
   }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-noch-green text-noch-dark font-semibold px-4 py-2 rounded-xl hover:bg-green-300 transition-colors;
+    @apply relative inline-flex items-center justify-center gap-2 font-semibold px-4 py-2 rounded-xl transition-all duration-200 text-sm;
+    background: linear-gradient(135deg, #4ADE80 0%, #22C55E 100%);
+    color: #09090B;
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 20px rgba(74, 222, 128, 0.25);
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+    filter: brightness(0.96);
   }
 
   .btn-secondary {
-    @apply bg-noch-card border border-noch-border text-white font-medium px-4 py-2 rounded-xl hover:bg-noch-border transition-colors;
+    @apply inline-flex items-center justify-center gap-2 font-medium px-4 py-2 rounded-xl transition-all duration-200 text-sm;
+    background: var(--card);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+  }
+  .btn-secondary:hover {
+    background: var(--card-hover, #1A1A22);
+    border-color: var(--border-bright);
+    color: #fff;
   }
 
   .btn-danger {
-    @apply bg-red-500/10 border border-red-500/30 text-red-400 font-medium px-4 py-2 rounded-xl hover:bg-red-500/20 transition-colors;
+    @apply inline-flex items-center justify-center gap-2 font-medium px-4 py-2 rounded-xl transition-all duration-200 text-sm;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #F87171;
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.15);
   }
 
   .card {
-    @apply bg-noch-card border border-noch-border rounded-2xl p-4;
+    @apply rounded-2xl p-4;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .card:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   }
 
   .input {
-    @apply bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white w-full focus:outline-none focus:border-noch-green transition-colors placeholder:text-noch-muted;
+    @apply w-full rounded-xl px-4 py-2.5 text-sm transition-all duration-200;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    outline: none;
+  }
+  .input::placeholder { color: var(--muted); }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
   }
 
   .label {
-    @apply text-sm text-noch-muted mb-1 block;
+    @apply text-xs font-medium mb-1.5 block;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
-  /* Date input — fix calendar icon visibility on dark bg */
+  /* Date picker dark fix */
   input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1) opacity(0.6);
+    filter: invert(1) opacity(0.5);
     cursor: pointer;
   }
   input[type="date"]::-webkit-calendar-picker-indicator:hover {
-    filter: invert(1) opacity(1);
+    filter: invert(1) opacity(0.9);
   }
 
+  /* Priority badges */
   .badge-urgent {
-    @apply bg-red-500/15 text-red-400 border border-red-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(239, 68, 68, 0.12);
+    color: #F87171;
+    border: 1px solid rgba(239, 68, 68, 0.25);
   }
-
   .badge-high {
-    @apply bg-orange-500/15 text-orange-400 border border-orange-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(249, 115, 22, 0.12);
+    color: #FB923C;
+    border: 1px solid rgba(249, 115, 22, 0.25);
   }
-
   .badge-medium {
-    @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(234, 179, 8, 0.12);
+    color: #FCD34D;
+    border: 1px solid rgba(234, 179, 8, 0.25);
   }
-
   .badge-low {
-    @apply bg-zinc-500/15 text-zinc-400 border border-zinc-500/30 text-xs font-semibold px-2 py-0.5 rounded-full;
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(113, 113, 122, 0.12);
+    color: #A1A1AA;
+    border: 1px solid rgba(113, 113, 122, 0.25);
   }
 
+  /* Status badges */
   .badge-pending {
-    @apply bg-zinc-500/15 text-zinc-400 text-xs font-semibold px-2 py-0.5 rounded-full;
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(113, 113, 122, 0.12);
+    color: #A1A1AA;
   }
-
   .badge-in_progress {
-    @apply bg-blue-500/15 text-blue-400 text-xs font-semibold px-2 py-0.5 rounded-full;
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(99, 102, 241, 0.12);
+    color: #818CF8;
+  }
+  .badge-done {
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ADE80;
   }
 
-  .badge-done {
-    @apply bg-green-500/15 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full;
+  /* Page heading utility */
+  .page-title {
+    @apply text-2xl font-bold tracking-tight;
+    font-family: 'Space Grotesk', 'Outfit', sans-serif;
+    color: #F4F4F5;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply rounded-2xl p-5;
+    background: var(--card);
+    border: 1px solid var(--border);
   }
 }

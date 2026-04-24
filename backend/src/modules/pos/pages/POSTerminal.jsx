@@ -21,18 +21,69 @@ import PaymentModal from '../components/PaymentModal'
 import ReceiptModal from '../components/ReceiptModal'
 import BarcodeScanner from '../components/BarcodeScanner'
 import { useAuth } from '../../../contexts/AuthContext'
-import { usePermission } from '../../../lib/usePermission'
 import toast from 'react-hot-toast'
 
 let itemIdCounter = 0
 function newItemId() { return ++itemIdCounter }
 
+function OnlineOrderRow({ order, branchId, onConfirmed }) {
+  const [confirming, setConfirming] = useState(false)
+
+  const handleConfirm = async () => {
+    setConfirming(true)
+    try {
+      const { data, error } = await supabase.rpc('confirm_pickup_order', {
+        p_pickup_code: order.pickup_code,
+        p_branch_id: branchId,
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      toast.success(`Order ${order.order_number} confirmed`)
+      onConfirmed()
+    } catch (err) {
+      toast.error(err.message || 'Confirm failed')
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  return (
+    <div className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm border ${
+      order.awaiting_staff_confirm
+        ? 'bg-yellow-500/10 border-yellow-500/30'
+        : 'bg-noch-dark border-transparent'
+    }`}>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-noch-green font-mono text-xs">{order.order_number}</span>
+        <span className="text-white">{order.customer_name || 'Guest'}</span>
+        {order.table_number && <span className="text-yellow-400 text-xs">📍 Table {order.table_number}</span>}
+        {order.awaiting_staff_confirm && order.pickup_code && (
+          <span className="text-yellow-300 text-xs font-mono tracking-widest">CODE: {order.pickup_code}</span>
+        )}
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <span className="text-white font-semibold">{Number(order.total).toFixed(2)} LYD</span>
+        <span className="text-noch-muted text-xs">
+          {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+        {order.awaiting_staff_confirm && (
+          <button
+            onClick={handleConfirm}
+            disabled={confirming}
+            className="bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-full transition-colors disabled:opacity-50"
+          >
+            {confirming ? '…' : 'Confirm'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function POSTerminal() {
   const { branchId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const can = usePermission()
-  const canEndOfDay = can('pos', 'end_of_day')
 
   const [branch, setBranch] = useState(null)
   const [products, setProducts] = useState([])
@@ -116,10 +167,10 @@ export default function POSTerminal() {
       try {
         const { data, error: err } = await supabase
           .from('pos_orders')
-          .select('id,order_number,customer_name,total,table_number,created_at')
+          .select('id,order_number,customer_name,total,table_number,created_at,awaiting_staff_confirm,pickup_code')
           .eq('branch_id', branchId)
           .eq('source', 'online')
-          .eq('status', 'pending')
+          .in('status', ['pending', 'pending_confirm'])
           .order('created_at', { ascending: false })
           .limit(10)
 
@@ -306,12 +357,13 @@ export default function POSTerminal() {
         <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white">
           <ScanLine size={18} />
         </button>
-        {canEndOfDay && (
-          <button onClick={() => navigate(`/pos/${branchId}/end-of-day`)} className="p-2 text-noch-muted hover:text-white" title="End of Day">
-            <ClipboardList size={18} />
-          </button>
-        )}
-        <button onClick={() => navigate(`/pos/${branchId}/settings`)} className="p-2 text-noch-muted hover:text-white">
+        <button onClick={() => navigate(`/pos/${branchId}/stock-check`)} className="p-2 text-noch-muted hover:text-white" title="Stock Check">
+          <ClipboardList size={18} />
+        </button>
+        <button onClick={() => navigate(`/pos/${branchId}/end-of-day`)} className="p-2 text-noch-muted hover:text-white" title="End of Day">
+          <ShoppingBag size={18} />
+        </button>
+        <button onClick={() => navigate(`/pos/${branchId}/settings`)} className="p-2 text-noch-muted hover:text-white" title="Settings">
           <Settings size={18} />
         </button>
 
@@ -337,24 +389,12 @@ export default function POSTerminal() {
           {onlineOrders.length > 0 ? (
             <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
               {onlineOrders.map(order => (
-                <div
+                <OnlineOrderRow
                   key={order.id}
-                  className="flex items-center justify-between bg-noch-dark rounded-lg px-3 py-2 text-sm"
-                >
-                  <div className="flex flex-col">
-                    <span className="text-noch-green font-mono text-xs">{order.order_number}</span>
-                    <span className="text-white">{order.customer_name || 'Guest'}</span>
-                    {order.table_number && (
-                      <span className="text-yellow-400 text-xs">📍 Table {order.table_number}</span>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-white font-semibold">{Number(order.total).toFixed(2)} LYD</span>
-                    <p className="text-noch-muted text-xs">
-                      {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
+                  order={order}
+                  branchId={branchId}
+                  onConfirmed={() => setOnlineOrders(prev => prev.filter(o => o.id !== order.id))}
+                />
               ))}
             </div>
           ) : (

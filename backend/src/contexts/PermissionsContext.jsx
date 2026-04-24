@@ -6,7 +6,13 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
 import { supabase } from '../lib/supabase'
 
-const PermissionsContext = createContext({})
+const PermissionsContext = createContext({
+  hasAccess: () => false,
+  canEdit:   () => false,
+  loading:   false,
+  isOwner:   false,
+  permissions: {},
+})
 
 export function PermissionsProvider({ children }) {
   const { user, profile } = useAuth()

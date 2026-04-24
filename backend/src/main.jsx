@@ -13,24 +13,27 @@ createRoot(document.getElementById('root')).render(
     <LanguageProvider>
       <AuthProvider>
         <PermissionProvider>
-        <PermissionsProvider>
-        <App />
-        </PermissionsProvider>
+          <PermissionsProvider>
+          <App />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              style: {
+                background: '#131318',
+                color: '#F4F4F5',
+                border: '1px solid #2D3050',
+                borderRadius: '14px',
+                fontFamily: "'Outfit', 'Cairo', sans-serif",
+                fontSize: '14px',
+                padding: '12px 16px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              },
+              success: { iconTheme: { primary: '#4ADE80', secondary: '#09090B' } },
+              error: { iconTheme: { primary: '#F87171', secondary: '#09090B' } },
+            }}
+          />
+          </PermissionsProvider>
         </PermissionProvider>
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: '#141414',
-              color: '#F9FAFB',
-              border: '1px solid #242424',
-              borderRadius: '12px',
-              fontFamily: 'Cairo, sans-serif',
-            },
-            success: { iconTheme: { primary: '#4ADE80', secondary: '#0A0A0A' } },
-            error: { iconTheme: { primary: '#F87171', secondary: '#0A0A0A' } },
-          }}
-        />
       </AuthProvider>
     </LanguageProvider>
   </StrictMode>,

@@ -13,7 +13,10 @@ import Recipes from './pages/Recipes'
 import RecipeDetail from './pages/RecipeDetail'
 import CostCalculator from './pages/CostCalculator'
 
-// Content Studio
+// Content Studio 2.0 (Noch 4.0)
+import ContentStudio2 from './modules/contentStudio'
+
+// Content Studio (legacy — kept for backward-compat)
 import ContentStudio from './pages/content/ContentStudio'
 import Studio from './pages/content/Studio'
 import BrandSetup from './pages/content/BrandSetup'
@@ -21,15 +24,15 @@ import BrandDetail from './pages/content/BrandDetail'
 import ReviewQueue from './pages/content/ReviewQueue'
 import IdeaBank from './pages/content/IdeaBank'
 
+// Product Catalog
+import ProductCatalog from './pages/ProductCatalog'
+
 // Inventory & Analytics
 import InventoryHub from './pages/InventoryHub'
 import StockManager from './pages/inventory/StockManager'
-import Suppliers from './pages/inventory/Suppliers'
 import ProcurementOrders from './pages/inventory/ProcurementOrders'
-import AnalyticsDashboard from './pages/analytics/AnalyticsDashboard'
-
-// Staff / Roles
-import RoleManager from './pages/staff/RoleManager'
+import StockCheckAll from './pages/StockCheckAll'
+import BusinessAnalytics from './pages/BusinessAnalytics'
 
 // POS System
 import POSHome from './modules/pos/pages/POSHome'
@@ -38,7 +41,7 @@ import POSEndOfDay from './modules/pos/pages/POSEndOfDay'
 import POSInventory from './modules/pos/pages/POSInventory'
 import POSSettings from './modules/pos/pages/POSSettings'
 import POSProducts from './modules/pos/pages/POSProducts'
-import POSPinLogin from './modules/pos/pages/POSPinLogin'
+import POSStockCheck from './modules/pos/pages/POSStockCheck'
 import TableQRGenerator from './pages/TableQRGenerator'
 
 // Ideas
@@ -56,13 +59,9 @@ import LoyaltyRewards from './modules/loyalty/pages/LoyaltyRewards'
 import LoyaltyQR from './modules/loyalty/pages/LoyaltyQR'
 import LoyaltySettings from './modules/loyalty/pages/LoyaltySettings'
 import LoyaltyLeaderboard from './modules/loyalty/pages/LoyaltyLeaderboard'
-import LoyaltyStamp from './modules/loyalty/pages/LoyaltyStamp'
-import LoyaltyGestures from './modules/loyalty/pages/LoyaltyGestures'
-import LoyaltySpinWheel from './modules/loyalty/pages/LoyaltySpinWheel'
 import MyCard from './modules/loyalty/customer/MyCard'
 
-// Sales
-import Sales from './pages/Sales'
+import ExpensesPage from './pages/expenses/ExpensesPage'
 
 // Storefront (Public)
 import Menu from './pages/storefront/Menu'
@@ -119,9 +118,6 @@ export default function App() {
         <Route path="/staff" element={
           <ProtectedRoute><OwnerRoute><Staff /></OwnerRoute></ProtectedRoute>
         } />
-        <Route path="/staff/roles" element={
-          <ProtectedRoute><OwnerRoute><RoleManager /></OwnerRoute></ProtectedRoute>
-        } />
 
         <Route path="/report" element={
           <ProtectedRoute><OwnerRoute><Report /></OwnerRoute></ProtectedRoute>
@@ -139,11 +135,20 @@ export default function App() {
           <ProtectedRoute><Recipes /></ProtectedRoute>
         } />
 
-        <Route path="/cost-calculator" element={
+        <Route path="/cost-calculator/*" element={
           <ProtectedRoute><OwnerRoute><CostCalculator /></OwnerRoute></ProtectedRoute>
         } />
 
-        {/* Content Studio */}
+        <Route path="/expenses/*" element={
+          <ProtectedRoute><OwnerRoute><ExpensesPage /></OwnerRoute></ProtectedRoute>
+        } />
+
+        {/* Content Studio 2.0 (Noch 4.0) */}
+        <Route path="/content-studio/*" element={
+          <ProtectedRoute><OwnerRoute><ContentStudio2 /></OwnerRoute></ProtectedRoute>
+        } />
+
+        {/* Content Studio (legacy) */}
         <Route path="/content" element={
           <ProtectedRoute><OwnerRoute><ContentStudio /></OwnerRoute></ProtectedRoute>
         } />
@@ -171,17 +176,19 @@ export default function App() {
         <Route path="/content/calendar" element={<Navigate to="/content" replace />} />
         <Route path="/content/experiments" element={<Navigate to="/content" replace />} />
 
+        {/* Product Catalog */}
+        <Route path="/products" element={
+          <ProtectedRoute><OwnerRoute><ProductCatalog /></OwnerRoute></ProtectedRoute>
+        } />
+
         {/* Inventory (staff + owner) */}
         <Route path="/inventory" element={<ProtectedRoute><InventoryHub /></ProtectedRoute>} />
+        <Route path="/inventory/stock-check" element={<ProtectedRoute><StockCheckAll /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<ProtectedRoute><StockManager /></ProtectedRoute>} />
-        <Route path="/inventory/suppliers" element={<ProtectedRoute><OwnerRoute><Suppliers /></OwnerRoute></ProtectedRoute>} />
         <Route path="/inventory/procurement" element={<ProtectedRoute><OwnerRoute><ProcurementOrders /></OwnerRoute></ProtectedRoute>} />
 
         {/* Analytics (owner only) */}
-        <Route path="/analytics" element={<ProtectedRoute><OwnerRoute><AnalyticsDashboard /></OwnerRoute></ProtectedRoute>} />
-
-        {/* Sales */}
-        <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
@@ -191,10 +198,6 @@ export default function App() {
         <Route path="/loyalty/qr" element={<ProtectedRoute><LoyaltyQR /></ProtectedRoute>} />
         <Route path="/loyalty/settings" element={<ProtectedRoute><LoyaltySettings /></ProtectedRoute>} />
         <Route path="/loyalty/leaderboard" element={<ProtectedRoute><LoyaltyLeaderboard /></ProtectedRoute>} />
-        <Route path="/loyalty/stamp" element={<ProtectedRoute><LoyaltyStamp /></ProtectedRoute>} />
-        <Route path="/loyalty/gestures" element={<ProtectedRoute><LoyaltyGestures /></ProtectedRoute>} />
-        <Route path="/loyalty/spin" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
-        <Route path="/loyalty/spin/:customerId" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
 
         {/* Ideas Module */}
         <Route path="/ideas" element={<ProtectedRoute><IdeasBoard /></ProtectedRoute>} />
@@ -208,16 +211,13 @@ export default function App() {
 
         {/* POS System */}
         <Route path="/pos" element={<ProtectedRoute><POSHome /></ProtectedRoute>} />
-        <Route path="/pos/pin" element={<ProtectedRoute><POSPinLogin /></ProtectedRoute>} />
         <Route path="/pos/:branchId" element={<ProtectedRoute><POSTerminal /></ProtectedRoute>} />
         <Route path="/pos/:branchId/end-of-day" element={<ProtectedRoute><POSEndOfDay /></ProtectedRoute>} />
         <Route path="/pos/:branchId/inventory" element={<ProtectedRoute><POSInventory /></ProtectedRoute>} />
         <Route path="/pos/:branchId/settings" element={<ProtectedRoute><POSSettings /></ProtectedRoute>} />
         <Route path="/pos/:branchId/products" element={<ProtectedRoute><POSProducts /></ProtectedRoute>} />
+        <Route path="/pos/:branchId/stock-check" element={<ProtectedRoute><POSStockCheck /></ProtectedRoute>} />
         <Route path="/pos/:branchId/tables" element={<ProtectedRoute><OwnerRoute><TableQRGenerator /></OwnerRoute></ProtectedRoute>} />
-
-        {/* Settings — Roles alias */}
-        <Route path="/settings/roles" element={<ProtectedRoute><OwnerRoute><RoleManager /></OwnerRoute></ProtectedRoute>} />
 
         {/* Storefront (Public — No Auth Required) */}
         <Route path="/menu/:branchId" element={<Menu />} />
