@@ -5,7 +5,7 @@ const TABLE = 'cs_extracted_concepts'
 export async function listConcepts({ businessId } = {}) {
   let q = supabase
     .from(TABLE)
-    .select('*, inspiration:cs_inspirations!inspiration_id(id, title, business_id, source_type, source_url, preview_image_url)')
+    .select('*, inspiration:cs_inspirations!inspiration_id(id, title, business_id, source_type, source_url, preview_image_url, platform)')
     .order('created_at', { ascending: false })
   const { data, error } = await q
   if (error) throw error
@@ -45,6 +45,18 @@ export async function updateConcept(id, patch) {
   const { data, error } = await supabase
     .from(TABLE)
     .update({ ...patch, edited_by_user: true })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/** Updates quality_score / quality_score_override without marking the concept as user-edited. */
+export async function patchConceptScore(id, patch) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(patch)
     .eq('id', id)
     .select()
     .single()

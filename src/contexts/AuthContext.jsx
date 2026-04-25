@@ -45,6 +45,12 @@ export function AuthProvider({ children }) {
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    // Set user + profile immediately so ProtectedRoute sees them before navigate('/') fires.
+    // onAuthStateChange will also fire but user/profile will already be correct.
+    if (data.user) {
+      setUser(data.user)
+      await loadProfile(data.user.id)
+    }
     return data
   }
 

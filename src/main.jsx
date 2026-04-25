@@ -7,9 +7,11 @@ import { AuthProvider } from './contexts/AuthContext.jsx'
 import { LanguageProvider } from './contexts/LanguageContext.jsx'
 import { PermissionProvider } from './contexts/PermissionContext.jsx'
 import { PermissionsProvider } from './contexts/PermissionsContext.jsx'
+import { ThemeProvider } from './contexts/ThemeContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
+    <ThemeProvider>
     <LanguageProvider>
       <AuthProvider>
         <PermissionProvider>
@@ -23,7 +25,7 @@ createRoot(document.getElementById('root')).render(
                 color: '#F4F4F5',
                 border: '1px solid #2D3050',
                 borderRadius: '14px',
-                fontFamily: "'Outfit', 'Cairo', sans-serif",
+                fontFamily: "'Outfit', 'IBM Plex Sans Arabic', sans-serif",
                 fontSize: '14px',
                 padding: '12px 16px',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
@@ -36,5 +38,6 @@ createRoot(document.getElementById('root')).render(
         </PermissionProvider>
       </AuthProvider>
     </LanguageProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

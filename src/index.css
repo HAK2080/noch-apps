@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  :root,
+  :root[data-theme="dark"] {
     --accent: #4ADE80;
     --accent-dim: #22C55E;
     --accent-glow: rgba(74, 222, 128, 0.10);
@@ -17,6 +18,37 @@
     --muted: #71717A;
   }
 
+  :root[data-theme="light"] {
+    --accent: #16A34A;
+    --accent-dim: #15803D;
+    --accent-glow: rgba(22, 163, 74, 0.10);
+    --accent-border: rgba(22, 163, 74, 0.25);
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+    --border-bright: #CBD5E1;
+    --text: #0F172A;
+    --muted: #64748B;
+  }
+
+  /* Tailwind hardcoded noch-* color overrides for light theme */
+  :root[data-theme="light"] .bg-noch-dark { background-color: var(--bg) !important; }
+  :root[data-theme="light"] .bg-noch-surface { background-color: var(--surface) !important; }
+  :root[data-theme="light"] .bg-noch-card,
+  :root[data-theme="light"] .bg-noch-card-hover { background-color: var(--card) !important; }
+  :root[data-theme="light"] .border-noch-border,
+  :root[data-theme="light"] .border-noch-border-bright { border-color: var(--border) !important; }
+  :root[data-theme="light"] .divide-noch-border > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+  :root[data-theme="light"] .text-white { color: var(--text) !important; }
+  :root[data-theme="light"] .text-noch-muted { color: var(--muted) !important; }
+  :root[data-theme="light"] .text-noch-green,
+  :root[data-theme="light"] .text-noch-dark { color: var(--text) !important; }
+  :root[data-theme="light"] .bg-noch-green { background-color: var(--accent) !important; color: #fff !important; }
+  :root[data-theme="light"] .border-noch-green { border-color: var(--accent) !important; }
+  :root[data-theme="light"] aside { background: linear-gradient(180deg, #F1F5F9 0%, #FFFFFF 100%) !important; }
+  :root[data-theme="light"] .bg-black\/60 { background-color: rgba(15, 23, 42, 0.45) !important; }
+
   * {
     box-sizing: border-box;
   }
@@ -25,13 +57,13 @@
     margin: 0;
     background-color: var(--bg);
     color: var(--text);
-    font-family: 'Outfit', 'Cairo', sans-serif;
+    font-family: 'Outfit', 'IBM Plex Sans Arabic', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3 {
-    font-family: 'Space Grotesk', 'Outfit', 'Cairo', sans-serif;
+    font-family: 'Space Grotesk', 'Outfit', 'IBM Plex Sans Arabic', sans-serif;
     letter-spacing: -0.025em;
   }
 

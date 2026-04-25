@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Outfit', 'Cairo', 'sans-serif'],
+        sans: ['Outfit', 'IBM Plex Sans Arabic', 'sans-serif'],
         display: ['Space Grotesk', 'Outfit', 'sans-serif'],
-        arabic: ['Cairo', 'sans-serif'],
+        arabic: ['IBM Plex Sans Arabic', 'sans-serif'],
       },
       colors: {
         noch: {

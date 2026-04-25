@@ -89,9 +89,13 @@ function OwnerRoute({ children }) {
 }
 
 function RootRedirect() {
-  const { profile, loading } = useAuth()
+  const { profile, loading, user } = useAuth()
+  // Still loading initial auth state
   if (loading) return null
-  if (!profile) return <Navigate to="/login" replace />
+  // No user → not authenticated → go to login
+  if (!user) return <Navigate to="/login" replace />
+  // User is authenticated but profile hasn't loaded yet — wait (avoid redirect loop)
+  if (!profile) return null
   return <Navigate to={profile.role === 'owner' ? '/dashboard' : '/my-tasks'} replace />
 }
 

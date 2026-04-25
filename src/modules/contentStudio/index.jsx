@@ -10,6 +10,7 @@ import Concepts from './pages/Concepts'
 import ConceptWorkbench from './pages/ConceptWorkbench'
 import Drafts from './pages/Drafts'
 import VoiceLab from './pages/VoiceLab'
+import DialectTrainer from './pages/DialectTrainer'
 import ContentBank from './pages/ContentBank'
 import Settings from './pages/Settings'
 
@@ -31,6 +32,7 @@ export default function ContentStudio() {
         <Route path="concepts/:id" element={<ConceptWorkbench />} />
         <Route path="drafts" element={<Drafts />} />
         <Route path="voice-lab" element={<VoiceLab />} />
+        <Route path="dialect-trainer" element={<DialectTrainer />} />
         <Route path="bank" element={<ContentBank />} />
         <Route path="settings" element={<Settings />} />
       </Route>

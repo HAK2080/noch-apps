@@ -3,6 +3,7 @@ import { LayoutDashboard, CheckSquare, Users, BarChart2, LogOut, Coffee, Calcula
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from './shared/LanguageToggle'
+import ThemeToggle from './shared/ThemeToggle'
 
 function NavItem({ to, icon: Icon, label, end }) {
   return (
@@ -147,6 +148,7 @@ export default function Layout({ children }) {
           </div>
 
           <LanguageToggle className="justify-start" />
+          <ThemeToggle />
 
           <button
             onClick={handleSignOut}
@@ -168,7 +170,7 @@ export default function Layout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 md:ms-56 pb-20 md:pb-0">
+      <main className="flex-1 min-w-0 md:ms-56 pb-20 md:pb-0">
         {/* Mobile header */}
         <header
           className="md:hidden flex items-center justify-between px-4 py-3 border-b sticky top-0 z-10"

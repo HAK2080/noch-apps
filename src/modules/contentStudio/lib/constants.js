@@ -25,7 +25,15 @@ export const INSPIRATION_SOURCE_TYPES = [
 ]
 
 export const INSPIRATION_STATUSES = ['new', 'reviewed', 'extracted', 'archived']
-export const DRAFT_STATUSES = ['generated', 'edited', 'approved', 'rejected', 'archived']
+export const DRAFT_STATUSES = ['generated', 'edited', 'approved', 'has_potential', 'rejected', 'archived']
+
+export const USE_LIKELIHOOD_LABELS = {
+  0: "Won't use",
+  1: 'Needs heavy work',
+  2: 'Has potential',
+  3: 'Post with edits',
+  4: 'Post as-is',
+}
 
 export const EVALUATOR_LABELS = {
   safe:               { label: 'Safe',                tone: 'green' },
@@ -65,8 +73,9 @@ export const SUB_NAV = [
   { to: '/content-studio/inspiration',  label: 'Inspiration' },
   { to: '/content-studio/concepts',     label: 'Concepts' },
   { to: '/content-studio/drafts',       label: 'Drafts' },
-  { to: '/content-studio/voice-lab',    label: 'Voice Lab' },
-  { to: '/content-studio/bank',         label: 'Content Bank' },
+  { to: '/content-studio/voice-lab',       label: 'Voice Lab' },
+  { to: '/content-studio/dialect-trainer', label: 'Dialect Trainer' },
+  { to: '/content-studio/bank',            label: 'Content Bank' },
   { to: '/content-studio/settings',     label: 'Settings' },
 ]
 

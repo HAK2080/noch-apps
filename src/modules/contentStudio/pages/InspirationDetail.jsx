@@ -50,10 +50,13 @@ export default function InspirationDetail() {
         target_audience: fields.target_audience || null,
         why_it_works: fields.why_it_works || null,
         reusable_mechanism: fields.reusable_mechanism || null,
-        originality_risk: fields.originality_risk || null,
+        originality_risk: fields.originality_risk || 'low',
+        source_brand: fields.source_brand || null,
+        voice_type: fields.voice_type || null,
+        post_nature: fields.post_nature || null,
         notes: fields.notes || null,
         ai_model: result?.ai_model || null,
-        status: 'draft',
+        status: concept ? (concept.status || 'draft') : 'draft',
       }
       const row = concept
         ? await updateConcept(concept.id, { ...payload, edited_by_user: false })

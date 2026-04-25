@@ -38,3 +38,15 @@ export async function updateDraftStatus(id, status) {
   if (error) throw error
   return data
 }
+
+/** Generic patch for non-body fields (ratings, status, etc.). */
+export async function updateDraft(id, patch) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update(patch)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}

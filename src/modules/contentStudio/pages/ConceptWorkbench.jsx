@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Sparkles, Loader2, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getConcept, updateConcept } from '../services/concepts'
+import { getConcept, updateConcept, patchConceptScore } from '../services/concepts'
+import { calculateConceptQuality } from '../lib/conceptQuality'
+import { extractConcept } from '../ai/extractConcept'
 import { listVoiceProfiles } from '../services/voiceProfiles'
 import { listDrafts, createDraft } from '../services/drafts'
 import { generateDrafts } from '../ai/generateDrafts'
@@ -29,6 +31,13 @@ export default function ConceptWorkbench() {
     try {
       const c = await getConcept(id)
       setConcept(c)
+      // Auto-calculate quality score if not yet set or not overridden
+      if (c && !c.quality_score_override) {
+        const score = calculateConceptQuality(c)
+        if (score !== c.quality_score) {
+          patchConceptScore(c.id, { quality_score: score }).catch(() => {})
+        }
+      }
       const businessId = c?.inspiration?.business_id
       const [vs, ds] = await Promise.all([
         businessId ? listVoiceProfiles(businessId) : Promise.resolve([]),
@@ -57,6 +66,48 @@ export default function ConceptWorkbench() {
       toast.success('Saved')
     } catch (e) { toast.error(e.message || 'Save failed') }
     finally { setSavingConcept(false) }
+  }
+
+  // Auto-fill missing categorical fields by re-running concept extraction on the
+  // inspiration. Only writes fields that are currently empty — never clobbers
+  // user-edited values.
+  async function handleAutoFillMissing() {
+    if (!concept?.inspiration) return toast.error('No inspiration linked')
+    setSavingConcept(true)
+    try {
+      const result = await extractConcept({ inspiration: concept.inspiration, voiceProfile: voices.find(v => v.id === voiceId) })
+      const fresh = result?.concept || {}
+      const patch = {}
+      const fillIfEmpty = (key) => {
+        if (!concept[key] && fresh[key]) patch[key] = fresh[key]
+      }
+      fillIfEmpty('source_brand')
+      fillIfEmpty('voice_type')
+      fillIfEmpty('post_nature')
+      fillIfEmpty('joke_structure')
+      // Backfill the prose fields too if completely empty — don't overwrite if user has edits
+      fillIfEmpty('hook_summary')
+      fillIfEmpty('content_pattern')
+      fillIfEmpty('emotional_driver')
+      fillIfEmpty('target_audience')
+      fillIfEmpty('why_it_works')
+      fillIfEmpty('reusable_mechanism')
+      if (Object.keys(patch).length === 0) {
+        toast('Nothing to fill — all fields already have values', { icon: 'ℹ️' })
+        return
+      }
+      const row = await updateConcept(concept.id, patch)
+      setConcept(c => ({ ...c, ...row }))
+      // Re-calc quality after fill
+      const newScore = calculateConceptQuality({ ...concept, ...row })
+      patchConceptScore(concept.id, { quality_score: newScore }).catch(() => {})
+      toast.success(`Auto-filled ${Object.keys(patch).length} field${Object.keys(patch).length === 1 ? '' : 's'}`)
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Auto-fill failed')
+    } finally {
+      setSavingConcept(false)
+    }
   }
 
   async function handleGenerate() {
@@ -144,7 +195,16 @@ export default function ConceptWorkbench() {
         {/* Concept */}
         <section className="bg-noch-card border border-noch-border rounded-2xl p-5">
           <h2 className="text-white font-semibold mb-3">Concept</h2>
-          <ConceptFields concept={concept} onSave={handleSaveConcept} saving={savingConcept} />
+          <ConceptFields
+          concept={concept}
+          onSave={handleSaveConcept}
+          saving={savingConcept}
+          onAutoFill={handleAutoFillMissing}
+          onScoreChange={({ quality_score, quality_score_override }) => {
+            patchConceptScore(concept.id, { quality_score, quality_score_override }).catch(() => {})
+            setConcept(c => ({ ...c, quality_score, quality_score_override }))
+          }}
+        />
         </section>
 
         {/* Drafts + Generator */}

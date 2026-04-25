@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Link2, Image as ImageIcon, ClipboardPaste, StickyNote } from 'lucide-react'
+import { Link2, Image as ImageIcon, ClipboardPaste, StickyNote, Check } from 'lucide-react'
 
 const ICONS = {
   url: Link2,
@@ -15,17 +15,14 @@ const STATUS_TONE = {
   archived: 'bg-noch-border text-noch-muted',
 }
 
-export default function InspirationCard({ item }) {
+export default function InspirationCard({ item, selectable = false, selected = false, onToggle }) {
   const Icon = ICONS[item.source_type] || StickyNote
   const tone = STATUS_TONE[item.status] || STATUS_TONE.new
   const preview = item.preview_image_url
   const blurb = item.source_text || item.source_url || ''
 
-  return (
-    <Link
-      to={`/content-studio/inspiration/${item.id}`}
-      className="block bg-noch-card border border-noch-border rounded-2xl overflow-hidden hover:border-noch-green/40 transition-colors"
-    >
+  const body = (
+    <>
       {preview && (
         <div className="aspect-video bg-noch-dark overflow-hidden">
           <img src={preview} alt="" className="w-full h-full object-cover" />
@@ -43,10 +40,45 @@ export default function InspirationCard({ item }) {
           </span>
         </div>
         <h3 className="text-white font-medium text-sm mb-1 line-clamp-1">
-          {item.title || (item.source_url ? new URL(item.source_url).hostname : 'Untitled')}
+          {item.title || (item.source_url ? safeHost(item.source_url) : 'Untitled')}
         </h3>
         {blurb && <p className="text-noch-muted text-xs line-clamp-2">{blurb}</p>}
       </div>
+    </>
+  )
+
+  const wrapperCls = `relative block bg-noch-card border rounded-2xl overflow-hidden transition-colors ${
+    selected ? 'border-noch-green ring-2 ring-noch-green/40' : 'border-noch-border hover:border-noch-green/40'
+  }`
+
+  if (selectable) {
+    return (
+      <div className={wrapperCls + ' cursor-pointer'} onClick={() => onToggle?.(item.id)}>
+        <Checkbox selected={selected} />
+        {body}
+      </div>
+    )
+  }
+
+  return (
+    <Link to={`/content-studio/inspiration/${item.id}`} className={wrapperCls}>
+      {body}
     </Link>
   )
+}
+
+function Checkbox({ selected }) {
+  return (
+    <div
+      className={`absolute top-3 left-3 w-5 h-5 rounded-md border-2 flex items-center justify-center z-10 ${
+        selected ? 'bg-noch-green border-noch-green' : 'bg-noch-dark/80 border-white/40'
+      }`}
+    >
+      {selected && <Check size={12} className="text-noch-dark" />}
+    </div>
+  )
+}
+
+function safeHost(url) {
+  try { return new URL(url).hostname } catch { return url }
 }

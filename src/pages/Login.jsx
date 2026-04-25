@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -6,19 +6,25 @@ import LanguageToggle from '../components/shared/LanguageToggle'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const { signIn } = useAuth()
+  const { signIn, user } = useAuth()
   const { t, lang } = useLanguage()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Navigate once React has committed the updated user state.
+  // This avoids the race where navigate('/') fires before the state batch lands.
+  useEffect(() => {
+    if (user) navigate('/', { replace: true })
+  }, [user])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     try {
       await signIn(email, password)
-      navigate('/')
+      // Navigation is handled by the useEffect above
     } catch (err) {
       toast.error(err.message || t('loginError'))
     } finally {

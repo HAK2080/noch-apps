@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Sparkles, Check, X, Save, Loader2, History, Wand2 } from 'lucide-react'
+import { Sparkles, Check, X, Save, Loader2, History, Wand2, Bookmark } from 'lucide-react'
 import toast from 'react-hot-toast'
 import EvaluatorBadge from './EvaluatorBadge'
 import { evaluateDraft } from '../ai/evaluateDraft'
 import { humanizeDraft } from '../ai/humanizeDraft'
-import { createDraft, updateDraftStatus } from '../services/drafts'
+import { createDraft, updateDraftStatus, updateDraft } from '../services/drafts'
 import { createEvaluation, latestEvaluation } from '../services/evaluations'
 import { recordEdit } from '../services/edits'
 import { recordSignal } from '../services/learningSignals'
 import { approveDraftToBank } from '../services/contentBank'
 import { lineDiff } from '../lib/diff'
 import { classifyEdit } from '../lib/classifyEdit'
-import { REWRITE_ACTIONS } from '../lib/constants'
+import { REWRITE_ACTIONS, USE_LIKELIHOOD_LABELS } from '../lib/constants'
+
+const STATUS_TONE = {
+  generated:     'bg-zinc-500/10 text-zinc-400',
+  edited:        'bg-blue-500/10 text-blue-400',
+  approved:      'bg-noch-green/10 text-noch-green',
+  has_potential: 'bg-amber-500/10 text-amber-400',
+  rejected:      'bg-red-500/10 text-red-400',
+  archived:      'bg-noch-border text-noch-muted',
+}
 
 export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
   const [body, setBody] = useState(draft.body_text || '')
@@ -21,8 +30,14 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
   const [saving, setSaving] = useState(false)
   const [rewriteAction, setRewriteAction] = useState('')
   const [rewriting, setRewriting] = useState(false)
+  const [qualityScore, setQualityScore] = useState(draft.user_quality_score ?? null)
+  const [useLikelihood, setUseLikelihood] = useState(draft.user_use_likelihood ?? null)
 
-  useEffect(() => { setBody(draft.body_text || '') }, [draft.id, draft.body_text])
+  useEffect(() => {
+    setBody(draft.body_text || '')
+    setQualityScore(draft.user_quality_score ?? null)
+    setUseLikelihood(draft.user_use_likelihood ?? null)
+  }, [draft.id, draft.body_text, draft.user_quality_score, draft.user_use_likelihood])
 
   useEffect(() => {
     let cancelled = false
@@ -129,7 +144,8 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
           toast.error('Approved, but bank snapshot failed')
         }
       }
-      toast.success(status === 'approved' ? 'Approved & banked' : 'Rejected')
+      const label = status === 'approved' ? 'Approved & banked' : status === 'has_potential' ? 'Saved to revisit' : 'Rejected'
+      toast.success(label)
       recordSignal({
         business_id: voiceProfile?.business_id || null,
         brand_voice_profile_id: draft.brand_voice_profile_id,
@@ -141,6 +157,29 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
       onChanged?.(row)
     } catch (e) {
       toast.error(e.message || 'Failed')
+    }
+  }
+
+  async function handleRating(field, value) {
+    const patch = { [field]: value }
+    // Optimistic update
+    if (field === 'user_quality_score') setQualityScore(value)
+    else setUseLikelihood(value)
+    try {
+      await updateDraft(draft.id, patch)
+      recordSignal({
+        business_id: voiceProfile?.business_id || null,
+        brand_voice_profile_id: draft.brand_voice_profile_id,
+        signal_type: 'rated',
+        source_table: 'cs_draft_variants',
+        source_id: draft.id,
+        payload: patch,
+      }).catch(() => {})
+    } catch (e) {
+      // Roll back on failure
+      if (field === 'user_quality_score') setQualityScore(draft.user_quality_score ?? null)
+      else setUseLikelihood(draft.user_use_likelihood ?? null)
+      toast.error('Rating save failed')
     }
   }
 
@@ -183,6 +222,8 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
     }
   }
 
+  const statusTone = STATUS_TONE[draft.status] || STATUS_TONE.generated
+
   return (
     <div className="bg-noch-card border border-noch-border rounded-xl p-4">
       <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -192,7 +233,7 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
           {draft.parent_draft_id && (
             <span className="inline-flex items-center gap-1"><History size={10} /> v{shortId(draft.id)}</span>
           )}
-          <span className="px-1.5 py-0.5 rounded bg-noch-border capitalize">{draft.status}</span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] capitalize ${statusTone}`}>{draft.status?.replace('_', ' ')}</span>
         </div>
         <div className="flex items-center gap-1">
           {evaluation?.labels?.map(l => <EvaluatorBadge key={l} label={l} />)}
@@ -227,6 +268,54 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
           </div>
         </details>
       )}
+
+      {/* User ratings row */}
+      <div className="mt-3 flex items-center gap-3 flex-wrap border-t border-noch-border pt-2.5">
+        {/* Quality: 1–5 stars */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-noch-muted/70 w-10">Quality</span>
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map(n => (
+              <button
+                key={n}
+                title={`Quality ${n}`}
+                onClick={() => handleRating('user_quality_score', n)}
+                className={`w-5 h-5 rounded text-[11px] transition-colors ${
+                  qualityScore !== null && n <= qualityScore
+                    ? 'bg-noch-green/20 text-noch-green'
+                    : 'bg-noch-dark text-noch-muted/30 hover:text-noch-muted'
+                }`}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Use likelihood: 5 named states */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span className="text-[10px] text-noch-muted/70 w-6 flex-shrink-0">Use?</span>
+          <div className="flex gap-1 flex-wrap">
+            {Object.entries(USE_LIKELIHOOD_LABELS).map(([k, label]) => {
+              const n = Number(k)
+              const active = useLikelihood === n
+              return (
+                <button
+                  key={n}
+                  title={label}
+                  onClick={() => handleRating('user_use_likelihood', n)}
+                  className={`px-2 py-0.5 rounded text-[10px] transition-colors border ${
+                    active
+                      ? 'bg-noch-green/20 border-noch-green/40 text-noch-green'
+                      : 'bg-noch-dark border-noch-border text-noch-muted/60 hover:text-noch-muted'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
 
       <div className="mt-3 flex items-center gap-1.5 flex-wrap bg-noch-dark border border-noch-border rounded-md p-1.5">
         <Wand2 size={12} className="text-noch-muted ml-1" />
@@ -263,6 +352,12 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
           {evaluating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Evaluate
         </button>
         <div className="flex-1" />
+        <button
+          onClick={() => handleStatus('has_potential')}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-md text-amber-400 hover:bg-amber-500/10 text-xs"
+        >
+          <Bookmark size={12} /> Revisit
+        </button>
         <button onClick={() => handleStatus('approved')} className="flex items-center gap-1 px-2.5 py-1 rounded-md text-green-400 hover:bg-green-500/10 text-xs">
           <Check size={12} /> Approve
         </button>
