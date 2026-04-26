@@ -70,6 +70,7 @@ export default function Layout({ children }) {
     { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
     { to: '/pos', icon: ShoppingCart, label: 'POS' },
     { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
+    { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/my-card', icon: Coffee, label: '🐰 My Card' },
   ]
 
