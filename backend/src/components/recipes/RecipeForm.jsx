@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { X, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Plus, Trash2, AlertTriangle, History } from 'lucide-react'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { loadDraft, saveDraft, clearDraft, draftAge } from '../../lib/drafts'
 import toast from 'react-hot-toast'
 
 const CATEGORIES = ['coffee', 'matcha', 'specialty', 'signature']
@@ -35,6 +36,9 @@ function emptyStep() {
 export default function RecipeForm({ recipe, prefill, onSave, onCancel }) {
   const { t, lang } = useLanguage()
   const { user } = useAuth()
+  const draftKey = `recipe:${recipe?.id || 'new'}`
+  const [pendingDraft, setPendingDraft] = useState(() => loadDraft(draftKey))
+  const mountedRef = useRef(false)
 
   const [form, setForm] = useState({
     code: recipe?.code || prefill?.code || '',
@@ -72,6 +76,24 @@ export default function RecipeForm({ recipe, prefill, onSave, onCancel }) {
   )
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  // Autosave draft on any state change (skip first render)
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    saveDraft(draftKey, { form, groups, layers, steps }, form.name || form.code || 'New recipe')
+  }, [form, groups, layers, steps, draftKey])
+
+  const restoreDraft = () => {
+    const d = pendingDraft.form
+    if (d.form) setForm(d.form)
+    if (d.groups) setGroups(d.groups)
+    if (d.layers) setLayers(d.layers)
+    if (d.steps) setSteps(d.steps)
+    setPendingDraft(null)
+    toast.success(lang === 'ar' ? 'تم استعادة المسودة' : 'Draft restored')
+  }
+  const discardDraft = () => { clearDraft(draftKey); setPendingDraft(null) }
+  const handleCancel = () => { clearDraft(draftKey); onCancel() }
 
   // --- Groups / Ingredients ---
   const addGroup = () => setGroups(g => [...g, emptyGroup()])
@@ -122,6 +144,7 @@ export default function RecipeForm({ recipe, prefill, onSave, onCancel }) {
         warning_ar: st.warning_ar || null,
       })),
     }
+    clearDraft(draftKey)
     onSave(payload)
   }
 
@@ -140,10 +163,22 @@ export default function RecipeForm({ recipe, prefill, onSave, onCancel }) {
           <h2 className="text-white font-bold text-lg">
             {recipe ? t('editRecipe') : t('newRecipe')}
           </h2>
-          <button onClick={onCancel} className="text-noch-muted hover:text-white p-1">
+          <button onClick={handleCancel} type="button" className="text-noch-muted hover:text-white p-1">
             <X size={20} />
           </button>
         </div>
+
+        {pendingDraft && (
+          <div className="rounded-xl px-3 py-2.5 mb-4 flex items-center gap-3" style={{ background: 'rgba(245,146,46,0.12)', border: '1px solid rgba(245,146,46,0.4)' }}>
+            <History size={16} className="text-amber-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-sm font-medium">{lang === 'ar' ? `تغييرات غير محفوظة من ${draftAge(pendingDraft.savedAt)}` : `Unsaved changes from ${draftAge(pendingDraft.savedAt)}`}</p>
+              <p className="text-zinc-400 text-xs truncate">{pendingDraft.label}</p>
+            </div>
+            <button type="button" onClick={restoreDraft} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: '#F5922E', color: '#0B1020' }}>{lang === 'ar' ? 'استعادة' : 'Restore'}</button>
+            <button type="button" onClick={discardDraft} className="text-xs font-medium px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white">{lang === 'ar' ? 'تجاهل' : 'Discard'}</button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 

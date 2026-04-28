@@ -5,12 +5,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import {
   Receipt, Plus, Check, X, Clock, DollarSign, Camera, Upload,
   ChevronDown, Settings, BarChart3, Loader2, Eye, CreditCard,
-  Building2, Tag, AlertCircle, CheckCircle2, Ban, Wallet, Zap
+  Building2, Tag, AlertCircle, CheckCircle2, Ban, Wallet, Zap, History
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePermissions } from '../../contexts/PermissionsContext'
 import { supabase } from '../../lib/supabase'
+import { loadDraft, saveDraft, clearDraft, draftAge } from '../../lib/drafts'
 import toast from 'react-hot-toast'
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -93,6 +94,7 @@ async function setOwnerSetting(key, value) {
 // ── SUBMIT TAB ───────────────────────────────────────────────
 function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onSubmitted }) {
   const today = new Date().toISOString().slice(0, 10)
+  const draftKey = 'expense:new'
   const [form, setForm] = useState({
     cost_center_id: '', category_id: '', amount: '', currency: 'LYD',
     vendor: '', description: '', expense_date: today,
@@ -101,11 +103,27 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
   const [receiptPreview, setReceiptPreview] = useState(null)
   const [saving, setSaving] = useState(false)
   const [autoApprove, setAutoApprove] = useState(false)
+  const [pendingDraft, setPendingDraft] = useState(() => loadDraft(draftKey))
+  const mountedRef = useRef(false)
   const fileRef = useRef()
 
   useEffect(() => {
     if (isOwner) getOwnerSetting('auto_approve_own', false).then(setAutoApprove)
   }, [isOwner])
+
+  // Autosave draft on form change (skip first render)
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    const label = form.vendor || form.description || (form.amount ? `${form.amount} ${form.currency}` : 'New expense')
+    saveDraft(draftKey, form, label)
+  }, [form])
+
+  const restoreDraft = () => {
+    setForm({ ...form, ...pendingDraft.form })
+    setPendingDraft(null)
+    toast.success('Draft restored')
+  }
+  const discardDraft = () => { clearDraft(draftKey); setPendingDraft(null) }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -155,6 +173,7 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
         })
       }
       toast.success(isAutoApproved ? 'Expense submitted & auto-approved' : 'Expense submitted for approval')
+      clearDraft(draftKey)
       setForm({ cost_center_id: '', category_id: '', amount: '', currency: 'LYD', vendor: '', description: '', expense_date: today })
       setReceiptFile(null)
       setReceiptPreview(null)
@@ -168,6 +187,17 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      {pendingDraft && (
+        <div className="rounded-xl px-3 py-2.5 flex items-center gap-3" style={{ background: 'rgba(245,146,46,0.12)', border: '1px solid rgba(245,146,46,0.4)' }}>
+          <History size={16} className="text-amber-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-medium">Unsaved expense from {draftAge(pendingDraft.savedAt)}</p>
+            <p className="text-zinc-400 text-xs truncate">{pendingDraft.label}</p>
+          </div>
+          <button onClick={restoreDraft} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: '#F5922E', color: '#0B1020' }}>Restore</button>
+          <button onClick={discardDraft} className="text-xs font-medium px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white">Discard</button>
+        </div>
+      )}
       {isOwner && (
         <div className="bg-noch-card border border-noch-border rounded-xl px-4 py-3 flex items-center justify-between">
           <div>

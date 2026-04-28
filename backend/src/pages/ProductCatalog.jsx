@@ -14,6 +14,7 @@ import {
   getProductSalesStats, uploadProductImage,
 } from '../modules/pos/lib/pos-supabase'
 import { getRecipesForCost, getCurrencyRates, calcCostPerBaseUnit } from '../lib/supabase'
+import { loadDraft, saveDraft, clearDraft, listDrafts, draftAge } from '../lib/drafts'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
 
 // ─── helpers ──────────────────────────────────────────────────
@@ -122,51 +123,6 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
   )
 }
 
-// ─── Draft persistence (localStorage, 24h expiry) ─────────────
-const DRAFT_PREFIX = 'noch.product-draft.'
-const DRAFT_TTL_MS = 24 * 60 * 60 * 1000
-
-function loadDraft(key) {
-  try {
-    const raw = localStorage.getItem(DRAFT_PREFIX + key)
-    if (!raw) return null
-    const d = JSON.parse(raw)
-    if (!d?.savedAt || Date.now() - d.savedAt > DRAFT_TTL_MS) {
-      localStorage.removeItem(DRAFT_PREFIX + key)
-      return null
-    }
-    return d
-  } catch { return null }
-}
-function saveDraft(key, form, label) {
-  try {
-    localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify({ form, label, savedAt: Date.now() }))
-  } catch {}
-}
-function clearDraft(key) {
-  try { localStorage.removeItem(DRAFT_PREFIX + key) } catch {}
-}
-function listDrafts() {
-  const out = []
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i)
-      if (!k || !k.startsWith(DRAFT_PREFIX)) continue
-      const id = k.slice(DRAFT_PREFIX.length)
-      const d = loadDraft(id)
-      if (d) out.push({ id, ...d })
-    }
-  } catch {}
-  return out.sort((a, b) => b.savedAt - a.savedAt)
-}
-function draftAge(savedAt) {
-  const mins = Math.floor((Date.now() - savedAt) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
-  const hrs = Math.floor(mins / 60)
-  return `${hrs}h ago`
-}
-
 // ─── Edit / Add modal ─────────────────────────────────────────
 const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
@@ -176,7 +132,7 @@ const BLANK = {
 }
 
 function ProductModal({ product, categories, branchId, recipes, rates, onSave, onClose }) {
-  const draftKey = product?.id || 'new'
+  const draftKey = `product:${product?.id || 'new'}`
   const [form, setForm] = useState(() => product
     ? { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
     : { ...BLANK }
@@ -519,18 +475,19 @@ export default function ProductCatalog() {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
-  const [drafts, setDrafts] = useState(() => listDrafts())
+  const [drafts, setDrafts] = useState(() => listDrafts('product'))
 
-  const refreshDrafts = () => setDrafts(listDrafts())
+  const refreshDrafts = () => setDrafts(listDrafts('product'))
 
   const resumeDraft = (draft) => {
-    if (draft.id === 'new') { setShowAdd(true); return }
-    const p = products.find(x => x.id === draft.id)
+    const id = draft.key.replace(/^product:/, '')
+    if (id === 'new') { setShowAdd(true); return }
+    const p = products.find(x => x.id === id)
     if (p) setEditProduct(p)
     else toast.error('Product not found in this branch')
   }
-  const discardOneDraft = (id) => { clearDraft(id); refreshDrafts() }
-  const discardAllDrafts = () => { drafts.forEach(d => clearDraft(d.id)); refreshDrafts() }
+  const discardOneDraft = (key) => { clearDraft(key); refreshDrafts() }
+  const discardAllDrafts = () => { drafts.forEach(d => clearDraft(d.key)); refreshDrafts() }
 
   // Load branches + recipes + rates once
   useEffect(() => {
@@ -625,11 +582,11 @@ export default function ProductCatalog() {
             </div>
             <div className="flex flex-wrap gap-2">
               {drafts.map(d => (
-                <div key={d.id} className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <div key={d.key} className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
                   <span className="text-white text-xs font-medium">{d.label}</span>
                   <span className="text-zinc-500 text-[11px]">{draftAge(d.savedAt)}</span>
                   <button onClick={() => resumeDraft(d)} className="text-[11px] font-bold px-2 py-0.5 rounded" style={{ background: '#F5922E', color: '#0B1020' }}>Resume</button>
-                  <button onClick={() => discardOneDraft(d.id)} className="text-zinc-500 hover:text-white"><X size={12} /></button>
+                  <button onClick={() => discardOneDraft(d.key)} className="text-zinc-500 hover:text-white"><X size={12} /></button>
                 </div>
               ))}
             </div>
