@@ -122,6 +122,51 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
   )
 }
 
+// ─── Draft persistence (localStorage, 24h expiry) ─────────────
+const DRAFT_PREFIX = 'noch.product-draft.'
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000
+
+function loadDraft(key) {
+  try {
+    const raw = localStorage.getItem(DRAFT_PREFIX + key)
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    if (!d?.savedAt || Date.now() - d.savedAt > DRAFT_TTL_MS) {
+      localStorage.removeItem(DRAFT_PREFIX + key)
+      return null
+    }
+    return d
+  } catch { return null }
+}
+function saveDraft(key, form, label) {
+  try {
+    localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify({ form, label, savedAt: Date.now() }))
+  } catch {}
+}
+function clearDraft(key) {
+  try { localStorage.removeItem(DRAFT_PREFIX + key) } catch {}
+}
+function listDrafts() {
+  const out = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.startsWith(DRAFT_PREFIX)) continue
+      const id = k.slice(DRAFT_PREFIX.length)
+      const d = loadDraft(id)
+      if (d) out.push({ id, ...d })
+    }
+  } catch {}
+  return out.sort((a, b) => b.savedAt - a.savedAt)
+}
+function draftAge(savedAt) {
+  const mins = Math.floor((Date.now() - savedAt) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ago`
+}
+
 // ─── Edit / Add modal ─────────────────────────────────────────
 const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
@@ -131,6 +176,7 @@ const BLANK = {
 }
 
 function ProductModal({ product, categories, branchId, recipes, rates, onSave, onClose }) {
+  const draftKey = product?.id || 'new'
   const [form, setForm] = useState(() => product
     ? { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
     : { ...BLANK }
@@ -139,10 +185,33 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
   const [uploading, setUploading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [recipeCalc, setRecipeCalc] = useState(null)
+  const [pendingDraft, setPendingDraft] = useState(() => loadDraft(draftKey))
+  const dirtyRef = useRef(false)
   const fileRef = useRef()
   const isEdit = !!product?.id
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k, v) => { dirtyRef.current = true; setForm(f => ({ ...f, [k]: v })) }
+
+  // Autosave draft on every user-driven change (24h localStorage)
+  useEffect(() => {
+    if (!dirtyRef.current) return
+    saveDraft(draftKey, form, form.name || product?.name || 'New product')
+  }, [form, draftKey, product?.name])
+
+  const restoreDraft = () => {
+    setForm({ ...BLANK, ...pendingDraft.form })
+    dirtyRef.current = true
+    setPendingDraft(null)
+    toast.success('Draft restored')
+  }
+  const discardDraft = () => {
+    clearDraft(draftKey)
+    setPendingDraft(null)
+  }
+  const handleCancel = () => {
+    clearDraft(draftKey)
+    onClose()
+  }
 
   // When recipe selected, calc its cost
   useEffect(() => {
@@ -171,6 +240,7 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
       }
       if (isEdit) await updatePOSProduct(product.id, payload)
       else await createPOSProduct(payload)
+      clearDraft(draftKey)
       toast.success(isEdit ? 'Product updated' : 'Product created')
       onSave()
     } catch (err) {
@@ -213,10 +283,23 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
           <div className="flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10"
             style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
             <h2 className="text-white font-bold">{isEdit ? `Edit: ${product.name}` : 'New Product'}</h2>
-            <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+            <button onClick={handleCancel} className="text-zinc-500 hover:text-white"><X size={18} /></button>
           </div>
 
           <div className="p-5 flex flex-col gap-4 flex-1 overflow-y-auto">
+
+            {/* Draft restore banner */}
+            {pendingDraft && (
+              <div className="rounded-xl px-3 py-2.5 flex items-center gap-3" style={{ background: 'rgba(245,146,46,0.12)', border: '1px solid rgba(245,146,46,0.4)' }}>
+                <History size={16} className="text-amber-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium">Unsaved changes from {draftAge(pendingDraft.savedAt)}</p>
+                  <p className="text-zinc-400 text-xs truncate">{pendingDraft.label}</p>
+                </div>
+                <button onClick={restoreDraft} className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ background: '#F5922E', color: '#0B1020' }}>Restore</button>
+                <button onClick={discardDraft} className="text-xs font-medium px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white">Discard</button>
+              </div>
+            )}
 
             {/* Photo (edit only) */}
             {isEdit && (
@@ -379,7 +462,7 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
-              <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+              <button onClick={handleCancel} className="btn-secondary flex-1">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
                 {saving ? 'Saving…' : isEdit ? 'Update' : 'Create Product'}
               </button>
@@ -407,6 +490,18 @@ export default function ProductCatalog() {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [drafts, setDrafts] = useState(() => listDrafts())
+
+  const refreshDrafts = () => setDrafts(listDrafts())
+
+  const resumeDraft = (draft) => {
+    if (draft.id === 'new') { setShowAdd(true); return }
+    const p = products.find(x => x.id === draft.id)
+    if (p) setEditProduct(p)
+    else toast.error('Product not found in this branch')
+  }
+  const discardOneDraft = (id) => { clearDraft(id); refreshDrafts() }
+  const discardAllDrafts = () => { drafts.forEach(d => clearDraft(d.id)); refreshDrafts() }
 
   // Load branches + recipes + rates once
   useEffect(() => {
@@ -490,6 +585,27 @@ export default function ProductCatalog() {
             <Plus size={14} /> Add Product
           </button>
         </div>
+
+        {/* Unsaved drafts banner */}
+        {drafts.length > 0 && !showAdd && !editProduct && (
+          <div className="mb-4 rounded-xl px-4 py-3" style={{ background: 'rgba(245,146,46,0.08)', border: '1px solid rgba(245,146,46,0.35)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <History size={14} className="text-amber-400" />
+              <p className="text-white text-sm font-semibold">You have {drafts.length} unsaved draft{drafts.length > 1 ? 's' : ''}</p>
+              <button onClick={discardAllDrafts} className="ml-auto text-xs text-zinc-400 hover:text-white">Discard all</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {drafts.map(d => (
+                <div key={d.id} className="flex items-center gap-2 rounded-lg px-3 py-1.5" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                  <span className="text-white text-xs font-medium">{d.label}</span>
+                  <span className="text-zinc-500 text-[11px]">{draftAge(d.savedAt)}</span>
+                  <button onClick={() => resumeDraft(d)} className="text-[11px] font-bold px-2 py-0.5 rounded" style={{ background: '#F5922E', color: '#0B1020' }}>Resume</button>
+                  <button onClick={() => discardOneDraft(d.id)} className="text-zinc-500 hover:text-white"><X size={12} /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Branch tabs */}
         {branches.length > 0 && (
@@ -576,8 +692,8 @@ export default function ProductCatalog() {
           branchId={activeBranch?.id}
           recipes={recipes}
           rates={rates}
-          onSave={() => { setShowAdd(false); setEditProduct(null); load() }}
-          onClose={() => { setShowAdd(false); setEditProduct(null) }}
+          onSave={() => { setShowAdd(false); setEditProduct(null); refreshDrafts(); load() }}
+          onClose={() => { setShowAdd(false); setEditProduct(null); refreshDrafts() }}
         />
       )}
     </Layout>
