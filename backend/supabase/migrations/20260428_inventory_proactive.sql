@@ -13,7 +13,10 @@
 
 alter table ingredients
   add column if not exists lead_time_days int default 7,
-  add column if not exists reorder_qty numeric;
+  add column if not exists reorder_qty numeric,
+  add column if not exists daily_usage_manual numeric,
+  add column if not exists archived boolean default false,
+  add column if not exists discontinued boolean default false;
 
 -- 2) View: per-ingredient daily usage from POS over last 30d ───────────────
 -- Skips fixed_cost rows and rows without an ingredient_id (custom labels).
