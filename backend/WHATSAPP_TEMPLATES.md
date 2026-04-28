@@ -99,7 +99,36 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 7. `loyalty_marketing_birthday` (Marketing — separate review)
+## 7. `loyalty_lapsed_checkin` (Marketing — "we miss you")
+
+**Purpose:** Customer hasn't visited in N days; nudge them back with a free-stamp incentive.
+
+**Body:**
+```
+يا {{1}}، اشتقنالك! آخر زيارة كانت قبل {{2}} يوم. تعال شرب قهوة على حسابنا — نسجل لك زيارة مجانية اليوم فقط. ☕
+```
+
+**Variables:**
+- `{{1}}` — customer name
+- `{{2}}` — days since last visit (e.g. "21")
+
+---
+
+## 8. `loyalty_visit_feedback` (Marketing — post-visit ask)
+
+**Purpose:** Fire 30–60 min after a loyalty stamp is earned to ask for feedback.
+
+**Body:**
+```
+شكراً لزيارتك يا {{1}}! 🙌 كيف كانت تجربتك؟ قيّم زيارتك بضغطة من بطاقة الولاء — رأيك يهمنا. https://apps.noch.cloud/loyalty/me
+```
+
+**Variables:**
+- `{{1}}` — customer name
+
+---
+
+## 9. `loyalty_marketing_birthday` (Marketing — separate review)
 
 **Purpose:** Birthday wish + bonus stamp.
 
