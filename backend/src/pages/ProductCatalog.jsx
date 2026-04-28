@@ -127,6 +127,7 @@ const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
+  visible_on_website: true, visible_on_menu: false,
 }
 
 function ProductModal({ product, categories, branchId, recipes, rates, onSave, onClose }) {
@@ -340,17 +341,41 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
               )}
             </div>
 
-            {/* POS visibility */}
-            <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_active', !form.is_active)}>
-              <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
-                style={{ background: form.is_active ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
-                <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
-              </div>
-              <div>
-                <p className="text-white text-sm">Visible in POS terminal</p>
-                <p className="text-zinc-600 text-xs">{form.is_active ? 'Shown to cashiers' : 'Hidden from POS — still in catalog'}</p>
-              </div>
-            </label>
+            {/* Visibility toggles */}
+            <div className="rounded-xl p-3 flex flex-col gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_active', !form.is_active)}>
+                <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                  style={{ background: form.is_active ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
+                </div>
+                <div>
+                  <p className="text-white text-sm">Visible in POS terminal</p>
+                  <p className="text-zinc-600 text-xs">{form.is_active ? 'Shown to cashiers' : 'Hidden from POS — still in catalog'}</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_website', !form.visible_on_website)}>
+                <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                  style={{ background: form.visible_on_website ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_website ? 'translate-x-4' : ''}`} />
+                </div>
+                <div>
+                  <p className="text-white text-sm">Visible on online shop (noch.cloud)</p>
+                  <p className="text-zinc-600 text-xs">{form.visible_on_website ? 'Shown on storefront' : 'Hidden from storefront'}</p>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_menu', !form.visible_on_menu)}>
+                <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                  style={{ background: form.visible_on_menu ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                  <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_menu ? 'translate-x-4' : ''}`} />
+                </div>
+                <div>
+                  <p className="text-white text-sm">Visible on NFC menu</p>
+                  <p className="text-zinc-600 text-xs">{form.visible_on_menu ? 'Shown on curated tap-menu' : 'Hidden from tap-menu'}</p>
+                </div>
+              </label>
+            </div>
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
