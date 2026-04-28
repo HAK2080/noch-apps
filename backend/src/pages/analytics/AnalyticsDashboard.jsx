@@ -19,7 +19,8 @@ const TABS = [
   { id: 'category',   label: 'By Category',     icon: Tag,        feature: 'analytics', action: 'view' },
   { id: 'lines',      label: 'Business Lines',  icon: Layers,     feature: 'analytics', action: 'view' },
   { id: 'financial',  label: 'Financial',       icon: DollarSign, feature: 'analytics', action: 'financial' },
-  { id: 'bloom',      label: 'Bloom',           icon: Coffee,     feature: 'analytics', action: 'financial' },
+  // Bloom tab hidden per owner request — flip back when ready to surface again
+  // { id: 'bloom',      label: 'Bloom',           icon: Coffee,     feature: 'analytics', action: 'financial' },
   { id: 'ai',         label: 'AI Insights',     icon: Brain,      feature: 'analytics', action: 'financial' },
 ]
 
