@@ -24,17 +24,17 @@ const CORS_HEADERS = {
 // the caller (which uses .catch(() => {})) silently swallows it. Once
 // Meta approves a template, sends just start working.
 const TEMPLATE_SIDS: Record<string, string> = {
-  staff_invite: 'HX9549493aceb9741684ec2e902b482bae',
+  staff_invite: 'HX65adb2b2b1458eb7eb97397f03b65c66',           // resubmitted 2026-04-29 with mid-sentence URL
   loyalty_stamp_earned: 'HX89f5ce59c0ee9cf028a86860c9c30219',
   loyalty_reward_ready: 'HXd1df8cc058afd9e1812ad2881ee9de1e',
   order_pending_confirm: 'HX22d413fd4c3b5889115a100f193dfc79',
-  order_ready_pickup: 'HXaefecaa7440e4342ac9faed72c934e2c',
+  order_ready_pickup: 'HX364e907491fa3eba180a0d8689a1a30e',     // resubmitted 2026-04-29 after Meta rejection
   loyalty_lapsed_checkin: 'HX1bcf158d960d649731d8026e86c70aa5',
   loyalty_visit_feedback: 'HX7817d895460872978be7411662b11fbe',
   loyalty_marketing_birthday: 'HX2d934c0762f0b623e080b1d382f7c5b1',
   marketing_weather_iced: 'HX20bba1bda93bfd0291b1f2428bd8d6f2',
+  marketing_streak_save: 'HXf13e53d06f67f28309bd4b1ad29f0eaf',
   marketing_back_in_stock: 'HX16c84ac97be895be6c153b3414e92976',
-  // marketing_streak_save: TODO — paste HX SID when visible in Twilio
   // marketing_anniversary: TODO — paste HX SID when visible in Twilio
 }
 
