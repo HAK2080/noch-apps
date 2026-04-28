@@ -39,6 +39,22 @@ function OnlineOrderRow({ order, branchId, onConfirmed }) {
       if (error) throw error
       if (data?.error) throw new Error(data.error)
       toast.success(`Order ${order.order_number} confirmed`)
+
+      // Best-effort customer notification — silently no-ops until the
+      // order_ready_pickup template is approved and TEMPLATE_SIDS has its SID.
+      if (order.customer_phone) {
+        supabase.functions.invoke('send-whatsapp', {
+          body: {
+            to: order.customer_phone,
+            templateName: 'order_ready_pickup',
+            templateVariables: {
+              '1': order.customer_name || 'Guest',
+              '2': order.pickup_code || '',
+            },
+          },
+        }).catch(() => {})
+      }
+
       onConfirmed()
     } catch (err) {
       toast.error(err.message || 'Confirm failed')
@@ -167,7 +183,7 @@ export default function POSTerminal() {
       try {
         const { data, error: err } = await supabase
           .from('pos_orders')
-          .select('id,order_number,customer_name,total,table_number,created_at,awaiting_staff_confirm,pickup_code')
+          .select('id,order_number,customer_name,customer_phone,total,table_number,created_at,awaiting_staff_confirm,pickup_code')
           .eq('branch_id', branchId)
           .eq('source', 'online')
           .in('status', ['pending', 'pending_confirm'])

@@ -201,6 +201,17 @@ export default function Menu() {
         headers: { 'Content-Type': 'application/json', apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
         body: JSON.stringify({ branch_id: branchId, message: msg }),
       }).catch(() => {})
+
+      // Best-effort WhatsApp confirmation to the customer. Uses the
+      // order_pending_confirm template — silently no-ops until Meta approves
+      // the template and TEMPLATE_SIDS is populated in send-whatsapp/index.ts.
+      supabase.functions.invoke('send-whatsapp', {
+        body: {
+          to: phone,
+          templateName: 'order_pending_confirm',
+          templateVariables: { '1': data.pickup_code },
+        },
+      }).catch(() => {})
     } catch (err) {
       setSubmitError(err.message || t('Order failed. Please try again.', 'فشل الطلب. حاول مرة أخرى.'))
     } finally {
