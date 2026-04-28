@@ -2,6 +2,8 @@
 
 Guide for switching off the Twilio WhatsApp **sandbox** (`+14155238886`, customers must text "join mood-same" first) and getting a production sender. End-to-end timeline: ~10–14 days, mostly Meta review.
 
+**Sender number chosen:** `+218 93 551 6524` (Libyana, dedicated to Noch's WhatsApp Business — must not have personal WhatsApp installed when Twilio claims it).
+
 ## What you need before you start
 
 Gather these into one folder. Twilio + Meta will ask for them.
