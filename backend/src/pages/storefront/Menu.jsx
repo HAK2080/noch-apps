@@ -209,7 +209,7 @@ export default function Menu() {
         body: {
           to: phone,
           templateName: 'order_pending_confirm',
-          templateVariables: { '1': data.pickup_code },
+          templateVariables: { '1': name, '2': data.pickup_code },
         },
       }).catch(() => {})
     } catch (err) {
