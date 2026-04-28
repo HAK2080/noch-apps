@@ -110,3 +110,4 @@ if __name__ == "__main__":
     if "--no-build" not in sys.argv:
         build()
     upload()
+# v3.5.0
