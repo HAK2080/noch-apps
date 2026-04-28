@@ -18,9 +18,11 @@ Rewrite of all 13 templates in Nochi's voice. Nochi is the brand's bunny mascot 
 
 ### 1. `staff_invite`
 ```
-هاي يا {{1}} 🐰 أنا نوتشي. سويت لك حساب جديد عندنا — افتحه من هنا وغير الباسوورد لراحتك: {{2}}
+هاي يا {{1}} 🐰 أنا نوتشي. حسابك جاهز — افتحه من {{2}} وغيّر الباسوورد لراحتك ☕
 ```
 Variables: `{{1}}` name, `{{2}}` login URL.
+
+> Meta rule: variables can't be at the start or end. Original ended with `{{2}}` — moved into the middle of the sentence.
 
 ### 2. `loyalty_stamp_earned`
 ```
@@ -48,9 +50,11 @@ Variables: `{{1}}` name, `{{2}}` pickup code.
 
 ### 5. `order_ready_pickup`
 ```
-يلا يا {{1}} 🐰 خلصت طلبك. تعا أخدته قبل لا يبرد — الرمز: *{{2}}*
+يلا يا {{1}} 🐰 خلصت طلبك. الرمز *{{2}}* — تعا أخدته قبل لا يبرد ☕
 ```
 Variables: `{{1}}` name, `{{2}}` pickup code.
+
+> Meta rule: variables can't be at the start or end. Original ended with `*{{2}}*` — moved into the middle.
 
 ---
 
@@ -82,9 +86,11 @@ Variables: `{{1}}` name, `{{2}}` top drink.
 
 ### 10. `marketing_streak_save`
 ```
-{{2}} زيارة متتالية يا {{1}} 🔥 لا تخسرها مني — أنا أحسب 👀🐰
+يا {{1}}، عندك {{2}} زيارة متتالية 🔥 لا تخسرها مني — أنا أحسب 👀🐰
 ```
 Variables: `{{1}}` name, `{{2}}` streak count.
+
+> Meta rule: variables can't be at the start or end. Original started with `{{2}}` — moved name to the front.
 
 ### 11. `marketing_anniversary`
 ```
