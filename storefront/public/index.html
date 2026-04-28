@@ -788,7 +788,7 @@ const BRANCHES = [
   { id: '8459848d-fe99-4716-8222-c99b8746d881',
     nameEn: 'Bloom Abu Nawas',      nameAr: 'بلوم أبو نواس',
     subEn: 'Abu Nawas',             subAr: 'أبو نواس',
-    live: false },
+    live: false, hidden: true },
   { id: '1332e9b6-8137-40fb-ad3e-074521c32ffb',
     nameEn: 'Noch Jaraba',          nameAr: 'نوتش الجربة',
     subEn: 'Jaraba',                subAr: 'الجربة',
@@ -1039,7 +1039,7 @@ function BranchPickerModal({ open, onClose, lang, t }){
         <button className="bp-close" onClick={onClose} aria-label={t.pickerClose}>✕</button>
         <h3 className="bp-title">{t.pickerTitle}</h3>
         <div className="bp-list">
-          {BRANCHES.map(b=>{
+          {BRANCHES.filter(b=>!b.hidden).map(b=>{
             const name = lang==='ar' ? b.nameAr : b.nameEn;
             const sub  = lang==='ar' ? b.subAr  : b.subEn;
             if(!b.live){
