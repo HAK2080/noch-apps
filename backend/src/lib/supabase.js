@@ -1781,6 +1781,19 @@ export async function lookupLoyaltyQR(qrToken) {
   return data?.customer || null
 }
 
+// ── Proactive inventory ────────────────────────────────────────
+export async function flagLowStockProactive() {
+  const { data, error } = await supabase.rpc('flag_low_stock_proactive')
+  if (error) throw error
+  return data || []
+}
+
+export async function inventoryReviewDigest() {
+  const { data, error } = await supabase.rpc('inventory_review_digest')
+  if (error) throw error
+  return data
+}
+
 // ── Loyalty redemption codes (4-letter, 5-min expiry) ──────────
 export async function generateLoyaltyCode(customerId) {
   const { data, error } = await supabase.rpc('generate_loyalty_code', { p_customer_id: customerId })

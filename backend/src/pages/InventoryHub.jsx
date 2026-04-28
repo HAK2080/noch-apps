@@ -11,7 +11,7 @@ import {
 import Layout from '../components/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../contexts/PermissionsContext'
-import { supabase } from '../lib/supabase'
+import { supabase, inventoryReviewDigest } from '../lib/supabase'
 import { sendTelegram } from '../lib/telegram'
 import { getPOSBranches, getAllLatestStockEntries } from '../modules/pos/lib/pos-supabase'
 import toast from 'react-hot-toast'
@@ -237,6 +237,8 @@ export default function InventoryHub() {
   const [reviewDay] = useState(isReviewDay())
   const [lastAlert, setLastAlert] = useState(null)
   const [stockCheckMap, setStockCheckMap] = useState({})
+  const [posDigest, setPosDigest] = useState(null)
+  const [digestLoading, setDigestLoading] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -356,6 +358,62 @@ export default function InventoryHub() {
                 {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                 Send Report
               </button>
+            )}
+          </div>
+        )}
+
+        {/* POS-derived proactive digest */}
+        {(isOwner || hasAccess('inventory')) && (
+          <div className="bg-noch-card border border-noch-border rounded-xl p-4">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <p className="text-white font-semibold text-sm flex items-center gap-2">
+                  <TrendingDown size={14} className="text-noch-green" />
+                  Proactive scan (POS-derived)
+                </p>
+                <p className="text-noch-muted text-xs mt-0.5">
+                  Estimates daily ingredient usage from POS sales × cost recipes — no manual logging required.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  setDigestLoading(true)
+                  try {
+                    const d = await inventoryReviewDigest()
+                    setPosDigest(d)
+                  } catch (err) {
+                    toast.error(err.message || 'Scan failed')
+                  } finally {
+                    setDigestLoading(false)
+                  }
+                }}
+                disabled={digestLoading}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-noch-green/20 text-noch-green border border-noch-green/30 rounded-lg text-xs font-medium hover:bg-noch-green/30 disabled:opacity-50"
+              >
+                {digestLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                {posDigest ? 'Re-scan' : 'Run scan'}
+              </button>
+            </div>
+            {posDigest && (
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg py-2">
+                  <p className="text-red-400 text-xl font-bold">{posDigest.critical}</p>
+                  <p className="text-red-400/70 text-[11px] uppercase tracking-wide">Critical</p>
+                </div>
+                <div className="bg-orange-400/10 border border-orange-400/20 rounded-lg py-2">
+                  <p className="text-orange-400 text-xl font-bold">{posDigest.reorder_now}</p>
+                  <p className="text-orange-400/70 text-[11px] uppercase tracking-wide">Reorder now</p>
+                </div>
+                <div className="bg-amber-400/10 border border-amber-400/20 rounded-lg py-2">
+                  <p className="text-amber-400 text-xl font-bold">{posDigest.reorder_soon}</p>
+                  <p className="text-amber-400/70 text-[11px] uppercase tracking-wide">Soon</p>
+                </div>
+              </div>
+            )}
+            {posDigest?.text && (
+              <pre className="mt-3 text-xs text-noch-muted whitespace-pre-wrap font-mono bg-noch-dark border border-noch-border rounded-lg p-3 max-h-64 overflow-y-auto">
+                {posDigest.text}
+              </pre>
             )}
           </div>
         )}
