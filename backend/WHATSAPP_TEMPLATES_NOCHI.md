@@ -94,9 +94,11 @@ Variables: `{{1}}` name, `{{2}}` streak count.
 
 ### 11. `marketing_anniversary`
 ```
-🎉 سنة كاملة معي يا {{1}}! اليوم {{2}} على حسابي — تعا نحتفل ☕🐰
+🎉 سنة كاملة معي يا {{1}}! خصم 20% اليوم على {{2}} وأي شيء تطلبه — تعا نحتفل ☕🐰
 ```
 Variables: `{{1}}` name, `{{2}}` top drink.
+
+> 20% discount instead of "on me" (free drink) — sustainable across the customer base. Wiring (Phase 2) needs to apply a 20% promo code at POS for that customer on their anniversary day.
 
 ### 12. `marketing_back_in_stock`
 ```
