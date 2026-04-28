@@ -54,8 +54,15 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
           chmod 600 "$HOME/.ssh/deploy_key"
 
-      - name: Build + Deploy
+      - name: Probe SSH connectivity from runner
+        run: |
+          echo "Runner egress IP: $(curl -sS https://api.ipify.org || echo unknown)"
+          timeout 8 bash -c '</dev/tcp/72.60.203.107/22' && echo "port 22 OPEN" || echo "port 22 BLOCKED"
+
+      - name: Build + Deploy (verbose)
         working-directory: backend
         run: |
           export DEPLOY_SSH_KEY_PATH="$HOME/.ssh/deploy_key"
-          python deploy.py
+          set -x
+          python -u deploy.py 2>&1
+          echo "--- deploy.py exit code: $? ---"
