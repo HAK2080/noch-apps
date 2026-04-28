@@ -56,6 +56,7 @@ export default function Menu() {
   const [phone, setPhone]         = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [orderResult, setOrderResult] = useState(null)
+  const [orderStatus, setOrderStatus] = useState('pending') // pending | confirmed
   const [submitError, setSubmitError] = useState('')
 
   // Coupon
@@ -239,8 +240,29 @@ export default function Menu() {
     })
   }
 
+  // Realtime: flip success screen to "Confirmed" when staff taps Confirm at POS.
+  // Anon SELECT on pos_orders is gated to rows < 24h old (see migration
+  // 20260428_anon_realtime_orders.sql).
+  useEffect(() => {
+    if (!orderResult?.order_id) return
+    setOrderStatus('pending')
+    const channel = supabase
+      .channel(`order-${orderResult.order_id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'pos_orders',
+        filter: `id=eq.${orderResult.order_id}`,
+      }, (payload) => {
+        const row = payload.new || {}
+        if (row.awaiting_staff_confirm === false) setOrderStatus('confirmed')
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [orderResult?.order_id])
+
   function resetOrder() {
-    setShowCheckout(false); setOrderResult(null); setName(''); setPhone('')
+    setShowCheckout(false); setOrderResult(null); setOrderStatus('pending'); setName(''); setPhone('')
     setGps({ status: 'idle', lat: null, lng: null, distance: null })
     setCopied(false); setCouponCode(''); setCouponApplied(null); setCouponError('')
   }
@@ -369,8 +391,12 @@ export default function Menu() {
             {/* Success screen */}
             {orderResult && (
               <div className="order-success">
-                <div className="success-check">✓</div>
-                <h2 className="success-title">{t('Order sent!', 'تم إرسال طلبك!')}</h2>
+                <div className="success-check">{orderStatus === 'confirmed' ? '✓' : '⏳'}</div>
+                <h2 className="success-title">
+                  {orderStatus === 'confirmed'
+                    ? t('Confirmed by cashier!', 'تم التأكيد من قبل الكاشير!')
+                    : t('Order sent!', 'تم إرسال طلبك!')}
+                </h2>
                 <p className="success-sub">{t('Show this code to the cashier', 'أرِ هذا الرمز للكاشير')}</p>
                 <div className="pickup-code-wrap">
                   <div className="pickup-code">{orderResult.pickup_code}</div>
@@ -378,11 +404,18 @@ export default function Menu() {
                     {copied ? t('✓ Copied', '✓ تم النسخ') : t('⧉ Copy code', '⧉ نسخ')}
                   </button>
                 </div>
+                <div className={`status-pill status-${orderStatus}`}>
+                  {orderStatus === 'confirmed'
+                    ? t('✓ Being prepared', '✓ قيد التحضير')
+                    : t('Waiting for cashier confirmation…', 'في انتظار تأكيد الكاشير…')}
+                </div>
                 <p className="order-number">{orderResult.order_number}</p>
                 <p className="order-total">{Number(orderResult.total).toFixed(2)} LYD</p>
                 {tableNumber && <p className="order-table">{t('Table', 'طاولة')} {tableNumber}</p>}
                 <p className="staff-note">
-                  {t('The cashier will confirm your order shortly.', 'سيقوم الكاشير بتأكيد طلبك في أقرب وقت.')}
+                  {orderStatus === 'confirmed'
+                    ? t('Your order is being prepared. Pick it up at the counter when ready.', 'يتم تحضير طلبك. تعال إلى الكاشير عند جاهزيته.')
+                    : t('The cashier will confirm your order shortly.', 'سيقوم الكاشير بتأكيد طلبك في أقرب وقت.')}
                 </p>
                 <button className="btn-done" onClick={resetOrder}>{t('Done', 'تم')}</button>
               </div>
