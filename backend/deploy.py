@@ -39,7 +39,7 @@ DIST = HERE / "dist"
 
 def build():
     print("[1/4] Building...")
-    result = subprocess.run(["npm", "run", "build"], cwd=HERE, shell=True)
+    result = subprocess.run("npm run build", cwd=HERE, shell=True)
     if result.returncode != 0:
         sys.exit("Build failed")
     if not DIST.exists():
