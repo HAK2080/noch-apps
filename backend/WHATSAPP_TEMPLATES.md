@@ -82,24 +82,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 6. `inventory_review_digest` (internal — owner/supervisor only)
-
-**Purpose:** Twice-weekly proactive stock review (Sun + Wed).
-
-**Body:**
-```
-📦 مراجعة المخزون - {{1}}: {{2}} عنصر حرج، {{3}} يحتاج إعادة طلب الآن، {{4}} قريباً. التفاصيل في التطبيق.
-```
-
-**Variables:**
-- `{{1}}` — date (e.g. "الأحد 28 أبريل")
-- `{{2}}` — critical count
-- `{{3}}` — reorder_now count
-- `{{4}}` — reorder_soon count
-
----
-
-## 7. `loyalty_lapsed_checkin` (Marketing — "we miss you")
+## 6. `loyalty_lapsed_checkin` (Marketing — "we miss you")
 
 **Purpose:** Customer hasn't visited in N days; nudge them back with a free-stamp incentive.
 
@@ -114,7 +97,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 8. `loyalty_visit_feedback` (Marketing — post-visit ask)
+## 7. `loyalty_visit_feedback` (Marketing — post-visit ask)
 
 **Purpose:** Fire 30–60 min after a loyalty stamp is earned to ask for feedback.
 
@@ -128,7 +111,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 9. `loyalty_marketing_birthday` (Marketing — separate review)
+## 8. `loyalty_marketing_birthday` (Marketing — separate review)
 
 **Purpose:** Birthday wish + bonus stamp.
 
@@ -144,7 +127,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 10. `marketing_weather_iced` (Marketing — personalized)
+## 9. `marketing_weather_iced` (Marketing — personalized)
 
 **Purpose:** Fire on hot days only (>32°C in Tripoli) with the customer's most-ordered drink. Cron checks weather API + customer's top-product view.
 
@@ -159,7 +142,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 11. `marketing_streak_save` (Marketing — loss aversion)
+## 10. `marketing_streak_save` (Marketing — loss aversion)
 
 **Purpose:** Customer is on an active visit streak; ping at day 5 since last visit before the streak resets.
 
@@ -174,7 +157,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 12. `marketing_anniversary` (Marketing — yearly surprise)
+## 11. `marketing_anniversary` (Marketing — yearly surprise)
 
 **Purpose:** Fire on the anniversary of customer's first visit. Personalized with their top drink.
 
@@ -189,7 +172,7 @@ Variables use `{{1}}`, `{{2}}`, etc. Meta requires example values for each.
 
 ---
 
-## 13. `marketing_back_in_stock` (Marketing — relevance)
+## 12. `marketing_back_in_stock` (Marketing — relevance)
 
 **Purpose:** A product the customer ordered before came back from out-of-stock. Fire only to customers who ordered it in last 90 days.
 

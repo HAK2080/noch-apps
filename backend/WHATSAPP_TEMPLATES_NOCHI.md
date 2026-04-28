@@ -52,53 +52,47 @@ Variables: `{{1}}` name, `{{2}}` pickup code.
 ```
 Variables: `{{1}}` name, `{{2}}` pickup code.
 
-### 6. `inventory_review_digest`
-```
-📦 مراجعة المخزون — {{1}}. عندنا {{2}} حرج، {{3}} لازم نطلبه اليوم، {{4}} قريب. التفاصيل في التطبيق 🐰
-```
-Variables: `{{1}}` date, `{{2}}` critical, `{{3}}` reorder_now, `{{4}}` reorder_soon.
-
 ---
 
 ## Marketing templates (submit after utility approves)
 
-### 7. `loyalty_lapsed_checkin`
+### 6. `loyalty_lapsed_checkin`
 ```
 يا {{1}}، نسيتني؟ 👀 من {{2}} يوم وأنا أنطر. تعا اليوم على حسابي — لا تخليني أحزن 🐰
 ```
 Variables: `{{1}}` name, `{{2}}` days since last visit.
 
-### 8. `loyalty_visit_feedback`
+### 7. `loyalty_visit_feedback`
 ```
 شكراً على زيارتك يا {{1}} 🙌 كيف كانت؟ اضغط على بطاقة الولاء وقيّمها بنجمة — رأيك يفرحني. https://apps.noch.cloud/loyalty/me
 ```
 Variables: `{{1}}` name.
 
-### 9. `loyalty_marketing_birthday`
+### 8. `loyalty_marketing_birthday`
 ```
 🎂 عيد ميلاد سعيد يا {{1}}! ضفت لك طابع إضافي بإيدي كهدية — تعا نحتفل ☕🐰
 ```
 Variables: `{{1}}` name.
 
-### 10. `marketing_weather_iced`
+### 9. `marketing_weather_iced`
 ```
 يا {{1}}، الجو حر اليوم 🌡️☀️ تبي {{2}} مثلج جاهز عند وصولك؟ قول لي وأبدأ أحضّره 🐰
 ```
 Variables: `{{1}}` name, `{{2}}` top drink.
 
-### 11. `marketing_streak_save`
+### 10. `marketing_streak_save`
 ```
 {{2}} زيارة متتالية يا {{1}} 🔥 لا تخسرها مني — أنا أحسب 👀🐰
 ```
 Variables: `{{1}}` name, `{{2}}` streak count.
 
-### 12. `marketing_anniversary`
+### 11. `marketing_anniversary`
 ```
 🎉 سنة كاملة معي يا {{1}}! اليوم {{2}} على حسابي — تعا نحتفل ☕🐰
 ```
 Variables: `{{1}}` name, `{{2}}` top drink.
 
-### 13. `marketing_back_in_stock`
+### 12. `marketing_back_in_stock`
 ```
 يا {{1}}، {{2}} رجع 🎉 خبيت لك واحد — تعا قبل لا أشربه أنا 🐰👀
 ```
