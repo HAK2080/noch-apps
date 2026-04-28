@@ -1781,6 +1781,29 @@ export async function lookupLoyaltyQR(qrToken) {
   return data?.customer || null
 }
 
+// ── Loyalty redemption codes (4-letter, 5-min expiry) ──────────
+export async function generateLoyaltyCode(customerId) {
+  const { data, error } = await supabase.rpc('generate_loyalty_code', { p_customer_id: customerId })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+export async function validateLoyaltyCode(code) {
+  const { data, error } = await supabase.rpc('validate_loyalty_code', { p_code: code?.toUpperCase() })
+  if (error) throw error
+  return data
+}
+
+export async function consumeLoyaltyCode(rewardId, orderId) {
+  const { data, error } = await supabase.rpc('consume_loyalty_code', {
+    p_reward_id: rewardId,
+    p_order_id: orderId,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function generateLoyaltyQR() {
   // Generate token directly in DB (no edge function needed)
   const token = 'NOCHI-' + Math.random().toString(36).substring(2, 7).toUpperCase()

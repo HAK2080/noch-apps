@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { QrCode, Gift, Star, Zap, Share2, Globe } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
-import { getMyLoyaltyCard, submitLoyaltyFeedback, getLoyaltySettings, getLastSpin } from '../../../lib/supabase'
+import { getMyLoyaltyCard, submitLoyaltyFeedback, getLoyaltySettings, getLastSpin, generateLoyaltyCode } from '../../../lib/supabase'
 import Layout from '../../../components/Layout'
 import NochiBunny from '../components/NochiBunny'
 import StampCard from '../components/StampCard'
@@ -40,6 +40,7 @@ export default function MyCard() {
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [nextSpinMs, setNextSpinMs] = useState(null)
+  const [showRedeem, setShowRedeem] = useState(false)
   const ar = lang === 'ar'
 
   useEffect(() => {
@@ -222,12 +223,23 @@ export default function MyCard() {
           {pendingRewards.map(r => (
             <p key={r.id} className="text-white text-sm">
               🎁 {r.description || (ar ? 'مشروب مجاني' : 'Free drink')}
-              <span className="text-noch-muted text-xs ms-2">
-                ({ar ? 'أرِه للبارستا' : 'Show to barista'})
-              </span>
             </p>
           ))}
+          <button
+            onClick={() => setShowRedeem(true)}
+            className="mt-3 w-full py-2.5 rounded-xl bg-yellow-400 text-noch-dark font-bold hover:bg-yellow-300 transition-colors"
+          >
+            {ar ? 'استرد الآن' : 'Redeem now'}
+          </button>
         </div>
+      )}
+
+      {showRedeem && (
+        <RedeemCodeModal
+          customerId={card.id}
+          ar={ar}
+          onClose={() => setShowRedeem(false)}
+        />
       )}
 
       {/* Stats */}
@@ -325,5 +337,83 @@ export default function MyCard() {
         </div>
       )}
     </Layout>
+  )
+}
+
+// ── Redemption code modal ─────────────────────────────────────
+function RedeemCodeModal({ customerId, ar, onClose }) {
+  const [loading, setLoading] = useState(true)
+  const [code, setCode] = useState(null)
+  const [expiresAt, setExpiresAt] = useState(null)
+  const [secondsLeft, setSecondsLeft] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    generateLoyaltyCode(customerId)
+      .then(d => {
+        if (cancelled) return
+        setCode(d.code)
+        setExpiresAt(new Date(d.expires_at))
+      })
+      .catch(err => { if (!cancelled) setError(err.message || 'failed') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [customerId])
+
+  useEffect(() => {
+    if (!expiresAt) return
+    const tick = () => {
+      const ms = expiresAt.getTime() - Date.now()
+      setSecondsLeft(Math.max(0, Math.floor(ms / 1000)))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [expiresAt])
+
+  const expired = secondsLeft === 0
+  const errorMsg = error === 'no_pending_reward'
+    ? (ar ? 'لا توجد مكافأة معلقة' : 'No pending reward')
+    : error
+      ? (ar ? 'حدث خطأ — حاول مرة أخرى' : 'Something went wrong — try again')
+      : null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="card max-w-sm w-full" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-bold">{ar ? 'استرداد المكافأة' : 'Redeem your reward'}</h3>
+          <button onClick={onClose} className="text-noch-muted hover:text-white">✕</button>
+        </div>
+
+        {loading && (
+          <p className="text-noch-muted text-sm text-center py-6">{ar ? 'جارٍ التوليد…' : 'Generating code…'}</p>
+        )}
+
+        {errorMsg && (
+          <p className="text-red-400 text-sm text-center py-6">{errorMsg}</p>
+        )}
+
+        {!loading && !error && code && (
+          <>
+            <p className="text-noch-muted text-xs text-center mb-2">
+              {ar ? 'أرِ هذا الرمز للبارستا' : 'Show this code to the barista'}
+            </p>
+            <div className="bg-yellow-400/10 border-2 border-yellow-400/40 rounded-xl py-6 text-center mb-3">
+              <p className={`text-5xl font-black tracking-[0.5em] ${expired ? 'text-noch-muted' : 'text-yellow-400'}`}>
+                {code}
+              </p>
+            </div>
+            <p className={`text-center text-sm ${expired ? 'text-red-400' : 'text-noch-muted'}`}>
+              {expired
+                ? (ar ? 'انتهت الصلاحية — أغلق ثم حاول مرة أخرى' : 'Expired — close and tap Redeem again')
+                : (ar ? `صالح لمدة ${secondsLeft}s` : `Valid for ${secondsLeft}s`)
+              }
+            </p>
+          </>
+        )}
+      </div>
+    </div>
   )
 }

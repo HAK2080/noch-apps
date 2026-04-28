@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp } from 'lucide-react'
-import { supabase } from '../../../lib/supabase'
+import { supabase, consumeLoyaltyCode } from '../../../lib/supabase'
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift
@@ -249,8 +249,13 @@ export default function POSTerminal() {
   // Complete payment
   const handlePaymentComplete = async (paymentData) => {
     const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0)
-    const discountAmount = showPayment.discountAmount || 0
-    const total = subtotal - discountAmount
+    const cartDiscount = showPayment.discountAmount || 0
+    const loyaltyDiscount = paymentData.loyalty_discount_amount || 0
+    const discountAmount = cartDiscount + loyaltyDiscount
+    const total = Math.max(0, subtotal - discountAmount)
+
+    // Strip loyalty fields not in pos_orders schema
+    const { loyalty_reward_id, loyalty_discount_amount, ...paymentDataForOrder } = paymentData
 
     const orderData = {
       branch_id: branchId,
@@ -259,7 +264,7 @@ export default function POSTerminal() {
       discount_amount: discountAmount,
       discount_pct: showPayment.discountType === 'pct' ? (showPayment.discountValue || 0) : 0,
       total,
-      ...paymentData,
+      ...paymentDataForOrder,
       synced: isOnline(),
     }
 
@@ -289,6 +294,20 @@ export default function POSTerminal() {
           created_at: new Date().toISOString(),
         }
         toast('Order saved offline. Will sync when online.', { icon: '📴' })
+      }
+
+      // Consume loyalty reward if one was applied (only after order persisted)
+      if (loyalty_reward_id && order?.id && !String(order.id).startsWith('offline-')) {
+        try {
+          const result = await consumeLoyaltyCode(loyalty_reward_id, order.id)
+          if (!result?.success) {
+            toast.error('Loyalty reward could not be consumed — please verify in admin')
+          }
+        } catch (err) {
+          toast.error('Loyalty consume failed: ' + (err.message || 'unknown'))
+        }
+      } else if (loyalty_reward_id && String(order.id || '').startsWith('offline-')) {
+        toast('Loyalty redemption queued — will reconcile when online', { icon: '📴' })
       }
 
       setShowPayment(null)
@@ -453,6 +472,7 @@ export default function POSTerminal() {
       {showPayment && (
         <PaymentModal
           total={showPayment.total}
+          cartItems={cart}
           onComplete={handlePaymentComplete}
           onClose={() => setShowPayment(null)}
         />

@@ -1,10 +1,10 @@
 // PaymentModal.jsx — Payment collection modal
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
+import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike, Gift } from 'lucide-react'
 import BarcodeScanner from './BarcodeScanner'
 import QRScanner from './QRScanner'
-import { lookupLoyaltyQR } from '../../../lib/supabase'
+import { lookupLoyaltyQR, validateLoyaltyCode } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
 const NUMPAD_KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫']
@@ -38,25 +38,36 @@ function Numpad({ value, onChange }) {
   )
 }
 
-export default function PaymentModal({ total, onComplete, onClose, loyaltyCustomer: initialLoyalty }) {
+export default function PaymentModal({ total, cartItems = [], onComplete, onClose, loyaltyCustomer: initialLoyalty }) {
   const [method, setMethod] = useState('cash') // cash | card | split | presto
-  const [cashTendered, setCashTendered] = useState(total.toFixed(2))
-  const [cardAmount, setCardAmount] = useState('0')
   const [showScanner, setShowScanner] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
+  const [showLoyaltyCode, setShowLoyaltyCode] = useState(false)
   const [loyaltyCustomer, setLoyaltyCustomer] = useState(initialLoyalty || null)
+  const [loyaltyReward, setLoyaltyReward] = useState(null) // { reward_id, customer_name, discount_amount }
+
+  const loyaltyDiscount = loyaltyReward?.discount_amount || 0
+  const effectiveTotal = Math.max(0, total - loyaltyDiscount)
+
+  const [cashTendered, setCashTendered] = useState(effectiveTotal.toFixed(2))
+  const [cardAmount, setCardAmount] = useState('0')
+
+  // Keep cashTendered in sync with effectiveTotal when loyalty is applied/removed
+  useEffect(() => {
+    setCashTendered(effectiveTotal.toFixed(2))
+  }, [effectiveTotal])
 
   const changeDue = method === 'cash'
-    ? Math.max(0, parseFloat(cashTendered || 0) - total)
+    ? Math.max(0, parseFloat(cashTendered || 0) - effectiveTotal)
     : 0
 
-  const splitCash = total - parseFloat(cardAmount || 0)
+  const splitCash = effectiveTotal - parseFloat(cardAmount || 0)
   const splitValid = method === 'split' &&
     parseFloat(cardAmount) > 0 &&
-    parseFloat(cardAmount) < total
+    parseFloat(cardAmount) < effectiveTotal
 
   const canComplete =
-    (method === 'cash' && parseFloat(cashTendered || 0) >= total) ||
+    (method === 'cash' && parseFloat(cashTendered || 0) >= effectiveTotal) ||
     method === 'card' ||
     method === 'presto' ||
     splitValid
@@ -67,11 +78,44 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
       payment_method: method,
       cash_tendered: method === 'cash' ? parseFloat(cashTendered) : null,
       change_due: changeDue,
-      card_amount: (method === 'card' || method === 'presto') ? total : method === 'split' ? parseFloat(cardAmount) : 0,
-      loyalty_customer_id: loyaltyCustomer?.id || null,
+      card_amount: (method === 'card' || method === 'presto') ? effectiveTotal : method === 'split' ? parseFloat(cardAmount) : 0,
+      loyalty_customer_id: loyaltyReward?.customer_id || loyaltyCustomer?.id || null,
+      loyalty_reward_id: loyaltyReward?.reward_id || null,
+      loyalty_discount_amount: loyaltyDiscount,
     }
     onComplete(paymentData)
-  }, [canComplete, method, cashTendered, changeDue, cardAmount, total, loyaltyCustomer, onComplete])
+  }, [canComplete, method, cashTendered, changeDue, cardAmount, effectiveTotal, loyaltyCustomer, loyaltyReward, loyaltyDiscount, onComplete])
+
+  const handleLoyaltyCodeApply = async (code) => {
+    try {
+      const result = await validateLoyaltyCode(code)
+      if (!result?.valid) {
+        const msg = result?.error === 'expired' ? 'Code expired'
+                  : result?.error === 'bad_format' ? 'Code must be 4 letters'
+                  : 'Code invalid or already used'
+        toast.error(msg)
+        return
+      }
+      // Discount = highest unit price in cart (one free drink)
+      const highestPrice = cartItems.reduce((max, i) => Math.max(max, parseFloat(i.price) || 0), 0)
+      if (highestPrice <= 0) {
+        toast.error('Add items to the cart first')
+        return
+      }
+      setLoyaltyReward({
+        reward_id: result.reward_id,
+        customer_id: result.customer_id,
+        customer_name: result.customer_name,
+        discount_amount: highestPrice,
+      })
+      setShowLoyaltyCode(false)
+      toast.success(`Loyalty applied — ${result.customer_name} (-${highestPrice.toFixed(2)} LYD)`)
+    } catch (err) {
+      toast.error(err.message || 'Could not validate code')
+    }
+  }
+
+  const removeLoyalty = () => setLoyaltyReward(null)
 
   // Enter key shortcut
   useEffect(() => {
@@ -125,7 +169,14 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
               <h2 className="text-white font-bold text-xl">Payment</h2>
-              <p className="text-noch-green text-2xl font-bold mt-1">{total.toFixed(2)} LYD</p>
+              {loyaltyDiscount > 0 ? (
+                <>
+                  <p className="text-noch-muted text-sm line-through mt-1">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-2xl font-bold">{effectiveTotal.toFixed(2)} LYD</p>
+                </>
+              ) : (
+                <p className="text-noch-green text-2xl font-bold mt-1">{total.toFixed(2)} LYD</p>
+              )}
             </div>
             <button onClick={onClose} className="text-noch-muted hover:text-white p-1">
               <X size={20} />
@@ -133,6 +184,33 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
           </div>
 
           <div className="p-5">
+            {/* Loyalty section */}
+            {loyaltyReward ? (
+              <div className="mb-4 rounded-xl px-3 py-2.5 flex items-center gap-3" style={{ background: 'rgba(245,146,46,0.12)', border: '1px solid rgba(245,146,46,0.4)' }}>
+                <Gift size={16} className="text-yellow-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">Loyalty: {loyaltyReward.customer_name}</p>
+                  <p className="text-yellow-400 text-xs">−{loyaltyDiscount.toFixed(2)} LYD (free drink)</p>
+                </div>
+                <button onClick={removeLoyalty} className="text-zinc-400 hover:text-white text-xs px-2">Remove</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowLoyaltyCode(true)}
+                className="mb-4 w-full py-2.5 rounded-xl border border-yellow-500/30 text-yellow-400 text-sm font-medium hover:bg-yellow-500/10 transition-colors flex items-center justify-center gap-2"
+              >
+                <Gift size={14} />
+                Apply Loyalty Code
+              </button>
+            )}
+
+            {showLoyaltyCode && (
+              <LoyaltyCodeEntry
+                onApply={handleLoyaltyCodeApply}
+                onClose={() => setShowLoyaltyCode(false)}
+              />
+            )}
+
             {/* Method tabs */}
             <div className="grid grid-cols-4 gap-2 mb-5">
               {[
@@ -172,7 +250,7 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
                 <Numpad value={cashTendered} onChange={setCashTendered} />
                 {/* Quick amounts */}
                 <div className="flex gap-2 mt-2">
-                  {[total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).map(amt => (
+                  {[effectiveTotal, Math.ceil(effectiveTotal), Math.ceil(effectiveTotal / 5) * 5, Math.ceil(effectiveTotal / 10) * 10].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).map(amt => (
                     <button
                       key={amt}
                       onClick={() => setCashTendered(amt.toFixed(2))}
@@ -192,7 +270,7 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
                 <p className="text-white font-semibold mb-1">Process on Verifone X990 Plus</p>
                 <p className="text-noch-muted text-sm mb-4">Insert / tap card on terminal</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{effectiveTotal.toFixed(2)} LYD</p>
                 </div>
               </div>
             )}
@@ -221,7 +299,7 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
                 <p className="text-white font-semibold mb-1">Presto Delivery</p>
                 <p className="text-noch-muted text-sm mb-4">Order will be marked as Presto payment</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{effectiveTotal.toFixed(2)} LYD</p>
                 </div>
               </div>
             )}
@@ -262,5 +340,58 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
         </div>
       </div>
     </>
+  )
+}
+
+// ── Loyalty code entry modal ──────────────────────────────────
+function LoyaltyCodeEntry({ onApply, onClose }) {
+  const [code, setCode] = useState('')
+  const handle = (k) => {
+    if (k === '⌫') return setCode(c => c.slice(0, -1))
+    if (code.length >= 4) return
+    setCode(c => (c + k).toUpperCase())
+  }
+  const KEYS = ['Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
+  // Subset matching the server alphabet (no I,O,Q,V,etc — keep I and O removed for clarity)
+  const ALPHABET = ['A','B','C','D','E','F','G','H','J','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z']
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-noch-border">
+          <h3 className="text-white font-bold">Loyalty code</h3>
+          <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="p-5">
+          <p className="text-noch-muted text-xs text-center mb-2">Enter the 4-letter code from the customer</p>
+          <div className="bg-noch-dark border-2 border-yellow-500/30 rounded-xl py-5 mb-4">
+            <p className="text-yellow-400 text-4xl font-black tracking-[0.4em] text-center">
+              {code.padEnd(4, '·')}
+            </p>
+          </div>
+          <div className="grid grid-cols-6 gap-1.5 mb-3">
+            {ALPHABET.map(k => (
+              <button
+                key={k}
+                onClick={() => handle(k)}
+                className="py-2.5 rounded-lg bg-noch-dark border border-noch-border text-white text-sm font-semibold hover:border-yellow-500/40"
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => handle('⌫')} className="flex-1 py-2.5 rounded-lg bg-noch-border/50 text-noch-muted hover:bg-noch-border">⌫</button>
+            <button
+              onClick={() => onApply(code)}
+              disabled={code.length !== 4}
+              className={`flex-[2] py-2.5 rounded-lg font-bold ${code.length === 4 ? 'bg-yellow-400 text-noch-dark hover:bg-yellow-300' : 'bg-noch-border text-noch-muted cursor-not-allowed'}`}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
