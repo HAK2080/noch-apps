@@ -19,14 +19,23 @@ const CORS_HEADERS = {
 // Map of template name → Twilio Content SID. Populate after Meta approves
 // each template (Twilio Console → Messaging → Content Templates → copy SID).
 // Names here must match WHATSAPP_TEMPLATES.md.
+// Filled in 2026-04-28. Templates pending Meta approval can still be
+// referenced — Twilio returns a 4xx the edge function passes back, and
+// the caller (which uses .catch(() => {})) silently swallows it. Once
+// Meta approves a template, sends just start working.
 const TEMPLATE_SIDS: Record<string, string> = {
-  // staff_invite: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  // loyalty_stamp_earned: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  // loyalty_reward_ready: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  // order_pending_confirm: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  // order_ready_pickup: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  // inventory_review_digest: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  // loyalty_marketing_birthday: 'HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+  staff_invite: 'HX9549493aceb9741684ec2e902b482bae',
+  loyalty_stamp_earned: 'HX89f5ce59c0ee9cf028a86860c9c30219',
+  loyalty_reward_ready: 'HXd1df8cc058afd9e1812ad2881ee9de1e',
+  order_pending_confirm: 'HX22d413fd4c3b5889115a100f193dfc79',
+  order_ready_pickup: 'HXaefecaa7440e4342ac9faed72c934e2c',
+  loyalty_lapsed_checkin: 'HX1bcf158d960d649731d8026e86c70aa5',
+  loyalty_visit_feedback: 'HX7817d895460872978be7411662b11fbe',
+  loyalty_marketing_birthday: 'HX2d934c0762f0b623e080b1d382f7c5b1',
+  marketing_weather_iced: 'HX20bba1bda93bfd0291b1f2428bd8d6f2',
+  marketing_back_in_stock: 'HX16c84ac97be895be6c153b3414e92976',
+  // marketing_streak_save: TODO — paste HX SID when visible in Twilio
+  // marketing_anniversary: TODO — paste HX SID when visible in Twilio
 }
 
 serve(async (req: Request) => {
