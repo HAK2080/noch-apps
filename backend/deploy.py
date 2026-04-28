@@ -27,7 +27,9 @@ except ImportError:
 
 HOST = "72.60.203.107"
 USER = "root"
-PASS = "9@hW@s3UWL@Z#9uIUlnp"
+# SSH auth: uses ED25519 key. Set DEPLOY_SSH_KEY_PATH to point at the private key,
+# or place it at repo-root/.deploy-keys/noch_deploy and we'll auto-detect.
+# DEPLOY_SSH_PASSWORD env var is honored as a last-resort fallback.
 REMOTE = "/var/www/apps"  # THE serving directory for apps.noch.cloud
 VERIFY_URL = "https://apps.noch.cloud/index.html"
 
@@ -48,7 +50,21 @@ def upload():
     print(f"[2/4] Connecting to {HOST}...")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(HOST, username=USER, password=PASS)
+
+    # Resolve SSH key: env var first, then auto-detect local .deploy-keys/noch_deploy
+    key_path = os.path.expanduser(os.environ.get("DEPLOY_SSH_KEY_PATH", ""))
+    if not key_path:
+        candidate = HERE.parents[1] / ".deploy-keys" / "noch_deploy"
+        if candidate.exists():
+            key_path = str(candidate)
+
+    if key_path and os.path.exists(key_path):
+        pkey = paramiko.Ed25519Key.from_private_key_file(key_path)
+        ssh.connect(HOST, username=USER, pkey=pkey, look_for_keys=False, allow_agent=False)
+    elif os.environ.get("DEPLOY_SSH_PASSWORD"):
+        ssh.connect(HOST, username=USER, password=os.environ["DEPLOY_SSH_PASSWORD"])
+    else:
+        sys.exit("No SSH key found. Set DEPLOY_SSH_KEY_PATH, place key at repo-root/.deploy-keys/noch_deploy, or set DEPLOY_SSH_PASSWORD.")
     sftp = ssh.open_sftp()
 
     print(f"[3/4] Uploading to {REMOTE}...")

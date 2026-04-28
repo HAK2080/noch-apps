@@ -1,0 +1,61 @@
+name: Deploy admin app → apps.noch.cloud
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'backend/**'
+      - '!backend/**/*.sql'   # SQL changes are run manually
+      - '.github/workflows/deploy-admin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: admin-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install paramiko
+        run: pip install --quiet paramiko
+
+      - name: Install JS deps
+        working-directory: backend
+        run: npm ci || npm install
+
+      - name: Write env file from secret (build needs VITE_*)
+        working-directory: backend
+        env:
+          NOCH_BACKEND_ENV: ${{ secrets.NOCH_BACKEND_ENV }}
+        run: |
+          if [ -n "$NOCH_BACKEND_ENV" ]; then
+            printf '%s\n' "$NOCH_BACKEND_ENV" > .env
+          else
+            echo "NOCH_BACKEND_ENV secret not set — falling back to repo .env if present"
+          fi
+
+      - name: Write SSH key from secret
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+      - name: Build + Deploy
+        working-directory: backend
+        run: |
+          export DEPLOY_SSH_KEY_PATH="$HOME/.ssh/deploy_key"
+          python deploy.py

@@ -1,7 +1,7 @@
 // ExpensesPage.jsx — Cost Center Expense Tracking Module
 // Tabs: Submit | My Expenses | Approve | Dashboard | Settings (owner)
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Receipt, Plus, Check, X, Clock, DollarSign, Camera, Upload,
   ChevronDown, Settings, BarChart3, Loader2, Eye, CreditCard,
@@ -1107,8 +1107,42 @@ function SettingsTab({ onMetaChanged }) {
   )
 }
 
+// ── ERROR BOUNDARY ───────────────────────────────────────────
+class ExpensesErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) {
+    console.error('Expenses crashed:', error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <Layout>
+          <div className="max-w-2xl mx-auto bg-red-500/10 border border-red-500/40 rounded-xl p-6 mt-6">
+            <h2 className="text-xl font-bold text-red-300 flex items-center gap-2 mb-3">
+              <AlertCircle size={20}/> Expenses module crashed
+            </h2>
+            <p className="text-sm text-noch-muted mb-3">
+              Something broke while loading. Tell HAK or the on-call dev — paste the message below.
+            </p>
+            <pre className="text-xs bg-black/40 border border-noch-border rounded-lg p-3 overflow-auto whitespace-pre-wrap text-red-200">
+              {String(this.state.error?.message || this.state.error)}
+              {this.state.error?.stack ? '\n\n' + this.state.error.stack.split('\n').slice(0,4).join('\n') : ''}
+            </pre>
+            <button onClick={()=>this.setState({error:null})}
+              className="mt-4 px-4 py-2 bg-noch-green text-black rounded-lg text-sm font-semibold">
+              Retry
+            </button>
+          </div>
+        </Layout>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ── MAIN PAGE ────────────────────────────────────────────────
-export default function ExpensesPage() {
+function ExpensesPageInner() {
   const { user, profile, isOwner } = useAuth()
   const { hasAccess } = usePermissions()
   const [activeTab, setActiveTab] = useState('submit')
@@ -1193,4 +1227,12 @@ export default function ExpensesPage() {
       </div>
     </Layout>
   )
+}
+
+export default function ExpensesPage() {
+  return (
+    <ExpensesErrorBoundary>
+      <ExpensesPageInner />
+    </ExpensesErrorBoundary>
+  );
 }

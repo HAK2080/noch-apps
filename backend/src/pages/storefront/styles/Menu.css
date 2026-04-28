@@ -69,6 +69,22 @@
   transition: background 0.2s, transform 0.15s;
 }
 .lang-toggle:hover { background: var(--brand-dark); transform: translateY(-1px); }
+.menu-back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #E86A1E; color: #fff; text-decoration: none;
+  border: 2.5px solid #0B1020; border-radius: 999px;
+  padding: 7px 15px; font-size: 13px; font-weight: 800;
+  box-shadow: 3px 3px 0 #0B1020;
+  transition: transform .15s, box-shadow .15s;
+  flex-shrink: 0;
+}
+.menu-back-btn:hover { transform: translate(-2px,-2px); box-shadow: 5px 5px 0 #0B1020; }
+.menu-header-inner > .menu-back-btn { order: -1; }
+.menu-header-inner { gap: 10px; flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .menu-back-btn { padding: 5px 10px; font-size: 11px; }
+  .menu-back-btn span { display: none; }
+}
 
 /* Loading */
 .menu-loading {

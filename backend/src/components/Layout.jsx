@@ -45,6 +45,7 @@ export default function Layout({ children }) {
 
   const ownerNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
+    { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/tasks', icon: CheckSquare, label: t('tasks') },
     { to: '/recipes', icon: Coffee, label: t('recipes') },
     { to: '/cost-calculator', icon: Calculator, label: 'Cost Calculator' },
@@ -56,13 +57,13 @@ export default function Layout({ children }) {
     { to: '/pos', icon: ShoppingCart, label: 'POS' },
     { to: '/products', icon: ShoppingBag, label: 'Products' },
     { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
-    { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/staff', icon: Users, label: t('staff') },
     { to: '/report', icon: BarChart2, label: t('report') },
   ]
 
   const staffNav = [
     { to: '/my-tasks', icon: CheckSquare, label: t('myTasks'), end: true },
+    { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
     { to: '/recipes', icon: Coffee, label: t('recipes') },
     { to: '/inventory', icon: Package, label: 'Inventory' },

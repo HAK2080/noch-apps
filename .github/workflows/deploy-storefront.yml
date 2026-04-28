@@ -1,0 +1,43 @@
+name: Deploy storefront → noch.cloud
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'storefront/**'
+      - '.github/workflows/deploy-storefront.yml'
+  workflow_dispatch:        # manual run from the Actions tab
+
+concurrency:
+  group: storefront-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install paramiko
+        run: pip install --quiet paramiko
+
+      - name: Write SSH key from secret
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+      - name: Run deploy.py
+        working-directory: storefront
+        env:
+          DEPLOY_SSH_KEY_PATH: ${{ runner.temp }}/../../../home/runner/.ssh/deploy_key
+        run: |
+          export DEPLOY_SSH_KEY_PATH="$HOME/.ssh/deploy_key"
+          python deploy.py
