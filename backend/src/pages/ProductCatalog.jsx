@@ -227,8 +227,14 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
     if (!branchId) return toast.error('No branch selected')
     setSaving(true)
     try {
+      // Whitelist payload to BLANK keys — strips joined relations
+      // like `pos_categories` and system columns (id, created_at, etc.)
+      // that get spread in when editing an existing product.
+      const clean = Object.fromEntries(
+        Object.keys(BLANK).map(k => [k, form[k]])
+      )
       const payload = {
-        ...form,
+        ...clean,
         name: form.name.trim(),
         branch_id: branchId,
         price: parseFloat(form.price),
