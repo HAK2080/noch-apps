@@ -7,9 +7,10 @@ Rewrite of all 13 templates in Nochi's voice. Nochi is the brand's bunny mascot 
 **Voice rules for Nochi:**
 - First person ("أنا"، "عندي"، "ضفت لك")
 - Libyan Arabic dialect ("هاي"، "تعا"، "حلو/حلوة")
-- Warm + slightly playful, not childish
+- **Mischievous + warm** — Nochi takes credit, teases, knows things, watches you. Not childish, not corporate.
 - Occasional 🐰 / paws / coffee emoji — not in every message
 - Short. Customers read on a phone, half-attention.
+- Internal templates (e.g. `inventory_review_digest` to owners) stay clinical — Nochi doesn't write inventory reports.
 
 ---
 
@@ -41,13 +42,13 @@ Variables: `{{1}}` name.
 
 ### 4. `order_pending_confirm`
 ```
-تسلم يا {{1}} ☕ استلمت طلبك — رمز الاستلام: *{{2}}*. نخبرك أول ما يكون جاهز 🐰
+شفت طلبك يا {{1}} 👀 استلمته بإيدي. رمزك: *{{2}}*. لما نخلص نقولك 🐰☕
 ```
-Variables: `{{1}}` name (NEW), `{{2}}` pickup code.
+Variables: `{{1}}` name, `{{2}}` pickup code.
 
 ### 5. `order_ready_pickup`
 ```
-يا {{1}}، طلبك جاهز ✅ تعا للكاشير ومعك الرمز: *{{2}}*. ناطرك 🐰
+يلا يا {{1}} 🐰 خلصت طلبك. تعا أخدته قبل لا يبرد — الرمز: *{{2}}*
 ```
 Variables: `{{1}}` name, `{{2}}` pickup code.
 
@@ -63,7 +64,7 @@ Variables: `{{1}}` date, `{{2}}` critical, `{{3}}` reorder_now, `{{4}}` reorder_
 
 ### 7. `loyalty_lapsed_checkin`
 ```
-يا {{1}}، اشتقتلك! 🐰 آخر زيارة كانت قبل {{2}} يوم — تعا اليوم على حسابي وأسجل لك زيارة مجانية ☕
+يا {{1}}، نسيتني؟ 👀 من {{2}} يوم وأنا أنطر. تعا اليوم على حسابي — لا تخليني أحزن 🐰
 ```
 Variables: `{{1}}` name, `{{2}}` days since last visit.
 
@@ -87,7 +88,7 @@ Variables: `{{1}}` name, `{{2}}` top drink.
 
 ### 11. `marketing_streak_save`
 ```
-يا {{1}}، عندك {{2}} زيارة متتالية 🔥 ما تكسر السلسلة! نشوفك هالأسبوع؟ 🐰
+{{2}} زيارة متتالية يا {{1}} 🔥 لا تخسرها مني — أنا أحسب 👀🐰
 ```
 Variables: `{{1}}` name, `{{2}}` streak count.
 
@@ -99,7 +100,7 @@ Variables: `{{1}}` name, `{{2}}` top drink.
 
 ### 13. `marketing_back_in_stock`
 ```
-يا {{1}}، {{2}} اللي تحبه رجع! 🎉 أحضّر لك واحد اليوم؟ 🐰
+يا {{1}}، {{2}} رجع 🎉 خبيت لك واحد — تعا قبل لا أشربه أنا 🐰👀
 ```
 Variables: `{{1}}` name, `{{2}}` product name.
 
