@@ -493,6 +493,8 @@ export default function ProductCatalog() {
   const [drafts, setDrafts] = useState(() => listDrafts('product'))
   const [syncing, setSyncing] = useState(false)
   const [syncReport, setSyncReport] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [importReport, setImportReport] = useState(null)
 
   const handleSyncImages = async () => {
     if (syncing) return
@@ -510,6 +512,27 @@ export default function ProductCatalog() {
       toast.error(err.message || 'Image sync failed')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleImportFromBloomly = async () => {
+    if (importing) return
+    if (!confirm('Import all bloomly.odoo.com products as new products in this branch?\n\nSkips any name that already exists. New rows get price + image from bloomly, marked visible on website. May take 1-2 minutes.')) return
+    setImporting(true)
+    setImportReport(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('bloomly-import-products', {
+        body: { branchId: activeBranch?.id },
+      })
+      if (error) throw error
+      if (!data?.ok) throw new Error(data?.error || 'Import failed')
+      setImportReport(data)
+      toast.success(`Imported ${data.summary.imported} · Duplicates ${data.summary.duplicates} · No price ${data.summary.no_price} · Errors ${data.summary.errors}`)
+      load()
+    } catch (err) {
+      toast.error(err.message || 'Import failed')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -603,12 +626,21 @@ export default function ProductCatalog() {
             </h1>
             <p className="text-zinc-500 text-sm mt-0.5">Central catalog — synced with POS, inventory & cost calculator</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handleImportFromBloomly}
+              disabled={importing}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+              title="Import all bloomly.odoo.com products as new products"
+            >
+              <Upload size={14} className={importing ? 'animate-pulse' : ''} />
+              {importing ? 'Importing...' : 'Import bloomly'}
+            </button>
             <button
               onClick={handleSyncImages}
               disabled={syncing}
               className="btn-secondary flex items-center gap-2 disabled:opacity-60"
-              title="Auto-source product images from bloomly.odoo.com"
+              title="Auto-source images for existing products from bloomly.odoo.com"
             >
               <Image size={14} className={syncing ? 'animate-pulse' : ''} />
               {syncing ? 'Syncing...' : 'Sync images'}
@@ -618,6 +650,27 @@ export default function ProductCatalog() {
             </button>
           </div>
         </div>
+
+        {importReport && (
+          <div className="mb-4 rounded-xl px-4 py-3" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)' }}>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-white text-sm font-medium">
+                Bloomly import: imported {importReport.summary.imported} · duplicates {importReport.summary.duplicates} · no price {importReport.summary.no_price} · errors {importReport.summary.errors}
+              </p>
+              <button onClick={() => setImportReport(null)} className="text-noch-muted hover:text-white"><X size={14} /></button>
+            </div>
+            {importReport.summary.errors > 0 && (
+              <details className="text-xs text-noch-muted">
+                <summary className="cursor-pointer">Show errors ({importReport.summary.errors})</summary>
+                <ul className="mt-2 space-y-1">
+                  {importReport.decisions.filter(d => d.action === 'error').slice(0, 30).map((d, i) => (
+                    <li key={i}>• <span className="text-white">{d.name}</span> — {d.error}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
 
         {syncReport && (
           <div className="mb-4 rounded-xl px-4 py-3" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)' }}>
