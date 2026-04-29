@@ -99,18 +99,6 @@ serve(async (req) => {
       }).catch(() => {})
     }
 
-    // Legacy Telegram path — kept for customers registered via the bot.
-    if (result?.reward_earned) {
-      fetch(`${SUPABASE_URL}/functions/v1/loyalty-notify`, {
-        method: 'POST',
-        headers: { ...sbHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'reward_earned',
-          customer_id: finalCustomerId,
-        }),
-      }).catch(() => {})
-    }
-
     return new Response(JSON.stringify(result), { headers: { ...headers, 'Access-Control-Allow-Origin': '*' } })
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers })

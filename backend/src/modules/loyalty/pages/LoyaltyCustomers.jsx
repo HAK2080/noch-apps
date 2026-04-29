@@ -65,7 +65,9 @@ export default function LoyaltyCustomers() {
           <p className="text-noch-muted text-sm">{filtered.length} {ar ? 'عميل' : 'customers'}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="btn-secondary p-2.5"><RefreshCw size={16} /></button>
+          <button onClick={load} disabled={loading} className="btn-secondary p-2.5 disabled:opacity-60">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
           <button onClick={() => setShowRegister(true)} className="btn-primary flex items-center gap-2">
             <UserPlus size={16} />
             <span className="hidden sm:inline">{ar ? 'تسجيل' : 'Register'}</span>

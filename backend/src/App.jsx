@@ -60,6 +60,10 @@ import LoyaltyRewards from './modules/loyalty/pages/LoyaltyRewards'
 import LoyaltyQR from './modules/loyalty/pages/LoyaltyQR'
 import LoyaltySettings from './modules/loyalty/pages/LoyaltySettings'
 import LoyaltyLeaderboard from './modules/loyalty/pages/LoyaltyLeaderboard'
+import LoyaltyStamp from './modules/loyalty/pages/LoyaltyStamp'
+import LoyaltySpinWheel from './modules/loyalty/pages/LoyaltySpinWheel'
+import LoyaltyGestures from './modules/loyalty/pages/LoyaltyGestures'
+import LoyaltyFeedback from './modules/loyalty/pages/LoyaltyFeedback'
 import MyCard from './modules/loyalty/customer/MyCard'
 
 import ExpensesPage from './pages/expenses/ExpensesPage'
@@ -200,6 +204,10 @@ export default function App() {
         <Route path="/loyalty/qr" element={<ProtectedRoute><LoyaltyQR /></ProtectedRoute>} />
         <Route path="/loyalty/settings" element={<ProtectedRoute><LoyaltySettings /></ProtectedRoute>} />
         <Route path="/loyalty/leaderboard" element={<ProtectedRoute><LoyaltyLeaderboard /></ProtectedRoute>} />
+        <Route path="/loyalty/stamp" element={<ProtectedRoute><LoyaltyStamp /></ProtectedRoute>} />
+        <Route path="/loyalty/spin" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
+        <Route path="/loyalty/gestures" element={<ProtectedRoute><LoyaltyGestures /></ProtectedRoute>} />
+        <Route path="/loyalty/feedback" element={<ProtectedRoute><LoyaltyFeedback /></ProtectedRoute>} />
 
         {/* Ideas Module */}
         <Route path="/ideas" element={<ProtectedRoute><IdeasBoard /></ProtectedRoute>} />

@@ -107,7 +107,7 @@ export default function Layout({ children }) {
             </h1>
           </div>
           <p className="text-xs mt-1 ms-4" style={{ color: 'var(--muted)' }}>
-            {t('appTagline')} <span style={{ color: 'rgba(74,222,128,0.4)' }}>v3.4.0</span>
+            {t('appTagline')} <span style={{ color: 'rgba(74,222,128,0.4)' }}>v3.6.0</span>
           </p>
         </div>
 

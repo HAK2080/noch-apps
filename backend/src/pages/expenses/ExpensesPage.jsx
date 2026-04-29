@@ -140,13 +140,17 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
   async function submit() {
     if (!form.cost_center_id) { toast.error('Select a cost center'); return }
     if (!form.category_id)    { toast.error('Select a category'); return }
-    if (!form.amount || isNaN(parseFloat(form.amount))) { toast.error('Enter a valid amount'); return }
+    const amt = parseFloat(form.amount)
+    if (!form.amount || isNaN(amt) || amt <= 0) { toast.error('Enter a valid amount greater than 0'); return }
     setSaving(true)
     try {
       let receipt_url = null
       if (receiptFile) {
-        try { receipt_url = await uploadReceipt(user.id, receiptFile) }
-        catch { toast('Receipt upload failed — saving without photo', { icon: '⚠️' }) }
+        try {
+          receipt_url = await uploadReceipt(user.id, receiptFile)
+        } catch (uploadErr) {
+          toast(`Receipt upload failed: ${uploadErr.message || 'unknown'}. Saving without photo.`, { icon: '⚠️', duration: 5000 })
+        }
       }
       const isAutoApproved = isOwner && autoApprove
       const { data: expense, error } = await supabase.from('expenses').insert({

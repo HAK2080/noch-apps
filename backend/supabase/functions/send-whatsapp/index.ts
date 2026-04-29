@@ -59,7 +59,21 @@ serve(async (req: Request) => {
       return json({ error: 'Twilio credentials not configured' }, 500)
     }
 
-    const toPhone = to.startsWith('+') ? to : '+' + to.replace(/\D/g, '')
+    // Normalize phone: Libyan local numbers (09XXXXXXXX) get +218 prepended.
+    // Already-international (+...) passes through.
+    let toPhone: string
+    if (to.startsWith('+')) {
+      toPhone = to
+    } else {
+      const digits = to.replace(/\D/g, '')
+      if (digits.startsWith('0') && digits.length === 10) {
+        toPhone = '+218' + digits.slice(1)
+      } else if (digits.startsWith('218')) {
+        toPhone = '+' + digits
+      } else {
+        toPhone = '+' + digits
+      }
+    }
 
     const params = new URLSearchParams({
       From: `whatsapp:${fromNumber}`,

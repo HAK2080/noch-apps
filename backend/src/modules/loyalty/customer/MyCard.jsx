@@ -41,33 +41,36 @@ export default function MyCard() {
   const [submitting, setSubmitting] = useState(false)
   const [nextSpinMs, setNextSpinMs] = useState(null)
   const [showRedeem, setShowRedeem] = useState(false)
+  const [loadError, setLoadError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const ar = lang === 'ar'
 
   useEffect(() => {
-    if (user) {
-      Promise.all([
-        getMyLoyaltyCard(user.id),
-        getLoyaltySettings(),
-      ])
-        .then(async ([c, s]) => {
-          setCard(c)
-          setLoyaltySettings(s)
-          if (c && s) {
-            const freq = s.spin_frequency || 'weekly'
-            if (freq !== 'off') {
-              const lastSpin = await getLastSpin(c.id).catch(() => null)
-              if (lastSpin) {
-                const elapsed = Date.now() - new Date(lastSpin).getTime()
-                const required = getFrequencyMs(freq)
-                if (elapsed < required) setNextSpinMs(required - elapsed)
-              }
+    if (!user) return
+    setLoading(true)
+    setLoadError(null)
+    Promise.all([
+      getMyLoyaltyCard(user.id),
+      getLoyaltySettings(),
+    ])
+      .then(async ([c, s]) => {
+        setCard(c)
+        setLoyaltySettings(s)
+        if (c && s) {
+          const freq = s.spin_frequency || 'weekly'
+          if (freq !== 'off') {
+            const lastSpin = await getLastSpin(c.id).catch(() => null)
+            if (lastSpin) {
+              const elapsed = Date.now() - new Date(lastSpin).getTime()
+              const required = getFrequencyMs(freq)
+              if (elapsed < required) setNextSpinMs(required - elapsed)
             }
           }
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false))
-    }
-  }, [user])
+        }
+      })
+      .catch((e) => setLoadError(e.message || (ar ? 'تعذر التحميل' : 'Failed to load')))
+      .finally(() => setLoading(false))
+  }, [user, reloadKey])
 
   const handleFeedback = async () => {
     if (!rating) return toast.error(ar ? 'اختر تقييماً' : 'Select a rating')
@@ -97,6 +100,22 @@ export default function MyCard() {
   }
 
   if (loading) return <Layout><p className="text-noch-muted text-center py-16">...</p></Layout>
+
+  if (loadError) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <p className="text-red-400 text-sm">{loadError}</p>
+          <button
+            onClick={() => setReloadKey(k => k + 1)}
+            className="btn-secondary px-4 py-2 text-sm"
+          >
+            {ar ? 'إعادة المحاولة' : 'Retry'}
+          </button>
+        </div>
+      </Layout>
+    )
+  }
 
   if (!card) {
     return (

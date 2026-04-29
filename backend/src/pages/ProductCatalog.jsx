@@ -209,8 +209,15 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
         if (pendingFile && created?.id) {
           try {
             await uploadProductImage(created.id, pendingFile)
-          } catch {
-            toast.error('Product saved but image upload failed')
+          } catch (uploadErr) {
+            const msg = uploadErr.message || ''
+            if (/row-level security|policy/i.test(msg)) {
+              toast.error('Product saved. Image blocked by storage policy — run PRODUCT_IMAGES_RLS.sql.')
+            } else if (/network|fetch/i.test(msg)) {
+              toast.error('Product saved. Image upload failed: network error.')
+            } else {
+              toast.error(`Product saved. Image upload failed: ${msg || 'unknown'}`)
+            }
           }
         }
       }
@@ -239,7 +246,14 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
         setPendingPreview(null)
         toast.success('Photo uploaded')
       } catch (err) {
-        toast.error(err.message || 'Upload failed')
+        const msg = err.message || ''
+        if (/row-level security|policy/i.test(msg)) {
+          toast.error('Upload blocked by storage policy — run PRODUCT_IMAGES_RLS.sql.')
+        } else if (/network|fetch/i.test(msg)) {
+          toast.error('Upload failed: network error. Try again.')
+        } else {
+          toast.error(msg || 'Upload failed')
+        }
       } finally {
         setUploading(false)
       }

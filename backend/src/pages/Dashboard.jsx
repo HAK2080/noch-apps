@@ -143,7 +143,9 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="btn-secondary p-2.5" title={l.refresh}><RefreshCw size={16} /></button>
+          <button onClick={load} disabled={loading} className="btn-secondary p-2.5 disabled:opacity-60" title={l.refresh}>
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
           <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
             <Plus size={16} />
             <span className="hidden sm:inline">{l.newTask}</span>
