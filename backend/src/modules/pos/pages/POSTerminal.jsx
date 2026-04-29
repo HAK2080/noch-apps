@@ -39,22 +39,6 @@ function OnlineOrderRow({ order, branchId, onConfirmed }) {
       if (error) throw error
       if (data?.error) throw new Error(data.error)
       toast.success(`Order ${order.order_number} confirmed`)
-
-      // Best-effort customer notification — silently no-ops until the
-      // order_ready_pickup template is approved and TEMPLATE_SIDS has its SID.
-      if (order.customer_phone) {
-        supabase.functions.invoke('send-whatsapp', {
-          body: {
-            to: order.customer_phone,
-            templateName: 'order_ready_pickup',
-            templateVariables: {
-              '1': order.customer_name || 'Guest',
-              '2': order.pickup_code || '',
-            },
-          },
-        }).catch(() => {})
-      }
-
       onConfirmed()
     } catch (err) {
       toast.error(err.message || 'Confirm failed')
