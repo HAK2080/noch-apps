@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
+import FormStatePreserver from './components/FormStatePreserver'
 
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -98,6 +99,7 @@ function RootRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <FormStatePreserver />
       <Routes>
         <Route path="/login" element={<Login />} />
 
