@@ -1,5 +1,5 @@
 /* ── Menu V3.4 ── */
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 .menu-root {
   --brand:      #E86A1E;
@@ -201,11 +201,11 @@
 .product-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .product-body { padding: 12px; display: flex; flex-direction: column; flex: 1; }
-.product-name { font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 4px; line-height: 1.3; font-family: 'Cairo', 'Inter', sans-serif; }
+.product-name { font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 4px; line-height: 1.3; font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif; }
 .product-desc { font-size: 12px; color: var(--muted); margin: 0 0 10px; line-height: 1.4; flex: 1; }
 
 .product-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
-.product-price { font-size: 15px; font-weight: 800; color: var(--brand); font-family: 'Cairo', 'Inter', sans-serif; }
+.product-price { font-size: 15px; font-weight: 800; color: var(--brand); font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif; }
 
 .btn-add {
   width: 32px; height: 32px;
@@ -436,7 +436,7 @@
   cursor: pointer;
   transition: background 0.18s, opacity 0.18s, transform 0.15s, box-shadow 0.15s;
   box-shadow: 4px 4px 0 var(--text);
-  font-family: 'Cairo', 'Inter', sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
 }
 .btn-order:hover:not(:disabled) { background: var(--brand-dark); transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--text); }
 .btn-order:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
@@ -463,7 +463,7 @@
   padding: 20px 16px 0;
 }
 .cat-group-heading {
-  font-family: 'Cairo', 'Inter', sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
   font-size: 15px;
   font-weight: 800;
   color: var(--brand-blue);
@@ -484,7 +484,7 @@
   justify-content: center;
 }
 .placeholder-letter {
-  font-family: 'Cairo', 'Inter', sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
   font-size: 2rem;
   font-weight: 800;
   line-height: 1;
@@ -541,7 +541,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
-  font-family: 'Cairo', 'Inter', sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
   box-shadow: 3px 3px 0 var(--text);
 }
 .copy-btn:hover  { background: var(--brand-blue-dark); transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--text); }
@@ -554,7 +554,7 @@
   border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
-  font-family: 'Cairo', 'Inter', sans-serif;
+  font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
   border: 2px solid;
   transition: background 0.3s, color 0.3s, border-color 0.3s;
 }
@@ -570,8 +570,8 @@
 }
 
 .order-number { font-size: 13px; color: var(--muted); margin: 0 0 4px; }
-.order-total  { font-size: 22px; font-weight: 800; color: var(--brand); margin: 0 0 4px; font-family: 'Cairo', 'Inter', sans-serif; }
+.order-total  { font-size: 22px; font-weight: 800; color: var(--brand); margin: 0 0 4px; font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif; }
 .order-table  { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
 .staff-note   { font-size: 13px; color: var(--muted); margin: 8px 0 24px; line-height: 1.5; }
-.btn-done { padding: 14px 40px; background: var(--brand-blue); color: #fff; border: 2.5px solid var(--text); border-radius: 50px; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 4px 4px 0 var(--text); transition: transform 0.15s, box-shadow 0.15s; font-family: 'Cairo', 'Inter', sans-serif; }
+.btn-done { padding: 14px 40px; background: var(--brand-blue); color: #fff; border: 2.5px solid var(--text); border-radius: 50px; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 4px 4px 0 var(--text); transition: transform 0.15s, box-shadow 0.15s; font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif; }
 .btn-done:hover { background: var(--brand-blue-dark); transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--text); }
