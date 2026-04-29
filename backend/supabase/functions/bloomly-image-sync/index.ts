@@ -60,34 +60,32 @@ async function scrapePage(page: number): Promise<BloomlyProduct[]> {
   const html = await res.text()
   const products: BloomlyProduct[] = []
 
-  // Odoo product card pattern — extract via regex on the oe_product_cart structure.
-  // Cards look roughly like: <a href="/shop/<slug>" ...>...<span itemprop="name">NAME</span>...
-  // and an <img src="/web/image/product.product/<id>/image_1024/...">
-  // Card boundary: "oe_product_cart" or "o_wsale_product_grid_wrapper"
-  const cardRegex = /<(?:div|article|li)[^>]*class="[^"]*oe_product[^"]*"[\s\S]*?<\/(?:div|article|li)>/g
-  let match: RegExpExecArray | null
-  const fallbackBlocks: string[] = []
-
-  while ((match = cardRegex.exec(html)) !== null) {
-    fallbackBlocks.push(match[0])
+  // Split into card blocks by the Odoo product class marker. The class is
+  // exactly "oe_product g-col-..." per inspection of bloomly.odoo.com on
+  // 2026-04-29. Each card has: title in <h2 class="o_wsale_products_item_title">
+  // → <a href="/shop/..."> → <span>NAME</span>; image in <img src="...image_1024/...">.
+  const blocks: string[] = []
+  const re = /class="oe_product\s+g-col-/g
+  const idxs: number[] = []
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) !== null) idxs.push(m.index)
+  for (let i = 0; i < idxs.length; i++) {
+    const start = idxs[i]
+    const end = i + 1 < idxs.length ? idxs[i + 1] : html.length
+    blocks.push(html.slice(start, end))
   }
 
-  const blocks = fallbackBlocks.length > 0 ? fallbackBlocks : [html]
   for (const block of blocks) {
-    const nameMatch = block.match(/itemprop=["']name["'][^>]*>([^<]+)</) ||
-                      block.match(/<h6[^>]*class="[^"]*o_wsale_products_item_title[^"]*"[^>]*>[\s\S]*?<a[^>]*>([^<]+)/) ||
-                      block.match(/<a[^>]*class="[^"]*o_wsale_products_item_title[^"]*"[^>]*>([^<]+)/)
-    const imgMatch = block.match(/<img[^>]+src=["']([^"']*\/web\/image\/product\.product\/\d+\/image_\d+[^"']*)["']/) ||
-                     block.match(/data-src=["']([^"']*\/web\/image\/product\.product\/\d+\/image_\d+[^"']*)["']/)
-    const linkMatch = block.match(/<a[^>]+href=["'](\/shop\/[^"']+)["']/)
-    if (nameMatch && imgMatch) {
+    const titleHrefMatch = block.match(/o_wsale_products_item_title[\s\S]*?<a[^>]+href=["'](\/shop\/[^"']+)["'][\s\S]*?<span[^>]*>\s*([^<]+?)\s*<\/span>/)
+    const imgMatch = block.match(/<img[^>]+src=["']([^"']*\/web\/image\/product\.product\/\d+\/image_\d+[^"']*)["']/)
+                  || block.match(/<img[^>]+src=["'](\/web\/image\/[^"']*)["']/)
+    if (titleHrefMatch && imgMatch) {
       const imgRaw = imgMatch[1]
       const image_url = imgRaw.startsWith('http') ? imgRaw : BLOOMLY_BASE + imgRaw
-      const source_url = linkMatch ? BLOOMLY_BASE + linkMatch[1] : ''
       products.push({
-        name: nameMatch[1].trim(),
+        name: titleHrefMatch[2].trim(),
         image_url,
-        source_url,
+        source_url: BLOOMLY_BASE + titleHrefMatch[1],
       })
     }
   }
