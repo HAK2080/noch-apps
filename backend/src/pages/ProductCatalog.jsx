@@ -4,7 +4,8 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Search, Edit2, Trash2, Upload, Package, TrendingUp, Layers, X,
-  ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag
+  ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag,
+  LayoutGrid, List as ListIcon, Wrench, Coffee, Box
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import toast from 'react-hot-toast'
@@ -33,6 +34,17 @@ function calcRecipeCost(recipe, rates) {
 }
 
 function fmt(n) { return parseFloat(n || 0).toFixed(3) }
+
+// Bucket maps a category name to a top-level filter chip.
+function bucketOf(categoryName) {
+  const n = (categoryName || '').toLowerCase()
+  if (!n) return 'other'
+  if (n === 'tools' || /tool|equipment|machine|grinder|brewer/.test(n)) return 'tools'
+  if (n === 'supplies' || /suppl|filter|cleaner|consumable/.test(n)) return 'supplies'
+  if (/coffee|tea|drink|latte|cappucc|mocha|frapp|matcha|chocolate|smoothie|juice|water|milk|chai/.test(n)) return 'drinks'
+  if (/cake|pastry|bakery|food|sandwich|pizza|salad|dessert/.test(n)) return 'food'
+  return 'other'
+}
 
 // ─── Margin display ───────────────────────────────────────────
 function Margin({ price, cost, size = 'sm' }) {
@@ -495,6 +507,9 @@ export default function ProductCatalog() {
   const [syncReport, setSyncReport] = useState(null)
   const [importing, setImporting] = useState(false)
   const [importReport, setImportReport] = useState(null)
+  const [bucket, setBucket] = useState('all')        // all | drinks | food | tools | supplies | other
+  const [viewMode, setViewMode] = useState('grouped') // grouped | list
+  const [collapsed, setCollapsed] = useState({})     // category_id -> bool
 
   const handleSyncImages = async () => {
     if (syncing) return
@@ -602,6 +617,7 @@ export default function ProductCatalog() {
       if (!hit) return false
     }
     if (categoryFilter && p.category_id !== categoryFilter) return false
+    if (bucket !== 'all' && bucketOf(p.pos_categories?.name) !== bucket) return false
     return true
   })
 
@@ -744,6 +760,44 @@ export default function ProductCatalog() {
           ))}
         </div>
 
+        {/* Bucket chips */}
+        {(() => {
+          const bucketCounts = products.reduce((acc, p) => {
+            const b = bucketOf(p.pos_categories?.name)
+            acc[b] = (acc[b] || 0) + 1
+            return acc
+          }, {})
+          const chipDefs = [
+            { key: 'all', label: 'All', icon: Layers, count: products.length },
+            { key: 'drinks', label: 'Drinks', icon: Coffee, count: bucketCounts.drinks || 0 },
+            { key: 'food', label: 'Food', icon: ShoppingBag, count: bucketCounts.food || 0 },
+            { key: 'tools', label: 'Tools', icon: Wrench, count: bucketCounts.tools || 0 },
+            { key: 'supplies', label: 'Supplies', icon: Box, count: bucketCounts.supplies || 0 },
+            { key: 'other', label: 'Other', icon: Package, count: bucketCounts.other || 0 },
+          ].filter(c => c.key === 'all' || c.count > 0)
+          return (
+            <div className="flex gap-2 flex-wrap mb-3">
+              {chipDefs.map(c => {
+                const active = bucket === c.key
+                const Icon = c.icon
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() => setBucket(c.key)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border"
+                    style={active
+                      ? { background: 'rgba(74,222,128,0.1)', color: '#4ADE80', borderColor: 'rgba(74,222,128,0.3)' }
+                      : { background: 'var(--card)', color: 'var(--muted)', borderColor: 'var(--border)' }
+                    }
+                  >
+                    <Icon size={12} /> {c.label} <span className="opacity-60">({c.count})</span>
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })()}
+
         {/* Filters row */}
         <div className="flex flex-wrap gap-3 mb-5">
           <div className="relative flex-1 min-w-48">
@@ -754,6 +808,18 @@ export default function ProductCatalog() {
             <option value="">All categories</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <div className="flex items-center gap-1 rounded-xl border p-1" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <button
+              onClick={() => setViewMode('grouped')}
+              className="px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+              style={viewMode === 'grouped' ? { background: 'rgba(74,222,128,0.12)', color: '#4ADE80' } : { color: 'var(--muted)' }}
+            ><LayoutGrid size={12} /> Grid</button>
+            <button
+              onClick={() => setViewMode('list')}
+              className="px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+              style={viewMode === 'list' ? { background: 'rgba(74,222,128,0.12)', color: '#4ADE80' } : { color: 'var(--muted)' }}
+            ><ListIcon size={12} /> List</button>
+          </div>
           <div className="flex items-center gap-2 rounded-xl px-3 border text-sm" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
             <TrendingUp size={13} className="text-zinc-500 flex-shrink-0" />
             <span className="text-zinc-500 text-xs">Sales:</span>
@@ -775,18 +841,118 @@ export default function ProductCatalog() {
           </div>
         ) : (
           <>
-            <p className="text-zinc-600 text-xs mb-3">{filtered.length} product{filtered.length !== 1 ? 's' : ''}{search || categoryFilter ? ' (filtered)' : ''}</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {filtered.map(p => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  stats={salesStats[p.id]}
-                  onEdit={setEditProduct}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </div>
+            <p className="text-zinc-600 text-xs mb-3">{filtered.length} product{filtered.length !== 1 ? 's' : ''}{search || categoryFilter || bucket !== 'all' ? ' (filtered)' : ''}</p>
+
+            {viewMode === 'list' ? (
+              <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+                <table className="w-full text-sm">
+                  <thead style={{ background: 'var(--surface)' }}>
+                    <tr className="text-zinc-500 text-xs">
+                      <th className="text-left px-3 py-2 font-medium w-12">Img</th>
+                      <th className="text-left px-3 py-2 font-medium">Name</th>
+                      <th className="text-left px-3 py-2 font-medium">Category</th>
+                      <th className="text-right px-3 py-2 font-medium">Price</th>
+                      <th className="text-right px-3 py-2 font-medium">Stock</th>
+                      <th className="px-3 py-2 w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(p => (
+                      <tr
+                        key={p.id}
+                        onClick={() => setEditProduct(p)}
+                        className="cursor-pointer border-t hover:bg-white/5 transition-colors"
+                        style={{ borderColor: 'var(--border)' }}
+                      >
+                        <td className="px-3 py-2">
+                          {p.image_url ? (
+                            <img src={p.image_url} alt="" className="w-9 h-9 rounded object-cover" />
+                          ) : (
+                            <div className="w-9 h-9 rounded flex items-center justify-center" style={{ background: 'var(--surface)' }}>
+                              <ShoppingBag size={14} className="text-zinc-600" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="text-white font-medium">{p.name}</p>
+                          {p.name_ar && <p className="text-zinc-500 text-xs" dir="rtl">{p.name_ar}</p>}
+                        </td>
+                        <td className="px-3 py-2 text-zinc-400">{p.pos_categories?.name || '—'}</td>
+                        <td className="px-3 py-2 text-right text-noch-green font-semibold">{fmt(p.price)}</td>
+                        <td className="px-3 py-2 text-right">
+                          {p.track_inventory ? <StockBadge qty={p.stock_qty} threshold={p.low_stock_alert} track /> : <span className="text-zinc-600 text-xs">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(p) }}
+                            className="text-red-400 hover:text-red-300 p-1"
+                            title="Delete"
+                          ><Trash2 size={13} /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {(() => {
+                  // Group filtered by category id (uncategorized as "Uncategorized")
+                  const groups = new Map()
+                  for (const p of filtered) {
+                    const k = p.category_id || 'uncat'
+                    if (!groups.has(k)) {
+                      groups.set(k, {
+                        id: k,
+                        name: p.pos_categories?.name || 'Uncategorized',
+                        color: p.pos_categories?.color || '#999',
+                        items: [],
+                      })
+                    }
+                    groups.get(k).items.push(p)
+                  }
+                  const ordered = Array.from(groups.values()).sort((a, b) => b.items.length - a.items.length)
+                  return ordered.map(g => {
+                    const isCollapsed = !!collapsed[g.id]
+                    return (
+                      <div key={g.id}>
+                        <button
+                          onClick={() => setCollapsed(c => ({ ...c, [g.id]: !c[g.id] }))}
+                          className="w-full flex items-center gap-2 mb-3 group"
+                        >
+                          <ChevronDown
+                            size={14}
+                            className="text-zinc-500 transition-transform"
+                            style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+                          />
+                          <span
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: g.color + '28', color: g.color }}
+                          >
+                            {g.name}
+                          </span>
+                          <span className="text-zinc-600 text-xs">{g.items.length}</span>
+                          <div className="flex-1 h-px ml-2" style={{ background: 'var(--border)' }} />
+                        </button>
+                        {!isCollapsed && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {g.items.map(p => (
+                              <ProductCard
+                                key={p.id}
+                                product={p}
+                                stats={salesStats[p.id]}
+                                onEdit={setEditProduct}
+                                onDelete={handleDelete}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            )}
           </>
         )}
       </div>
