@@ -23,6 +23,12 @@ const sbHeaders = {
   'Authorization': `Bearer ${SERVICE_KEY}`,
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 // ── String normalization (Arabic-aware) ────────────────────────────────
 function normalize(s: string): string {
   return s
@@ -157,7 +163,7 @@ async function downloadAndUpload(
 
 // ── Main ───────────────────────────────────────────────────────────────
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } })
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
   try {
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
@@ -265,6 +271,6 @@ serve(async (req) => {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   })
 }
