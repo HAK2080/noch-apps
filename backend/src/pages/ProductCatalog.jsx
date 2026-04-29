@@ -15,6 +15,7 @@ import {
 } from '../modules/pos/lib/pos-supabase'
 import { getRecipesForCost, getCurrencyRates, calcCostPerBaseUnit } from '../lib/supabase'
 import { loadDraft, saveDraft, clearDraft, listDrafts, draftAge } from '../lib/drafts'
+import { supabase } from '../lib/supabase'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
 
 // ─── helpers ──────────────────────────────────────────────────
@@ -490,6 +491,27 @@ export default function ProductCatalog() {
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [drafts, setDrafts] = useState(() => listDrafts('product'))
+  const [syncing, setSyncing] = useState(false)
+  const [syncReport, setSyncReport] = useState(null)
+
+  const handleSyncImages = async () => {
+    if (syncing) return
+    if (!confirm('Auto-source product images from bloomly.odoo.com?\n\nWill only update products that currently have NO image. Match score threshold 0.7. May take ~30s.')) return
+    setSyncing(true)
+    setSyncReport(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('bloomly-image-sync', { body: {} })
+      if (error) throw error
+      if (!data?.ok) throw new Error(data?.error || 'Sync failed')
+      setSyncReport(data)
+      toast.success(`Applied ${data.summary.applied} · Unsure ${data.summary.unsure} · No match ${data.summary.no_match}`)
+      load()
+    } catch (err) {
+      toast.error(err.message || 'Image sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const refreshDrafts = () => setDrafts(listDrafts('product'))
 
@@ -581,10 +603,42 @@ export default function ProductCatalog() {
             </h1>
             <p className="text-zinc-500 text-sm mt-0.5">Central catalog — synced with POS, inventory & cost calculator</p>
           </div>
-          <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
-            <Plus size={14} /> Add Product
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSyncImages}
+              disabled={syncing}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+              title="Auto-source product images from bloomly.odoo.com"
+            >
+              <Image size={14} className={syncing ? 'animate-pulse' : ''} />
+              {syncing ? 'Syncing...' : 'Sync images'}
+            </button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
+              <Plus size={14} /> Add Product
+            </button>
+          </div>
         </div>
+
+        {syncReport && (
+          <div className="mb-4 rounded-xl px-4 py-3" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.25)' }}>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-white text-sm font-medium">
+                Image sync: applied {syncReport.summary.applied} · unsure {syncReport.summary.unsure} · no match {syncReport.summary.no_match} · errors {syncReport.summary.errors}
+              </p>
+              <button onClick={() => setSyncReport(null)} className="text-noch-muted hover:text-white"><X size={14} /></button>
+            </div>
+            {syncReport.summary.unsure > 0 && (
+              <details className="text-xs text-noch-muted">
+                <summary className="cursor-pointer">Show unsure matches ({syncReport.summary.unsure})</summary>
+                <ul className="mt-2 space-y-1">
+                  {syncReport.decisions.filter(d => d.action === 'unsure').slice(0, 50).map(d => (
+                    <li key={d.product_id}>• <span className="text-white">{d.product_name}</span> ↔ {d.best_match} ({Math.round((d.score || 0) * 100)}%)</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
 
         {/* Unsaved drafts banner */}
         {drafts.length > 0 && !showAdd && !editProduct && (
