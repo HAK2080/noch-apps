@@ -82,7 +82,24 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: result.error }), { status: 400, headers })
     }
 
-    // If reward earned, send notification (fire and forget)
+    // Fetch customer for WhatsApp + legacy Telegram notification.
+    const customers = await sbGet(`loyalty_customers?id=eq.${finalCustomerId}&select=full_name,phone,current_stamps&limit=1`)
+    const customer = customers?.[0]
+
+    // WhatsApp: stamp earned (every visit) or reward ready (on 10th).
+    if (customer?.phone) {
+      const templateName = result?.reward_earned ? 'loyalty_reward_ready' : 'loyalty_stamp_earned'
+      const templateVariables = result?.reward_earned
+        ? { '1': customer.full_name || 'Guest' }
+        : { '1': customer.full_name || 'Guest', '2': String(customer.current_stamps ?? '') }
+      fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
+        method: 'POST',
+        headers: { ...sbHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: customer.phone, templateName, templateVariables }),
+      }).catch(() => {})
+    }
+
+    // Legacy Telegram path — kept for customers registered via the bot.
     if (result?.reward_earned) {
       fetch(`${SUPABASE_URL}/functions/v1/loyalty-notify`, {
         method: 'POST',
