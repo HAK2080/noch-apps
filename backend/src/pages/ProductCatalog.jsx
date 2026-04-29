@@ -393,7 +393,22 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Category</label>
-                <select value={form.category_id} onChange={e => set('category_id', e.target.value)} className="input">
+                <select
+                  value={form.category_id}
+                  onChange={e => {
+                    const newId = e.target.value
+                    const cat = categories.find(c => c.id === newId)
+                    const b = bucketOf(cat?.name)
+                    // Auto-default visibility: tools/supplies → website only;
+                    // drinks/food/other → menu only. User can override after.
+                    const defaults = (b === 'tools' || b === 'supplies')
+                      ? { visible_on_website: true,  visible_on_menu: false }
+                      : { visible_on_website: false, visible_on_menu: true }
+                    dirtyRef.current = true
+                    setForm(f => ({ ...f, category_id: newId, ...defaults }))
+                  }}
+                  className="input"
+                >
                   <option value="">No category</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
