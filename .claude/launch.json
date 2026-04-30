@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 5174,
       "autoPort": true
+    },
+    {
+      "name": "noch-rebuild",
+      "runtimeExecutable": "C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude/start-rebuild.bat",
+      "runtimeArgs": [],
+      "port": 5181,
+      "autoPort": true
     }
   ]
 }
