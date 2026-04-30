@@ -2,7 +2,6 @@
 // Called by pg_cron every hour: select cron.schedule('process-reminders-hourly', '0 * * * *', ...)
 // Uses direct Supabase REST API calls (no imports) for maximum compatibility
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,7 +46,7 @@ async function sbPatch(table: string, filter: string, payload: Record<string, un
   return r.json()
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
   }

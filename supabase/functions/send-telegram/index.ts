@@ -2,14 +2,13 @@
 // Deploy: npx supabase functions deploy send-telegram --no-verify-jwt
 // Secrets: npx supabase secrets set TELEGRAM_BOT_TOKEN=...
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
   }

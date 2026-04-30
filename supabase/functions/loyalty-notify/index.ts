@@ -1,7 +1,6 @@
 // loyalty-notify: Send Nochi notifications to customers
 // Types: reward_earned, nochi_sad, nochi_tired, nochi_deathbed, birthday, random_love, feedback_request
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -78,7 +77,7 @@ function fillTemplate(template: string, vars: Record<string, string | number>) {
   return template.replace(/\${(\w+)}/g, (_, key) => String(vars[key] ?? ''))
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } })
 
   try {

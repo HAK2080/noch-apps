@@ -1,6 +1,5 @@
 // loyalty-feedback: Receive customer feedback, auto-create task if negative
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -43,7 +42,7 @@ function getSentiment(rating: number): string {
   return 'positive'
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } })
 
   try {
