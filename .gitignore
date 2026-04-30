@@ -42,3 +42,8 @@ noch-deploy.zip
 apps-deploy.zip
 storefront-deploy.zip
 deploy-build/
+
+# VPS recovery scratch (contains hardcoded SSH credentials — never commit)
+_vps_*.py
+_compare_bundles.py
+vps-dist-*/
