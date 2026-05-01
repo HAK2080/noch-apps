@@ -142,8 +142,13 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
   const [uploading, setUploading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [recipeCalc, setRecipeCalc] = useState(null)
+  const [pendingFile, setPendingFile] = useState(null)
+  const [pendingPreview, setPendingPreview] = useState(null)
   const fileRef = useRef()
   const isEdit = !!product?.id
+
+  // Revoke object URL when modal closes / file changes (avoid memory leak)
+  useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -184,8 +189,24 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
       // Strip joined-relation keys returned by select('*, foo(...)')
       delete payload.pos_categories
       delete payload.pos_branches
-      if (isEdit) await updatePOSProduct(product.id, payload)
-      else await createPOSProduct(payload)
+
+      let saved
+      if (isEdit) {
+        saved = await updatePOSProduct(product.id, payload)
+      } else {
+        saved = await createPOSProduct(payload)
+      }
+
+      // If the user picked a photo before saving (new product flow), upload now
+      if (pendingFile && saved?.id) {
+        try {
+          await uploadProductImage(saved.id, pendingFile)
+        } catch (err) {
+          toast.error('Saved, but photo upload failed: ' + (err.message || 'unknown'))
+        }
+        setPendingFile(null)
+        if (pendingPreview) { URL.revokeObjectURL(pendingPreview); setPendingPreview(null) }
+      }
       toast.success(isEdit ? 'Product updated' : 'Product created')
       onSave()
     } catch (err) {
@@ -198,16 +219,24 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!product?.id) return toast.error('Save the product first, then upload a photo')
-    setUploading(true)
-    try {
-      const url = await uploadProductImage(product.id, file)
-      set('image_url', url)
-      toast.success('Photo uploaded')
-    } catch (err) {
-      toast.error(err.message || 'Upload failed')
-    } finally {
-      setUploading(false)
+    // For existing products: upload immediately so the URL is live.
+    // For new products: defer the upload until Save (we need the product ID first).
+    if (product?.id) {
+      setUploading(true)
+      try {
+        const url = await uploadProductImage(product.id, file)
+        set('image_url', url)
+        toast.success('Photo uploaded')
+      } catch (err) {
+        toast.error(err.message || 'Upload failed')
+      } finally {
+        setUploading(false)
+      }
+    } else {
+      // Stash the file + a local preview; uploaded after createPOSProduct returns the ID
+      setPendingFile(file)
+      if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+      setPendingPreview(URL.createObjectURL(file))
     }
   }
 
@@ -233,26 +262,26 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
 
           <div className="p-5 flex flex-col gap-4 flex-1 overflow-y-auto">
 
-            {/* Photo (edit only) */}
-            {isEdit && (
-              <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                  {form.image_url
-                    ? <img src={form.image_url} alt="" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center"><Image size={22} className="text-zinc-600" /></div>
-                  }
-                </div>
-                <div>
-                  <p className="text-white text-sm font-medium mb-1.5">Product Photo</p>
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                  <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5">
-                    <Upload size={11} /> {uploading ? 'Uploading…' : form.image_url ? 'Change photo' : 'Upload photo'}
-                  </button>
-                  <p className="text-zinc-600 text-[11px] mt-1">JPG, PNG, WebP · shown in POS terminal</p>
-                </div>
+            {/* Photo — works on Add and Edit. New products: image is uploaded after Save. */}
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                {(pendingPreview || form.image_url)
+                  ? <img src={pendingPreview || form.image_url} alt="" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><Image size={22} className="text-zinc-600" /></div>
+                }
               </div>
-            )}
-            {!isEdit && <p className="text-zinc-600 text-xs rounded-xl px-3 py-2" style={{ background: 'var(--surface)' }}>💡 Save first, then you can upload a photo.</p>}
+              <div>
+                <p className="text-white text-sm font-medium mb-1.5">Product Photo</p>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5">
+                  <Upload size={11} /> {uploading ? 'Uploading…' : (pendingPreview || form.image_url) ? 'Change photo' : 'Upload photo'}
+                </button>
+                <p className="text-zinc-600 text-[11px] mt-1">
+                  JPG, PNG, WebP · shown in POS terminal
+                  {!isEdit && pendingFile && <> · <span className="text-noch-green">will upload on Save</span></>}
+                </p>
+              </div>
+            </div>
 
             {/* Names */}
             <div className="grid grid-cols-2 gap-3">
