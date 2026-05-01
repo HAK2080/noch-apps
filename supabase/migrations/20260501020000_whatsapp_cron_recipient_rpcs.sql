@@ -20,20 +20,34 @@
 -- analytics. record_whatsapp_send RPC is the writer (called by whatsapp-cron).
 -- Both are missing from prior migrations; adding here.
 -- ──────────────────────────────────────────────────────────────────────────
+-- If the table was partly created by an earlier failed run with a 'trigger'
+-- column (a borderline-reserved word), rename it before re-creating.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'whatsapp_sends'
+      and column_name = 'trigger'
+  ) then
+    execute 'alter table public.whatsapp_sends rename column "trigger" to trigger_name';
+  end if;
+end $$;
+
 create table if not exists public.whatsapp_sends (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   customer_id uuid references public.loyalty_customers(id) on delete set null,
   phone text not null,
   template text not null,
-  trigger text not null,
+  trigger_name text not null,
   status text not null check (status in ('sent','failed')),
   error text,
   payload_key text
 );
 
 create index if not exists whatsapp_sends_customer_trigger_idx
-  on public.whatsapp_sends (customer_id, trigger, created_at desc);
+  on public.whatsapp_sends (customer_id, trigger_name, created_at desc);
 create index if not exists whatsapp_sends_phone_idx
   on public.whatsapp_sends (phone, created_at desc);
 
@@ -49,7 +63,7 @@ create or replace function public.record_whatsapp_send(
   p_customer_id uuid,
   p_phone text,
   p_template text,
-  p_trigger text,
+  p_trigger_name text,
   p_status text,
   p_error text default null,
   p_payload_key text default null
@@ -58,7 +72,7 @@ language sql
 security definer
 set search_path = public
 as $$
-  insert into public.whatsapp_sends (customer_id, phone, template, trigger, status, error, payload_key)
+  insert into public.whatsapp_sends (customer_id, phone, template, trigger_name, status, error, payload_key)
   values (p_customer_id, p_phone, p_template, p_trigger, p_status, p_error, p_payload_key);
 $$;
 grant execute on function public.record_whatsapp_send(uuid,text,text,text,text,text,text) to authenticated, service_role;
@@ -66,7 +80,7 @@ grant execute on function public.record_whatsapp_send(uuid,text,text,text,text,t
 -- Helper: did we send this trigger to this customer recently?
 create or replace function public._wa_recently_sent(
   p_customer_id uuid,
-  p_trigger text,
+  p_trigger_name text,
   p_window interval
 ) returns boolean
 language sql
@@ -77,7 +91,7 @@ as $$
   select exists (
     select 1 from public.whatsapp_sends
     where customer_id = p_customer_id
-      and trigger = p_trigger
+      and trigger_name = p_trigger
       and status = 'sent'
       and created_at > now() - p_window
   );
