@@ -10,6 +10,54 @@
 -- All idempotent. Apply via dashboard SQL editor.
 
 -- ──────────────────────────────────────────────────────────────────────────
+-- 0. Ensure prerequisite tables exist (in case the original loyalty system
+--    migration was only partly applied to the remote DB).
+-- ──────────────────────────────────────────────────────────────────────────
+create table if not exists public.loyalty_challenges (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  title_ar text,
+  description text,
+  description_ar text,
+  challenge_type text not null check (challenge_type in ('visits', 'streak', 'referral', 'time_of_day', 'custom')),
+  target_value int not null default 3,
+  bonus_stamps int not null default 2,
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz not null,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table public.loyalty_challenges enable row level security;
+drop policy if exists "loyalty_challenges_all" on public.loyalty_challenges;
+create policy "loyalty_challenges_all" on public.loyalty_challenges for all to authenticated using (true) with check (true);
+
+create table if not exists public.loyalty_challenge_progress (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.loyalty_customers(id) on delete cascade,
+  challenge_id uuid not null references public.loyalty_challenges(id) on delete cascade,
+  current_value int not null default 0,
+  completed boolean not null default false,
+  completed_at timestamptz,
+  bonus_awarded boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (customer_id, challenge_id)
+);
+alter table public.loyalty_challenge_progress enable row level security;
+drop policy if exists "loyalty_challenge_progress_all" on public.loyalty_challenge_progress;
+create policy "loyalty_challenge_progress_all" on public.loyalty_challenge_progress for all to authenticated using (true) with check (true);
+
+create table if not exists public.loyalty_customer_badges (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid references public.loyalty_customers(id) on delete cascade,
+  badge_key text not null,
+  earned_at timestamptz default now(),
+  unique (customer_id, badge_key)
+);
+alter table public.loyalty_customer_badges enable row level security;
+drop policy if exists "loyalty_customer_badges_all" on public.loyalty_customer_badges;
+create policy "loyalty_customer_badges_all" on public.loyalty_customer_badges for all to authenticated using (true) with check (true);
+
+-- ──────────────────────────────────────────────────────────────────────────
 -- 1. New columns on loyalty_customers
 -- ──────────────────────────────────────────────────────────────────────────
 alter table public.loyalty_customers

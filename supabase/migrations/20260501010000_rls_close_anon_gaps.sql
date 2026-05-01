@@ -20,6 +20,10 @@ begin
     'loyalty_feedback','loyalty_challenges','loyalty_challenge_progress','loyalty_qr_tokens'
   ]
   loop
+    if to_regclass('public.' || t) is null then
+      raise notice 'skipping %: table does not exist', t;
+      continue;
+    end if;
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "loyalty_owner_all"  on public.%I', t);
     execute format('drop policy if exists "loyalty_staff_read" on public.%I', t);
