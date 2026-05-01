@@ -43,12 +43,23 @@ export async function updatePOSBranch(id, updates) {
 // ============================================================
 
 export async function getPOSCategories(branchId) {
+  // Returns categories visible at the given branch (new array model)
+  // OR legacy categories scoped to that branch_id.
+  let q = supabase.from('pos_categories').select('*').eq('is_active', true).order('sort_order')
+  if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
+  const { data, error } = await q
+  if (error) throw error
+  return data
+}
+
+// Centralized category catalog — all categories regardless of branch
+export async function getAllCategories() {
   const { data, error } = await supabase
     .from('pos_categories')
     .select('*')
-    .eq('branch_id', branchId)
     .eq('is_active', true)
     .order('sort_order')
+    .order('name')
   if (error) throw error
   return data
 }

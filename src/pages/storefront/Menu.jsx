@@ -75,12 +75,18 @@ export default function Menu() {
       setError(null)
       const [{ data: b, error: be }, { data: cats }, { data: prods }] = await Promise.all([
         supabase.from('pos_branches').select('*').eq('id', branchId).eq('is_active', true).single(),
-        supabase.from('pos_categories').select('*').eq('branch_id', branchId).eq('is_active', true).order('sort_order').order('name'),
+        // Categories: visible at this branch (new array model) OR legacy single branch_id
+        supabase.from('pos_categories')
+          .select('*')
+          .eq('is_active', true)
+          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
+          .order('sort_order').order('name'),
+        // Products: visible at this branch + visible on customer menu
         supabase.from('pos_products')
           .select('*')
-          .eq('branch_id', branchId)
           .eq('is_active', true)
           .eq('visible_on_menu', true)
+          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
           .order('menu_sort')
           .order('name'),
       ])
@@ -89,7 +95,9 @@ export default function Menu() {
       setCategories(cats || [])
       if (!prods?.length) {
         const { data: all } = await supabase.from('pos_products')
-          .select('*').eq('branch_id', branchId).eq('is_active', true).order('name')
+          .select('*').eq('is_active', true)
+          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
+          .order('name')
         setProducts(all || [])
       } else {
         setProducts(prods)

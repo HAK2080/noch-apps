@@ -9,7 +9,7 @@ import {
 import Layout from '../components/Layout'
 import toast from 'react-hot-toast'
 import {
-  getPOSBranches, getPOSProducts, getPOSCategories,
+  getPOSBranches, getAllProducts, getAllCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
   getProductSalesStats, uploadProductImage,
 } from '../modules/pos/lib/pos-supabase'
@@ -127,9 +127,10 @@ const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
+  visible_branch_ids: [], visible_on_menu: false, visible_on_website: true,
 }
 
-function ProductModal({ product, categories, branchId, recipes, rates, onSave, onClose }) {
+function ProductModal({ product, categories, branches, recipes, rates, onSave, onClose }) {
   const [form, setForm] = useState(() => product
     ? { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
     : { ...BLANK }
@@ -152,22 +153,30 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
     setRecipeCalc({ cost, name: r.name })
   }, [form.cost_recipe_id, recipes, rates])
 
+  const toggleBranch = (id) => setForm(f => {
+    const cur = Array.isArray(f.visible_branch_ids) ? f.visible_branch_ids : []
+    return { ...f, visible_branch_ids: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] }
+  })
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.price) return toast.error('Name and price required')
-    if (!branchId) return toast.error('No branch selected')
     setSaving(true)
     try {
       const payload = {
         ...form,
         name: form.name.trim(),
-        branch_id: branchId,
         price: parseFloat(form.price),
         cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
         cost_recipe_id: form.cost_recipe_id || null,
         stock_qty: parseFloat(form.stock_qty) || 0,
         low_stock_alert: parseFloat(form.low_stock_alert) || 5,
         category_id: form.category_id || null,
+        visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
+        visible_on_menu:    !!form.visible_on_menu,
+        visible_on_website: form.visible_on_website !== false,
       }
+      // Drop legacy single-branch field — visibility lives in the array now
+      delete payload.branch_id
       if (isEdit) await updatePOSProduct(product.id, payload)
       else await createPOSProduct(payload)
       toast.success(isEdit ? 'Product updated' : 'Product created')
@@ -340,17 +349,66 @@ function ProductModal({ product, categories, branchId, recipes, rates, onSave, o
               )}
             </div>
 
-            {/* POS visibility */}
-            <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_active', !form.is_active)}>
-              <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
-                style={{ background: form.is_active ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
-                <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
+            {/* Where this product is sold */}
+            <div className="rounded-xl p-3 flex flex-col gap-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Where this product is sold</p>
+
+              {(branches || []).length > 0 && (
+                <div>
+                  <p className="text-white text-xs font-medium mb-2">Branches</p>
+                  <div className="flex flex-wrap gap-2">
+                    {branches.map(b => {
+                      const on = (form.visible_branch_ids || []).includes(b.id)
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => toggleBranch(b.id)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            on
+                              ? 'bg-noch-green/15 border-noch-green/40 text-noch-green'
+                              : 'border-noch-border text-noch-muted hover:text-white'
+                          }`}
+                        >
+                          {on ? '✓ ' : ''}{b.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_menu', !form.visible_on_menu)}>
+                  <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                    style={{ background: form.visible_on_menu ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_menu ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm">Show on customer menu (apps.noch.cloud/menu)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_website', !form.visible_on_website)}>
+                  <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                    style={{ background: form.visible_on_website ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_website ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm">Show on website (noch.cloud)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_active', !form.is_active)}>
+                  <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                    style={{ background: form.is_active ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm">Visible in POS terminal</p>
+                    <p className="text-zinc-600 text-xs">{form.is_active ? 'Shown to cashiers' : 'Hidden from POS — still in catalog'}</p>
+                  </div>
+                </label>
               </div>
-              <div>
-                <p className="text-white text-sm">Visible in POS terminal</p>
-                <p className="text-zinc-600 text-xs">{form.is_active ? 'Shown to cashiers' : 'Hidden from POS — still in catalog'}</p>
-              </div>
-            </label>
+            </div>
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
@@ -390,23 +448,24 @@ export default function ProductCatalog() {
         setBranches(b)
         setRecipes(r)
         setRates(rates)
-        if (b.length > 0) setActiveBranch(b[0])
+        // activeBranch is now optional — used as a FILTER on the global catalog,
+        // not a scope for what's loaded
       })
       .catch(err => toast.error(err.message || 'Failed to load'))
   }, [])
 
   useEffect(() => {
-    if (activeBranch) load()
-  }, [activeBranch, dateFrom, dateTo])
+    load()
+  }, [dateFrom, dateTo])
 
   const load = async () => {
-    if (!activeBranch) return
     setLoading(true)
     try {
       const [p, c, s] = await Promise.all([
-        getPOSProducts(activeBranch.id),
-        getPOSCategories(activeBranch.id),
-        getProductSalesStats(activeBranch.id, dateFrom, dateTo),
+        getAllProducts(),
+        getAllCategories(),
+        // sales stats still per-branch; default to first branch if none active
+        activeBranch ? getProductSalesStats(activeBranch.id, dateFrom, dateTo) : Promise.resolve({}),
       ])
       setProducts(p); setCategories(c); setSalesStats(s)
     } catch (err) {
@@ -548,7 +607,7 @@ export default function ProductCatalog() {
         <ProductModal
           product={editProduct || null}
           categories={categories}
-          branchId={activeBranch?.id}
+          branches={branches}
           recipes={recipes}
           rates={rates}
           onSave={() => { setShowAdd(false); setEditProduct(null); load() }}
