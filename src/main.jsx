@@ -5,7 +5,6 @@ import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import { LanguageProvider } from './contexts/LanguageContext.jsx'
-import { PermissionProvider } from './contexts/PermissionContext.jsx'
 import { PermissionsProvider } from './contexts/PermissionsContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
 
@@ -14,8 +13,7 @@ createRoot(document.getElementById('root')).render(
     <ThemeProvider>
     <LanguageProvider>
       <AuthProvider>
-        <PermissionProvider>
-          <PermissionsProvider>
+        <PermissionsProvider>
           <App />
           <Toaster
             position="top-center"
@@ -34,8 +32,7 @@ createRoot(document.getElementById('root')).render(
               error: { iconTheme: { primary: '#F87171', secondary: '#09090B' } },
             }}
           />
-          </PermissionsProvider>
-        </PermissionProvider>
+        </PermissionsProvider>
       </AuthProvider>
     </LanguageProvider>
     </ThemeProvider>

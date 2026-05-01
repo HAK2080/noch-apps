@@ -1,6 +1,6 @@
-// PermissionsContext.jsx — Simple role-based permissions
-// Uses the role_permissions table (role TEXT, feature TEXT, can_access, can_edit)
-// aerohaith@gmail.com is ALWAYS owner regardless of DB role
+// PermissionsContext.jsx — Role-based permissions.
+// Reads from role_permissions(role TEXT, feature TEXT, can_access, can_edit).
+// Owner status comes from profiles.role only — no email backdoor.
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
@@ -15,11 +15,11 @@ const PermissionsContext = createContext({
 })
 
 export function PermissionsProvider({ children }) {
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const [permissions, setPermissions] = useState({})
   const [loading, setLoading] = useState(true)
 
-  const isOwner = user?.email === 'aerohaith@gmail.com' || profile?.role === 'owner'
+  const isOwner = profile?.role === 'owner'
 
   useEffect(() => {
     if (!profile) {
