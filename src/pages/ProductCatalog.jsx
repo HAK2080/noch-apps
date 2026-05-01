@@ -131,6 +131,7 @@ const BLANK = {
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
   visible_branch_ids: [], visible_on_menu: false, visible_on_website: true,
+  is_available: true,
 }
 
 function ProductModal({ product, categories, branches, recipes, rates, onSave, onClose }) {
@@ -191,6 +192,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
         visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
         visible_on_menu:    !!form.visible_on_menu,
         visible_on_website: form.visible_on_website !== false,
+        is_available:       form.is_available !== false,
       }
       // Drop legacy single-branch field — visibility lives in the array now
       delete payload.branch_id
@@ -452,6 +454,16 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                   </div>
                   <div>
                     <p className="text-white text-sm">Show on website (noch.cloud)</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_available', !form.is_available)}>
+                  <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                    style={{ background: form.is_available ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_available ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm">Available now</p>
+                    <p className="text-zinc-600 text-xs">{form.is_available ? 'Customers can order this' : 'Shown shaded with “Sold out” — creates FOMO'}</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_active', !form.is_active)}>

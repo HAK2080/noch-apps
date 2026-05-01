@@ -530,17 +530,20 @@ export default function Menu() {
 
 function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatured, catColor }) {
   const col = catColor || CARD_COLORS[0]
+  const soldOut = p.is_available === false
   return (
-    <div className={`product-card${isFeatured ? ' featured' : ''}`}>
+    <div className={`product-card${isFeatured ? ' featured' : ''}${soldOut ? ' sold-out' : ''}`}>
       {p.image_url ? (
         <div className="product-img-wrap">
           <img src={p.image_url} alt={name_(p)} className="product-img" loading="lazy" />
+          {soldOut && <span className="sold-out-badge">Sold out</span>}
         </div>
       ) : (
         <div className="product-img-wrap product-placeholder" style={{ background: col.bg }}>
           <span className="placeholder-letter" style={{ color: col.text }}>
             {name_(p).charAt(0).toUpperCase()}
           </span>
+          {soldOut && <span className="sold-out-badge">Sold out</span>}
         </div>
       )}
       <div className="product-body">
@@ -548,7 +551,7 @@ function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatur
         {desc_(p) && <p className="product-desc">{desc_(p)}</p>}
         <div className="product-footer">
           <span className="product-price">{parseFloat(p.price).toFixed(2)} LYD</span>
-          {qty === 0 ? (
+          {soldOut ? null : qty === 0 ? (
             <button className="btn-add" onClick={onAdd}>+</button>
           ) : (
             <div className="qty-ctrl">
