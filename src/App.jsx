@@ -64,6 +64,7 @@ import LoyaltyStamp from './modules/loyalty/pages/LoyaltyStamp'
 import LoyaltyGestures from './modules/loyalty/pages/LoyaltyGestures'
 import LoyaltySpinWheel from './modules/loyalty/pages/LoyaltySpinWheel'
 import MyCard from './modules/loyalty/customer/MyCard'
+import LoyaltyRegister from './modules/loyalty/customer/LoyaltyRegister'
 
 import ExpensesPage from './pages/expenses/ExpensesPage'
 
@@ -220,6 +221,7 @@ export default function App() {
 
         {/* Customer-facing loyalty card */}
         <Route path="/my-card" element={<ProtectedRoute><MyCard /></ProtectedRoute>} />
+        <Route path="/loyalty/register" element={<LoyaltyRegister />} />
 
         {/* POS System */}
         <Route path="/pos" element={<ProtectedRoute><POSHome /></ProtectedRoute>} />

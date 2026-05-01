@@ -1,0 +1,14 @@
+{
+  "name": "noch.apps",
+  "short_name": "noch.apps",
+  "description": "Nochi loyalty + Noch operations",
+  "start_url": "/my-card",
+  "display": "standalone",
+  "background_color": "#09090B",
+  "theme_color": "#4ADE80",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

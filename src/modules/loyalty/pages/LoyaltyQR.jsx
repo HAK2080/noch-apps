@@ -88,11 +88,13 @@ export default function LoyaltyQR() {
         <div className="w-48 h-48 bg-noch-border rounded-2xl animate-pulse" />
       ) : token ? (
         <div className="relative">
-          <QRImage value={token} size={fullscreen ? 280 : 200} />
-          {/* Overlay token text for manual entry */}
+          <QRImage
+            value={`${window.location.origin}/loyalty/register?t=${encodeURIComponent(token)}`}
+            size={fullscreen ? 280 : 200}
+          />
           <div className="mt-2 text-center">
-            <p className="text-noch-muted text-xs">{ar ? 'أو أدخل الرمز:' : 'Or enter code:'}</p>
-            <p className="text-noch-green font-mono font-bold text-lg tracking-widest">{token}</p>
+            <p className="text-noch-muted text-xs">{ar ? 'امسح بالكاميرا' : 'Scan with camera'}</p>
+            <p className="text-noch-muted text-[10px] mt-1">{ar ? 'الرمز:' : 'Code:'} <span className="text-noch-green font-mono">{token}</span></p>
           </div>
         </div>
       ) : null}

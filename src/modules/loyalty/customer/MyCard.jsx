@@ -3,15 +3,30 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, Gift, Star, Zap, Share2, Globe } from 'lucide-react'
+import { QrCode, Gift, Star, Zap, Share2, Globe, Crown, Trophy, Award, Sparkles } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
-import { getMyLoyaltyCard, submitLoyaltyFeedback, getLoyaltySettings, getLastSpin } from '../../../lib/supabase'
+import { getMyLoyaltyCard, submitLoyaltyFeedback, getLoyaltySettings, getLastSpin, supabase } from '../../../lib/supabase'
 import Layout from '../../../components/Layout'
 import NochiBunny from '../components/NochiBunny'
 import StampCard from '../components/StampCard'
 import BadgeGrid from '../components/BadgeGrid'
 import toast from 'react-hot-toast'
+
+const TIER_META = {
+  bronze: { icon: Award,  color: 'text-amber-700',  bg: 'bg-amber-700/10',  border: 'border-amber-700/30',  label: { ar: 'برونزي', en: 'Bronze' } },
+  silver: { icon: Trophy, color: 'text-slate-300',  bg: 'bg-slate-300/10',  border: 'border-slate-300/30',  label: { ar: 'فضي',    en: 'Silver' } },
+  gold:   { icon: Trophy, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30', label: { ar: 'ذهبي',   en: 'Gold' } },
+  legend: { icon: Crown,  color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/30', label: { ar: 'أسطورة', en: 'Legend' } },
+}
+
+const NOCHI_STATE_COPY = {
+  happy:    { ar: 'نوتشي سعيد بزيارتك! 🌟',                en: 'Nochi is glowing 🌟' },
+  sad:      { ar: 'نوتشي يفتقدك… مرّ علينا قريباً 😢',     en: 'Nochi misses you. Come by soon 😢' },
+  tired:    { ar: 'نوتشي تعب من الانتظار 😴',              en: 'Nochi is getting tired of waiting 😴' },
+  deathbed: { ar: 'نوتشي على فراش المرض. لا تتركه 🛏️',    en: "Nochi is on the windowsill. Please don't forget him 🛏️" },
+  dead:     { ar: 'نوتشي رحل… فرصتك الأخيرة لإحيائه 💀',   en: 'Nochi is gone… your last chance to revive him 💀' },
+}
 
 function getFrequencyMs(freq) {
   if (freq === 'biweekly') return 14 * 24 * 60 * 60 * 1000
@@ -40,6 +55,10 @@ export default function MyCard() {
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [nextSpinMs, setNextSpinMs] = useState(null)
+  const [events, setEvents] = useState([])
+  const [challenges, setChallenges] = useState([])
+  const [nochiNameInput, setNochiNameInput] = useState('')
+  const [savingName, setSavingName] = useState(false)
   const ar = lang === 'ar'
 
   useEffect(() => {
@@ -51,6 +70,27 @@ export default function MyCard() {
         .then(async ([c, s]) => {
           setCard(c)
           setLoyaltySettings(s)
+          if (c) {
+            setNochiNameInput(c.nochi_name || '')
+            // Last 8 events for the timeline
+            const { data: ev } = await supabase
+              .from('loyalty_recent_events')
+              .select('*')
+              .eq('customer_id', c.id)
+              .order('created_at', { ascending: false })
+              .limit(8)
+            setEvents(ev || [])
+            // Active challenges (current period)
+            const { data: ch } = await supabase
+              .from('loyalty_challenges')
+              .select('id, title, description, target_value, bonus_stamps, ends_at')
+              .eq('is_active', true)
+              .lte('starts_at', new Date().toISOString())
+              .gt('ends_at', new Date().toISOString())
+              .order('bonus_stamps', { ascending: false })
+              .limit(4)
+            setChallenges(ch || [])
+          }
           if (c && s) {
             const freq = s.spin_frequency || 'weekly'
             if (freq !== 'off') {
@@ -67,6 +107,24 @@ export default function MyCard() {
         .finally(() => setLoading(false))
     }
   }, [user])
+
+  const saveNochiName = async () => {
+    if (!nochiNameInput.trim() || !card?.id) return
+    setSavingName(true)
+    try {
+      const { error } = await supabase
+        .from('loyalty_customers')
+        .update({ nochi_name: nochiNameInput.trim() })
+        .eq('id', card.id)
+      if (error) throw error
+      setCard({ ...card, nochi_name: nochiNameInput.trim() })
+      toast.success(ar ? 'تم! 🐰' : 'Saved! 🐰')
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setSavingName(false)
+    }
+  }
 
   const handleFeedback = async () => {
     if (!rating) return toast.error(ar ? 'اختر تقييماً' : 'Select a rating')
@@ -136,16 +194,65 @@ export default function MyCard() {
         </button>
       </div>
 
-      {/* Header */}
-      <div className="text-center mb-6">
+      {/* Header with tier badge */}
+      <div className="text-center mb-4">
         <h1 className="text-white font-bold text-xl">{ar ? `أهلاً ${card.full_name}! 🐰` : `Welcome ${card.full_name}! 🐰`}</h1>
-        <p className="text-noch-muted text-sm">{ar ? 'بطاقة نوتشي الخاصة بك' : 'Your Nochi loyalty card'}</p>
+        {card.tier && TIER_META[card.tier] && (() => {
+          const t = TIER_META[card.tier]
+          const Icon = t.icon
+          return (
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 mt-2 rounded-full border ${t.bg} ${t.border}`}>
+              <Icon size={13} className={t.color} />
+              <span className={`text-xs font-bold ${t.color}`}>{t.label[ar ? 'ar' : 'en']}</span>
+            </div>
+          )
+        })()}
       </div>
 
-      {/* Nochi mascot */}
-      <div className="flex justify-center mb-4">
+      {/* Nochi mascot + state line */}
+      <div className="flex flex-col items-center mb-4">
         <NochiBunny state={card.nochi_state} size="xl" lang={lang} />
+        {NOCHI_STATE_COPY[card.nochi_state] && (
+          <p className="text-white text-sm font-medium mt-2 text-center max-w-xs">
+            {card.nochi_name ? (
+              ar
+                ? NOCHI_STATE_COPY[card.nochi_state].ar.replace('نوتشي', card.nochi_name)
+                : NOCHI_STATE_COPY[card.nochi_state].en.replace('Nochi', card.nochi_name)
+            ) : NOCHI_STATE_COPY[card.nochi_state][ar ? 'ar' : 'en']}
+          </p>
+        )}
       </div>
+
+      {/* Name your Nochi (prompt only if not set) */}
+      {!card.nochi_name && (
+        <div className="card mb-4 border-noch-green/30 bg-noch-green/5">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles size={14} className="text-noch-green" />
+            <p className="text-white text-sm font-semibold">
+              {ar ? 'سمِّ نوتشي الخاص بك' : 'Name your Nochi'}
+            </p>
+          </div>
+          <p className="text-noch-muted text-xs mb-3">
+            {ar ? 'كل واحد منا له نوتشي خاص. اعطه اسماً يبقى معك.' : 'Every regular has their own Nochi. Give them a name that sticks.'}
+          </p>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1"
+              placeholder={ar ? 'مثلاً: فولفول، الكابتن…' : 'e.g. Bunny, Capt, Nochi Jr…'}
+              value={nochiNameInput}
+              onChange={e => setNochiNameInput(e.target.value)}
+              maxLength={20}
+            />
+            <button
+              onClick={saveNochiName}
+              disabled={savingName || !nochiNameInput.trim()}
+              className="btn-primary px-4"
+            >
+              {savingName ? '…' : (ar ? 'احفظ' : 'Save')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stamp card */}
       <div className="mb-4">
@@ -246,6 +353,29 @@ export default function MyCard() {
         </div>
       </div>
 
+      {/* Active monthly challenges */}
+      {challenges.length > 0 && (
+        <div className="card mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">🎯</span>
+            <p className="text-white font-semibold text-sm">{ar ? 'تحديات الشهر' : 'This month\'s challenges'}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {challenges.map(c => (
+              <div key={c.id} className="p-3 rounded-xl border border-noch-border bg-noch-dark">
+                <p className="text-white text-sm font-medium">{c.title}</p>
+                <p className="text-noch-muted text-xs mt-0.5">{c.description}</p>
+                {c.bonus_stamps > 0 && (
+                  <p className="text-noch-green text-[11px] mt-1 font-medium">
+                    +{c.bonus_stamps} {ar ? 'طوابع إضافية' : 'bonus stamps'}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Badge grid */}
       <div className="card mb-4">
         <div className="flex items-center gap-2 mb-3">
@@ -254,6 +384,42 @@ export default function MyCard() {
         </div>
         <BadgeGrid customerId={card.id} />
       </div>
+
+      {/* Memory timeline — Nochi remembers */}
+      {events.length > 0 && (
+        <div className="card mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">📖</span>
+            <p className="text-white font-semibold text-sm">
+              {card.nochi_name
+                ? (ar ? `يتذكر ${card.nochi_name}` : `${card.nochi_name} remembers`)
+                : (ar ? 'نوتشي يتذكر' : 'Nochi remembers')}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {events.map((e, i) => {
+              const date = new Date(e.created_at)
+              const dateStr = date.toLocaleDateString(ar ? 'ar-LY' : 'en-GB', { day: 'numeric', month: 'short' })
+              const isStamp = e.kind === 'stamp'
+              return (
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  <div className="w-7 text-center">
+                    {isStamp ? '☕' : '🎁'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs">
+                      {isStamp
+                        ? (ar ? `الطابع رقم ${e.value}` : `Stamp #${e.value}`)
+                        : (e.description || (ar ? 'مكافأة' : 'Reward earned'))}
+                    </p>
+                  </div>
+                  <p className="text-noch-muted text-[11px]">{dateStr}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Referral */}
       <div className="card mb-4">
