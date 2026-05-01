@@ -1,54 +1,63 @@
-import Anthropic from "@anthropic-ai/sdk";
+// extract-recipe: vision-based recipe extraction from an image. Owner-only.
 
-const client = new Anthropic({
-  apiKey: Deno.env.get("ANTHROPIC_API_KEY"),
-});
+import Anthropic from "npm:@anthropic-ai/sdk";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+}
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "missing Authorization" }, 401);
+
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !user) return json({ error: "invalid token" }, 401);
+
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+  const { data: callerProfile } = await admin
+    .from("profiles").select("role").eq("id", user.id).single();
+  if (callerProfile?.role !== "owner") return json({ error: "forbidden — owner only" }, 403);
 
   try {
-    const { base64, mimeType, fileName } = await req.json();
+    const { base64, mimeType } = await req.json();
+    if (!base64 || !mimeType) return json({ error: "Missing base64 or mimeType" }, 400);
 
-    if (!base64 || !mimeType) {
-      return new Response(
-        JSON.stringify({ error: "Missing base64 or mimeType" }),
-        { status: 400 }
-      );
-    }
+    let mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/jpeg";
+    if (mimeType.includes("png")) mediaType = "image/png";
+    else if (mimeType.includes("gif")) mediaType = "image/gif";
+    else if (mimeType.includes("webp")) mediaType = "image/webp";
 
-    // Determine media type for Claude API
-    let mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" =
-      "image/jpeg";
-    if (mimeType.includes("png")) {
-      mediaType = "image/png";
-    } else if (mimeType.includes("gif")) {
-      mediaType = "image/gif";
-    } else if (mimeType.includes("webp")) {
-      mediaType = "image/webp";
-    }
-
-    // Call Claude with vision to extract recipe data
+    const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
     const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 2048,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: base64,
-              },
-            },
-            {
-              type: "text",
-              text: `Extract recipe information from this image and return valid JSON only (no markdown, no explanation).
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+          {
+            type: "text",
+            text: `Extract recipe information from this image and return valid JSON only (no markdown, no explanation).
 If it's a barista/coffee recipe, extract these fields:
 {
   "code": "recipe code like SL-01",
@@ -82,41 +91,22 @@ If it's a barista/coffee recipe, extract these fields:
 }
 
 Return ONLY the JSON, no other text. If not a recipe, still try to extract as much structured info as possible.`,
-            },
-          ],
-        },
-      ],
+          },
+        ],
+      }],
     });
 
-    // Parse the response
-    const content = response.content[0];
-    if (content.type !== "text") {
-      return new Response(
-        JSON.stringify({ error: "Unexpected response type" }),
-        { status: 500 }
-      );
-    }
+    const block = response.content[0];
+    if (block.type !== "text") return json({ error: "Unexpected response type" }, 500);
 
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonStr = content.text.trim();
-    if (jsonStr.startsWith("```json")) {
-      jsonStr = jsonStr.replace(/^```json\n/, "").replace(/\n```$/, "");
-    } else if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/^```\n/, "").replace(/\n```$/, "");
-    }
+    let jsonStr = block.text.trim();
+    if (jsonStr.startsWith("```json")) jsonStr = jsonStr.replace(/^```json\n/, "").replace(/\n```$/, "");
+    else if (jsonStr.startsWith("```")) jsonStr = jsonStr.replace(/^```\n/, "").replace(/\n```$/, "");
 
     const recipe = JSON.parse(jsonStr);
-
-    return new Response(JSON.stringify({ recipe }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      { status: 500 }
-    );
+    return json({ recipe });
+  } catch (err) {
+    console.error("extract-recipe error", err);
+    return json({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
   }
 });

@@ -47,3 +47,4 @@ deploy-build/
 _vps_*.py
 _compare_bundles.py
 vps-dist-*/
+supabase/.temp/
