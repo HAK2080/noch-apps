@@ -114,7 +114,7 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
 
         <Route path="/dashboard" element={
-          <ProtectedRoute><OwnerRoute><Dashboard /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><Dashboard /></ProtectedRoute>
         } />
 
         <Route path="/tasks" element={
@@ -186,9 +186,9 @@ export default function App() {
         <Route path="/content/calendar" element={<Navigate to="/content" replace />} />
         <Route path="/content/experiments" element={<Navigate to="/content" replace />} />
 
-        {/* Product Catalog */}
+        {/* Product Catalog — staff get read-only via in-page gating */}
         <Route path="/products" element={
-          <ProtectedRoute><OwnerRoute><ProductCatalog /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><ProductCatalog /></ProtectedRoute>
         } />
 
         {/* Inventory (staff + owner) */}

@@ -14,6 +14,7 @@ import {
   getProductSalesStats, uploadProductImage,
 } from '../modules/pos/lib/pos-supabase'
 import { getRecipesForCost, getCurrencyRates, calcCostPerBaseUnit } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
 
 // ─── helpers ──────────────────────────────────────────────────
@@ -60,7 +61,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
       style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
       onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-bright)'}
       onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-      onClick={() => onEdit(product)}
+      onClick={() => onEdit && onEdit(product)}
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--surface)' }}>
@@ -86,13 +87,15 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
             <EyeOff size={9} /> Hidden
           </span>
         )}
-        {/* Delete on hover */}
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(product) }}
-          className="absolute bottom-2 right-2 w-6 h-6 rounded-full items-center justify-center hidden group-hover:flex bg-red-500/80 text-white transition-all"
-        >
-          <Trash2 size={11} />
-        </button>
+        {/* Delete on hover (owner only) */}
+        {onDelete && (
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(product) }}
+            className="absolute bottom-2 right-2 w-6 h-6 rounded-full items-center justify-center hidden group-hover:flex bg-red-500/80 text-white transition-all"
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
       </div>
 
       {/* Body */}
@@ -426,6 +429,9 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
 
 // ─── Main page ────────────────────────────────────────────────
 export default function ProductCatalog() {
+  const { isOwner } = useAuth()
+  const canEdit = isOwner   // staff get read-only view; only owners edit
+
   const [branches, setBranches] = useState([])
   const [activeBranch, setActiveBranch] = useState(null)
   const [products, setProducts] = useState([])
@@ -520,9 +526,11 @@ export default function ProductCatalog() {
             </h1>
             <p className="text-zinc-500 text-sm mt-0.5">Central catalog — synced with POS, inventory & cost calculator</p>
           </div>
-          <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
-            <Plus size={14} /> Add Product
-          </button>
+          {canEdit && (
+            <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
+              <Plus size={14} /> Add Product
+            </button>
+          )}
         </div>
 
         {/* Branch tabs */}
@@ -582,7 +590,7 @@ export default function ProductCatalog() {
             <ShoppingBag size={40} className="mx-auto text-zinc-700 mb-3" />
             <p className="text-zinc-400 font-medium">{products.length === 0 ? 'No products yet' : 'No matches'}</p>
             <p className="text-zinc-600 text-sm mt-1">{products.length === 0 ? 'Add your first product to get started' : 'Try a different search or filter'}</p>
-            {products.length === 0 && <button onClick={() => setShowAdd(true)} className="btn-primary mt-4 text-sm">Add Product</button>}
+            {products.length === 0 && canEdit && <button onClick={() => setShowAdd(true)} className="btn-primary mt-4 text-sm">Add Product</button>}
           </div>
         ) : (
           <>
@@ -593,8 +601,8 @@ export default function ProductCatalog() {
                   key={p.id}
                   product={p}
                   stats={salesStats[p.id]}
-                  onEdit={setEditProduct}
-                  onDelete={handleDelete}
+                  onEdit={canEdit ? setEditProduct : undefined}
+                  onDelete={canEdit ? handleDelete : undefined}
                 />
               ))}
             </div>

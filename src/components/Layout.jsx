@@ -73,6 +73,7 @@ export default function Layout({ children }) {
     { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/inventory', icon: Package, label: 'Inventory' },
     { to: '/products', icon: ShoppingBag, label: 'Products' },
+    { to: '/recipes', icon: Coffee, label: t('recipes') },
     { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
     { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
   ]
