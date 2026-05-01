@@ -59,11 +59,12 @@ create policy "ws_owner_all" on public.whatsapp_sends
   with check (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'owner'));
 -- service_role bypasses RLS, so cron writes work without policy
 
-create or replace function public.record_whatsapp_send(
+drop function if exists public.record_whatsapp_send(uuid,text,text,text,text,text,text);
+create function public.record_whatsapp_send(
   p_customer_id uuid,
   p_phone text,
   p_template text,
-  p_trigger_name text,
+  p_trigger text,
   p_status text,
   p_error text default null,
   p_payload_key text default null
@@ -78,9 +79,10 @@ $$;
 grant execute on function public.record_whatsapp_send(uuid,text,text,text,text,text,text) to authenticated, service_role;
 
 -- Helper: did we send this trigger to this customer recently?
-create or replace function public._wa_recently_sent(
+drop function if exists public._wa_recently_sent(uuid,text,interval);
+create function public._wa_recently_sent(
   p_customer_id uuid,
-  p_trigger_name text,
+  p_trigger text,
   p_window interval
 ) returns boolean
 language sql
