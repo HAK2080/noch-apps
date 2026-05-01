@@ -17,8 +17,9 @@ const ROLE_COLORS = {
   limited_staff: 'text-noch-muted bg-noch-muted/10 border-noch-muted/30',
 }
 
-function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, canEditRole }) {
+function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, canEditRole, fromRequest }) {
   const isEdit = !!staff?.id
+  const isApproval = !!fromRequest
   const [form, setForm] = useState(isEdit ? {
     full_name: staff.full_name || '',
     telegram_chat_id: staff.telegram_chat_id || '',
@@ -34,7 +35,7 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
     app_role_id: staff.app_role_id || '',
     is_active: staff.is_active !== false,
   } : {
-    full_name: '', telegram_chat_id: '', phone: '', photo_url: '',
+    full_name: fromRequest?.full_name || '', telegram_chat_id: '', phone: fromRequest?.phone || '', photo_url: '',
     monthly_salary: '', hourly_rate: '', employment_type: 'full_time',
     start_date: '', pin_code: '', department: '', branch_id: '', app_role_id: '', is_active: true,
   })
@@ -42,10 +43,10 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
   const [showPin, setShowPin] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [sendWhatsAppInvite, setSendWhatsAppInvite] = useState(!isEdit)
-  const [email, setEmail] = useState(isEdit ? (staff.email || '') : '')
+  const [sendWhatsAppInvite, setSendWhatsAppInvite] = useState(false)
+  const [email, setEmail] = useState(isEdit ? (staff.email || '') : (fromRequest?.email || ''))
   const [password, setPassword] = useState('')
-  const [provisionMode, setProvisionMode] = useState('password') // 'password' | 'invite'
+  const [provisionMode, setProvisionMode] = useState('invite') // 'password' | 'invite'
   const [resetMode, setResetMode] = useState('set') // 'set' | 'email'
   const [newPassword, setNewPassword] = useState('')
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -124,27 +125,20 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
       if (isEdit) {
         if (email.trim()) payload.email = email.trim()
         await updateProfile(staff.id, payload)
-      } else {
-        if (!email.trim()) { toast.error('Email required for login'); setSaving(false); return }
-        if (provisionMode === 'password' && password.length < 6) {
-          toast.error('Password must be at least 6 characters'); setSaving(false); return
-        }
-        const { data, error } = await supabase.functions.invoke('provision-staff', {
-          body: { email: email.trim(), password, mode: provisionMode, profile: payload },
+      } else if (isApproval) {
+        const { data, error } = await supabase.functions.invoke('approve-staff-request', {
+          body: { request_id: fromRequest.id, profile: payload, redirectTo: `${window.location.origin}/login` },
         })
-        if (error || data?.error) throw new Error(data?.error || error.message)
-
-        if (sendWhatsAppInvite && payload.phone) {
-          const digits = payload.phone.replace(/\D/g, '')
-          const loginUrl = 'https://apps.noch.cloud'
-          const credsBlock = provisionMode === 'password'
-            ? `Login: ${loginUrl}\nEmail: ${email.trim()}\nPassword: ${password}\n\n`
-            : `Check your email (${email.trim()}) for a link to set your password, then log in at:\n${loginUrl}\n\n`
-          const msg = `Hi ${payload.full_name} 👋\n\nYou've been added to the Noch team.\n\n${credsBlock}To receive tasks & reminders on Telegram, also tap Start here:\nhttps://t.me/Noch_bot\n\n— noch omni`
-          window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, '_blank')
+        if (error || data?.error) {
+          let msg = data?.error || error?.message
+          try { const b = await error?.context?.json(); msg = b?.error || msg } catch {}
+          throw new Error(msg)
         }
+      } else {
+        toast.error('Direct staff add is disabled. Have them submit /staff/request-access.')
+        setSaving(false); return
       }
-      toast.success(isEdit ? 'Updated' : 'Staff added')
+      toast.success(isEdit ? 'Updated' : 'Staff approved — invite email sent')
       onSave()
     } catch (err) {
       toast.error(err.message || 'Save failed')
@@ -351,7 +345,14 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
           )}
 
           {/* Login credentials — only on Add */}
-          {!isEdit && (
+          {!isEdit && isApproval && (
+            <div className="border border-noch-green/30 rounded-xl p-3 bg-noch-green/5">
+              <p className="text-xs text-noch-muted uppercase tracking-wider font-semibold mb-2">Login</p>
+              <p className="text-white text-sm">{fromRequest.email}</p>
+              <p className="text-xs text-noch-muted mt-1">An invite email will be sent on save. The staff member sets their own password via the link.</p>
+            </div>
+          )}
+          {!isEdit && !isApproval && (
             <div className="border border-noch-border rounded-xl p-3 space-y-3 bg-noch-dark/40">
               <p className="text-xs text-noch-muted uppercase tracking-wider font-semibold">Login Credentials</p>
               <div>
@@ -424,8 +425,8 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
             <input className="input" value={form.telegram_chat_id} onChange={e => set('telegram_chat_id', e.target.value)} placeholder="e.g. 123456789" />
           </div>
 
-          {/* Auto-invite toggle — only on Add */}
-          {!isEdit && (
+          {/* Auto-invite toggle — only on legacy Add */}
+          {!isEdit && !isApproval && (
             <label className={`flex items-start gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${form.phone ? 'border-noch-border hover:border-noch-green/40' : 'border-noch-border/40 opacity-60 cursor-not-allowed'}`}>
               <input
                 type="checkbox"
@@ -473,9 +474,11 @@ export default function Staff() {
   const [roles, setRoles] = useState([])
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
   const [editingStaff, setEditingStaff] = useState(null)
+  const [pendingRequests, setPendingRequests] = useState([])
+  const [approvingRequest, setApprovingRequest] = useState(null)
+  const [rejectingId, setRejectingId] = useState(null)
 
   // Telegram scanner
   const [scanning, setScanning] = useState(false)
@@ -485,6 +488,15 @@ export default function Staff() {
   const [assigning, setAssigning] = useState(null)
   const pollRef = useRef(null)
   const prevChatIds = useRef(new Set())
+
+  const loadPendingRequests = async () => {
+    const { data } = await supabase
+      .from('staff_access_requests')
+      .select('id, full_name, email, phone, note, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+    setPendingRequests(data || [])
+  }
 
   useEffect(() => {
     Promise.all([
@@ -501,7 +513,25 @@ export default function Staff() {
       })
       .catch(() => toast.error(t('error')))
       .finally(() => setLoading(false))
+    loadPendingRequests()
   }, [])
+
+  const rejectRequest = async (id) => {
+    setRejectingId(id)
+    try {
+      const { error } = await supabase
+        .from('staff_access_requests')
+        .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+      setPendingRequests(prev => prev.filter(r => r.id !== id))
+      toast.success('Request rejected')
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setRejectingId(null)
+    }
+  }
 
   const openTaskCount = (staffId) =>
     tasks.filter(t => t.assigned_to === staffId && t.status !== 'done').length
@@ -581,9 +611,15 @@ export default function Staff() {
             {scanning ? <RefreshCw size={15} className="animate-spin" /> : <Send size={15} />}
             Scan Bot
           </button>
-          <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-            <Plus size={16} /> {t('addStaff')}
-          </button>
+          <a
+            href="/staff/request-access"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary flex items-center gap-2"
+            title="New staff submit a request here; owner approves below"
+          >
+            <LinkIcon size={15} /> Request page
+          </a>
         </div>
       </div>
 
@@ -648,6 +684,47 @@ export default function Staff() {
           <button onClick={() => scanBot(false)} disabled={scanning} className="mt-4 text-xs text-noch-muted hover:text-white flex items-center gap-1 transition-colors">
             <RefreshCw size={12} className={scanning ? 'animate-spin' : ''} /> Refresh
           </button>
+        </div>
+      )}
+
+      {/* Pending access requests */}
+      {pendingRequests.length > 0 && (
+        <div className="card mb-6 border-noch-green/30">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-white font-semibold flex items-center gap-2">
+              <UserCheck size={16} className="text-noch-green" />
+              Pending access requests
+              <span className="text-[10px] px-2 py-0.5 bg-noch-green/20 text-noch-green rounded-full font-bold">
+                {pendingRequests.length}
+              </span>
+            </h2>
+          </div>
+          <div className="flex flex-col gap-2">
+            {pendingRequests.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-noch-border bg-noch-dark">
+                <div className="min-w-0 flex-1">
+                  <p className="text-white text-sm font-medium truncate">{r.full_name}</p>
+                  <p className="text-noch-muted text-xs truncate">{r.email}{r.phone ? ` · ${r.phone}` : ''}</p>
+                  {r.note && <p className="text-noch-muted text-xs italic mt-1 truncate">{r.note}</p>}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setApprovingRequest(r)}
+                    className="text-xs bg-noch-green/10 border border-noch-green/30 text-noch-green px-3 py-1.5 rounded-lg hover:bg-noch-green/20 transition-colors"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => rejectRequest(r.id)}
+                    disabled={rejectingId === r.id}
+                    className="text-xs bg-red-500/10 border border-red-500/30 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                  >
+                    {rejectingId === r.id ? '...' : 'Reject'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -723,19 +800,21 @@ export default function Staff() {
         </div>
       )}
 
-      {/* Add Staff modal (simple quick-add) */}
-      {showForm && (
+      {/* Approve request — opens modal with request prefilled */}
+      {approvingRequest && (
         <StaffModal
           staff={null}
           roles={roles}
           branches={branches}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
+          fromRequest={approvingRequest}
           onSave={() => {
-            setShowForm(false)
+            setApprovingRequest(null)
             getStaffProfiles().then(setStaff).catch(() => {})
+            loadPendingRequests()
           }}
-          onClose={() => setShowForm(false)}
+          onClose={() => setApprovingRequest(null)}
         />
       )}
 

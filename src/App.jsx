@@ -3,6 +3,7 @@ import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 
 import Login from './pages/Login'
+import StaffAccessRequest from './pages/StaffAccessRequest'
 import Dashboard from './pages/Dashboard'
 import Tasks from './pages/Tasks'
 import TaskDetail from './pages/TaskDetail'
@@ -104,6 +105,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/staff/request-access" element={<StaffAccessRequest />} />
 
         <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
 

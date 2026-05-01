@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from '../components/shared/LanguageToggle'
+import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Login() {
@@ -12,6 +13,27 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetting, setResetting] = useState(false)
+
+  const handleForgotPassword = async () => {
+    const target = (email || '').trim()
+    if (!target) {
+      toast.error(lang === 'ar' ? 'أدخل البريد الإلكتروني أولاً' : 'Enter your email first')
+      return
+    }
+    setResetting(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo: `${window.location.origin}/login`,
+      })
+      if (error) throw error
+      toast.success(lang === 'ar' ? 'تم إرسال رابط إعادة التعيين' : 'Reset link sent — check your email')
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   // Navigate once React has committed the updated user state.
   // This avoids the race where navigate('/') fires before the state batch lands.
@@ -78,11 +100,24 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-noch-muted text-xs mt-4">
-            {lang === 'ar'
-              ? 'هذا النظام داخلي — تواصل مع الإدارة للحصول على حساب'
-              : 'Internal system — contact admin to get an account'}
-          </p>
+          <div className="flex justify-between items-center mt-4 text-xs">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetting}
+              className="text-noch-muted hover:text-white transition-colors disabled:opacity-50"
+            >
+              {resetting
+                ? (lang === 'ar' ? 'جاري الإرسال...' : 'Sending...')
+                : (lang === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot password?')}
+            </button>
+            <Link
+              to="/staff/request-access"
+              className="text-noch-green hover:underline"
+            >
+              {lang === 'ar' ? 'طلب وصول →' : 'Request access →'}
+            </Link>
+          </div>
         </div>
 
         <div className="flex justify-center mt-6">
