@@ -38,7 +38,9 @@
       "Bash(cp -r 'C:/Users/aeroh/AI apps/noch-task-manager-main/__TRACKED_VAR__' 'C:/Users/aeroh/AI apps/Noch_apps_May_2026/__TRACKED_VAR__')",
       "Bash([ -e \"$OLD/.claude/settings.local.json\" ])",
       "Bash(mkdir -p 'C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude')",
-      "Bash(cp 'C:/Users/aeroh/AI apps/noch-task-manager-main/.claude/settings.local.json' 'C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude/')"
+      "Bash(cp 'C:/Users/aeroh/AI apps/noch-task-manager-main/.claude/settings.local.json' 'C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude/')",
+      "Bash(curl.exe -sS --ssl-no-revoke \"https://noch.cloud/\" --max-time 8)",
+      "Bash(curl.exe -sS --ssl-no-revoke \"https://noch.cloud/\" --max-time 10 -o /tmp/nochcloud.html)"
     ],
     "defaultMode": "bypassPermissions"
   }
