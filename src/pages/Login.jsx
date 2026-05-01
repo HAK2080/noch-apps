@@ -59,7 +59,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-noch-green font-bold text-5xl tracking-tight mb-1">noch omni</h1>
+          <h1 className="text-noch-green font-bold text-5xl tracking-tight mb-1">noch.apps</h1>
           <p className="text-noch-muted text-sm">{t('appTagline')}</p>
         </div>
 

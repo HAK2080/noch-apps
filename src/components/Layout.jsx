@@ -46,35 +46,39 @@ export default function Layout({ children }) {
 
   const ownerNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
+    { type: 'group', label: 'OPERATIONS' },
     { to: '/tasks', icon: CheckSquare, label: t('tasks') },
-    { to: '/recipes', icon: Coffee, label: t('recipes') },
-    { to: '/cost-calculator', icon: Calculator, label: 'Cost Calculator' },
-    { to: '/content-studio', icon: Sparkles, label: 'Content Studio 2.0' },
-    { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
+    { to: '/expenses', icon: Receipt, label: 'Expenses' },
     { to: '/inventory', icon: Package, label: 'Inventory' },
-    { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-    { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
     { to: '/pos', icon: ShoppingCart, label: 'POS' },
     { to: '/products', icon: ShoppingBag, label: 'Products' },
+    { to: '/staff', icon: Users, label: 'Team' },
+    { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
     { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
-    { to: '/expenses', icon: Receipt, label: 'Expenses' },
-    { to: '/staff', icon: Users, label: t('staff') },
+    { type: 'group', label: 'MANAGEMENT' },
     { to: '/report', icon: BarChart2, label: t('report') },
+    { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { type: 'group', label: 'CONTENT' },
+    { to: '/content-studio', icon: Sparkles, label: 'Content Studio' },
+    { type: 'group', label: 'TOOLS' },
+    { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
+    { to: '/cost-calculator', icon: Calculator, label: 'Cost Calculator' },
+    { to: '/recipes', icon: Coffee, label: t('recipes') },
   ]
 
   const staffNav = [
-    { to: '/my-tasks', icon: CheckSquare, label: t('myTasks'), end: true },
-    { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
-    { to: '/recipes', icon: Coffee, label: t('recipes') },
-    { to: '/inventory', icon: Package, label: 'Inventory' },
-    { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
+    { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
     { to: '/pos', icon: ShoppingCart, label: 'POS' },
-    { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
+    { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
     { to: '/expenses', icon: Receipt, label: 'Expenses' },
-    { to: '/my-card', icon: Coffee, label: '🐰 My Card' },
+    { to: '/inventory', icon: Package, label: 'Inventory' },
+    { to: '/products', icon: ShoppingBag, label: 'Products' },
+    { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
+    { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
   ]
 
   const navItems = profile?.role === 'owner' ? ownerNav : staffNav
+  const navLinkItems = navItems.filter(i => i.type !== 'group')
 
   const initials = profile?.full_name
     ?.split(' ')
@@ -104,11 +108,11 @@ export default function Layout({ children }) {
               className="font-bold text-lg tracking-tight text-white"
               style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}
             >
-              noch <span style={{ color: '#4ADE80' }}>omni</span>
+              noch<span style={{ color: '#4ADE80' }}>.apps</span>
             </h1>
           </div>
           <p className="text-xs mt-1 ms-4" style={{ color: 'var(--muted)' }}>
-            {t('appTagline')} <span style={{ color: 'rgba(74,222,128,0.4)' }}>v3.4.0</span>
+            {t('appTagline')} <span style={{ color: 'rgba(74,222,128,0.4)' }}>v4.0</span>
           </p>
         </div>
 
@@ -117,8 +121,18 @@ export default function Layout({ children }) {
 
         {/* Nav */}
         <nav className="flex flex-col gap-0.5 flex-1 px-3 py-3 overflow-y-auto">
-          {navItems.map(item => (
-            <NavItem key={item.to} {...item} />
+          {navItems.map((item, idx) => (
+            item.type === 'group' ? (
+              <div
+                key={`g-${idx}`}
+                className="px-3 pt-4 pb-1 text-[10px] font-bold tracking-[0.12em]"
+                style={{ color: 'var(--muted)' }}
+              >
+                {item.label}
+              </div>
+            ) : (
+              <NavItem key={item.to} {...item} />
+            )
           ))}
         </nav>
 
@@ -186,7 +200,7 @@ export default function Layout({ children }) {
               className="font-bold text-lg text-white"
               style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}
             >
-              noch <span style={{ color: '#4ADE80' }}>omni</span>
+              noch<span style={{ color: '#4ADE80' }}>.apps</span>
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -211,7 +225,7 @@ export default function Layout({ children }) {
         className="md:hidden fixed bottom-0 left-0 right-0 flex items-center justify-around px-2 py-2 z-10 overflow-x-auto border-t"
         style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
-        {navItems.map(item => (
+        {navLinkItems.map(item => (
           <NavLink
             key={item.to}
             to={item.to}

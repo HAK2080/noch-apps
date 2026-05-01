@@ -94,7 +94,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           <div className="w-16 h-16 rounded-2xl bg-noch-green/10 border border-noch-green/20 flex items-center justify-center mx-auto mb-4">
             <Coffee size={28} className="text-noch-green" />
           </div>
-          <h1 className="text-white font-bold text-2xl">noch omni</h1>
+          <h1 className="text-white font-bold text-2xl">noch.apps</h1>
           <p className="text-noch-muted text-sm mt-1">Enter your PIN to continue</p>
         </div>
 

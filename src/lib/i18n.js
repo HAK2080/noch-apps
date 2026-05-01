@@ -159,7 +159,7 @@ export const translations = {
   },
 
   en: {
-    appName: 'Noch Omni',
+    appName: 'noch.apps',
     appTagline: 'All-in-one Management',
     login: 'Login',
     email: 'Email',

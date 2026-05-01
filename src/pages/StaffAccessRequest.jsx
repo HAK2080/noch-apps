@@ -49,7 +49,7 @@ export default function StaffAccessRequest() {
     <div className="min-h-screen bg-noch-dark flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-noch-green font-bold text-5xl tracking-tight mb-1">noch omni</h1>
+          <h1 className="text-noch-green font-bold text-5xl tracking-tight mb-1">noch.apps</h1>
           <p className="text-noch-muted text-sm">
             {lang === 'ar' ? 'طلب وصول الموظف' : 'Staff access request'}
           </p>
