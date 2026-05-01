@@ -148,6 +148,16 @@ Deno.serve(async (req) => {
       ))
     }
 
+    if (include('phoenix')) {
+      const recipients = await rpc<Recipient[]>('whatsapp_phoenix_recipients')
+      summary.push(await fireBatch(
+        'phoenix',
+        'loyalty_phoenix_revival',  // Twilio template — submit + approve before this fires for real
+        recipients,
+        (r) => ({ '1': r.full_name, '2': String(r.revival_count ?? 1) }),
+      ))
+    }
+
     return new Response(JSON.stringify({ ok: true, summary }), {
       headers: { 'Content-Type': 'application/json' },
     })

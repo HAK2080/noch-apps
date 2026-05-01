@@ -14,11 +14,25 @@ import BadgeGrid from '../components/BadgeGrid'
 import toast from 'react-hot-toast'
 
 const TIER_META = {
-  bronze: { icon: Award,  color: 'text-amber-700',  bg: 'bg-amber-700/10',  border: 'border-amber-700/30',  label: { ar: 'برونزي', en: 'Bronze' } },
-  silver: { icon: Trophy, color: 'text-slate-300',  bg: 'bg-slate-300/10',  border: 'border-slate-300/30',  label: { ar: 'فضي',    en: 'Silver' } },
-  gold:   { icon: Trophy, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30', label: { ar: 'ذهبي',   en: 'Gold' } },
-  legend: { icon: Crown,  color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/30', label: { ar: 'أسطورة', en: 'Legend' } },
+  bronze: { icon: Award,  color: 'text-amber-700',  bg: 'bg-amber-700/10',  border: 'border-amber-700/30',  label: { ar: 'برونزي', en: 'Bronze' }, threshold: 0 },
+  silver: { icon: Trophy, color: 'text-slate-300',  bg: 'bg-slate-300/10',  border: 'border-slate-300/30',  label: { ar: 'فضي',    en: 'Silver' }, threshold: 30 },
+  gold:   { icon: Trophy, color: 'text-yellow-400', bg: 'bg-yellow-400/10', border: 'border-yellow-400/30', label: { ar: 'ذهبي',   en: 'Gold' },   threshold: 75 },
+  legend: { icon: Crown,  color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/30', label: { ar: 'أسطورة', en: 'Legend' }, threshold: 150 },
 }
+
+const TIER_RANK = { bronze: 0, silver: 1, gold: 2, legend: 3 }
+
+// Tangible perks per tier — these show as locked/unlocked in the customer's card.
+// Mechanics are honor-system at the counter for now; the visibility itself is the cult driver.
+const TIER_PERKS = [
+  { tier: 'silver', icon: '🎡', ar: 'اختر مزاج عجلة الحظ',         en: 'Pick your spin mood' },
+  { tier: 'silver', icon: '⭐', ar: 'مكافأة عيد ميلاد مضاعفة',     en: 'Double birthday reward' },
+  { tier: 'gold',   icon: '⏭️', ar: 'تخطّي الطابور — البارستا يعرفك', en: 'Skip the queue — barista knows you' },
+  { tier: 'gold',   icon: '🆕', ar: 'تذوّق المشروبات الجديدة قبل الجميع', en: 'First taste of new drinks' },
+  { tier: 'legend', icon: '🤝', ar: 'مشروب مجاني لصديق شهرياً',     en: 'Free drink for a friend, every month' },
+  { tier: 'legend', icon: '🪪', ar: 'بطاقة Legend منقوشة باسمك',    en: 'Engraved Legend card with your name' },
+  { tier: 'legend', icon: '🗳️', ar: 'صوّت على المشروب الموسمي القادم', en: 'Vote on the next seasonal drink' },
+]
 
 const NOCHI_STATE_COPY = {
   happy:    { ar: 'نوتشي سعيد بزيارتك! 🌟',                en: 'Nochi is glowing 🌟' },
@@ -350,6 +364,39 @@ export default function MyCard() {
         <div className="card text-center">
           <p className="text-blue-400 font-bold text-xl">{days ?? '—'}</p>
           <p className="text-noch-muted text-xs">{ar ? 'يوم مضى' : 'Days ago'}</p>
+        </div>
+      </div>
+
+      {/* Tier perks — locked/unlocked based on current tier */}
+      <div className="card mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">✨</span>
+          <p className="text-white font-semibold text-sm">{ar ? 'امتيازاتك' : 'Your perks'}</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {TIER_PERKS.map((p, i) => {
+            const unlocked = TIER_RANK[card.tier] >= TIER_RANK[p.tier]
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${
+                  unlocked
+                    ? 'border-noch-green/30 bg-noch-green/5'
+                    : 'border-noch-border bg-noch-dark opacity-50'
+                }`}
+              >
+                <span className="text-base">{unlocked ? p.icon : '🔒'}</span>
+                <p className={`flex-1 text-xs ${unlocked ? 'text-white' : 'text-noch-muted'}`}>
+                  {ar ? p.ar : p.en}
+                </p>
+                {!unlocked && (
+                  <span className="text-[10px] text-noch-muted uppercase tracking-wider">
+                    {TIER_META[p.tier].label[ar ? 'ar' : 'en']}
+                  </span>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
