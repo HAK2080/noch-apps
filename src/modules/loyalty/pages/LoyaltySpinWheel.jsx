@@ -6,6 +6,7 @@ import { useParams } from 'react-router-dom'
 import { Loader2, RotateCcw, Clock } from 'lucide-react'
 import { supabase, awardPoints, recordSpin, getLastSpin, getSpinPrizes } from '../../../lib/supabase'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import NochiAnimation from '../components/NochiAnimation'
 import toast from 'react-hot-toast'
 
@@ -273,6 +274,7 @@ export default function LoyaltySpinWheel() {
   if (loading) return <Layout><p className="text-noch-muted text-center py-16">Loading...</p></Layout>
   if (settings?.spin_frequency === 'off') return (
     <Layout>
+      <BackButton to="/loyalty" />
       <div className="card text-center py-12">
         <p className="text-noch-muted">Spin wheel is disabled. Enable it in Loyalty Settings.</p>
       </div>
@@ -281,6 +283,7 @@ export default function LoyaltySpinWheel() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <NochiAnimation
         type="spin_win"
         show={showAnim}

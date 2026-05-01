@@ -4,6 +4,7 @@ import { getLoyaltyRewards, redeemLoyaltyReward } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import toast from 'react-hot-toast'
 
 export default function LoyaltyRewards() {
@@ -40,6 +41,7 @@ export default function LoyaltyRewards() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-white font-bold text-xl">{ar ? 'المكافآت' : 'Rewards'}</h1>

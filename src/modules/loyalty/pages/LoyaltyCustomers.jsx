@@ -4,6 +4,7 @@ import { UserPlus, Search, RefreshCw } from 'lucide-react'
 import { getLoyaltyCustomers } from '../../../lib/supabase'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import NochiBunny from '../components/NochiBunny'
 import CustomerRegisterForm from '../components/CustomerRegisterForm'
 import toast from 'react-hot-toast'
@@ -59,6 +60,7 @@ export default function LoyaltyCustomers() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-white font-bold text-xl">{ar ? 'عملاء نوتشي' : 'Nochi Customers'}</h1>

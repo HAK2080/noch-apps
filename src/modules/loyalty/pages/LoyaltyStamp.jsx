@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { QrCode, Phone, Search, Star, Gift, Check, Loader2, ChevronRight, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import NochiBunny from '../components/NochiBunny'
 import toast from 'react-hot-toast'
 
@@ -137,6 +138,7 @@ export default function LoyaltyStamp() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       {showWin && <WinAnimation onDone={() => { setShowWin(false); reset() }} />}
 
       <div className="max-w-md mx-auto">

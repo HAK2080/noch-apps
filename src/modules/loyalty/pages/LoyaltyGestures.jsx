@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import toast from 'react-hot-toast'
 
 const CONTENT_TYPES = ['prayer', 'hydration', 'word', 'puzzle', 'humor', 'affirmation', 'fun_fact']
@@ -112,6 +113,7 @@ export default function LoyaltyGestures() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>

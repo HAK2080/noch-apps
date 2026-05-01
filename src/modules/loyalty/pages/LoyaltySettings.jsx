@@ -5,6 +5,7 @@ import { getPOSBranches, updatePOSBranch } from '../../pos/lib/pos-supabase'
 import { supabase } from '../../../lib/supabase'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import NochiBunny from '../components/NochiBunny'
 import toast from 'react-hot-toast'
 
@@ -156,6 +157,7 @@ export default function LoyaltySettings() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-white font-bold text-xl">{ar ? 'إعدادات نوتشي' : 'Nochi Settings'}</h1>

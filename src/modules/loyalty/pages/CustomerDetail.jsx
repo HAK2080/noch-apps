@@ -6,6 +6,7 @@ import { getPOSBranches } from '../../pos/lib/pos-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import NochiBunny from '../components/NochiBunny'
 import StampCard from '../components/StampCard'
 import ConfirmModal from '../../../components/shared/ConfirmModal'
@@ -129,6 +130,7 @@ export default function CustomerDetail() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty/customers" />
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button onClick={() => navigate('/loyalty/customers')} className="text-noch-muted hover:text-white">

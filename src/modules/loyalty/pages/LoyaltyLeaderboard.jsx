@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Trophy, ArrowRight } from 'lucide-react'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -55,6 +56,7 @@ export default function LoyaltyLeaderboard() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <button onClick={() => navigate('/loyalty')} className="flex items-center gap-2 text-noch-muted hover:text-white text-sm mb-4 transition-colors">
         <ArrowRight size={16} className="rotate-180 rtl:rotate-0" />
         {lang === 'ar' ? 'رجوع' : 'Back'}

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { QrCode, RefreshCw, Maximize2 } from 'lucide-react'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
+import BackButton from '../../../components/shared/BackButton'
 import { generateLoyaltyQR } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 let nochiImg = null
@@ -132,6 +133,7 @@ export default function LoyaltyQR() {
 
   return (
     <Layout>
+      <BackButton to="/loyalty" />
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-white font-bold text-xl">{ar ? 'QR الكاونتر' : 'Counter QR'}</h1>

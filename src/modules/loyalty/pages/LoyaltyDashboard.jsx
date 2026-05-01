@@ -179,19 +179,11 @@ export default function LoyaltyDashboard() {
           {/* Negative feedback this week */}
           {stats?.negative_feedback_week > 0 && (
             <div className="card border-red-500/30 bg-red-500/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={16} className="text-red-400" />
-                  <p className="text-white text-sm font-medium">
-                    {ar ? `${stats.negative_feedback_week} تغذية راجعة سلبية هذا الأسبوع` : `${stats.negative_feedback_week} negative feedback this week`}
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate('/loyalty/feedback')}
-                  className="text-xs text-red-400 hover:underline"
-                >
-                  {ar ? 'عرض' : 'View'}
-                </button>
+              <div className="flex items-center gap-2">
+                <MessageSquare size={16} className="text-red-400" />
+                <p className="text-white text-sm font-medium">
+                  {ar ? `${stats.negative_feedback_week} تغذية راجعة سلبية هذا الأسبوع` : `${stats.negative_feedback_week} negative feedback this week`}
+                </p>
               </div>
             </div>
           )}
