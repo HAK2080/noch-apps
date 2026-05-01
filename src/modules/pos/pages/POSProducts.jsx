@@ -410,6 +410,49 @@ export default function POSProducts() {
     }
   }
   const handleDragEnd = () => setDragOverIdx(null)
+
+  // ── Category drag-and-drop (separate state from product drag) ───────────────
+  const catDragItem = useRef(null)
+  const catDragOverItem = useRef(null)
+  const [catDragOverIdx, setCatDragOverIdx] = useState(null)
+
+  const handleCatDragStart = (e, idx) => {
+    catDragItem.current = idx
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const handleCatDragOver = (e, idx) => {
+    e.preventDefault()
+    if (catDragOverItem.current !== idx) {
+      catDragOverItem.current = idx
+      setCatDragOverIdx(idx)
+    }
+  }
+  const handleCatDragEnd = () => setCatDragOverIdx(null)
+  const handleCatDrop = async (e, idx) => {
+    e.preventDefault()
+    setCatDragOverIdx(null)
+    const from = catDragItem.current
+    catDragItem.current = null; catDragOverItem.current = null
+    if (from === null || from === idx) return
+
+    const newOrder = [...categories]
+    const [moved] = newOrder.splice(from, 1)
+    newOrder.splice(idx, 0, moved)
+    const updates = newOrder.map((c, i) => ({ id: c.id, sort_order: (i + 1) * 10 }))
+
+    setCategories(prev => prev.map(c => {
+      const u = updates.find(x => x.id === c.id)
+      return u ? { ...c, sort_order: u.sort_order } : c
+    }).sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100)))
+
+    try {
+      await Promise.all(updates.map(u => updatePOSCategory(u.id, { sort_order: u.sort_order })))
+      toast.success('Category order saved')
+    } catch {
+      toast.error('Failed to save order')
+      load()
+    }
+  }
   const handleDrop = async (e, idx) => {
     e.preventDefault()
     setDragOverIdx(null)
@@ -745,8 +788,21 @@ export default function POSProducts() {
                 </button>
               </div>
             ) : (
-              categories.map(c => (
-                <div key={c.id} className="card flex items-center gap-3">
+              categories.map((c, idx) => (
+                <div
+                  key={c.id}
+                  draggable
+                  onDragStart={e => handleCatDragStart(e, idx)}
+                  onDragOver={e => handleCatDragOver(e, idx)}
+                  onDragEnd={handleCatDragEnd}
+                  onDrop={e => handleCatDrop(e, idx)}
+                  className={`card flex items-center gap-3 transition-all ${
+                    catDragOverIdx === idx ? 'ring-2 ring-noch-green ring-offset-1 ring-offset-noch-bg' : ''
+                  }`}
+                >
+                  <div className="cursor-grab active:cursor-grabbing text-noch-muted hover:text-white shrink-0 touch-none select-none">
+                    <GripVertical size={16} />
+                  </div>
                   <div className="w-3 h-8 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
                   <div className="flex-1">
                     <p className="text-white font-medium">{c.name}</p>
