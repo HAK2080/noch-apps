@@ -1,5 +1,5 @@
 /* ── Menu V3.4 ── */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Baloo+2:wght@500;700;800&family=Cairo:wght@400;600;700;800&display=swap');
 
 .menu-root {
   --brand:      #E86A1E;
@@ -44,10 +44,13 @@
 }
 .menu-branch-name {
   margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+  font-family: 'Baloo 2', 'Cairo', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: #fff;
 }
+[dir="rtl"] .menu-branch-name { font-family: 'Cairo', 'Baloo 2', sans-serif; }
 .table-pill {
   display: inline-block;
   margin-top: 4px;
@@ -110,37 +113,38 @@
 }
 .featured-scroll::-webkit-scrollbar { display: none; }
 
-/* Category pills */
+/* Category pills — wrap, don't scroll. Chunky pill style matches the rest of the brand. */
 .cat-strip {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 16px 16px 8px;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
   max-width: 700px;
   margin: 0 auto;
 }
-.cat-strip::-webkit-scrollbar { display: none; }
 .cat-pill {
-  flex-shrink: 0;
-  padding: 7px 18px;
-  border-radius: 24px;
-  border: 1.5px solid var(--border);
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 2.5px solid var(--text);
   background: var(--card);
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 500;
+  color: var(--text);
+  font-family: 'Baloo 2', 'Cairo', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
   cursor: pointer;
-  transition: all 0.18s;
+  transition: transform 0.12s, box-shadow 0.12s;
   white-space: nowrap;
-  scroll-snap-align: start;
+  box-shadow: 2px 2px 0 var(--text);
 }
-.cat-pill.active, .cat-pill:hover {
+[dir="rtl"] .cat-pill { font-family: 'Cairo', 'Baloo 2', sans-serif; }
+.cat-pill:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--text);
+}
+.cat-pill.active {
   background: var(--brand);
-  border-color: var(--brand);
+  border-color: var(--text);
   color: #fff;
-  box-shadow: 3px 3px 0 var(--text);
 }
 
 /* Products grid */

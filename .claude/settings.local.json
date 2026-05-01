@@ -40,7 +40,8 @@
       "Bash(mkdir -p 'C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude')",
       "Bash(cp 'C:/Users/aeroh/AI apps/noch-task-manager-main/.claude/settings.local.json' 'C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude/')",
       "Bash(curl.exe -sS --ssl-no-revoke \"https://noch.cloud/\" --max-time 8)",
-      "Bash(curl.exe -sS --ssl-no-revoke \"https://noch.cloud/\" --max-time 10 -o /tmp/nochcloud.html)"
+      "Bash(curl.exe -sS --ssl-no-revoke \"https://noch.cloud/\" --max-time 10 -o /tmp/nochcloud.html)",
+      "Bash(curl.exe -sS --ssl-no-revoke \"https://noch.cloud/menu.html\" --max-time 8 -o /tmp/nochmenu.html)"
     ],
     "defaultMode": "bypassPermissions"
   }
