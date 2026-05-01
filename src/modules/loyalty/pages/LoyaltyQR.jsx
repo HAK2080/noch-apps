@@ -89,7 +89,7 @@ export default function LoyaltyQR() {
       ) : token ? (
         <div className="relative">
           <QRImage
-            value={`${window.location.origin}/loyalty/register?t=${encodeURIComponent(token)}`}
+            value={`https://noch.cloud/#loyalty?t=${encodeURIComponent(token)}`}
             size={fullscreen ? 280 : 200}
           />
           <div className="mt-2 text-center">

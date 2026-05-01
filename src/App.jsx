@@ -63,8 +63,8 @@ import LoyaltyLeaderboard from './modules/loyalty/pages/LoyaltyLeaderboard'
 import LoyaltyStamp from './modules/loyalty/pages/LoyaltyStamp'
 import LoyaltyGestures from './modules/loyalty/pages/LoyaltyGestures'
 import LoyaltySpinWheel from './modules/loyalty/pages/LoyaltySpinWheel'
-import MyCard from './modules/loyalty/customer/MyCard'
-import LoyaltyRegister from './modules/loyalty/customer/LoyaltyRegister'
+// Customer-facing loyalty UI lives on noch.cloud, not on this backend app.
+// MyCard + LoyaltyRegister components retired — customers register via noch.cloud/#loyalty.
 
 import ExpensesPage from './pages/expenses/ExpensesPage'
 
@@ -220,8 +220,7 @@ export default function App() {
         <Route path="/vestaboard" element={<ProtectedRoute><Vestaboard /></ProtectedRoute>} />
 
         {/* Customer-facing loyalty card */}
-        <Route path="/my-card" element={<ProtectedRoute><MyCard /></ProtectedRoute>} />
-        <Route path="/loyalty/register" element={<LoyaltyRegister />} />
+        {/* /my-card and /loyalty/register removed — customers use noch.cloud/#loyalty */}
 
         {/* POS System */}
         <Route path="/pos" element={<ProtectedRoute><POSHome /></ProtectedRoute>} />

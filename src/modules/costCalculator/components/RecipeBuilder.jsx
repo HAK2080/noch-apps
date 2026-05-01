@@ -466,19 +466,18 @@ function SaveAsProductModal({ recipeName, recipeId, calculatedCost, onClose }) {
     if (!salePrice || parseFloat(salePrice) <= 0) return toast.error('Enter a sale price')
     setSaving(true)
     try {
-      // Check if a product with this recipe already exists in this branch
+      // Match by name (recipe→product link no longer stored)
       const existing = await getPOSProducts(branchId)
-      const match = existing.find(p => p.cost_recipe_id === recipeId)
+      const match = existing.find(p => p.name?.trim().toLowerCase() === recipeName.trim().toLowerCase())
       const payload = {
         name: recipeName,
         price: parseFloat(salePrice),
         cost_price: parseFloat(calculatedCost.toFixed(3)),
-        cost_recipe_id: recipeId,
         branch_id: branchId,
         is_active: true,
       }
       if (match) {
-        await updatePOSProduct(match.id, { price: payload.price, cost_price: payload.cost_price, cost_recipe_id: recipeId })
+        await updatePOSProduct(match.id, { price: payload.price, cost_price: payload.cost_price })
         toast.success(`Updated "${recipeName}" in Products`)
       } else {
         await createPOSProduct(payload)

@@ -38,7 +38,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
       // Find staff with matching PIN for this branch (or any branch)
       const { data, error: dbErr } = await supabase
         .from('profiles')
-        .select('id, full_name, role, app_role_id, photo_url, department')
+        .select('id, full_name, role, photo_url, department')
         .eq('pin_code', hashed)
         .eq('is_active', true)
         .limit(1)
@@ -70,7 +70,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         setVerifying(true)
         setTimeout(async () => {
           const hashed = await hashPin(newPin)
-          const { data } = await supabase.from('profiles').select('id, full_name, role, app_role_id, photo_url').eq('pin_code', hashed).eq('is_active', true).limit(1)
+          const { data } = await supabase.from('profiles').select('id, full_name, role, photo_url').eq('pin_code', hashed).eq('is_active', true).limit(1)
           setVerifying(false)
           if (data?.length) {
             toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)

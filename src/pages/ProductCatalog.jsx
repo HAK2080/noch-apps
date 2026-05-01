@@ -129,32 +129,33 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
 const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
   category_id: '', track_inventory: false, stock_qty: '0',
-  low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
+  low_stock_alert: '5', is_active: true, image_url: '',
   visible_branch_ids: [], visible_on_menu: false, visible_on_website: true,
 }
 
 function ProductModal({ product, categories, branches, recipes, rates, onSave, onClose }) {
   const [form, setForm] = useState(() => product
-    ? { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
+    ? { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '' }
     : { ...BLANK }
   )
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [recipeCalc, setRecipeCalc] = useState(null)
+  const [pickRecipeId, setPickRecipeId] = useState('')
   const fileRef = useRef()
   const isEdit = !!product?.id
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  // When recipe selected, calc its cost
+  // Calculator preview when a recipe is picked (no link stored on the product)
   useEffect(() => {
-    if (!form.cost_recipe_id) { setRecipeCalc(null); return }
-    const r = recipes.find(x => x.id === form.cost_recipe_id)
+    if (!pickRecipeId) { setRecipeCalc(null); return }
+    const r = recipes.find(x => x.id === pickRecipeId)
     if (!r) { setRecipeCalc(null); return }
     const cost = calcRecipeCost(r, rates)
     setRecipeCalc({ cost, name: r.name })
-  }, [form.cost_recipe_id, recipes, rates])
+  }, [pickRecipeId, recipes, rates])
 
   const toggleBranch = (id) => setForm(f => {
     const cur = Array.isArray(f.visible_branch_ids) ? f.visible_branch_ids : []
@@ -170,7 +171,6 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
         name: form.name.trim(),
         price: parseFloat(form.price),
         cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
-        cost_recipe_id: form.cost_recipe_id || null,
         stock_qty: parseFloat(form.stock_qty) || 0,
         low_stock_alert: parseFloat(form.low_stock_alert) || 5,
         category_id: form.category_id || null,
@@ -284,16 +284,16 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
               </div>
             )}
 
-            {/* Link to recipe */}
+            {/* Cost calculator — pick a recipe to compute, then 'Use' to copy into Cost Price */}
             <div>
-              <label className="label">Link to Cost Recipe (optional)</label>
-              <select value={form.cost_recipe_id} onChange={e => set('cost_recipe_id', e.target.value)} className="input">
-                <option value="">— None —</option>
+              <label className="label">Calculate cost from a recipe (optional)</label>
+              <select value={pickRecipeId} onChange={e => setPickRecipeId(e.target.value)} className="input">
+                <option value="">— Pick a recipe to preview its cost —</option>
                 {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
               {recipeCalc && (
                 <div className="mt-2 flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.18)' }}>
-                  <span className="text-zinc-400 text-xs flex-1">Calculated cost from <span className="text-white">{recipeCalc.name}</span>: <span className="text-noch-green font-bold">{fmt(recipeCalc.cost)} LYD</span></span>
+                  <span className="text-zinc-400 text-xs flex-1"><span className="text-white">{recipeCalc.name}</span> currently costs <span className="text-noch-green font-bold">{fmt(recipeCalc.cost)} LYD</span></span>
                   <button
                     onClick={() => set('cost_price', recipeCalc.cost.toFixed(3))}
                     className="text-xs font-semibold px-3 py-1 rounded-lg transition-colors"
@@ -303,6 +303,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                   </button>
                 </div>
               )}
+              <p className="text-zinc-600 text-[11px] mt-1">Recipes are calculators only — not linked. If a recipe ingredient cost changes, click here again and re-apply.</p>
             </div>
 
             {/* Category + SKU */}

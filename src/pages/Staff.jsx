@@ -17,7 +17,7 @@ const ROLE_COLORS = {
   limited_staff: 'text-noch-muted bg-noch-muted/10 border-noch-muted/30',
 }
 
-function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, canEditRole, fromRequest }) {
+function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditRole, fromRequest }) {
   const isEdit = !!staff?.id
   const isApproval = !!fromRequest
   const [form, setForm] = useState(isEdit ? {
@@ -32,13 +32,21 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
     pin_code: staff.pin_code || '',
     department: staff.department || '',
     branch_id: staff.branch_id || '',
-    app_role_id: staff.app_role_id || '',
+    role: staff.role || 'staff',
     is_active: staff.is_active !== false,
   } : {
     full_name: fromRequest?.full_name || '', telegram_chat_id: '', phone: fromRequest?.phone || '', photo_url: '',
     monthly_salary: '', hourly_rate: '', employment_type: 'full_time',
-    start_date: '', pin_code: '', department: '', branch_id: '', app_role_id: '', is_active: true,
+    start_date: '', pin_code: '', department: '', branch_id: '', role: 'staff', is_active: true,
   })
+
+  const ROLE_OPTIONS = [
+    { value: 'owner',         label: 'Owner' },
+    { value: 'supervisor',    label: 'Supervisor' },
+    { value: 'accountant',    label: 'Accountant' },
+    { value: 'staff',         label: 'Staff' },
+    { value: 'limited_staff', label: 'Limited Staff' },
+  ]
   const [saving, setSaving] = useState(false)
   const [showPin, setShowPin] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -119,7 +127,7 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
         payload.hourly_rate = form.hourly_rate ? parseFloat(form.hourly_rate) : null
       }
       if (canEditRole) {
-        payload.app_role_id = form.app_role_id || null
+        payload.role = form.role || 'staff'
       }
 
       if (isEdit) {
@@ -229,10 +237,9 @@ function StaffModal({ staff, roles, branches, onSave, onClose, canSeeSalaries, c
           {/* Role — only if canEditRole */}
           {canEditRole && (
             <div>
-              <label className="label">App Role</label>
-              <select className="input" value={form.app_role_id} onChange={e => set('app_role_id', e.target.value)}>
-                <option value="">No role assigned</option>
-                {roles.map(r => <option key={r.id} value={r.id}>{r.name.replace('_', ' ')} (Level {r.level})</option>)}
+              <label className="label">Role</label>
+              <select className="input" value={form.role} onChange={e => set('role', e.target.value)}>
+                {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
           )}
@@ -471,7 +478,6 @@ export default function Staff() {
 
   const [staff, setStaff] = useState([])
   const [tasks, setTasks] = useState([])
-  const [roles, setRoles] = useState([])
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState(null)
@@ -502,13 +508,11 @@ export default function Staff() {
     Promise.all([
       getStaffProfiles(),
       getTasks(),
-      supabase.from('app_roles').select('*').order('level', { ascending: false }),
       supabase.from('pos_branches').select('id, name').eq('is_active', true),
     ])
-      .then(([s, t, rolesRes, branchRes]) => {
+      .then(([s, t, branchRes]) => {
         setStaff(s)
         setTasks(t)
-        setRoles(rolesRes.data || [])
         setBranches(branchRes.data || [])
       })
       .catch(() => toast.error(t('error')))
@@ -590,12 +594,8 @@ export default function Staff() {
     finally { setAssigning(null) }
   }
 
-  const getRoleName = (s) => {
-    const role = roles.find(r => r.id === s.app_role_id)
-    return role?.name || s.role
-  }
-
-  const getRole = (s) => roles.find(r => r.id === s.app_role_id)
+  const getRoleName = (s) => s.role || 'staff'
+  const getRole = (s) => ({ name: s.role || 'staff' })
 
   return (
     <Layout>
@@ -804,7 +804,6 @@ export default function Staff() {
       {approvingRequest && (
         <StaffModal
           staff={null}
-          roles={roles}
           branches={branches}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
@@ -822,7 +821,6 @@ export default function Staff() {
       {editingStaff && (
         <StaffModal
           staff={editingStaff}
-          roles={roles}
           branches={branches}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
