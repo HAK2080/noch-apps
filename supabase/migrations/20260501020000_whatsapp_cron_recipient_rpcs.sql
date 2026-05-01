@@ -1,3 +1,12 @@
+-- Backfill missing columns on loyalty_customers (some prior migrations
+-- didn't reach prod, so birthday_day / birthday_month / language / current_streak
+-- may be missing). All idempotent.
+alter table public.loyalty_customers
+  add column if not exists birthday_day   int,
+  add column if not exists birthday_month int,
+  add column if not exists language       text,
+  add column if not exists current_streak int default 0;
+
 -- WhatsApp marketing cron requires 5 recipient-resolver RPCs.
 -- These were referenced by supabase/functions/whatsapp-cron/index.ts but
 -- never defined, so the cron has been crashing on first call. This migration
