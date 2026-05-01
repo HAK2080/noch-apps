@@ -1,10 +1,16 @@
 // ProductGrid.jsx — Product selection grid for POS terminal
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 export default function ProductGrid({ products = [], categories = [], onSelect, searchQuery = '' }) {
+  // Default to Matcha if it exists, else 'all'
   const [activeCategory, setActiveCategory] = useState('all')
+  useEffect(() => {
+    if (activeCategory !== 'all') return
+    const matcha = categories.find(c => /matcha/i.test(c.name || '') || /ماتشا/.test(c.name_ar || ''))
+    if (matcha) setActiveCategory(matcha.id)
+  }, [categories])
 
   const filtered = products.filter(p => {
     const matchSearch = !searchQuery ||

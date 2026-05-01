@@ -269,6 +269,13 @@ export default function Menu() {
       <header className="menu-header">
         <div className="menu-header-inner">
           <div className="menu-header-left">
+            <a
+              href="https://noch.cloud/"
+              className="menu-back"
+              aria-label={t('Back to noch.cloud', 'الرجوع إلى noch.cloud')}
+            >
+              {lang === 'ar' ? '→' : '←'}
+            </a>
             <img
               src="https://noch.cloud/assets/noch-logo.png"
               alt="Noch"

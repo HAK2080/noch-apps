@@ -42,6 +42,23 @@
   align-items: center;
   justify-content: space-between;
 }
+.menu-header-left { display: flex; align-items: center; gap: 12px; }
+.menu-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.menu-back:hover { background: rgba(255,255,255,0.2); transform: translateY(-1px); }
 .menu-branch-name {
   margin: 0;
   font-family: 'Baloo 2', 'Cairo', sans-serif;
