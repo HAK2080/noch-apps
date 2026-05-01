@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight } from 'lucide-react'
-import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment, getStaffProfiles } from '../lib/supabase'
+import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight, UserCheck, X } from 'lucide-react'
+import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment, getStaffProfiles, supabase } from '../lib/supabase'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,6 +18,61 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [accessRequests, setAccessRequests] = useState([])
+  const [busyRequestId, setBusyRequestId] = useState(null)
+
+  const isOwner = profile?.role === 'owner'
+
+  const loadAccessRequests = useCallback(async () => {
+    if (!isOwner) return
+    const { data } = await supabase
+      .from('staff_access_requests')
+      .select('id, full_name, email, phone, note, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+    setAccessRequests(data || [])
+  }, [isOwner])
+
+  const approveAccess = async (req) => {
+    setBusyRequestId(req.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('approve-staff-request', {
+        body: {
+          request_id: req.id,
+          profile: { full_name: req.full_name, phone: req.phone || null },
+          redirectTo: `${window.location.origin}/login`,
+        },
+      })
+      if (error || data?.error) {
+        let msg = data?.error || error?.message
+        try { const b = await error?.context?.json(); msg = b?.error || msg } catch {}
+        throw new Error(msg)
+      }
+      setAccessRequests(prev => prev.filter(r => r.id !== req.id))
+      toast.success(`${req.full_name} approved — invite sent`)
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setBusyRequestId(null)
+    }
+  }
+
+  const rejectAccess = async (req) => {
+    setBusyRequestId(req.id)
+    try {
+      const { error } = await supabase
+        .from('staff_access_requests')
+        .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+        .eq('id', req.id)
+      if (error) throw error
+      setAccessRequests(prev => prev.filter(r => r.id !== req.id))
+      toast.success('Rejected')
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setBusyRequestId(null)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -30,7 +85,8 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+    loadAccessRequests()
+  }, [loadAccessRequests])
 
   useEffect(() => { load() }, [load])
 
@@ -150,6 +206,51 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Pending access requests — owner only, top priority */}
+      {isOwner && accessRequests.length > 0 && (
+        <div className="card mb-4 border-noch-green/40 bg-noch-green/5">
+          <div className="flex items-center gap-2 mb-3 text-noch-green">
+            <UserCheck size={16} />
+            <h2 className="font-semibold text-sm uppercase tracking-wide">
+              Access requests ({accessRequests.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {accessRequests.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-noch-border bg-noch-dark">
+                <div className="min-w-0 flex-1">
+                  <p className="text-white text-sm font-medium truncate">{r.full_name}</p>
+                  <p className="text-noch-muted text-xs truncate">
+                    {r.email}{r.phone ? ` · ${r.phone}` : ''}
+                  </p>
+                  {r.note && <p className="text-noch-muted text-xs italic truncate mt-0.5">{r.note}</p>}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => approveAccess(r)}
+                    disabled={busyRequestId === r.id}
+                    className="text-xs bg-noch-green/15 border border-noch-green/40 text-noch-green px-3 py-1.5 rounded-lg hover:bg-noch-green/25 transition-colors disabled:opacity-50"
+                  >
+                    {busyRequestId === r.id ? '...' : '✓ Approve'}
+                  </button>
+                  <button
+                    onClick={() => rejectAccess(r)}
+                    disabled={busyRequestId === r.id}
+                    className="text-xs bg-red-500/10 border border-red-500/30 text-red-400 px-2 py-1.5 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                    title="Reject"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-noch-muted text-[11px] mt-3">
+            Approve sends an invite email so they can set their own password. Edit role/branch later in Staff.
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
       <StatsBar stats={stats} />
