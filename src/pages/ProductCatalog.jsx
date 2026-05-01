@@ -134,10 +134,18 @@ const BLANK = {
 }
 
 function ProductModal({ product, categories, branches, recipes, rates, onSave, onClose }) {
-  const [form, setForm] = useState(() => product
-    ? { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
-    : { ...BLANK }
-  )
+  const [form, setForm] = useState(() => {
+    if (product) {
+      return { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
+    }
+    // New product: default to ALL branches selected, customer-menu ON.
+    // Owner can opt out of a branch by clicking it off.
+    return {
+      ...BLANK,
+      visible_branch_ids: (branches || []).map(b => b.id),
+      visible_on_menu: true,
+    }
+  })
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
@@ -419,6 +427,11 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                       )
                     })}
                   </div>
+                  {(form.visible_branch_ids || []).length === 0 && (
+                    <p className="mt-2 text-amber-400 text-[11px] flex items-center gap-1">
+                      ⚠ Not selected at any branch — this product won't appear on any menu.
+                    </p>
+                  )}
                 </div>
               )}
 
