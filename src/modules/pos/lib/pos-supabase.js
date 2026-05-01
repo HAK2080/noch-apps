@@ -98,12 +98,16 @@ export async function deletePOSCategory(id) {
 // ============================================================
 
 export async function getPOSProducts(branchId) {
-  const { data, error } = await supabase
+  // Returns products visible at the given branch — array model OR legacy
+  // single branch_id column. Mirrors what the storefront Menu.jsx does so
+  // both surfaces show the same set.
+  let q = supabase
     .from('pos_products')
     .select('*, pos_categories(name, name_ar, color)')
-    .eq('branch_id', branchId)
     .eq('is_active', true)
     .order('name')
+  if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
+  const { data, error } = await q
   if (error) throw error
   return data
 }
