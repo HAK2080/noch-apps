@@ -1,0 +1,13 @@
+Original Supabase auth email templates as of 2026-05-01, before Noch customization.
+Restore from here if needed.
+
+────────────────────────────────────────────────────────────────────
+RESET PASSWORD (default)
+────────────────────────────────────────────────────────────────────
+Subject: Reset Your Password
+
+<h2>Reset Password</h2>
+<p>Follow this link to reset the password for your user:</p>
+<p><a href="{{ .ConfirmationURL }}">Reset Password</a></p>
+
+────────────────────────────────────────────────────────────────────

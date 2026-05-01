@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false)
   const [accessRequests, setAccessRequests] = useState([])
   const [busyRequestId, setBusyRequestId] = useState(null)
+  const [foundersClub, setFoundersClub] = useState(null)
 
   const isOwner = profile?.role === 'owner'
 
@@ -31,6 +32,12 @@ export default function Dashboard() {
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
     setAccessRequests(data || [])
+  }, [isOwner])
+
+  const loadFoundersClub = useCallback(async () => {
+    if (!isOwner) return
+    const { data } = await supabase.from('founders_club_status').select('*').single()
+    setFoundersClub(data || null)
   }, [isOwner])
 
   const approveAccess = async (req) => {
@@ -86,7 +93,8 @@ export default function Dashboard() {
       setLoading(false)
     }
     loadAccessRequests()
-  }, [loadAccessRequests])
+    loadFoundersClub()
+  }, [loadAccessRequests, loadFoundersClub])
 
   useEffect(() => { load() }, [load])
 
@@ -249,6 +257,27 @@ export default function Dashboard() {
           <p className="text-noch-muted text-[11px] mt-3">
             Approve sends an invite email so they can set their own password. Edit role/branch later in Staff.
           </p>
+        </div>
+      )}
+
+      {/* Founders Club counter — owner only, scarcity reminder */}
+      {isOwner && foundersClub && (
+        <div className="card mb-4 border-purple-400/30 bg-gradient-to-r from-purple-400/5 to-pink-400/5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-purple-300 text-xs font-bold tracking-widest uppercase mb-1">🏛 Noch Founders Club</p>
+              <p className="text-white text-sm">
+                <span className="font-bold text-2xl text-purple-300">{foundersClub.filled}</span>
+                <span className="text-noch-muted"> / {foundersClub.total} seats taken</span>
+              </p>
+              <p className="text-noch-muted text-xs mt-1">
+                {foundersClub.seats_left > 0
+                  ? `${foundersClub.seats_left} founder seats remain. Closes forever once full.`
+                  : 'The Founders Club is closed. No new founders, ever.'}
+              </p>
+            </div>
+            <div className="text-3xl">🏛</div>
+          </div>
         </div>
       )}
 

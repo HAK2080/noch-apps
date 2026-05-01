@@ -208,19 +208,28 @@ export default function MyCard() {
         </button>
       </div>
 
-      {/* Header with tier badge */}
+      {/* Header with tier badge + founder pin if applicable */}
       <div className="text-center mb-4">
         <h1 className="text-white font-bold text-xl">{ar ? `أهلاً ${card.full_name}! 🐰` : `Welcome ${card.full_name}! 🐰`}</h1>
-        {card.tier && TIER_META[card.tier] && (() => {
-          const t = TIER_META[card.tier]
-          const Icon = t.icon
-          return (
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1 mt-2 rounded-full border ${t.bg} ${t.border}`}>
-              <Icon size={13} className={t.color} />
-              <span className={`text-xs font-bold ${t.color}`}>{t.label[ar ? 'ar' : 'en']}</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+          {card.tier && TIER_META[card.tier] && (() => {
+            const t = TIER_META[card.tier]
+            const Icon = t.icon
+            return (
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border ${t.bg} ${t.border}`}>
+                <Icon size={13} className={t.color} />
+                <span className={`text-xs font-bold ${t.color}`}>{t.label[ar ? 'ar' : 'en']}</span>
+              </div>
+            )
+          })()}
+          {card.is_founder && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-purple-400/40 bg-gradient-to-r from-purple-400/20 to-pink-400/20">
+              <span className="text-xs font-bold text-purple-300">
+                {ar ? `🏛️ مؤسس · مقعد #${card.founder_seat}` : `🏛️ Founder · seat #${card.founder_seat}`}
+              </span>
             </div>
-          )
-        })()}
+          )}
+        </div>
       </div>
 
       {/* Nochi mascot + state line */}
