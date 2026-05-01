@@ -64,7 +64,16 @@ alter table public.loyalty_customers
   add column if not exists nochi_name      text,
   add column if not exists is_phoenix      boolean not null default false,
   add column if not exists revival_count   int     not null default 0,
-  add column if not exists referred_by_id  uuid    references public.loyalty_customers(id);
+  add column if not exists referred_by_id  uuid    references public.loyalty_customers(id),
+  add column if not exists referral_code   text;
+
+-- Generate a referral_code for any customer that doesn't have one yet
+update public.loyalty_customers
+   set referral_code = upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))
+ where referral_code is null;
+
+create unique index if not exists loyalty_customers_referral_code_idx
+  on public.loyalty_customers (referral_code) where referral_code is not null;
 
 -- ──────────────────────────────────────────────────────────────────────────
 -- 2. Birthday auto-reward — fired by a daily cron job (or whatsapp-cron's
