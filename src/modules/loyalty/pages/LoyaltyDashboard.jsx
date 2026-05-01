@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Star, Gift, TrendingUp, AlertTriangle, RefreshCw, MessageSquare, Trophy } from 'lucide-react'
-import { getLoyaltyStats, getLoyaltyCustomers } from '../../../lib/supabase'
+import { Users, Star, Gift, TrendingUp, AlertTriangle, RefreshCw, MessageSquare, Trophy, Sparkles } from 'lucide-react'
+import { getLoyaltyStats, getLoyaltyCustomers, supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
 import NochiBunny from '../components/NochiBunny'
@@ -10,11 +11,13 @@ import toast from 'react-hot-toast'
 export default function LoyaltyDashboard() {
   const { lang } = useLanguage()
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [stats, setStats] = useState(null)
   const [atRisk, setAtRisk] = useState([])
   const [loading, setLoading] = useState(true)
-
+  const [runningNochiDay, setRunningNochiDay] = useState(false)
   const [notSetup, setNotSetup] = useState(false)
+  const isOwner = profile?.role === 'owner'
 
   const load = async () => {
     setLoading(true)
@@ -38,6 +41,32 @@ export default function LoyaltyDashboard() {
   }
 
   useEffect(() => { load() }, [])
+
+  const handleNochiDay = async () => {
+    if (!confirm(ar
+      ? 'إعلان يوم نوتشي السنوي؟ سيتم إحياء كل نوتشي + منح مكافأة مشروب مجاني لكل عميل لديه طابع واحد على الأقل. يمكن تشغيله مرة واحدة في السنة.'
+      : 'Run annual Nochi Day? Every Nochi gets revived + every customer with ≥1 stamp gets a free-drink reward. Once a year only.'
+    )) return
+    setRunningNochiDay(true)
+    try {
+      const { data, error } = await supabase.rpc('loyalty_nochi_day_run')
+      if (error) throw error
+      toast.success(ar
+        ? `تم! تم إحياء ${data?.revived ?? 0} نوتشي ومنح ${data?.rewards_issued ?? 0} مكافأة 🎉`
+        : `Done! ${data?.revived ?? 0} Nochis revived, ${data?.rewards_issued ?? 0} rewards issued 🎉`
+      )
+      load()
+    } catch (err) {
+      const code = err.message?.match(/[A-Z_]{4,}/)?.[0]
+      toast.error(
+        code === 'NOCHI_DAY_ALREADY_RAN_THIS_YEAR' ? (ar ? 'تم تشغيله بالفعل هذا العام' : 'Already ran this year')
+        : code === 'OWNER_ONLY' ? (ar ? 'للمالك فقط' : 'Owner only')
+        : (err.message || 'Failed')
+      )
+    } finally {
+      setRunningNochiDay(false)
+    }
+  }
 
   const ar = lang === 'ar'
 
@@ -63,8 +92,19 @@ export default function LoyaltyDashboard() {
           <h1 className="text-white font-bold text-xl">{ar ? 'نوتشي لويالتي' : 'Nochi Loyalty'}</h1>
           <p className="text-noch-muted text-sm">{ar ? 'لوحة التحكم' : 'Dashboard'}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={load} className="btn-secondary p-2.5"><RefreshCw size={16} /></button>
+          {isOwner && (
+            <button
+              onClick={handleNochiDay}
+              disabled={runningNochiDay}
+              className="btn-secondary flex items-center gap-2 border-purple-400/40 text-purple-300 hover:bg-purple-400/10"
+              title={ar ? 'يوم نوتشي السنوي — مرة واحدة في السنة' : 'Annual Nochi Day — once a year'}
+            >
+              <Sparkles size={15} />
+              {runningNochiDay ? '…' : (ar ? 'يوم نوتشي' : 'Nochi Day')}
+            </button>
+          )}
           <button onClick={() => navigate('/loyalty/customers')} className="btn-primary flex items-center gap-2">
             <Users size={16} />
             <span className="hidden sm:inline">{ar ? 'العملاء' : 'Customers'}</span>
