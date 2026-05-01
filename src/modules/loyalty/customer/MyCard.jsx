@@ -31,7 +31,6 @@ const TIER_PERKS = [
   { tier: 'gold',   icon: '🆕', ar: 'تذوّق المشروبات الجديدة قبل الجميع', en: 'First taste of new drinks' },
   { tier: 'legend', icon: '🤝', ar: 'مشروب مجاني لصديق شهرياً',     en: 'Free drink for a friend, every month' },
   { tier: 'legend', icon: '🪪', ar: 'بطاقة Legend منقوشة باسمك',    en: 'Engraved Legend card with your name' },
-  { tier: 'legend', icon: '🗳️', ar: 'صوّت على المشروب الموسمي القادم', en: 'Vote on the next seasonal drink' },
 ]
 
 const NOCHI_STATE_COPY = {
@@ -73,10 +72,6 @@ export default function MyCard() {
   const [challenges, setChallenges] = useState([])
   const [nochiNameInput, setNochiNameInput] = useState('')
   const [savingName, setSavingName] = useState(false)
-  const [activePolls, setActivePolls] = useState([])
-  const [pollVotes, setPollVotes] = useState({}) // {pollId: option_id}
-  const [tallies, setTallies] = useState({})    // {pollId: [{option_id, label, votes}]}
-  const [castingVote, setCastingVote] = useState(null)
   const ar = lang === 'ar'
 
   useEffect(() => {
@@ -106,38 +101,6 @@ export default function MyCard() {
               .order('bonus_stamps', { ascending: false })
               .limit(4)
             setChallenges(ch || [])
-
-            // Active drink polls (Legend-only feature)
-            if (c.tier === 'legend') {
-              const nowIso = new Date().toISOString()
-              const { data: polls } = await supabase
-                .from('loyalty_drink_polls')
-                .select('id, title, description, options, opens_at, closes_at')
-                .eq('is_active', true)
-                .lte('opens_at', nowIso)
-                .gt('closes_at', nowIso)
-                .order('opens_at', { ascending: false })
-              setActivePolls(polls || [])
-              if (polls?.length) {
-                const ids = polls.map(p => p.id)
-                const { data: prevVotes } = await supabase
-                  .from('loyalty_drink_votes')
-                  .select('poll_id, option_id')
-                  .eq('customer_id', c.id)
-                  .in('poll_id', ids)
-                setPollVotes(Object.fromEntries((prevVotes || []).map(v => [v.poll_id, v.option_id])))
-                const { data: t } = await supabase
-                  .from('loyalty_drink_poll_tallies')
-                  .select('*')
-                  .in('poll_id', ids)
-                const grouped = {}
-                ;(t || []).forEach(row => {
-                  if (!grouped[row.poll_id]) grouped[row.poll_id] = []
-                  grouped[row.poll_id].push(row)
-                })
-                setTallies(grouped)
-              }
-            }
           }
           if (c && s) {
             const freq = s.spin_frequency || 'weekly'
@@ -155,29 +118,6 @@ export default function MyCard() {
         .finally(() => setLoading(false))
     }
   }, [user])
-
-  const castVote = async (pollId, optionId) => {
-    if (!card?.id) return
-    setCastingVote(pollId)
-    try {
-      const { error } = await supabase.rpc('cast_drink_vote', {
-        p_poll_id: pollId, p_option_id: optionId, p_customer_id: card.id,
-      })
-      if (error) throw error
-      setPollVotes(prev => ({ ...prev, [pollId]: optionId }))
-      // Refresh tally
-      const { data: t } = await supabase
-        .from('loyalty_drink_poll_tallies')
-        .select('*')
-        .eq('poll_id', pollId)
-      setTallies(prev => ({ ...prev, [pollId]: t || [] }))
-      toast.success(ar ? 'تم تسجيل صوتك! 🐰' : 'Vote counted! 🐰')
-    } catch (err) {
-      toast.error(err.message || 'Failed')
-    } finally {
-      setCastingVote(null)
-    }
-  }
 
   const saveNochiName = async () => {
     if (!nochiNameInput.trim() || !card?.id) return
@@ -465,76 +405,6 @@ export default function MyCard() {
           })}
         </div>
       </div>
-
-      {/* Drink polls — Legend-only voting on next seasonal drink */}
-      {card.tier === 'legend' && activePolls.length > 0 && (
-        <div className="card mb-4 border-purple-400/30 bg-gradient-to-br from-purple-400/5 to-pink-400/5">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">🗳️</span>
-            <p className="text-white font-semibold text-sm">
-              {ar ? 'صوّت على المشروب القادم' : 'Vote on the next seasonal drink'}
-            </p>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-400/20 text-purple-300 font-bold">
-              LEGEND
-            </span>
-          </div>
-          {activePolls.map(poll => {
-            const myVote = pollVotes[poll.id]
-            const tally = tallies[poll.id] || []
-            const totalVotes = tally.reduce((s, r) => s + r.votes, 0)
-            return (
-              <div key={poll.id} className="mb-3 last:mb-0">
-                <p className="text-white text-sm font-medium mb-1">{poll.title}</p>
-                {poll.description && <p className="text-noch-muted text-xs mb-3">{poll.description}</p>}
-                <div className="flex flex-col gap-2">
-                  {(poll.options || []).map(opt => {
-                    const isMine = myVote === opt.id
-                    const optTally = tally.find(t => t.option_id === opt.id)
-                    const votes = optTally?.votes || 0
-                    const pct = totalVotes ? Math.round((votes / totalVotes) * 100) : 0
-                    return (
-                      <button
-                        key={opt.id}
-                        onClick={() => castVote(poll.id, opt.id)}
-                        disabled={castingVote === poll.id}
-                        className={`relative overflow-hidden text-left p-3 rounded-xl border transition-colors ${
-                          isMine
-                            ? 'border-purple-400/60 bg-purple-400/15'
-                            : 'border-noch-border bg-noch-dark hover:border-purple-400/30'
-                        }`}
-                      >
-                        {/* Tally bar background */}
-                        {myVote && (
-                          <div
-                            className="absolute inset-y-0 left-0 bg-purple-400/10 transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        )}
-                        <div className="relative flex items-center justify-between gap-3">
-                          <span className="text-white text-sm">
-                            {ar ? (opt.label_ar || opt.label) : opt.label}
-                          </span>
-                          {myVote && (
-                            <span className="text-purple-300 text-xs font-mono">
-                              {votes} · {pct}%
-                            </span>
-                          )}
-                          {isMine && <span className="text-purple-300 text-xs">✓</span>}
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-                {!myVote && (
-                  <p className="text-noch-muted text-[11px] mt-2">
-                    {ar ? 'اختر مشروبك. تظهر النتائج بعد التصويت.' : 'Pick a drink. Results show after you vote.'}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {/* Active monthly challenges */}
       {challenges.length > 0 && (
