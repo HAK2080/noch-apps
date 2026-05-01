@@ -181,6 +181,9 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
       }
       // Drop legacy single-branch field — visibility lives in the array now
       delete payload.branch_id
+      // Strip joined-relation keys returned by select('*, foo(...)')
+      delete payload.pos_categories
+      delete payload.pos_branches
       if (isEdit) await updatePOSProduct(product.id, payload)
       else await createPOSProduct(payload)
       toast.success(isEdit ? 'Product updated' : 'Product created')
