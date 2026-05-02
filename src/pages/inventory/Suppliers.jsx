@@ -8,12 +8,26 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 const BLANK = { name: '', contact_name: '', phone: '', email: '', website: '', category: '', notes: '' }
+const DRAFT_KEY = 'noch:supplier_draft'
 
 function SupplierModal({ supplier, onSave, onClose }) {
-  const [form, setForm] = useState(supplier ? { ...supplier } : { ...BLANK })
-  const [saving, setSaving] = useState(false)
   const isEdit = !!supplier?.id
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const [form, setForm] = useState(() => {
+    if (supplier) return { ...supplier }
+    try {
+      const draft = localStorage.getItem(DRAFT_KEY)
+      if (draft) return { ...BLANK, ...JSON.parse(draft) }
+    } catch {}
+    return { ...BLANK }
+  })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setForm(f => {
+    const next = { ...f, [k]: v }
+    if (!isEdit) {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(next)) } catch {}
+    }
+    return next
+  })
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Name required'); return }
@@ -26,6 +40,7 @@ function SupplierModal({ supplier, onSave, onClose }) {
         const { error } = await supabase.from('suppliers').insert({ ...form, name: form.name.trim() })
         if (error) throw error
       }
+      try { localStorage.removeItem(DRAFT_KEY) } catch {}
       toast.success(isEdit ? 'Supplier updated' : 'Supplier added')
       onSave()
     } catch (err) {
@@ -76,7 +91,16 @@ function SupplierModal({ supplier, onSave, onClose }) {
             <textarea value={form.notes} onChange={e => set('notes', e.target.value)} className="input w-full resize-none" rows={3} placeholder="Payment terms, order minimums, etc." />
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+            <button
+              onClick={() => {
+                if (!isEdit && (form.name || form.contact_name || form.phone || form.email || form.website || form.category || form.notes)) {
+                  if (!confirm('Discard this draft? It will be cleared.')) return
+                  try { localStorage.removeItem(DRAFT_KEY) } catch {}
+                }
+                onClose()
+              }}
+              className="btn-secondary flex-1"
+            >Cancel</button>
             <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               {saving ? 'Saving...' : (isEdit ? 'Update' : 'Add Supplier')}
