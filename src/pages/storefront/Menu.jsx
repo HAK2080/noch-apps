@@ -3,6 +3,36 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import './styles/Menu.css'
 
+// ── Custom inline SVGs for categories that need brand colors ────────────────
+function MatchaIcedIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'inline-block', verticalAlign: '-3px' }}>
+      <line x1="15" y1="2" x2="15" y2="10" stroke="#0B1020" strokeWidth="1.6" strokeLinecap="round"/>
+      <path d="M7 8 L17 8 L15.5 21 L8.5 21 Z" fill="#7BB661" stroke="#0B1020" strokeWidth="1.6" strokeLinejoin="round"/>
+      <path d="M7 8 L17 8 L16.6 11.5 L7.4 11.5 Z" fill="#fff" stroke="#0B1020" strokeWidth="1.6" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+function V60Icon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'inline-block', verticalAlign: '-3px' }}>
+      {/* Cone dripper */}
+      <path d="M5 5 L19 5 L13.5 14 L10.5 14 Z" fill="#E86A1E" stroke="#0B1020" strokeWidth="1.6" strokeLinejoin="round"/>
+      {/* Server below */}
+      <rect x="8" y="14" width="8" height="6" rx="1" fill="#fff" stroke="#0B1020" strokeWidth="1.6"/>
+      {/* Drip */}
+      <line x1="12" y1="14" x2="12" y2="17" stroke="#6B4423" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function CatIcon({ name }) {
+  const n = (name || '').toLowerCase()
+  if (/matcha|ماتشا/.test(n) && !/coffee/.test(n)) return <MatchaIcedIcon />
+  if (/tools|tool|equipment|أدوات|معدات|v60/.test(n)) return <V60Icon />
+  return <span>{catEmoji(name)}</span>
+}
+
 // ── Auto-emoji for category names (EN + AR) ──────────────────────────────────
 // Order matters: iced/specific variants checked BEFORE broad keywords.
 function catEmoji(name = '') {
@@ -327,7 +357,7 @@ export default function Menu() {
             const label = lang === 'ar' && c.name_ar ? c.name_ar : c.name
             return (
               <button key={c.id} className={`cat-pill${selectedCat === c.id ? ' active' : ''}`} onClick={() => setSelectedCat(c.id)}>
-                {catEmoji(label)}&nbsp;{label}
+                <CatIcon name={label} />&nbsp;{label}
               </button>
             )
           })}
@@ -345,7 +375,7 @@ export default function Menu() {
             return (
               <section key={cat?.id || 'uncategorized'} className="cat-group">
                 <h2 className="cat-group-heading">
-                  {cat ? catEmoji(catLabel) : '🌿'}&nbsp;{catLabel}
+                  {cat ? <CatIcon name={catLabel} /> : '🌿'}&nbsp;{catLabel}
                 </h2>
                 <div className="products-grid">
                   {grpProds.map(p => (
