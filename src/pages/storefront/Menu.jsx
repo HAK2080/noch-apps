@@ -4,10 +4,20 @@ import { supabase } from '../../lib/supabase'
 import './styles/Menu.css'
 
 // ── Auto-emoji for category names (EN + AR) ──────────────────────────────────
+// Order matters: iced/specific variants checked BEFORE broad keywords.
 function catEmoji(name = '') {
   const n = name.toLowerCase()
+  // Specific iced variants first
+  if (/iced.*coffee|coffee.*iced|قهوة.*مثلج|مثلج.*قهوة/.test(n)) return '🥤'
+  if (/iced.*tea|tea.*iced|شاي.*مثلج|مثلج.*شاي/.test(n)) return '🍹'
+  if (/iced.*matcha|matcha.*iced/.test(n)) return '🥤'
+  // Tools / equipment
+  if (/tools|tool|equipment|أدوات|معدات/.test(n)) return '🧰'
+  // Others / misc
+  if (/others|other|misc|أخرى|متنوع/.test(n)) return '💧'
+  // Matcha (default to iced look — most cafés serve iced)
+  if (/matcha|ماتشا/.test(n)) return '🥤'
   if (/coffee|قهوة|espresso|latte|cappuccino|كابتشينو|لاتيه/.test(n)) return '☕'
-  if (/matcha|ماتشا/.test(n)) return '🍵'
   if (/tea|شاي|herbal|أعشاب/.test(n)) return '🫖'
   if (/sweet|حلو|dessert|cake|pastry|كيك|حلوى|حلويات|cookie|brownie/.test(n)) return '🍩'
   if (/waffle|وافل/.test(n)) return '🧇'
