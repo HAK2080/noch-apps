@@ -20,9 +20,11 @@ function SupplierModal({ supplier, onSave, onClose }) {
     setSaving(true)
     try {
       if (isEdit) {
-        await supabase.from('suppliers').update({ ...form, name: form.name.trim() }).eq('id', supplier.id)
+        const { error } = await supabase.from('suppliers').update({ ...form, name: form.name.trim() }).eq('id', supplier.id)
+        if (error) throw error
       } else {
-        await supabase.from('suppliers').insert({ ...form, name: form.name.trim() })
+        const { error } = await supabase.from('suppliers').insert({ ...form, name: form.name.trim() })
+        if (error) throw error
       }
       toast.success(isEdit ? 'Supplier updated' : 'Supplier added')
       onSave()
@@ -97,7 +99,8 @@ export default function Suppliers() {
   async function loadData() {
     setLoading(true)
     try {
-      const { data: suppData } = await supabase.from('suppliers').select('*').order('name')
+      const { data: suppData, error: suppErr } = await supabase.from('suppliers').select('*').order('name')
+      if (suppErr) throw suppErr
       setSuppliers(suppData || [])
       // Load item counts
       const { data: ingData } = await supabase.from('ingredients').select('supplier_id').not('supplier_id', 'is', null)
