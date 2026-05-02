@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import nochLogo from '../../assets/noch-logo.png'
 import './styles/Menu.css'
 
 // ── Custom inline SVGs for categories that need brand colors ────────────────
@@ -317,7 +318,7 @@ export default function Menu() {
               {lang === 'ar' ? '→' : '←'}
             </a>
             <img
-              src="https://noch.cloud/assets/noch-logo.png"
+              src={nochLogo}
               alt="Noch"
               className="menu-logo"
             />
