@@ -102,7 +102,7 @@ function AlertPrefsPanel({ userId, hasTelegram }) {
 
 // ── Flagged Items Panel ──────────────────────────────────────
 function FlaggedPanel({ items, loading }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   const flagged = items.filter(i => ['out', 'low', 'urgent'].includes(i.flag))
 

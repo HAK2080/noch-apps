@@ -32,6 +32,7 @@ import ProductCatalog from './pages/ProductCatalog'
 import InventoryHub from './pages/InventoryHub'
 import StockManager from './pages/inventory/StockManager'
 import ProcurementOrders from './pages/inventory/ProcurementOrders'
+import Suppliers from './pages/inventory/Suppliers'
 import StockCheckAll from './pages/StockCheckAll'
 import BusinessAnalytics from './pages/BusinessAnalytics'
 
@@ -196,6 +197,7 @@ export default function App() {
         <Route path="/inventory/stock-check" element={<ProtectedRoute><StockCheckAll /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<ProtectedRoute><StockManager /></ProtectedRoute>} />
         <Route path="/inventory/procurement" element={<ProtectedRoute><OwnerRoute><ProcurementOrders /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/inventory/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
 
         {/* Analytics (owner only) */}
         <Route path="/analytics" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
