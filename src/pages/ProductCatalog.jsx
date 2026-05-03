@@ -161,6 +161,14 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  // New product: auto-select all branches once they load (modal often opens
+  // before parent finishes fetching branches, so the initializer sees []).
+  useEffect(() => {
+    if (isEdit) return
+    if (!branches?.length) return
+    setForm(f => (f.visible_branch_ids?.length ? f : { ...f, visible_branch_ids: branches.map(b => b.id) }))
+  }, [branches, isEdit])
+
   // Live cost preview from the linked recipe — recomputes each time
   // ingredients change. cost_price stays manual; this is just a hint.
   useEffect(() => {
@@ -444,7 +452,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                     <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_menu ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-white text-sm">Show on customer menu (apps.noch.cloud/menu)</p>
+                    <p className="text-white text-sm">Show on customer Drinks menu</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_website', !form.visible_on_website)}>
@@ -453,7 +461,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                     <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_website ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-white text-sm">Show on website (noch.cloud)</p>
+                    <p className="text-white text-sm">Show on online store</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_available', !form.is_available)}>
@@ -472,7 +480,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                     <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-white text-sm">Visible in POS terminal</p>
+                    <p className="text-white text-sm">Show in POS terminal</p>
                     <p className="text-zinc-600 text-xs">{form.is_active ? 'Shown to cashiers' : 'Hidden from POS — still in catalog'}</p>
                   </div>
                 </label>
