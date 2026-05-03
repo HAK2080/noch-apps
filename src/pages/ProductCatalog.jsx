@@ -496,7 +496,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
 // ─── Main page ────────────────────────────────────────────────
 export default function ProductCatalog() {
   const { isOwner } = useAuth()
-  const canEdit = isOwner   // staff get read-only view; only owners edit
+  const canEdit = true   // owners + all staff can add/edit products
 
   const [branches, setBranches] = useState([])
   const [activeBranch, setActiveBranch] = useState(null)
