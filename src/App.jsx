@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Tasks from './pages/Tasks'
 import TaskDetail from './pages/TaskDetail'
 import Staff from './pages/Staff'
+import RoleManager from './pages/staff/RoleManager'
 import Report from './pages/Report'
 import MyTasks from './pages/MyTasks'
 import Recipes from './pages/Recipes'
@@ -128,6 +129,10 @@ export default function App() {
 
         <Route path="/staff" element={
           <ProtectedRoute><OwnerRoute><Staff /></OwnerRoute></ProtectedRoute>
+        } />
+
+        <Route path="/staff/roles" element={
+          <ProtectedRoute><OwnerRoute><RoleManager /></OwnerRoute></ProtectedRoute>
         } />
 
         <Route path="/report" element={
