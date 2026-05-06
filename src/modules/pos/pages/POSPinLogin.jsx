@@ -4,6 +4,8 @@
 import { useState } from 'react'
 import { Delete, Coffee, Loader2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { setServedBy } from '../lib/pos-session'
+import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 // Simple hash for PIN verification — matches what's stored in profiles.pin_code
@@ -20,6 +22,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   const [pin, setPin] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState('')
+  const { isOwner } = useAuth()
 
   const addDigit = (d) => {
     if (pin.length >= 6) return
@@ -49,6 +52,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         return
       }
       toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)
+      setServedBy(data[0])
       onSuccess(data[0])
     } catch (err) {
       setError('Verification failed')
@@ -74,6 +78,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           setVerifying(false)
           if (data?.length) {
             toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)
+            setServedBy(data[0])
             onSuccess(data[0])
           } else {
             setError('Incorrect PIN')
@@ -146,9 +151,13 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           {verifying ? 'Verifying...' : 'Enter'}
         </button>
 
-        {/* Skip (owner bypass) */}
-        {onSkip && (
-          <button onClick={onSkip} className="w-full mt-3 py-2 text-noch-muted text-sm hover:text-white transition-colors">
+        {/* Skip (owner bypass) — gated to actual owner profile only.
+            Audit fix 2026-05-06: previously this button rendered for anyone. */}
+        {onSkip && isOwner && (
+          <button
+            onClick={() => { setServedBy(null); onSkip() }}
+            className="w-full mt-3 py-2 text-noch-muted text-sm hover:text-white transition-colors"
+          >
             Skip (Owner Mode)
           </button>
         )}

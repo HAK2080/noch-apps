@@ -86,10 +86,16 @@ export default function POSEndOfDay() {
       payment_method: 'z-report',
       created_at: new Date().toISOString(),
     }
+    const prestoTotal = parseFloat(shift.total_presto_sales || 0)
+    const prestoUncollected = parseFloat(shift.total_presto_uncollected || 0)
     const zItems = [
       { product_name: `Total Orders: ${shift.total_orders}`, quantity: 1, unit_price: 0, total: 0 },
       { product_name: 'Cash Sales', quantity: 1, unit_price: parseFloat(shift.total_cash_sales), total: parseFloat(shift.total_cash_sales) },
       { product_name: 'Card Sales', quantity: 1, unit_price: parseFloat(shift.total_card_sales), total: parseFloat(shift.total_card_sales) },
+      ...(prestoTotal > 0 ? [
+        { product_name: 'Presto (in total)', quantity: 1, unit_price: prestoTotal, total: prestoTotal },
+        { product_name: '  Owed by Presto', quantity: 1, unit_price: prestoUncollected, total: prestoUncollected },
+      ] : []),
       ...(summary.topProducts || []).slice(0, 5).map(p => ({
         product_name: `  ${p.name} x${p.qty}`,
         quantity: 1,
@@ -150,6 +156,30 @@ export default function POSEndOfDay() {
                 <p className="text-white font-bold text-lg">{parseFloat(shift.total_card_sales).toFixed(2)}</p>
               </div>
             </div>
+
+            {/* Presto card — shown only when there's Presto activity. Counted in
+                Total Sales above; the "Owed by Presto" line is the portion not
+                yet reconciled against Presto's portal. */}
+            {parseFloat(shift.total_presto_sales || 0) > 0 && (
+              <div className="card mb-5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-white font-semibold text-sm">Presto Delivery</p>
+                  <p className="text-noch-muted text-xs">included in total</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-noch-muted text-xs mb-0.5">Presto Sales</p>
+                    <p className="text-white font-bold">{parseFloat(shift.total_presto_sales).toFixed(2)} LYD</p>
+                  </div>
+                  <div>
+                    <p className="text-noch-muted text-xs mb-0.5">Owed by Presto</p>
+                    <p className={`font-bold ${parseFloat(shift.total_presto_uncollected || 0) > 0 ? 'text-yellow-400' : 'text-noch-green'}`}>
+                      {parseFloat(shift.total_presto_uncollected || 0).toFixed(2)} LYD
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Top products */}
             {summary.topProducts?.length > 0 && (

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
@@ -21,6 +21,8 @@ import PaymentModal from '../components/PaymentModal'
 import ReceiptModal from '../components/ReceiptModal'
 import BarcodeScanner from '../components/BarcodeScanner'
 import { useAuth } from '../../../contexts/AuthContext'
+import { getServedBy } from '../lib/pos-session'
+import { round, sum, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
 
 let itemIdCounter = 0
@@ -106,6 +108,7 @@ export default function POSTerminal() {
   const [showPayment, setShowPayment] = useState(null) // charge data
   const [showReceipt, setShowReceipt] = useState(null) // { order, items }
   const [showScanner, setShowScanner] = useState(false)
+  const [submitting, setSubmitting] = useState(false)  // disables Charge while RPC is in flight
 
   // Load branch, products, categories
   useEffect(() => {
@@ -248,13 +251,31 @@ export default function POSTerminal() {
 
   // Complete payment
   const handlePaymentComplete = async (paymentData) => {
-    const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0)
-    const discountAmount = showPayment.discountAmount || 0
-    const total = subtotal - discountAmount
+    if (submitting) return
+    setSubmitting(true)
+
+    const subtotal = sum(cart.map(i => lineTotal(i.price, i.quantity)))
+    const discountAmount = round(showPayment.discountAmount || 0)
+    const total = round(Math.max(0, subtotal - discountAmount))
+
+    const servedByProfile = getServedBy()
+
+    // Idempotency key: stable across retries within this charge attempt.
+    // Generated client-side so a network retry of the same submit hits the
+    // same server-side row instead of double-charging.
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+    const clientCreatedAt = new Date().toISOString()
 
     const orderData = {
       branch_id: branchId,
       shift_id: shift?.id || null,
+      served_by: servedByProfile?.id || null,
+      idempotency_key: idempotencyKey,
+      client_created_at: clientCreatedAt,
       subtotal,
       discount_amount: discountAmount,
       discount_pct: showPayment.discountType === 'pct' ? (showPayment.discountValue || 0) : 0,
@@ -267,9 +288,9 @@ export default function POSTerminal() {
       product_id: i.product_id,
       product_name: i.name,
       product_name_ar: i.name_ar,
-      unit_price: i.price,
+      unit_price: round(i.price),
       quantity: i.quantity,
-      total: i.price * i.quantity,
+      total: lineTotal(i.price, i.quantity),
       track_inventory: i.track_inventory,
       notes: i.notes,
     }))
@@ -279,14 +300,18 @@ export default function POSTerminal() {
       if (isOnline()) {
         order = await createPOSOrder(orderData, items)
       } else {
+        // Offline: queue with the pre-generated idempotency_key so sync
+        // dedupes correctly even if the queue runs twice.
         const localId = await queueOfflineOrder({ ...orderData, items })
         setOfflineQueue(q => q + 1)
-        // Create a fake order for receipt display
+        // Local receipt uses the OFFLINE-* number; this same number is
+        // preserved server-side at sync time (see pos-sync.js) so the
+        // customer's printed slip remains valid.
         order = {
           ...orderData,
           id: `offline-${localId}`,
           order_number: `OFFLINE-${localId}`,
-          created_at: new Date().toISOString(),
+          created_at: clientCreatedAt,
         }
         toast('Order saved offline. Will sync when online.', { icon: '📴' })
       }
@@ -296,6 +321,8 @@ export default function POSTerminal() {
       setCart([])
     } catch (err) {
       toast.error(err.message || 'Failed to complete sale')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -356,6 +383,9 @@ export default function POSTerminal() {
         {/* Actions */}
         <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white">
           <ScanLine size={18} />
+        </button>
+        <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title="Today's Orders">
+          <ListOrdered size={18} />
         </button>
         <button onClick={() => navigate(`/pos/${branchId}/stock-check`)} className="p-2 text-noch-muted hover:text-white" title="Stock Check">
           <ClipboardList size={18} />
@@ -453,8 +483,9 @@ export default function POSTerminal() {
       {showPayment && (
         <PaymentModal
           total={showPayment.total}
+          submitting={submitting}
           onComplete={handlePaymentComplete}
-          onClose={() => setShowPayment(null)}
+          onClose={() => !submitting && setShowPayment(null)}
         />
       )}
 

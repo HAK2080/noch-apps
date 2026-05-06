@@ -45,6 +45,7 @@ import POSInventory from './modules/pos/pages/POSInventory'
 import POSSettings from './modules/pos/pages/POSSettings'
 import POSProducts from './modules/pos/pages/POSProducts'
 import POSStockCheck from './modules/pos/pages/POSStockCheck'
+import POSOrders from './modules/pos/pages/POSOrders'
 import TableQRGenerator from './pages/TableQRGenerator'
 
 // Ideas
@@ -237,6 +238,7 @@ export default function App() {
         <Route path="/pos/:branchId/settings" element={<ProtectedRoute><POSSettings /></ProtectedRoute>} />
         <Route path="/pos/:branchId/products" element={<ProtectedRoute><POSProducts /></ProtectedRoute>} />
         <Route path="/pos/:branchId/stock-check" element={<ProtectedRoute><POSStockCheck /></ProtectedRoute>} />
+        <Route path="/pos/:branchId/orders" element={<ProtectedRoute><POSOrders /></ProtectedRoute>} />
         <Route path="/pos/:branchId/tables" element={<ProtectedRoute><OwnerRoute><TableQRGenerator /></OwnerRoute></ProtectedRoute>} />
 
         {/* Storefront (Public — No Auth Required) */}

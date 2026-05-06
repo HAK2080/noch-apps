@@ -38,7 +38,7 @@ function Numpad({ value, onChange }) {
   )
 }
 
-export default function PaymentModal({ total, onComplete, onClose, loyaltyCustomer: initialLoyalty }) {
+export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty }) {
   const [method, setMethod] = useState('cash') // cash | card | split | presto
   const [cashTendered, setCashTendered] = useState(total.toFixed(2))
   const [cardAmount, setCardAmount] = useState('0')
@@ -219,7 +219,8 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
               <div className="text-center py-6">
                 <Bike size={48} className="text-noch-green mx-auto mb-3" />
                 <p className="text-white font-semibold mb-1">Presto Delivery</p>
-                <p className="text-noch-muted text-sm mb-4">Order will be marked as Presto payment</p>
+                <p className="text-noch-muted text-sm mb-1">Cash on delivery — Presto collects from customer</p>
+                <p className="text-yellow-400 text-xs mb-4">Counted in day total. Flagged as &quot;owed by Presto&quot; until reconciled.</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
                   <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
                 </div>
@@ -246,17 +247,25 @@ export default function PaymentModal({ total, onComplete, onClose, loyaltyCustom
               )}
             </div>
 
-            {/* Complete button */}
+            {/* Complete button — disabled while a charge is in flight to
+                prevent double-submit (also guarded server-side by the
+                idempotency_key on create_pos_order). */}
             <button
               onClick={handleComplete}
-              disabled={!canComplete}
+              disabled={!canComplete || submitting}
               className={`w-full py-4 rounded-xl font-bold text-lg mt-5 transition-all ${
-                canComplete
+                canComplete && !submitting
                   ? 'bg-noch-green text-noch-dark hover:bg-noch-green/90 active:scale-95'
                   : 'bg-noch-border text-noch-muted cursor-not-allowed'
               }`}
             >
-              {method === 'card' ? 'Confirm Card Payment' : method === 'presto' ? 'Confirm Presto Order' : 'Complete Sale'}
+              {submitting
+                ? 'Processing…'
+                : method === 'card'
+                  ? 'Confirm Card Payment'
+                  : method === 'presto'
+                    ? 'Confirm Presto Order'
+                    : 'Complete Sale'}
             </button>
           </div>
         </div>

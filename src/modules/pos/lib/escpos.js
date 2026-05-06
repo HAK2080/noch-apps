@@ -17,6 +17,57 @@ export const CMD = {
   CUT: [GS, 0x56, 0x00],
   CASH_DRAWER: [ESC, 0x70, 0x00, 0x19, 0xfa],
   LINE_FEED: [LF],
+  // Code-page selection. ESC t n. XPrinter NP-N200L supports several
+  // Arabic pages; CP864 (n=22) is the most widely-supported value across
+  // the NP-N200L firmware revisions in the field. If the operator has
+  // already verified CP1256 (n=23) works on their unit, switch the value
+  // here. The right page is the one whose glyphs match the bytes we send.
+  CODEPAGE_CP437: [ESC, 0x74, 0x00],
+  CODEPAGE_CP864: [ESC, 0x74, 0x16],   // Arabic
+  CODEPAGE_CP1256: [ESC, 0x74, 0x17],  // Arabic Windows
+}
+
+// CP864 + CP1256 maps for the Arabic glyphs we actually use on receipts:
+// the static Arabic phrase("شكراً لزيارتكم") in receipt_footer, plus
+// product_name_ar values. We render via a runtime byte-encoder so the
+// printer doesn't see UTF-8 multibyte sequences for Arabic chars.
+//
+// Strategy: encode ASCII as-is; encode Arabic by mapping Unicode codepoints
+// to CP1256 byte values (single-byte). Anything outside the table falls
+// back to a '?' so we don't blow up the layout. CP1256 is chosen because
+// most XPrinter NP-N200L units in the field default to it and it covers
+// Arabic + Latin in one page.
+const CP1256_MAP = (() => {
+  const m = new Map()
+  // Latin/extended punctuation we care about
+  for (let i = 0; i < 128; i++) m.set(i, i)
+  // Arabic letters (Unicode U+0600–U+06FF range → CP1256)
+  const arabic = {
+    0x060C: 0xA1, 0x061B: 0xBA, 0x061F: 0xBF,
+    0x0621: 0xC1, 0x0622: 0xC2, 0x0623: 0xC3, 0x0624: 0xC4, 0x0625: 0xC5,
+    0x0626: 0xC6, 0x0627: 0xC7, 0x0628: 0xC8, 0x0629: 0xC9, 0x062A: 0xCA,
+    0x062B: 0xCB, 0x062C: 0xCC, 0x062D: 0xCD, 0x062E: 0xCE, 0x062F: 0xCF,
+    0x0630: 0xD0, 0x0631: 0xD1, 0x0632: 0xD2, 0x0633: 0xD3, 0x0634: 0xD4,
+    0x0635: 0xD5, 0x0636: 0xD6, 0x0637: 0xD8, 0x0638: 0xD9, 0x0639: 0xDA,
+    0x063A: 0xDB, 0x0640: 0xDC, 0x0641: 0xDD, 0x0642: 0xDE, 0x0643: 0xDF,
+    0x0644: 0xE1, 0x0645: 0xE3, 0x0646: 0xE4, 0x0647: 0xE5, 0x0648: 0xE6,
+    0x0649: 0xEC, 0x064A: 0xED,
+    0x064B: 0xF0, 0x064C: 0xF1, 0x064D: 0xF2, 0x064E: 0xF3, 0x064F: 0xF5,
+    0x0650: 0xF6, 0x0651: 0xF8, 0x0652: 0xFA,
+  }
+  Object.entries(arabic).forEach(([cp, b]) => m.set(parseInt(cp, 10), b))
+  return m
+})()
+
+function encodeForPrinter(text) {
+  const out = []
+  for (const ch of String(text)) {
+    const cp = ch.codePointAt(0)
+    if (cp < 128) { out.push(cp); continue }
+    const mapped = CP1256_MAP.get(cp)
+    out.push(mapped != null ? mapped : 0x3F)
+  }
+  return out
 }
 
 const RECEIPT_WIDTH = 48
@@ -65,13 +116,22 @@ export function isPrinterConnected() {
   return _port !== null && _writer !== null
 }
 
-async function writeBytes(bytes) {
+async function writeBytes(bytes, timeoutMs = 8000) {
   if (!_writer) throw new Error('Printer not connected')
-  await _writer.write(new Uint8Array(bytes))
+  // Wrap the serial write in a timeout so a yanked USB cable doesn't
+  // hang the receipt modal forever (Pass 3 F1).
+  await Promise.race([
+    _writer.write(new Uint8Array(bytes)),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Print timed out — check printer cable / power')), timeoutMs)
+    ),
+  ])
 }
 
 function textToBytes(text) {
-  return Array.from(new TextEncoder().encode(text))
+  // Use the CP1256-aware encoder for Arabic compatibility on the
+  // XPrinter NP-N200L. ASCII passes through unchanged.
+  return encodeForPrinter(text)
 }
 
 function line(text = '') {
@@ -104,8 +164,10 @@ export async function printReceipt(order, branch, items) {
   const dateStr = now.toLocaleDateString('en-GB')
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-  // Init
+  // Init + select Arabic-compatible code page so the Arabic footer and
+  // any product_name_ar values render as glyphs, not boxes.
   pushCmd(CMD.INIT)
+  pushCmd(CMD.CODEPAGE_CP1256)
   pushCmd(CMD.ALIGN_CENTER)
   pushCmd(CMD.BOLD_ON)
   pushLine(branch.receipt_header || branch.name)

@@ -240,16 +240,24 @@ export async function openShift(branchId, openingCash, userId) {
 }
 
 export async function closeShift(shiftId, closeData) {
-  const { data, error } = await supabase
-    .from('pos_shifts')
-    .update({
-      ...closeData,
-      closed_at: new Date().toISOString(),
-      status: 'closed',
-    })
-    .eq('id', shiftId)
-    .select()
-    .single()
+  // Routes through close_pos_shift RPC which:
+  //   - locks the shift row (blocks double-close races)
+  //   - rejects with 'shift is already closed' if already closed
+  //   - reconciles shift totals against pos_orders sum
+  //   - writes audit log
+  const { data, error } = await supabase.rpc('close_pos_shift', {
+    p_shift_id: shiftId,
+    p_actual_cash: Number(closeData.closing_cash) || 0,
+    p_notes: closeData.notes || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function markPrestoCollected(orderId) {
+  const { data, error } = await supabase.rpc('mark_presto_collected', {
+    p_order_id: orderId,
+  })
   if (error) throw error
   return data
 }
@@ -301,118 +309,58 @@ function getBranchCode(branchName) {
     .slice(0, 3) || 'POS'
 }
 
+// createPOSOrder is now a thin wrapper around the create_pos_order RPC.
+// The RPC is atomic, idempotent (via idempotency_key), and uses atomic
+// UPDATE for stock + shift totals so concurrent terminals can't lose updates.
+//
+// orderData should include: branch_id, shift_id, subtotal, discount_amount,
+// discount_pct, total, payment_method, cash_tendered, change_due,
+// card_amount, loyalty_customer_id, served_by (optional, PIN-verified),
+// idempotency_key (UUID — caller should generate at cart-charge time),
+// client_created_at (ISO string), offline_order_number (optional, for
+// preserving an OFFLINE-N receipt number when syncing).
 export async function createPOSOrder(orderData, items) {
-  // 1. Generate order number
-  const branch = await getPOSBranch(orderData.branch_id)
-  const branchCode = getBranchCode(branch.name)
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const idempotencyKey =
+    orderData.idempotency_key ||
+    (typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`)
 
-  // Count today's orders for sequence
-  const startOfDay = new Date()
-  startOfDay.setHours(0, 0, 0, 0)
-  const { count } = await supabase
-    .from('pos_orders')
-    .select('id', { count: 'exact', head: true })
-    .eq('branch_id', orderData.branch_id)
-    .gte('created_at', startOfDay.toISOString())
-  const seq = String((count || 0) + 1).padStart(4, '0')
-  const orderNumber = `${branchCode}-${dateStr}-${seq}`
-
-  // 2. Insert order
-  const { data: order, error: orderErr } = await supabase
-    .from('pos_orders')
-    .insert({ ...orderData, order_number: orderNumber })
-    .select()
-    .single()
-  if (orderErr) throw orderErr
-
-  // 3. Insert order items
-  const itemsWithOrderId = items.map(item => ({
-    order_id: order.id,
+  const itemsPayload = items.map(item => ({
     product_id: item.product_id || null,
     product_name: item.product_name,
     product_name_ar: item.product_name_ar || null,
-    unit_price: item.unit_price,
-    quantity: item.quantity,
-    total: item.unit_price * item.quantity,
+    unit_price: Number(item.unit_price),
+    quantity: parseInt(item.quantity, 10) || 1,
     notes: item.notes || null,
+    track_inventory: !!item.track_inventory,
   }))
 
-  const { error: itemsErr } = await supabase
-    .from('pos_order_items')
-    .insert(itemsWithOrderId)
-  if (itemsErr) throw itemsErr
+  const { data, error } = await supabase.rpc('create_pos_order', {
+    p_idempotency_key: idempotencyKey,
+    p_branch_id: orderData.branch_id,
+    p_shift_id: orderData.shift_id || null,
+    p_served_by: orderData.served_by || null,
+    p_subtotal: Number(orderData.subtotal) || 0,
+    p_discount_amount: Number(orderData.discount_amount) || 0,
+    p_discount_pct: Number(orderData.discount_pct) || 0,
+    p_total: Number(orderData.total) || 0,
+    p_payment_method: orderData.payment_method || 'cash',
+    p_cash_tendered: orderData.cash_tendered != null ? Number(orderData.cash_tendered) : null,
+    p_change_due: Number(orderData.change_due) || 0,
+    p_card_amount: Number(orderData.card_amount) || 0,
+    p_loyalty_customer_id: orderData.loyalty_customer_id || null,
+    p_client_created_at: orderData.client_created_at || new Date().toISOString(),
+    p_offline_order_number: orderData.offline_order_number || null,
+    p_items: itemsPayload,
+  })
+  if (error) throw error
 
-  // 4. Update inventory & create movement records
-  for (const item of items) {
-    if (!item.product_id || !item.track_inventory) continue
-    const { data: product } = await supabase
-      .from('pos_products')
-      .select('stock_qty')
-      .eq('id', item.product_id)
-      .single()
-    if (!product) continue
-    const stockBefore = parseFloat(product.stock_qty)
-    const stockAfter = stockBefore - item.quantity
-    await supabase
-      .from('pos_products')
-      .update({ stock_qty: stockAfter, updated_at: new Date().toISOString() })
-      .eq('id', item.product_id)
-    await supabase
-      .from('pos_inventory_movements')
-      .insert({
-        branch_id: orderData.branch_id,
-        product_id: item.product_id,
-        movement_type: 'sale',
-        quantity: -item.quantity,
-        stock_before: stockBefore,
-        stock_after: stockAfter,
-        reference_id: order.id,
-        notes: `Order ${orderNumber}`,
-      })
-  }
-
-  // 5. Update shift totals
-  if (orderData.shift_id) {
-    const method = orderData.payment_method
-    const isCash = method === 'cash' || method === 'split'
-    const isCard = method === 'card' || method === 'split' || method === 'presto'
-    const cashAmt = method === 'cash'
-      ? parseFloat(orderData.total)
-      : method === 'split'
-      ? parseFloat(orderData.total) - parseFloat(orderData.card_amount || 0)
-      : 0
-    const cardAmt = (method === 'card' || method === 'presto')
-      ? parseFloat(orderData.total)
-      : parseFloat(orderData.card_amount || 0)
-
-    const { data: shift } = await supabase
-      .from('pos_shifts')
-      .select('total_sales, total_orders, total_cash_sales, total_card_sales, total_discounts, expected_cash')
-      .eq('id', orderData.shift_id)
-      .single()
-    if (shift) {
-      await supabase
-        .from('pos_shifts')
-        .update({
-          total_sales: parseFloat(shift.total_sales) + parseFloat(orderData.total),
-          total_orders: shift.total_orders + 1,
-          total_cash_sales: parseFloat(shift.total_cash_sales) + cashAmt,
-          total_card_sales: parseFloat(shift.total_card_sales) + cardAmt,
-          total_discounts: parseFloat(shift.total_discounts) + parseFloat(orderData.discount_amount || 0),
-          expected_cash: parseFloat(shift.expected_cash) + cashAmt,
-        })
-        .eq('id', orderData.shift_id)
-    }
-  }
-
-  // 6. Return complete order with items
-  const { data: fullOrder } = await supabase
-    .from('pos_orders')
-    .select('*, pos_order_items(*)')
-    .eq('id', order.id)
-    .single()
-  return fullOrder || order
+  // RPC returns { order, items, idempotent_replay }. Flatten for callers
+  // that expected the old shape (order with pos_order_items inline).
+  const order = data?.order || {}
+  const returnedItems = data?.items || []
+  return { ...order, pos_order_items: returnedItems, idempotent_replay: !!data?.idempotent_replay }
 }
 
 export async function getPOSOrders(branchId, filters = {}) {
@@ -433,17 +381,14 @@ export async function getPOSOrders(branchId, filters = {}) {
   return data
 }
 
-export async function voidPOSOrder(orderId, reason) {
-  const { data, error } = await supabase
-    .from('pos_orders')
-    .update({
-      status: 'voided',
-      voided_at: new Date().toISOString(),
-      void_reason: reason,
-    })
-    .eq('id', orderId)
-    .select()
-    .single()
+export async function voidPOSOrder(orderId, reason, servedBy = null) {
+  // Routes through void_pos_order RPC which atomically reverses stock,
+  // shift totals, and writes the audit log.
+  const { data, error } = await supabase.rpc('void_pos_order', {
+    p_order_id: orderId,
+    p_reason: reason || null,
+    p_served_by: servedBy,
+  })
   if (error) throw error
   return data
 }
