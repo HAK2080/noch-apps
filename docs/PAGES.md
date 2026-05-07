@@ -8,14 +8,37 @@ This file maps every page in this repo to its file, URL, audience, and access ga
 
 ## TL;DR — what lives where
 
+Repo layout (as of 2026-05-07):
+
+```
+Noch_apps_May_2026/
+├── apps/
+│   ├── pos/           ← apps.noch.cloud (POS + dashboard SPA)
+│   └── storefront/    ← noch.cloud (Hub + Menu + Shop + Loyalty landing)
+├── packages/
+│   └── shared/        ← reserved for shared assets/utils (currently scaffold)
+├── deploy.py          ← deploys both, --target apps|storefront|both
+├── supabase/          ← migrations (one DB, both apps use it)
+├── docs/              ← this file + audit/, accounting/
+└── .env               ← single source of truth; both apps read it
+```
+
 | Domain | Code lives in | Audience | Auth |
 |---|---|---|---|
-| **`apps.noch.cloud`** | **THIS REPO** (`src/`) | Staff (POS, dashboard) + Customers (storefront menu/checkout) | Mixed |
-| **`noch.cloud`** | **NOT IN THIS REPO** — separate deploy | Customers (landing page, marketing) | Public |
+| **`apps.noch.cloud`** | `apps/pos/` | Staff (POS, dashboard) + Customers (menu/checkout pages) | Mixed |
+| **`noch.cloud`** | `apps/storefront/` | Customers (landing page, marketing) | Public |
 
-**Rule of thumb:**
-- Anything you can edit by changing files in this repo serves under `apps.noch.cloud`.
-- The orange-and-rabbit landing at `noch.cloud` is **not** in this repo. If you want it changed, point me at where it's checked out.
+The previously-separate `C:/Users/aeroh/AI apps/noch-storefront/` folder was merged in here on 2026-05-07.
+
+Build + deploy:
+
+```
+python deploy.py apps         # builds + deploys apps.noch.cloud
+python deploy.py storefront   # builds + deploys noch.cloud
+python deploy.py both         # both, in order
+```
+
+Both `apps/pos/vite.config.js` and `apps/storefront/vite.config.js` declare `envDir: '../..'` — they both read the **single `.env` at the repo root**. Don't duplicate the env file; if a build ever fails with "supabaseUrl is required," check the root `.env` exists and is readable.
 
 The 4 mockup HTMLs at the repo root (`noch-storefront-mockup.html`, `noch-storefront-refined.html`, `noch-menu.html`, `noch-hub.html`) were design experiments — **deleted in commit `e89fe75`**. They were never deployed.
 
