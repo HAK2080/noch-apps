@@ -70,7 +70,10 @@ function encodeForPrinter(text) {
   return out
 }
 
-const RECEIPT_WIDTH = 48
+// XPrinter XP-58IIH is a 58mm thermal printer → 32 chars per line.
+// (The previous value 48 targeted an 80mm printer and would truncate
+// totals and double up the separator bar on a 58mm unit.)
+const RECEIPT_WIDTH = 32
 const TRANSPORT_KEY = 'noch_printer_transport'
 
 // ──────────────────────────────────────────────────────────────────
