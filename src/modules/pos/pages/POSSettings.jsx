@@ -3,11 +3,12 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList } from 'lucide-react'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb } from 'lucide-react'
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift } from '../lib/pos-supabase'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected,
-  printTestPage, openCashDrawer
+  printTestPage, openCashDrawer,
+  getTransport, setTransport, isTransportAvailable, getTransportLabel,
 } from '../lib/escpos'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
@@ -24,13 +25,16 @@ export default function POSSettings() {
   const [printerConnected, setPrinterConnected] = useState(isPrinterConnected())
   const [connecting, setConnecting] = useState(false)
   const [baudRate, setBaudRate] = useState(9600)
+  const [transport, setTransportState] = useState(getTransport())
   const [editing, setEditing] = useState(false)
   const [branchForm, setBranchForm] = useState({})
   const [savingBranch, setSavingBranch] = useState(false)
   const [openingCash, setOpeningCash] = useState('')
   const [openingShift, setOpeningShift] = useState(false)
 
-  const serialAvailable = typeof navigator !== 'undefined' && 'serial' in navigator
+  const serialAvailable = isTransportAvailable('serial')
+  const bluetoothAvailable = isTransportAvailable('bluetooth')
+  const transportAvailable = isTransportAvailable(transport)
 
   useEffect(() => {
     Promise.all([getPOSBranch(branchId), getOpenShift(branchId)])
@@ -56,14 +60,23 @@ export default function POSSettings() {
     }
     setConnecting(true)
     try {
-      await connectPrinter(baudRate)
+      // Façade routes to the active transport. Baud rate is only used by
+      // the serial transport; bluetooth ignores it.
+      await connectPrinter(transport === 'serial' ? { baudRate } : {})
       setPrinterConnected(true)
-      toast.success('Printer connected!')
+      toast.success(`Connected via ${getTransportLabel()}`)
     } catch (err) {
       toast.error(err.message || 'Connection failed')
     } finally {
       setConnecting(false)
     }
+  }
+
+  const handleTransportChange = (kind) => {
+    if (kind === transport) return
+    setTransport(kind)
+    setTransportState(kind)
+    setPrinterConnected(isPrinterConnected())
   }
 
   const handleTestPrint = async () => {
@@ -137,12 +150,46 @@ export default function POSSettings() {
             <h2 className="text-white font-semibold">Printer Setup</h2>
           </div>
 
-          {!serialAvailable && (
+          {/* Transport selector — Bluetooth (default on Android tablets) or
+              USB Serial. Each option is hidden when its underlying browser
+              API isn't available, so a desktop without Bluetooth won't
+              show a dead BT button. */}
+          {(bluetoothAvailable || serialAvailable) && (
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button
+                onClick={() => handleTransportChange('bluetooth')}
+                disabled={!bluetoothAvailable || printerConnected}
+                className={`flex items-center justify-center gap-2 py-2 rounded-xl border text-sm transition-all ${
+                  transport === 'bluetooth'
+                    ? 'bg-noch-green/10 border-noch-green/50 text-noch-green'
+                    : 'border-noch-border text-noch-muted hover:border-noch-green/20'
+                } ${(!bluetoothAvailable || printerConnected) ? 'opacity-40 cursor-not-allowed' : ''}`}
+              >
+                <Bluetooth size={14} />
+                Bluetooth
+              </button>
+              <button
+                onClick={() => handleTransportChange('serial')}
+                disabled={!serialAvailable || printerConnected}
+                className={`flex items-center justify-center gap-2 py-2 rounded-xl border text-sm transition-all ${
+                  transport === 'serial'
+                    ? 'bg-noch-green/10 border-noch-green/50 text-noch-green'
+                    : 'border-noch-border text-noch-muted hover:border-noch-green/20'
+                } ${(!serialAvailable || printerConnected) ? 'opacity-40 cursor-not-allowed' : ''}`}
+              >
+                <Usb size={14} />
+                USB Serial
+              </button>
+            </div>
+          )}
+
+          {!transportAvailable && (
             <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-lg px-3 py-2 mb-4 flex items-start gap-2">
               <AlertTriangle size={14} className="text-yellow-400 shrink-0 mt-0.5" />
               <p className="text-yellow-300 text-xs">
-                Web Serial API requires Chrome/Edge on HTTPS or localhost.
-                Printer features are not available in this browser.
+                {transport === 'bluetooth'
+                  ? 'Web Bluetooth is not available in this browser. Use Chrome on Android (or desktop with Bluetooth enabled).'
+                  : 'Web Serial is not available in this browser. Use Chrome/Edge on HTTPS or localhost.'}
               </p>
             </div>
           )}
@@ -150,11 +197,13 @@ export default function POSSettings() {
           <div className="flex items-center gap-3 mb-3">
             <div className={`w-2 h-2 rounded-full ${printerConnected ? 'bg-noch-green' : 'bg-noch-muted'}`} />
             <span className="text-sm text-white">
-              {printerConnected ? 'Connected — XPrinter NP-N200L' : 'Not connected'}
+              {printerConnected
+                ? `Connected — ${getTransportLabel()}`
+                : `Not connected (${getTransportLabel()})`}
             </span>
           </div>
 
-          {!printerConnected && (
+          {!printerConnected && transport === 'serial' && (
             <div className="mb-3">
               <label className="label block mb-1">Baud Rate</label>
               <select
@@ -173,14 +222,20 @@ export default function POSSettings() {
           <div className="flex gap-3">
             <button
               onClick={handleConnectPrinter}
-              disabled={connecting || !serialAvailable}
+              disabled={connecting || !transportAvailable}
               className={`flex-1 py-2 rounded-xl font-medium text-sm transition-all ${
                 printerConnected
                   ? 'btn-secondary border-red-400/30 text-red-400 hover:bg-red-400/10'
                   : 'btn-primary'
               }`}
             >
-              {connecting ? 'Connecting...' : printerConnected ? 'Disconnect' : 'Connect Printer'}
+              {connecting
+                ? 'Connecting...'
+                : printerConnected
+                  ? 'Disconnect'
+                  : transport === 'bluetooth'
+                    ? 'Connect Bluetooth Printer'
+                    : 'Connect USB Printer'}
             </button>
             {printerConnected && (
               <button onClick={handleTestPrint} className="btn-secondary flex-1 py-2 text-sm">

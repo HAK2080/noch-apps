@@ -71,61 +71,87 @@ function encodeForPrinter(text) {
 }
 
 const RECEIPT_WIDTH = 48
-const PRINTER_PORT_KEY = 'noch_printer_connected'
+const TRANSPORT_KEY = 'noch_printer_transport'
 
-// Module-level port reference
-let _port = null
-let _writer = null
+// ──────────────────────────────────────────────────────────────────
+// Transport façade. Two implementations live in sibling modules and
+// expose the same { isAvailable, isConnected, connect, disconnect,
+// write, label } interface. The user picks one in POS Settings.
+// ──────────────────────────────────────────────────────────────────
+import * as serialTransport from './escpos-transport-serial'
+import * as bluetoothTransport from './escpos-transport-bluetooth'
 
-function isSerialAvailable() {
-  return typeof navigator !== 'undefined' && 'serial' in navigator
+const TRANSPORTS = {
+  serial: serialTransport,
+  bluetooth: bluetoothTransport,
 }
 
-export async function connectPrinter(baudRate = 9600) {
-  if (!isSerialAvailable()) {
-    throw new Error('Web Serial API not available. Use HTTPS or Chrome/Edge.')
-  }
+function readSavedTransport() {
   try {
-    _port = await navigator.serial.requestPort()
-    await _port.open({ baudRate })
-    _writer = _port.writable.getWriter()
-    localStorage.setItem(PRINTER_PORT_KEY, 'connected')
-    return true
-  } catch (err) {
-    _port = null
-    _writer = null
-    throw err
+    const v = localStorage.getItem(TRANSPORT_KEY)
+    if (v === 'serial' || v === 'bluetooth') return v
+  } catch { /* ignore */ }
+  return null
+}
+
+function defaultTransportKind() {
+  // Prefer Bluetooth on Android (production setup); fall back to serial
+  // when only Web Serial is exposed (most desktops).
+  if (bluetoothTransport.isAvailable()) return 'bluetooth'
+  if (serialTransport.isAvailable()) return 'serial'
+  return 'bluetooth'
+}
+
+let _kind = readSavedTransport() || defaultTransportKind()
+
+export function getTransport() {
+  return _kind
+}
+
+export function getTransportLabel() {
+  return TRANSPORTS[_kind]?.label || _kind
+}
+
+export function isTransportAvailable(kind = _kind) {
+  return TRANSPORTS[kind]?.isAvailable?.() === true
+}
+
+export function setTransport(kind) {
+  if (!TRANSPORTS[kind]) throw new Error(`Unknown transport: ${kind}`)
+  if (kind === _kind) return
+  // Switching transports while one is connected: disconnect cleanly first.
+  if (TRANSPORTS[_kind].isConnected()) {
+    // Fire-and-forget; the user will tap Connect again on the new transport.
+    TRANSPORTS[_kind].disconnect().catch(() => {})
   }
+  _kind = kind
+  try { localStorage.setItem(TRANSPORT_KEY, kind) } catch { /* ignore */ }
+}
+
+// connectPrinter signature kept for compatibility — opts.baudRate only
+// applies to the serial transport. Older callers pass a number directly;
+// support that for one release.
+export async function connectPrinter(opts = {}) {
+  const t = TRANSPORTS[_kind]
+  if (!t) throw new Error('No transport selected')
+  const connectOpts = typeof opts === 'number' ? { baudRate: opts } : (opts || {})
+  return t.connect(connectOpts)
 }
 
 export async function disconnectPrinter() {
-  try {
-    if (_writer) {
-      await _writer.releaseLock()
-      _writer = null
-    }
-    if (_port) {
-      await _port.close()
-      _port = null
-    }
-  } catch { /* ignore */ }
-  localStorage.removeItem(PRINTER_PORT_KEY)
+  const t = TRANSPORTS[_kind]
+  if (!t) return
+  await t.disconnect()
 }
 
 export function isPrinterConnected() {
-  return _port !== null && _writer !== null
+  return TRANSPORTS[_kind]?.isConnected?.() === true
 }
 
 async function writeBytes(bytes, timeoutMs = 8000) {
-  if (!_writer) throw new Error('Printer not connected')
-  // Wrap the serial write in a timeout so a yanked USB cable doesn't
-  // hang the receipt modal forever (Pass 3 F1).
-  await Promise.race([
-    _writer.write(new Uint8Array(bytes)),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Print timed out — check printer cable / power')), timeoutMs)
-    ),
-  ])
+  const t = TRANSPORTS[_kind]
+  if (!t || !t.isConnected()) throw new Error('Printer not connected')
+  await t.write(bytes, timeoutMs)
 }
 
 function textToBytes(text) {
@@ -145,11 +171,6 @@ function padRight(left, right, width) {
 
 function separator(char = '-', width = RECEIPT_WIDTH) {
   return line(char.repeat(width))
-}
-
-function centerText(text, width = RECEIPT_WIDTH) {
-  const pad = Math.max(0, Math.floor((width - text.length) / 2))
-  return ' '.repeat(pad) + text
 }
 
 export async function printReceipt(order, branch, items) {
