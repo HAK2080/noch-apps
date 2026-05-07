@@ -35,6 +35,27 @@ HERE = Path(__file__).resolve().parent
 DIST = HERE / "dist"
 
 
+def stamp_sw_cache():
+    """Bump the service-worker cache name so each deploy purges the old one
+    on activate. Without this, returning POS users keep serving stale JS
+    bundles from cache (and the offline-reload path can hold a deleted hash)."""
+    sw_path = DIST / "sw.js"
+    if not sw_path.exists():
+        return
+    import re, time
+    stamp = time.strftime("%Y-%m-%d-%H%M%S")
+    text = sw_path.read_text(encoding="utf-8")
+    new_text = re.sub(
+        r"const CACHE = '[^']+'",
+        f"const CACHE = 'noch-pos-{stamp}'",
+        text,
+        count=1,
+    )
+    if new_text != text:
+        sw_path.write_text(new_text, encoding="utf-8")
+        print(f"      stamped sw.js cache: noch-pos-{stamp}")
+
+
 def build():
     print("[1/4] Building...")
     result = subprocess.run(["npm", "run", "build"], cwd=HERE, shell=True)
@@ -42,6 +63,7 @@ def build():
         sys.exit("Build failed")
     if not DIST.exists():
         sys.exit(f"dist/ not found at {DIST}")
+    stamp_sw_cache()
 
 
 def upload():
