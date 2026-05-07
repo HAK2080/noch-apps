@@ -113,6 +113,11 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
               </>
             )}
 
+            {order.loyalty_stamps_awarded > 0 && (
+              <div className="text-center text-noch-green text-xs mt-1">
+                ⭐ {order.loyalty_stamps_awarded} loyalty stamp{order.loyalty_stamps_awarded > 1 ? 's' : ''} awarded
+              </div>
+            )}
             <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center text-noch-muted" dir="rtl">
               {branch?.receipt_footer || 'شكراً لزيارتكم'}
             </div>

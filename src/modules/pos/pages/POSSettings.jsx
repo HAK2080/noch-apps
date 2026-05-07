@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft } from 'lucide-react'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3 } from 'lucide-react'
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
@@ -394,6 +394,44 @@ export default function POSSettings() {
               className="btn-primary text-xs px-3 py-1"
             >
               Manage
+            </button>
+          </div>
+        </div>
+
+        {/* Modifiers quick link */}
+        <div className="card mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package size={16} className="text-noch-green" />
+              <div>
+                <h2 className="text-white font-semibold">Modifiers</h2>
+                <p className="text-noch-muted text-xs mt-0.5">Drink options: milk, syrup, sugar, size</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/pos/${branchId}/modifiers`)}
+              className="btn-primary text-xs px-3 py-1"
+            >
+              Manage
+            </button>
+          </div>
+        </div>
+
+        {/* Reports quick link */}
+        <div className="card mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 size={16} className="text-noch-green" />
+              <div>
+                <h2 className="text-white font-semibold">Sales Reports</h2>
+                <p className="text-noch-muted text-xs mt-0.5">Today, week, month, by product, by barista</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/pos/${branchId}/reports`)}
+              className="btn-primary text-xs px-3 py-1"
+            >
+              Open
             </button>
           </div>
         </div>

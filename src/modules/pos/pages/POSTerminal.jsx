@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered } from 'lucide-react'
+import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
@@ -12,6 +12,9 @@ import {
 } from '../lib/pos-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
 import POSPinLogin from './POSPinLogin'
+import ShiftAttendees from '../components/ShiftAttendees'
+import ProductModifierModal from '../components/ProductModifierModal'
+import { getModifierGroupsForProduct } from '../lib/pos-supabase'
 import {
   cacheProducts, getCachedProducts,
   cacheCategories, getCachedCategories,
@@ -117,6 +120,8 @@ export default function POSTerminal() {
   const [showReceipt, setShowReceipt] = useState(null) // { order, items }
   const [showScanner, setShowScanner] = useState(false)
   const [submitting, setSubmitting] = useState(false)  // disables Charge while RPC is in flight
+  const [showAttendees, setShowAttendees] = useState(false)
+  const [modifierProduct, setModifierProduct] = useState(null)
 
   // Load branch, products, categories
   useEffect(() => {
@@ -203,12 +208,37 @@ export default function POSTerminal() {
     }
   }, [branchId])
 
-  // Add product to cart. Gated on the per-branch settings:
-  //   - If is_sold_out is set, always block.
-  //   - If block_out_of_stock is on AND product tracks inventory AND
-  //     stock <= 0, block.
-  // Otherwise allow (current behaviour).
-  const addToCart = useCallback((product) => {
+  // addCartLine: append a fully-formed cart line (used after the
+  // modifier modal returns, and from the bare addToCart path below).
+  const addCartLine = useCallback((product, overrides = {}) => {
+    setCart(prev => {
+      // Lines with modifiers always create a NEW row (different config).
+      // Bare lines collapse onto an existing row of the same product.
+      const hasMods = (overrides.modifiers && overrides.modifiers.length) || false
+      if (!hasMods) {
+        const existing = prev.find(i => i.product_id === product.id && (!i.modifiers || i.modifiers.length === 0))
+        if (existing) {
+          return prev.map(i => i.id === existing.id ? { ...i, quantity: i.quantity + 1 } : i)
+        }
+      }
+      return [...prev, {
+        id: newItemId(),
+        product_id: product.id,
+        name: product.name,
+        name_ar: product.name_ar,
+        price: overrides.unit_price != null ? Number(overrides.unit_price) : parseFloat(product.price),
+        quantity: 1,
+        track_inventory: product.track_inventory,
+        notes: '',
+        modifiers: overrides.modifiers || [],
+      }]
+    })
+  }, [])
+
+  // addToCart: entry point used by ProductGrid and barcode scan.
+  // Checks stock guards, then (for non-barcode taps) consults modifier
+  // groups; if any exist, opens the modifier modal instead of adding.
+  const addToCart = useCallback(async (product, opts = {}) => {
     if (product.is_sold_out) {
       toast.error(`${product.name} is sold out`)
       return
@@ -220,27 +250,19 @@ export default function POSTerminal() {
         return
       }
     }
-    setCart(prev => {
-      const existing = prev.find(i => i.product_id === product.id)
-      if (existing) {
-        return prev.map(i =>
-          i.product_id === product.id
-            ? { ...i, quantity: i.quantity + 1 }
-            : i
-        )
+    if (opts.skipModifiers) {
+      addCartLine(product)
+      return
+    }
+    try {
+      const groups = await getModifierGroupsForProduct(product.id)
+      if (groups && groups.length > 0) {
+        setModifierProduct({ product, groups })
+        return
       }
-      return [...prev, {
-        id: newItemId(),
-        product_id: product.id,
-        name: product.name,
-        name_ar: product.name_ar,
-        price: parseFloat(product.price),
-        quantity: 1,
-        track_inventory: product.track_inventory,
-        notes: '',
-      }]
-    })
-  }, [settings])
+    } catch { /* if the lookup fails, fall through to bare add */ }
+    addCartLine(product)
+  }, [settings, addCartLine])
 
   // Long-press a tile to flip is_sold_out for the day. Optimistic UI.
   const handleSoldOutToggle = useCallback(async (product) => {
@@ -270,12 +292,14 @@ export default function POSTerminal() {
     // stored in charge data via CartPanel
   }
 
-  // Handle barcode scan
+  // Handle barcode scan. Barcode flow skips the modifier picker — the
+  // assumption is that scanned items are pre-packaged retail SKUs, not
+  // configurable drinks. Drinks added by tile tap still get the modal.
   const handleScan = async (result) => {
     setShowScanner(false)
     try {
       const product = await getPOSProductByBarcode(branchId, result)
-      addToCart(product)
+      await addToCart(product, { skipModifiers: true })
       toast.success(`Added: ${product.name}`)
     } catch {
       toast.error(`Product not found for barcode: ${result}`)
@@ -332,6 +356,7 @@ export default function POSTerminal() {
       total: lineTotal(i.price, i.quantity),
       track_inventory: i.track_inventory,
       notes: i.notes,
+      modifiers: Array.isArray(i.modifiers) ? i.modifiers : [],
     }))
 
     try {
@@ -437,7 +462,12 @@ export default function POSTerminal() {
         <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white">
           <ScanLine size={18} />
         </button>
-        <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title="Today's Orders">
+        {settings?.per_barista_shift && shift && (
+          <button onClick={() => setShowAttendees(true)} className="p-2 text-noch-muted hover:text-white" title="Shift attendees">
+            <Users size={18} />
+          </button>
+        )}
+        <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title="Orders">
           <ListOrdered size={18} />
         </button>
         <button onClick={() => navigate(`/pos/${branchId}/stock-check`)} className="p-2 text-noch-muted hover:text-white" title="Stock Check">
@@ -526,6 +556,7 @@ export default function POSTerminal() {
             onDiscount={handleDiscount}
             onClear={clearCart}
             onCharge={handleCharge}
+            managerOverrideEnabled={!!settings?.manager_override_enabled}
           />
         </div>
       </div>
@@ -551,6 +582,25 @@ export default function POSTerminal() {
           branch={branch}
           onNewOrder={() => setShowReceipt(null)}
           onClose={() => setShowReceipt(null)}
+        />
+      )}
+
+      {showAttendees && shift && (
+        <ShiftAttendees
+          shiftId={shift.id}
+          branchId={branchId}
+          onClose={() => setShowAttendees(false)}
+        />
+      )}
+
+      {modifierProduct && (
+        <ProductModifierModal
+          product={modifierProduct.product}
+          onAdd={({ unit_price, modifiers }) => {
+            addCartLine(modifierProduct.product, { unit_price, modifiers })
+            setModifierProduct(null)
+          }}
+          onClose={() => setModifierProduct(null)}
         />
       )}
     </div>

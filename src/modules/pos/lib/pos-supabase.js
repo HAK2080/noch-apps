@@ -283,6 +283,94 @@ export async function recordCashMovement({
   return data
 }
 
+// ── Shift attendees (per-barista clock in/out) ────────────────────
+export async function clockInAttendee(shiftId, userId, branchId) {
+  const { data, error } = await supabase.rpc('clock_in_attendee', {
+    p_shift_id: shiftId, p_user_id: userId, p_branch_id: branchId,
+  })
+  if (error) throw error
+  return data
+}
+export async function clockOutAttendee(shiftId, userId) {
+  const { data, error } = await supabase.rpc('clock_out_attendee', {
+    p_shift_id: shiftId, p_user_id: userId,
+  })
+  if (error) throw error
+  return data
+}
+export async function getShiftAttendees(shiftId) {
+  if (!shiftId) return []
+  const { data, error } = await supabase
+    .from('pos_shift_attendees')
+    .select('*, profiles!user_id(id, full_name, photo_url)')
+    .eq('shift_id', shiftId)
+    .order('clocked_in_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+// ── Partial refunds ───────────────────────────────────────────────
+export async function refundPOSOrderLines(orderId, lines, reason, servedBy = null) {
+  const { data, error } = await supabase.rpc('refund_pos_order_lines', {
+    p_order_id: orderId,
+    p_lines: lines,
+    p_reason: reason || null,
+    p_served_by: servedBy,
+  })
+  if (error) throw error
+  return data
+}
+
+// ── Reporting ─────────────────────────────────────────────────────
+export async function getSalesByProduct(branchId, fromIso, toIso) {
+  const { data, error } = await supabase.rpc('pos_sales_by_product', {
+    p_branch_id: branchId, p_from: fromIso, p_to: toIso,
+  })
+  if (error) throw error
+  return data || []
+}
+export async function getSalesByBarista(branchId, fromIso, toIso) {
+  const { data, error } = await supabase.rpc('pos_sales_by_barista', {
+    p_branch_id: branchId, p_from: fromIso, p_to: toIso,
+  })
+  if (error) throw error
+  return data || []
+}
+export async function getDailySalesRange(branchId, fromIso, toIso) {
+  const { data, error } = await supabase
+    .from('pos_sales_daily')
+    .select('*')
+    .eq('branch_id', branchId)
+    .gte('day', fromIso.slice(0, 10))
+    .lte('day', toIso.slice(0, 10))
+    .order('day', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+// ── Modifiers ─────────────────────────────────────────────────────
+export async function getModifierGroupsForProduct(productId) {
+  // Returns groups + their modifiers, scoped to the product via the
+  // pos_product_modifier_groups link table.
+  const { data: links } = await supabase
+    .from('pos_product_modifier_groups')
+    .select('group_id')
+    .eq('product_id', productId)
+  const groupIds = (links || []).map(l => l.group_id)
+  if (!groupIds.length) return []
+  const { data: groups, error } = await supabase
+    .from('pos_modifier_groups')
+    .select('*, pos_modifiers(*)')
+    .in('id', groupIds)
+    .eq('is_active', true)
+    .order('sort_order')
+  if (error) throw error
+  return (groups || []).map(g => ({
+    ...g,
+    modifiers: (g.pos_modifiers || []).filter(m => m.is_active).sort((a, b) => a.sort_order - b.sort_order),
+  }))
+}
+
 export async function getCashMovements(shiftId) {
   if (!shiftId) return []
   const { data, error } = await supabase

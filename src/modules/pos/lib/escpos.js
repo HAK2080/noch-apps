@@ -204,7 +204,7 @@ export async function printReceipt(order, branch, items) {
   pushLine(padRight(dateStr, timeStr, RECEIPT_WIDTH))
   bytes.push(...separator('-'))
 
-  // Items
+  // Items (with modifier sub-lines)
   for (const item of items) {
     const name = item.product_name || item.name || 'Item'
     const qty = item.quantity || 1
@@ -212,6 +212,12 @@ export async function printReceipt(order, branch, items) {
     const total = (parseFloat(item.unit_price) * qty).toFixed(2)
     pushLine(name.slice(0, RECEIPT_WIDTH))
     pushLine(padRight(`  ${qty} x ${price}`, total, RECEIPT_WIDTH))
+    if (Array.isArray(item.modifiers) && item.modifiers.length) {
+      for (const m of item.modifiers) {
+        const label = `   + ${m.modifier_name || ''}`.slice(0, RECEIPT_WIDTH)
+        pushLine(label)
+      }
+    }
   }
 
   bytes.push(...separator('-'))
@@ -249,6 +255,13 @@ export async function printReceipt(order, branch, items) {
   }
 
   bytes.push(...separator('='))
+
+  // Loyalty awarded
+  if (order.loyalty_stamps_awarded > 0) {
+    pushCmd(CMD.ALIGN_CENTER)
+    pushLine(`* ${order.loyalty_stamps_awarded} loyalty stamp(s) awarded *`)
+    pushCmd(CMD.ALIGN_LEFT)
+  }
 
   // Footer (Arabic greeting — may not render on all printers)
   pushCmd(CMD.ALIGN_CENTER)

@@ -1,8 +1,9 @@
 // CartPanel.jsx — Shopping cart for POS terminal
 
 import { useState } from 'react'
-import { Minus, Plus, X, Trash2, Tag } from 'lucide-react'
+import { Minus, Plus, X, Trash2, Tag, Shield } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
+import ManagerOverrideModal from './ManagerOverrideModal'
 
 function CartItem({ item, onUpdateQty, onRemove }) {
   const [editQty, setEditQty] = useState(false)
@@ -21,6 +22,12 @@ function CartItem({ item, onUpdateQty, onRemove }) {
         <p className="text-white text-sm font-medium truncate">{item.name}</p>
         {item.name_ar && (
           <p className="text-noch-muted text-xs text-right" dir="rtl">{item.name_ar}</p>
+        )}
+        {/* Modifier list (oat milk, extra shot, etc.) */}
+        {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
+          <p className="text-noch-muted text-[11px] mt-0.5 truncate">
+            {item.modifiers.map(m => m.modifier_name).join(' · ')}
+          </p>
         )}
         {item.notes && (
           <p className="text-noch-muted text-xs italic mt-0.5">{item.notes}</p>
@@ -81,7 +88,10 @@ function CartItem({ item, onUpdateQty, onRemove }) {
   )
 }
 
-export default function CartPanel({ items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge }) {
+export default function CartPanel({
+  items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge,
+  managerOverrideEnabled = false,
+}) {
   const can = usePermission()
   const canDiscountAny = can('pos', 'discount_any')
   const canVoidOrder = can('pos', 'void_order')
@@ -89,8 +99,13 @@ export default function CartPanel({ items = [], onUpdateQty, onRemove, onDiscoun
   const [discountType, setDiscountType] = useState('pct') // 'pct' | 'flat'
   const [discountValue, setDiscountValue] = useState('')
   const [showDiscount, setShowDiscount] = useState(false)
+  // Manager-override approved state for the current cart. Cleared on void.
+  const [overrideBy, setOverrideBy] = useState(null)
+  const [showOverride, setShowOverride] = useState(false)
 
-  const MAX_DISCOUNT_PCT = canDiscountAny ? Infinity : 10
+  const baselineCap = canDiscountAny ? Infinity : 10
+  // Cap is lifted once a manager has approved.
+  const MAX_DISCOUNT_PCT = (managerOverrideEnabled && overrideBy) ? Infinity : baselineCap
 
   const handleDiscountTypeChange = (type) => {
     setDiscountType(type)
@@ -177,8 +192,23 @@ export default function CartPanel({ items = [], onUpdateQty, onRemove, onDiscoun
           {/* Discount toggle */}
           {showDiscount ? (
             <div className="flex flex-col gap-1.5 mb-3">
-              {!canDiscountAny && (
-                <p className="text-yellow-400 text-[10px]">Max discount: 10%</p>
+              {!canDiscountAny && !overrideBy && (
+                <p className="text-yellow-400 text-[10px] flex items-center justify-between">
+                  <span>Max discount: 10%</span>
+                  {managerOverrideEnabled && (
+                    <button
+                      onClick={() => setShowOverride(true)}
+                      className="text-yellow-300 underline inline-flex items-center gap-1"
+                    >
+                      <Shield size={10} /> Manager override
+                    </button>
+                  )}
+                </p>
+              )}
+              {overrideBy && (
+                <p className="text-noch-green text-[10px] flex items-center gap-1">
+                  <Shield size={10} /> Approved by {overrideBy.full_name || 'manager'}
+                </p>
               )}
               <div className="flex gap-2">
               <select
@@ -219,13 +249,25 @@ export default function CartPanel({ items = [], onUpdateQty, onRemove, onDiscoun
 
           {/* Charge button */}
           <button
-            onClick={() => onCharge({ subtotal, discountAmount, total, discountType, discountValue: parseFloat(discountValue) || 0 })}
+            onClick={() => onCharge({
+              subtotal, discountAmount, total, discountType,
+              discountValue: parseFloat(discountValue) || 0,
+              override_by: overrideBy?.id || null,
+            })}
             className="btn-primary w-full py-4 text-lg font-bold rounded-xl"
             disabled={items.length === 0}
           >
             Charge {total.toFixed(2)} LYD
           </button>
         </div>
+      )}
+
+      {showOverride && (
+        <ManagerOverrideModal
+          action="Approve a discount above the 10% staff cap."
+          onApprove={(profile) => { setOverrideBy(profile); setShowOverride(false) }}
+          onClose={() => setShowOverride(false)}
+        />
       )}
     </div>
   )
