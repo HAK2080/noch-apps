@@ -8,15 +8,12 @@ import { setServedBy } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
-// Simple hash for PIN verification — matches what's stored in profiles.pin_code
-// We use a simple btoa approach (not truly secure but functional for café context)
-async function hashPin(pin) {
-  // Use Web Crypto API for SHA-256
-  const encoder = new TextEncoder()
-  const data = encoder.encode(pin + 'noch_salt_2026')
-  const hash = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
+// Verification routes through the verify_pos_pin RPC, which:
+//   * uses each user's per-user salt (with a legacy fallback for existing
+//     PINs that were hashed with the old static salt 'noch_salt_2026'),
+//   * rate-limits brute force (10 failed attempts / 5 min → 15 min lock),
+//   * never returns the stored hash to the client.
+// The client never hashes PINs anymore.
 
 export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   const [pin, setPin] = useState('')
@@ -37,54 +34,60 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
     setVerifying(true)
     setError('')
     try {
-      const hashed = await hashPin(pin)
-      // Find staff with matching PIN for this branch (or any branch)
-      const { data, error: dbErr } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, photo_url, department')
-        .eq('pin_code', hashed)
-        .eq('is_active', true)
-        .limit(1)
-      if (dbErr) throw dbErr
-      if (!data?.length) {
+      const { data, error: rpcErr } = await supabase.rpc('verify_pos_pin', {
+        p_pin: pin,
+        p_branch_id: branchId || null,
+      })
+      if (rpcErr) throw rpcErr
+      if (data?.locked) {
+        setError(`Too many failed attempts. Try again in ${Math.ceil((data.retry_in_seconds || 900) / 60)} min.`)
+        setPin('')
+        return
+      }
+      if (!data?.matched) {
         setError('Incorrect PIN — try again')
         setPin('')
         return
       }
-      toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)
-      setServedBy(data[0])
-      onSuccess(data[0])
+      toast.success(`Welcome, ${data.profile.full_name || 'Staff'} 👋`)
+      setServedBy(data.profile)
+      onSuccess(data.profile)
     } catch (err) {
-      setError('Verification failed')
+      setError(err.message || 'Verification failed')
       setPin('')
     } finally {
       setVerifying(false)
     }
   }
 
-  // Auto-verify when 6 digits entered
+  // Auto-verify when 6 digits entered. Routes through the same RPC.
   const handleDigit = async (d) => {
     const newPin = pin + d
     if (newPin.length > 6) return
     setPin(newPin)
     setError('')
-    if (newPin.length >= 4) {
-      // Wait a tick then auto-try if it's 6 digits
-      if (newPin.length === 6) {
-        setVerifying(true)
-        setTimeout(async () => {
-          const hashed = await hashPin(newPin)
-          const { data } = await supabase.from('profiles').select('id, full_name, role, photo_url').eq('pin_code', hashed).eq('is_active', true).limit(1)
-          setVerifying(false)
-          if (data?.length) {
-            toast.success(`Welcome, ${data[0].full_name || 'Staff'} 👋`)
-            setServedBy(data[0])
-            onSuccess(data[0])
-          } else {
-            setError('Incorrect PIN')
-            setPin('')
-          }
-        }, 200)
+    if (newPin.length === 6) {
+      setVerifying(true)
+      try {
+        const { data } = await supabase.rpc('verify_pos_pin', {
+          p_pin: newPin, p_branch_id: branchId || null,
+        })
+        if (data?.locked) {
+          setError(`Too many failed attempts. Try again in ${Math.ceil((data.retry_in_seconds || 900) / 60)} min.`)
+          setPin('')
+        } else if (data?.matched) {
+          toast.success(`Welcome, ${data.profile.full_name || 'Staff'} 👋`)
+          setServedBy(data.profile)
+          onSuccess(data.profile)
+        } else {
+          setError('Incorrect PIN')
+          setPin('')
+        }
+      } catch {
+        setError('Verification failed')
+        setPin('')
+      } finally {
+        setVerifying(false)
       }
     }
   }

@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb } from 'lucide-react'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft } from 'lucide-react'
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift } from '../lib/pos-supabase'
+import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected,
   printTestPage, openCashDrawer,
@@ -13,6 +14,32 @@ import {
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+
+function FlagRow({ label, hint, value, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className="flex items-start gap-3 text-left p-2 rounded-lg hover:bg-noch-border/30 transition-colors"
+    >
+      <span
+        className={`mt-1 inline-flex w-9 h-5 rounded-full transition-colors shrink-0 ${
+          value ? 'bg-noch-green' : 'bg-noch-border'
+        }`}
+      >
+        <span
+          className={`block w-4 h-4 bg-white rounded-full mt-0.5 transition-transform ${
+            value ? 'translate-x-4' : 'translate-x-0.5'
+          }`}
+        />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-white text-sm font-medium">{label}</span>
+        {hint && <span className="block text-noch-muted text-xs mt-0.5">{hint}</span>}
+      </span>
+    </button>
+  )
+}
 
 export default function POSSettings() {
   const { branchId } = useParams()
@@ -31,16 +58,22 @@ export default function POSSettings() {
   const [savingBranch, setSavingBranch] = useState(false)
   const [openingCash, setOpeningCash] = useState('')
   const [openingShift, setOpeningShift] = useState(false)
+  const [posSettings, setPosSettings] = useState(null)
 
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
   const transportAvailable = isTransportAvailable(transport)
 
   useEffect(() => {
-    Promise.all([getPOSBranch(branchId), getOpenShift(branchId)])
-      .then(([b, s]) => {
+    Promise.all([
+      getPOSBranch(branchId),
+      getOpenShift(branchId),
+      getPOSSettings(branchId),
+    ])
+      .then(([b, s, ps]) => {
         setBranch(b)
         setShift(s)
+        setPosSettings(ps)
         setBranchForm({
           receipt_header: b.receipt_header || '',
           receipt_footer: b.receipt_footer || '',
@@ -50,6 +83,18 @@ export default function POSSettings() {
       .catch(err => toast.error(err.message || 'Failed to load'))
       .finally(() => setLoading(false))
   }, [branchId])
+
+  const handleToggleFlag = async (flag, value) => {
+    setPosSettings(s => ({ ...s, [flag]: value }))
+    try {
+      clearPOSSettingsCache(branchId)
+      await updatePOSSettings(branchId, { [flag]: value })
+    } catch (err) {
+      // Revert on failure
+      setPosSettings(s => ({ ...s, [flag]: !value }))
+      toast.error(err.message || 'Could not save setting')
+    }
+  }
 
   const handleConnectPrinter = async () => {
     if (printerConnected) {
@@ -371,6 +416,46 @@ export default function POSSettings() {
             </button>
           </div>
         </div>
+
+        {/* Feature flags — per-branch toggles. Defaults match the
+            user's choices on 2026-05-07: out-of-stock blocking off,
+            manager-override off, per-barista-shift off. PIN required
+            is on by default and recommended on for any branch with
+            staff. */}
+        {posSettings && (
+          <div className="card mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ToggleLeft size={16} className="text-noch-green" />
+              <h2 className="text-white font-semibold">POS Behaviour</h2>
+            </div>
+            <div className="flex flex-col gap-3">
+              <FlagRow
+                label="Block sale of out-of-stock items"
+                hint="When on, products with stock ≤ 0 cannot be added to the cart. Off = current behaviour."
+                value={!!posSettings.block_out_of_stock}
+                onChange={v => handleToggleFlag('block_out_of_stock', v)}
+              />
+              <FlagRow
+                label="Require PIN to use POS"
+                hint="When on, the terminal cannot be opened without a verified staff PIN. Records `served_by` on every order."
+                value={posSettings.require_pin !== false}
+                onChange={v => handleToggleFlag('require_pin', v)}
+              />
+              <FlagRow
+                label="Manager override (coming soon)"
+                hint="When on, baristas above their discount cap or attempting a void/refund prompt for a manager PIN. Wired but not yet active."
+                value={!!posSettings.manager_override_enabled}
+                onChange={v => handleToggleFlag('manager_override_enabled', v)}
+              />
+              <FlagRow
+                label="Per-barista shift attendees (coming soon)"
+                hint="When on, multiple staff clock in/out on the same shift with per-barista totals. Wired but not yet active."
+                value={!!posSettings.per_barista_shift}
+                onChange={v => handleToggleFlag('per_barista_shift', v)}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Shift */}
         <div className="card">

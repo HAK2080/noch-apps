@@ -254,6 +254,46 @@ export async function closeShift(shiftId, closeData) {
   return data
 }
 
+// Toggle a product's is_sold_out flag (used by long-press in the terminal).
+// Reset happens automatically on shift open via DB trigger or admin action;
+// for now the flag is sticky until manually cleared.
+export async function setProductSoldOut(productId, soldOut) {
+  const { data, error } = await supabase
+    .from('pos_products')
+    .update({ is_sold_out: !!soldOut, updated_at: new Date().toISOString() })
+    .eq('id', productId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function recordCashMovement({
+  branch_id, shift_id, movement_type, amount, reason, served_by,
+}) {
+  const { data, error } = await supabase.rpc('record_cash_movement', {
+    p_branch_id: branch_id,
+    p_shift_id: shift_id || null,
+    p_movement_type: movement_type,
+    p_amount: Number(amount) || 0,
+    p_reason: reason || null,
+    p_served_by: served_by || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function getCashMovements(shiftId) {
+  if (!shiftId) return []
+  const { data, error } = await supabase
+    .from('pos_cash_movements')
+    .select('*, profiles!served_by(full_name)')
+    .eq('shift_id', shiftId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
 export async function markPrestoCollected(orderId) {
   const { data, error } = await supabase.rpc('mark_presto_collected', {
     p_order_id: orderId,

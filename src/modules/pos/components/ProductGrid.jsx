@@ -1,9 +1,14 @@
 // ProductGrid.jsx — Product selection grid for POS terminal
 
-import { useState, useEffect } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { AlertTriangle, Ban } from 'lucide-react'
 
-export default function ProductGrid({ products = [], categories = [], onSelect, searchQuery = '' }) {
+const LONG_PRESS_MS = 500
+
+export default function ProductGrid({
+  products = [], categories = [], onSelect, onLongPress,
+  blockOutOfStock = false, searchQuery = '',
+}) {
   // Default to Matcha if it exists, else 'all'
   const [activeCategory, setActiveCategory] = useState('all')
   useEffect(() => {
@@ -24,6 +29,44 @@ export default function ProductGrid({ products = [], categories = [], onSelect, 
   const isLowStock = (p) =>
     p.track_inventory &&
     parseFloat(p.stock_qty) <= parseFloat(p.low_stock_alert)
+
+  // Out-of-stock = tracked + qty<=0. Visual cue is always shown; the
+  // click is only blocked when blockOutOfStock prop is true (the
+  // pos_settings.block_out_of_stock flag).
+  const isOutOfStock = (p) =>
+    p.track_inventory &&
+    Number.isFinite(parseFloat(p.stock_qty)) &&
+    parseFloat(p.stock_qty) <= 0
+
+  const isUnavailable = (p) =>
+    p.is_sold_out || (blockOutOfStock && isOutOfStock(p))
+
+  // Long-press handlers — only fire onLongPress; tap fires onSelect.
+  // Using refs+timeout instead of pointer events for broad compatibility.
+  const longPressTimer = useRef(null)
+  const longPressFired = useRef(false)
+  const startPress = (product) => {
+    longPressFired.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true
+      if (onLongPress) onLongPress(product)
+    }, LONG_PRESS_MS)
+  }
+  const cancelPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+  const handleClick = (product) => {
+    if (longPressFired.current) {
+      // Long press already handled — swallow the click.
+      longPressFired.current = false
+      return
+    }
+    if (isUnavailable(product)) return
+    onSelect(product)
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -65,10 +108,20 @@ export default function ProductGrid({ products = [], categories = [], onSelect, 
         {filtered.map(product => (
           <button
             key={product.id}
-            onClick={() => onSelect(product)}
-            className="relative bg-noch-card border border-noch-border rounded-xl text-left
-              hover:border-noch-green/50 hover:bg-noch-green/5 active:scale-95 transition-all
-              min-h-[80px] flex flex-col justify-between overflow-hidden"
+            onClick={() => handleClick(product)}
+            onMouseDown={() => startPress(product)}
+            onMouseUp={cancelPress}
+            onMouseLeave={cancelPress}
+            onTouchStart={() => startPress(product)}
+            onTouchEnd={cancelPress}
+            onTouchCancel={cancelPress}
+            onContextMenu={(e) => e.preventDefault()}
+            disabled={isUnavailable(product)}
+            className={`relative bg-noch-card border border-noch-border rounded-xl text-left
+              transition-all min-h-[80px] flex flex-col justify-between overflow-hidden
+              ${isUnavailable(product)
+                ? 'opacity-50 grayscale cursor-not-allowed'
+                : 'hover:border-noch-green/50 hover:bg-noch-green/5 active:scale-95'}`}
           >
             {/* Product image background */}
             {product.image_url ? (
@@ -79,12 +132,20 @@ export default function ProductGrid({ products = [], categories = [], onSelect, 
             ) : null}
 
             <div className="relative z-10 p-3 flex flex-col justify-between h-full">
-              {/* Low stock badge */}
-              {isLowStock(product) && (
+              {/* Sold-out / out-of-stock / low-stock indicator */}
+              {product.is_sold_out ? (
+                <div className="absolute top-0 right-0 flex items-center gap-1 bg-red-500/90 text-white text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-bl">
+                  <Ban size={10} /> Sold out
+                </div>
+              ) : isOutOfStock(product) ? (
+                <div className="absolute top-0 right-0 bg-red-500/80 text-white text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-bl">
+                  Out of stock
+                </div>
+              ) : isLowStock(product) ? (
                 <div className="absolute top-0 right-0">
                   <AlertTriangle size={12} className="text-yellow-400" />
                 </div>
-              )}
+              ) : null}
 
               {/* No image: show first letter avatar */}
               {!product.image_url && (

@@ -7,8 +7,11 @@ import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, Clipbo
 import { supabase } from '../../../lib/supabase'
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
-  getPOSProductByBarcode, createPOSOrder, getOpenShift
+  getPOSProductByBarcode, createPOSOrder, getOpenShift,
+  setProductSoldOut,
 } from '../lib/pos-supabase'
+import { getPOSSettings } from '../lib/pos-settings'
+import POSPinLogin from './POSPinLogin'
 import {
   cacheProducts, getCachedProducts,
   cacheCategories, getCachedCategories,
@@ -91,9 +94,14 @@ export default function POSTerminal() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [shift, setShift] = useState(null)
+  const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [online, setOnline] = useState(isOnline())
   const [offlineQueue, setOfflineQueue] = useState(0)
+  // PIN gate: when require_pin is on (default), the terminal cannot
+  // load until a barista is verified. The PIN-verified profile is held
+  // in sessionStorage by pos-session.js and re-checked on mount.
+  const [pinVerified, setPinVerified] = useState(() => !!getServedBy())
 
   // Cart state
   const [cart, setCart] = useState([])
@@ -114,12 +122,14 @@ export default function POSTerminal() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [b, s] = await Promise.all([
+        const [b, s, st] = await Promise.all([
           getPOSBranch(branchId),
           getOpenShift(branchId),
+          getPOSSettings(branchId),
         ])
         setBranch(b)
         setShift(s)
+        setSettings(st)
 
         if (isOnline()) {
           const [prods, cats] = await Promise.all([
@@ -193,8 +203,23 @@ export default function POSTerminal() {
     }
   }, [branchId])
 
-  // Add product to cart
+  // Add product to cart. Gated on the per-branch settings:
+  //   - If is_sold_out is set, always block.
+  //   - If block_out_of_stock is on AND product tracks inventory AND
+  //     stock <= 0, block.
+  // Otherwise allow (current behaviour).
   const addToCart = useCallback((product) => {
+    if (product.is_sold_out) {
+      toast.error(`${product.name} is sold out`)
+      return
+    }
+    if (settings?.block_out_of_stock && product.track_inventory) {
+      const onHand = parseFloat(product.stock_qty)
+      if (Number.isFinite(onHand) && onHand <= 0) {
+        toast.error(`${product.name} is out of stock`)
+        return
+      }
+    }
     setCart(prev => {
       const existing = prev.find(i => i.product_id === product.id)
       if (existing) {
@@ -215,6 +240,20 @@ export default function POSTerminal() {
         notes: '',
       }]
     })
+  }, [settings])
+
+  // Long-press a tile to flip is_sold_out for the day. Optimistic UI.
+  const handleSoldOutToggle = useCallback(async (product) => {
+    const next = !product.is_sold_out
+    setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_sold_out: next } : p))
+    try {
+      await setProductSoldOut(product.id, next)
+      toast.success(next ? `${product.name} marked sold out` : `${product.name} back in stock`)
+    } catch (err) {
+      // Revert on failure
+      setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_sold_out: !next } : p))
+      toast.error(err.message || 'Could not update')
+    }
   }, [])
 
   const updateQty = (itemId, qty) => {
@@ -331,6 +370,20 @@ export default function POSTerminal() {
       <p className="text-noch-muted">Loading terminal...</p>
     </div>
   )
+
+  // PIN gate. The branch's pos_settings.require_pin defaults to true; the
+  // terminal will not render until a barista is verified. POSPinLogin
+  // routes through the verify_pos_pin RPC (rate-limited, per-user salt).
+  if (settings?.require_pin !== false && !pinVerified) {
+    return (
+      <POSPinLogin
+        branchId={branchId}
+        onSuccess={() => setPinVerified(true)}
+        // No skip option here: PIN is mandatory. The Owner Mode skip in
+        // POSHome remains gated on isOwner.
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col h-screen bg-noch-dark overflow-hidden">
@@ -455,6 +508,8 @@ export default function POSTerminal() {
             products={products}
             categories={categories}
             onSelect={addToCart}
+            onLongPress={handleSoldOutToggle}
+            blockOutOfStock={!!settings?.block_out_of_stock}
             searchQuery={searchQuery}
           />
         </div>

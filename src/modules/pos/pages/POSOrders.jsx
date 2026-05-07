@@ -23,15 +23,21 @@ export default function POSOrders() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [busyId, setBusyId] = useState(null)
+  // Date range — defaults to today, but operators can scroll back.
+  const today = () => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10)
+  }
+  const [fromDate, setFromDate] = useState(today())
+  const [toDate, setToDate] = useState(today())
 
   const load = async () => {
     setLoading(true)
     try {
-      const start = new Date()
-      start.setHours(0, 0, 0, 0)
+      const fromIso = new Date(`${fromDate}T00:00:00`).toISOString()
+      const toIso   = new Date(`${toDate}T23:59:59.999`).toISOString()
       const [b, list] = await Promise.all([
         getPOSBranch(branchId),
-        getPOSOrders(branchId, { from: start.toISOString(), limit: 200 }),
+        getPOSOrders(branchId, { from: fromIso, to: toIso, limit: 500 }),
       ])
       setBranch(b)
       setOrders(list || [])
@@ -42,7 +48,7 @@ export default function POSOrders() {
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load() }, [branchId])
+  useEffect(() => { load() }, [branchId, fromDate, toDate])
 
   const handleReprint = async (order) => {
     if (!isPrinterConnected()) { toast.error('Printer not connected'); return }
@@ -103,10 +109,22 @@ export default function POSOrders() {
             <ArrowLeft size={18} />
           </button>
           <div className="flex-1">
-            <h1 className="text-white font-bold text-xl">Today's Orders</h1>
+            <h1 className="text-white font-bold text-xl">Orders</h1>
             <p className="text-noch-muted text-sm">{branch?.name}</p>
           </div>
           <button onClick={load} className="btn-secondary text-sm px-3 py-1">Refresh</button>
+        </div>
+
+        {/* Date range */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="label block mb-1 text-xs">From</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="input w-full text-sm" max={toDate} />
+          </div>
+          <div>
+            <label className="label block mb-1 text-xs">To</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="input w-full text-sm" min={fromDate} />
+          </div>
         </div>
 
         <div className="relative mb-4">
