@@ -4,7 +4,7 @@
     {
       "name": "noch-backend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/pos"],
       "port": 5174,
       "autoPort": true
     },
@@ -13,6 +13,13 @@
       "runtimeExecutable": "C:/Users/aeroh/AI apps/Noch_apps_May_2026/.claude/start-rebuild.bat",
       "runtimeArgs": [],
       "port": 5181,
+      "autoPort": true
+    },
+    {
+      "name": "noch-storefront",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/storefront"],
+      "port": 5180,
       "autoPort": true
     }
   ]
