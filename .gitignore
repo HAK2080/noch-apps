@@ -48,3 +48,7 @@ _vps_*.py
 _compare_bundles.py
 vps-dist-*/
 supabase/.temp/
+
+.claude/worktrees/
+
+_noch_cloud_index.html
