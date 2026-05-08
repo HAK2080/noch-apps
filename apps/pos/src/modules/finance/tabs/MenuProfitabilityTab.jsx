@@ -40,23 +40,29 @@ export default function MenuProfitabilityTab() {
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    getMenuMatrix({ branchId, from: period.from, to: period.to })
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timed out fetching matrix')), 12000)
+    )
+    Promise.race([
+      getMenuMatrix({ branchId, from: period.from, to: period.to }),
+      timeoutPromise,
+    ])
       .then(d => { if (!cancelled) setItems(d) })
       .catch(err => { if (!cancelled) toast.error(err.message || 'Failed to load matrix') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [branchId, period?.from, period?.to])
 
-  const { withCost, withoutCost, medCM, medUnits, classified } = useMemo(() => {
+  const { withoutCost, medCM, medUnits, classified } = useMemo(() => {
     const all = items || []
-    const withCost = all.filter(i => i.has_cost && i.units_sold > 0)
-    const withoutCost = all.filter(i => !i.has_cost && i.units_sold > 0)
-    const cms = withCost.map(i => Number(i.contribution_margin)).sort((a, b) => a - b)
-    const us  = withCost.map(i => Number(i.units_sold)).sort((a, b) => a - b)
-    const medCM = cms.length ? cms[Math.floor(cms.length / 2)] : 0
-    const medUnits = us.length ? us[Math.floor(us.length / 2)] : 0
-    const classified = withCost.map(i => ({ ...i, quadrant: classify(i, medCM, medUnits) }))
-    return { withCost, withoutCost, medCM, medUnits, classified }
+    const costed = all.filter(i => i.has_cost && i.units_sold > 0)
+    const uncosted = all.filter(i => !i.has_cost && i.units_sold > 0)
+    const cms = costed.map(i => Number(i.contribution_margin)).sort((a, b) => a - b)
+    const us  = costed.map(i => Number(i.units_sold)).sort((a, b) => a - b)
+    const cm = cms.length ? cms[Math.floor(cms.length / 2)] : 0
+    const u  = us.length  ? us[Math.floor(us.length / 2)]  : 0
+    const list = costed.map(i => ({ ...i, quadrant: classify(i, cm, u) }))
+    return { withoutCost: uncosted, medCM: cm, medUnits: u, classified: list }
   }, [items])
 
   // Layout dimensions
@@ -124,7 +130,6 @@ export default function MenuProfitabilityTab() {
 
               {/* Dots */}
               {classified.map(item => {
-                const meta = QUADRANT[item.quadrant]
                 const cx = x(item.contribution_margin)
                 const cy = y(item.units_sold)
                 return (

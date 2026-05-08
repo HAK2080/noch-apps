@@ -57,10 +57,10 @@ function rowsToBankTx(parsed, accountLabel) {
   return parsed.map(r => {
     const date = r.date || r['posted at'] || r['posted_at'] || r['transaction date'] || ''
     const desc = r.description || r.narrative || r.details || ''
-    const dr   = parseFloat(String(r.debit  || r.dr || '').replace(/[^\d.\-]/g, '')) || 0
-    const cr   = parseFloat(String(r.credit || r.cr || '').replace(/[^\d.\-]/g, '')) || 0
-    const amt  = (cr - dr) || parseFloat(String(r.amount || '').replace(/[^\d.\-]/g, '')) || 0
-    const bal  = parseFloat(String(r.balance || r['balance after'] || '').replace(/[^\d.\-]/g, ''))
+    const dr   = parseFloat(String(r.debit  || r.dr || '').replace(/[^\d.-]/g, '')) || 0
+    const cr   = parseFloat(String(r.credit || r.cr || '').replace(/[^\d.-]/g, '')) || 0
+    const amt  = (cr - dr) || parseFloat(String(r.amount || '').replace(/[^\d.-]/g, '')) || 0
+    const bal  = parseFloat(String(r.balance || r['balance after'] || '').replace(/[^\d.-]/g, ''))
     return {
       account_label: accountLabel,
       posted_at: date.length === 10 ? date : (() => {

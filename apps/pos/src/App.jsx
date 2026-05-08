@@ -1,84 +1,83 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 
+// Eagerly-loaded: critical-path screens that the operator hits within
+// 1 second of opening the app every day. Login + Dashboard + POS +
+// MyTasks. Everything else is code-split via React.lazy below to keep
+// the initial bundle small for slow Tripoli connections.
 import Login from './pages/Login'
 import StaffAccessRequest from './pages/StaffAccessRequest'
 import Dashboard from './pages/Dashboard'
-import Tasks from './pages/Tasks'
-import TaskDetail from './pages/TaskDetail'
-import Staff from './pages/Staff'
-import RoleManager from './pages/staff/RoleManager'
-import Report from './pages/Report'
 import MyTasks from './pages/MyTasks'
-import Recipes from './pages/Recipes'
-import RecipeDetail from './pages/RecipeDetail'
-import CostCalculator from './pages/CostCalculator'
 
-// Content Studio 2.0 (Noch 4.0)
-import ContentStudio2 from './modules/contentStudio'
-
-// Content Studio (legacy — kept for backward-compat)
-import ContentStudio from './pages/content/ContentStudio'
-import Studio from './pages/content/Studio'
-import BrandSetup from './pages/content/BrandSetup'
-import BrandDetail from './pages/content/BrandDetail'
-import ReviewQueue from './pages/content/ReviewQueue'
-import IdeaBank from './pages/content/IdeaBank'
-
-// Product Catalog
-import ProductCatalog from './pages/ProductCatalog'
-
-// Inventory & Analytics
-import InventoryHub from './pages/InventoryHub'
-import StockManager from './pages/inventory/StockManager'
-import ProcurementOrders from './pages/inventory/ProcurementOrders'
-import Suppliers from './pages/inventory/Suppliers'
-import StockCheckAll from './pages/StockCheckAll'
-import BusinessAnalytics from './pages/BusinessAnalytics'
-import FinanceDashboard from './modules/finance/FinanceDashboard'
-import MarketingDashboard from './modules/marketing/MarketingDashboard'
-
-// POS System
+// POS — eager. Daily critical path; baristas tap this instantly.
 import POSHome from './modules/pos/pages/POSHome'
 import POSTerminal from './modules/pos/pages/POSTerminal'
-import POSEndOfDay from './modules/pos/pages/POSEndOfDay'
-import POSInventory from './modules/pos/pages/POSInventory'
-import POSSettings from './modules/pos/pages/POSSettings'
-import POSProducts from './modules/pos/pages/POSProducts'
-import POSStockCheck from './modules/pos/pages/POSStockCheck'
-import POSOrders from './modules/pos/pages/POSOrders'
-import POSReports from './modules/pos/pages/POSReports'
-import POSModifiers from './modules/pos/pages/POSModifiers'
-import TableQRGenerator from './pages/TableQRGenerator'
 
-// Ideas
-import IdeasBoard from './pages/ideas/IdeasBoard'
-import IdeasCategories from './pages/ideas/IdeasCategories'
-
-// Vestaboard
-import Vestaboard from './pages/Vestaboard'
-
-// Loyalty — Nochi V3.01
-import LoyaltyDashboard from './modules/loyalty/pages/LoyaltyDashboard'
-import LoyaltyCustomers from './modules/loyalty/pages/LoyaltyCustomers'
-import CustomerDetail from './modules/loyalty/pages/CustomerDetail'
-import LoyaltyRewards from './modules/loyalty/pages/LoyaltyRewards'
-import LoyaltyQR from './modules/loyalty/pages/LoyaltyQR'
-import LoyaltySettings from './modules/loyalty/pages/LoyaltySettings'
-import LoyaltyLeaderboard from './modules/loyalty/pages/LoyaltyLeaderboard'
-import LoyaltyStamp from './modules/loyalty/pages/LoyaltyStamp'
-import LoyaltyGestures from './modules/loyalty/pages/LoyaltyGestures'
-import LoyaltySpinWheel from './modules/loyalty/pages/LoyaltySpinWheel'
-// Customer-facing loyalty UI lives on noch.cloud, not on this backend app.
-// MyCard + LoyaltyRegister components retired — customers register via noch.cloud/#loyalty.
-
-import ExpensesPage from './pages/expenses/ExpensesPage'
-
-// Storefront (Public)
+// Storefront (Public, customer-facing) — eager so the menu loads fast
+// for customers on the worst connections.
 import Menu from './pages/storefront/Menu'
 import Checkout from './pages/storefront/Checkout'
 import OrderConfirmation from './pages/storefront/OrderConfirmation'
+
+// ── Code-split route components ──────────────────────────────────────
+// Each import() becomes its own JS chunk Vite emits separately, fetched
+// on first navigation to that route. Subsequent visits are cached.
+const Tasks            = lazy(() => import('./pages/Tasks'))
+const TaskDetail       = lazy(() => import('./pages/TaskDetail'))
+const Staff            = lazy(() => import('./pages/Staff'))
+const RoleManager      = lazy(() => import('./pages/staff/RoleManager'))
+const Report           = lazy(() => import('./pages/Report'))
+const Recipes          = lazy(() => import('./pages/Recipes'))
+const RecipeDetail     = lazy(() => import('./pages/RecipeDetail'))
+const CostCalculator   = lazy(() => import('./pages/CostCalculator'))
+
+const ContentStudio2   = lazy(() => import('./modules/contentStudio'))
+const ContentStudio    = lazy(() => import('./pages/content/ContentStudio'))
+const Studio           = lazy(() => import('./pages/content/Studio'))
+const BrandSetup       = lazy(() => import('./pages/content/BrandSetup'))
+const BrandDetail      = lazy(() => import('./pages/content/BrandDetail'))
+const ReviewQueue      = lazy(() => import('./pages/content/ReviewQueue'))
+const IdeaBank         = lazy(() => import('./pages/content/IdeaBank'))
+
+const ProductCatalog   = lazy(() => import('./pages/ProductCatalog'))
+const InventoryHub     = lazy(() => import('./pages/InventoryHub'))
+const StockManager     = lazy(() => import('./pages/inventory/StockManager'))
+const ProcurementOrders= lazy(() => import('./pages/inventory/ProcurementOrders'))
+const Suppliers        = lazy(() => import('./pages/inventory/Suppliers'))
+const StockCheckAll    = lazy(() => import('./pages/StockCheckAll'))
+const BusinessAnalytics= lazy(() => import('./pages/BusinessAnalytics'))
+const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
+const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
+
+const POSEndOfDay      = lazy(() => import('./modules/pos/pages/POSEndOfDay'))
+const POSInventory     = lazy(() => import('./modules/pos/pages/POSInventory'))
+const POSSettings      = lazy(() => import('./modules/pos/pages/POSSettings'))
+const POSProducts      = lazy(() => import('./modules/pos/pages/POSProducts'))
+const POSStockCheck    = lazy(() => import('./modules/pos/pages/POSStockCheck'))
+const POSOrders        = lazy(() => import('./modules/pos/pages/POSOrders'))
+const POSReports       = lazy(() => import('./modules/pos/pages/POSReports'))
+const POSModifiers     = lazy(() => import('./modules/pos/pages/POSModifiers'))
+const TableQRGenerator = lazy(() => import('./pages/TableQRGenerator'))
+
+const IdeasBoard       = lazy(() => import('./pages/ideas/IdeasBoard'))
+const IdeasCategories  = lazy(() => import('./pages/ideas/IdeasCategories'))
+const Vestaboard       = lazy(() => import('./pages/Vestaboard'))
+
+const LoyaltyDashboard = lazy(() => import('./modules/loyalty/pages/LoyaltyDashboard'))
+const LoyaltyCustomers = lazy(() => import('./modules/loyalty/pages/LoyaltyCustomers'))
+const CustomerDetail   = lazy(() => import('./modules/loyalty/pages/CustomerDetail'))
+const LoyaltyRewards   = lazy(() => import('./modules/loyalty/pages/LoyaltyRewards'))
+const LoyaltyQR        = lazy(() => import('./modules/loyalty/pages/LoyaltyQR'))
+const LoyaltySettings  = lazy(() => import('./modules/loyalty/pages/LoyaltySettings'))
+const LoyaltyLeaderboard = lazy(() => import('./modules/loyalty/pages/LoyaltyLeaderboard'))
+const LoyaltyStamp     = lazy(() => import('./modules/loyalty/pages/LoyaltyStamp'))
+const LoyaltyGestures  = lazy(() => import('./modules/loyalty/pages/LoyaltyGestures'))
+const LoyaltySpinWheel = lazy(() => import('./modules/loyalty/pages/LoyaltySpinWheel'))
+
+const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -114,6 +113,11 @@ function RootRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Suspense fallback={
+        <div className="min-h-screen bg-noch-dark flex items-center justify-center">
+          <div className="text-noch-muted text-sm">Loading…</div>
+        </div>
+      }>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/staff/request-access" element={<StaffAccessRequest />} />
@@ -257,6 +261,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

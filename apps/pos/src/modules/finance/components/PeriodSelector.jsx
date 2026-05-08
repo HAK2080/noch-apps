@@ -29,6 +29,14 @@ export default function PeriodSelector({ value, onChange, defaultPreset = '7d' }
   })()
   const [range, setRange] = useState(value || initial)
 
+  // Seed the parent on mount so consumers don't have to handle a null
+  // initial period (the bug that caused /finance Daily P&L to hang
+  // indefinitely on load).
+  useEffect(() => {
+    if (!value) onChange?.({ preset: range.preset, from: range.from, to: range.to })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (value && (value.from !== range.from || value.to !== range.to)) setRange(value)
   // eslint-disable-next-line react-hooks/exhaustive-deps

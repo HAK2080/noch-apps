@@ -24,14 +24,29 @@ export default function DailyPnLTab() {
       .catch(err => toast.error(err.message || 'Failed to load setup'))
   }, [])
 
+  const [loadError, setLoadError] = useState(null)
   useEffect(() => {
     if (!period) return
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    getPnL({ branchId, from: period.from, to: period.to })
+    setLoadError(null)
+    // 12-second timeout so /finance never hangs forever if the RPC
+    // is slow on the server.
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timed out fetching P&L (server slow)')), 12000)
+    )
+    Promise.race([
+      getPnL({ branchId, from: period.from, to: period.to }),
+      timeoutPromise,
+    ])
       .then(d => { if (!cancelled) setPnl(d) })
-      .catch(err => { if (!cancelled) toast.error(err.message || 'Failed to load P&L') })
+      .catch(err => {
+        if (!cancelled) {
+          setLoadError(err.message || 'Failed to load P&L')
+          toast.error(err.message || 'Failed to load P&L')
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [branchId, period?.from, period?.to])
@@ -52,6 +67,19 @@ export default function DailyPnLTab() {
     return { rev, cogs, labor, opex, prime, net, cogsR, laborR, primeR, netR, grossR, orders: pnl.orders }
   }, [pnl])
 
+  if (loadError && !pnl) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+        <p className="text-red-300 text-sm font-semibold mb-1">Could not load P&L</p>
+        <p className="text-red-300/80 text-xs">{loadError}</p>
+        <p className="text-noch-muted text-xs mt-3">
+          The other tabs may still work. If this persists, the <code>finance_pnl</code> RPC
+          may be slow on a large `pos_orders` history; consider adding indexes on
+          <code>(branch_id, created_at, status)</code>.
+        </p>
+      </div>
+    )
+  }
   if (loading || !pnl || !settings) {
     return <p className="text-noch-muted text-center py-12">Loading…</p>
   }
