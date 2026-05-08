@@ -394,11 +394,19 @@ After this migration, `expense_entries`, `bank_transactions`, `finance_settings`
 
 ### 3.1 Foundations (must ship before P&L renders correctly)
 
-**[A] Recipe Linker** (`/finance/menu-cost-mapping`)
+**[A] Recipe Linker** — TWO surfaces, not one:
+
+**A1. Bulk Linker page** (`/finance/menu-cost-mapping`) — runs **once** over the existing menu.
 - Two-column screen: left list of `pos_products` (active, visible), right list of `recipes` (filtered by category match).
 - Click product → click recipe → save `pos_products.recipe_id`. Bulk-link by name match available as a "Suggest links" button (case-insensitive substring).
 - Status pill per product: ✅ linked / ⚠ unlinked.
-- One-time owner setup; finished in 5–10 minutes for the current 30-item menu.
+- ~5–10 minutes to backfill the current ~30-item menu.
+
+**A2. Inline Recipe field on the existing Product editor** (`POSProducts.jsx` modal) — used **every time** a new product is created or an existing one is edited. So:
+- The link is part of normal product management — no separate workflow to remember.
+- The bulk linker is a one-time launch tool; routine maintenance happens in-place.
+
+> **Phase 1.1 follow-up: modifier costs.** Today `pos_modifiers.price_delta` exists (oat milk = +1.50 LYD revenue) but there is no `cost_delta_lyd` (oat milk also costs us ~0.40 more than whole milk). Without modifier-cost tracking, drinks with paid modifiers will show **overstated margin** in the Menu Profitability Matrix. The matrix is "good enough" for v1 base drinks; Phase 1.1 adds `pos_modifiers.cost_delta_lyd` and folds it into `finance_menu_matrix` and `finance_pnl`. Flagged in `01-inspection.md` follow-ups.
 
 **[B] Shift / Labor Log** (`/finance/shifts`)
 - Tab in FinanceDashboard. List of shifts grouped by day. Each shift shows: branch, attendees, total hours, total labor cost.

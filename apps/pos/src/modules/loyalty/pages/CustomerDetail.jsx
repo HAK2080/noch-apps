@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Gift, Send, Trash2, Star } from 'lucide-react'
 import { getLoyaltyCustomer, awardLoyaltyStamp, redeemLoyaltyReward, sendLoyaltyNotification, deleteLoyaltyCustomer, requestGoogleReview } from '../../../lib/supabase'
+import { getCustomerSegment } from '../../marketing/lib/marketing-supabase'
+import SegmentBadge from '../../marketing/components/SegmentBadge'
 import { getPOSBranches } from '../../pos/lib/pos-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
@@ -29,6 +31,7 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true)
   const [stampLoading, setStampLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [segment, setSegment] = useState(null)
   const ar = lang === 'ar'
 
   const load = async () => {
@@ -43,6 +46,12 @@ export default function CustomerDetail() {
   }
 
   useEffect(() => { load() }, [id])
+
+  // Marketing module: load segment + RFM (read-only; soft-fail).
+  useEffect(() => {
+    if (!id) return
+    getCustomerSegment(id).then(setSegment).catch(() => {})
+  }, [id])
 
   const handleAwardStamp = async () => {
     setStampLoading(true)
@@ -173,6 +182,33 @@ export default function CustomerDetail() {
           <p className="text-noch-muted text-xs">{ar ? 'يوم منذ آخر زيارة' : 'Days since visit'}</p>
         </div>
       </div>
+
+      {/* Marketing intelligence (segment + RFM) */}
+      {segment && (
+        <div className="card mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <SegmentBadge segment={segment.segment} />
+              <span className="text-noch-muted text-xs">RFM {segment.recency_score}-{segment.frequency_score}-{segment.monetary_score}</span>
+            </div>
+            <span className="text-noch-muted text-[10px]">refreshed {segment.computed_at ? new Date(segment.computed_at).toLocaleDateString('en-GB') : '—'}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="bg-noch-dark/50 rounded px-2 py-1">
+              <p className="text-noch-muted text-[10px] uppercase">Visits (180d)</p>
+              <p className="text-white font-mono">{segment.total_visits}</p>
+            </div>
+            <div className="bg-noch-dark/50 rounded px-2 py-1">
+              <p className="text-noch-muted text-[10px] uppercase">Spend (180d)</p>
+              <p className="text-noch-green font-mono">{Number(segment.total_spend_lyd).toFixed(2)} LYD</p>
+            </div>
+            <div className="bg-noch-dark/50 rounded px-2 py-1">
+              <p className="text-noch-muted text-[10px] uppercase">Last visit</p>
+              <p className="text-white">{segment.last_visit_at ? new Date(segment.last_visit_at).toLocaleDateString('en-GB') : '—'}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Award Stamp */}
       <div className="card mb-4">

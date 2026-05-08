@@ -36,6 +36,8 @@ import ProcurementOrders from './pages/inventory/ProcurementOrders'
 import Suppliers from './pages/inventory/Suppliers'
 import StockCheckAll from './pages/StockCheckAll'
 import BusinessAnalytics from './pages/BusinessAnalytics'
+import FinanceDashboard from './modules/finance/FinanceDashboard'
+import MarketingDashboard from './modules/marketing/MarketingDashboard'
 
 // POS System
 import POSHome from './modules/pos/pages/POSHome'
@@ -208,7 +210,10 @@ export default function App() {
         <Route path="/inventory/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
 
         {/* Analytics (owner only) */}
-        <Route path="/analytics" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/analytics" element={<Navigate to="/finance" replace />} />
+        <Route path="/finance" element={<ProtectedRoute><OwnerRoute><FinanceDashboard /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/marketing" element={<ProtectedRoute><OwnerRoute><MarketingDashboard /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/analytics-legacy" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
