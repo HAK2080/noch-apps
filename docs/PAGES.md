@@ -117,11 +117,19 @@ Legend: 🟢 public · 🔒 logged-in any role · 👑 owner only
 | 👑 `/inventory/procurement` | `src/pages/inventory/ProcurementOrders.jsx` | Purchase orders |
 | 🔒 `/inventory/suppliers` | `src/pages/inventory/Suppliers.jsx` | Supplier directory |
 
-### Analytics
+### Finance (extends old `/analytics`)
 
 | Route | Page file | Purpose |
 |---|---|---|
-| 👑 `/analytics` | `src/pages/BusinessAnalytics.jsx` (uses `pages/analytics/*`) | Business analytics dashboard with tabs (Overview, Branch, Bloom, Category, Financial, Intelligence, Business Lines) |
+| 👑 `/finance` | `apps/pos/src/modules/finance/FinanceDashboard.jsx` | CFO-style management dashboard. Tabs: Daily P&L · Menu profit · Cash & runway · Expenses · Shifts · Bank · Cost mapping · Overview (legacy) · AI insights. Schema: `finance_settings`, `expense_entries`, `bank_transactions`, `shift_labor_cost` view, `pos_products.cost_lyd`, `profiles.hourly_rate_lyd`. RPCs: `finance_pnl`, `finance_menu_matrix`, `finance_cash_runway`. |
+| 👑 `/analytics` | redirect → `/finance` | Legacy URL preserved as a Navigate. |
+| 👑 `/analytics-legacy` | `apps/pos/src/pages/BusinessAnalytics.jsx` | The old analytics dashboard (Overview, Branch, Category, Financial, Intelligence, BusinessLines, Bloom). Kept for parity until Finance fully replaces it. |
+
+### Marketing
+
+| Route | Page file | Purpose |
+|---|---|---|
+| 👑 `/marketing` | `apps/pos/src/modules/marketing/MarketingDashboard.jsx` | Owner console. Tabs: Channels (manual-first analytics for IG/TikTok/FB/GBP/WhatsApp) · Customers (RFM segmentation) · Cohorts (retention heatmap). Schema: `marketing_channel_snapshots`, `customer_segments`, `loyalty_customers.{marketing_opt_in, phone_normalised}`. RPCs: `refresh_customer_segments` (nightly cron 04:15 UTC), `cohort_retention`. Extends `/loyalty/customers/:id` with a Marketing intelligence panel (segment + RFM). |
 
 ### Loyalty (Nochi)
 
