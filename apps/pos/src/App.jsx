@@ -165,7 +165,7 @@ export default function App() {
         } />
 
         <Route path="/expenses/*" element={
-          <ProtectedRoute><ExpensesPage /></ProtectedRoute>
+          <ProtectedRoute><OwnerRoute><ExpensesPage /></OwnerRoute></ProtectedRoute>
         } />
 
         {/* Content Studio 2.0 (Noch 4.0) */}

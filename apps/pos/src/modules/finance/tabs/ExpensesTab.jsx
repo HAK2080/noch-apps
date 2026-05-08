@@ -35,7 +35,10 @@ export default function ExpensesTab() {
   }
   useEffect(() => { reload() }, [])
 
-  const filtered = filterCat ? list.filter(r => r.category === filterCat) : list
+  const pendingCount = list.filter(r => r.status === 'pending_review').length
+  const filtered = list
+    .filter(r => filterCat ? r.category === filterCat : true)
+    .filter(r => filterCat === '__pending' ? r.status === 'pending_review' : true)
   const totalLyd = filtered.reduce((s, r) => s + Number(r.amount_lyd || 0), 0)
 
   const onSave = async (form, id) => {
@@ -59,6 +62,7 @@ export default function ExpensesTab() {
         <div className="flex items-center gap-2">
           <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="input py-1 px-2 text-xs">
             <option value="">All categories</option>
+            {pendingCount > 0 && <option value="__pending">⚠ Pending review ({pendingCount})</option>}
             {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
           </select>
           <span className="text-noch-muted text-xs">{filtered.length} entries · {lyd(totalLyd)}</span>
@@ -103,19 +107,28 @@ export default function ExpensesTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(r => (
-                  <tr key={r.id} className="border-t border-noch-border/40">
-                    <td className="py-1.5 pr-2 text-white">{r.paid_at}</td>
-                    <td className="py-1.5 pr-2 text-white">{r.category.replace(/_/g, ' ')}</td>
-                    <td className="py-1.5 pr-2 text-white">{r.vendor || '—'}</td>
-                    <td className="py-1.5 pr-2 text-noch-muted">{branches.find(b => b.id === r.branch_id)?.name || (r.branch_id ? '—' : 'corporate')}</td>
-                    <td className="py-1.5 pr-2 text-right text-noch-green font-mono">{lyd(r.amount_lyd)}</td>
-                    <td className="py-1.5 text-right">
-                      <button onClick={() => setEditing(r)} className="text-noch-muted hover:text-white px-1">edit</button>
-                      <button onClick={() => onDelete(r.id)} className="text-red-400 hover:text-red-300 px-1"><Trash2 size={10}/></button>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(r => {
+                  const isPending = r.status === 'pending_review'
+                  return (
+                    <tr key={r.id} className={`border-t border-noch-border/40 ${isPending ? 'bg-yellow-500/5' : ''}`}>
+                      <td className="py-1.5 pr-2 text-white">{r.paid_at}</td>
+                      <td className="py-1.5 pr-2 text-white">
+                        {r.category.replace(/_/g, ' ')}
+                        {isPending && <span className="ml-2 text-[9px] uppercase font-bold bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded">review</span>}
+                      </td>
+                      <td className="py-1.5 pr-2 text-white">{r.vendor || '—'}</td>
+                      <td className="py-1.5 pr-2 text-noch-muted">{branches.find(b => b.id === r.branch_id)?.name || (r.branch_id ? '—' : 'corporate')}</td>
+                      <td className="py-1.5 pr-2 text-right text-noch-green font-mono">{lyd(r.amount_lyd)}</td>
+                      <td className="py-1.5 text-right">
+                        {isPending && (
+                          <button onClick={() => onSave({ status: 'approved' }, r.id)} className="text-noch-green text-[10px] uppercase font-bold px-1">approve</button>
+                        )}
+                        <button onClick={() => setEditing(r)} className="text-noch-muted hover:text-white px-1">edit</button>
+                        <button onClick={() => onDelete(r.id)} className="text-red-400 hover:text-red-300 px-1"><Trash2 size={10}/></button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -147,7 +160,14 @@ export default function ExpensesTab() {
           }}
           ocrPreview={scanDraft}
           onClose={() => setScanDraft(null)}
-          onSave={(form) => onSave({ ...form, status: 'approved' }).then(() => setScanDraft(null))}
+          onSave={(form) => onSave({
+            ...form,
+            status: 'pending_review',
+            ocr_confidence: scanDraft?.confidence || null,
+            ocr_raw_response: scanDraft || null,
+            invoice_number: scanDraft?.invoice_number || null,
+            currency: scanDraft?.currency || 'LYD',
+          }).then(() => setScanDraft(null))}
         />
       )}
     </div>

@@ -71,15 +71,27 @@ function GroupForm({ group, onSave, onCancel }) {
 
 function ModifierRows({ group, onChanged }) {
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ name: '', name_ar: '', price_delta: '0', sort_order: 0, is_default: false })
+  const [form, setForm] = useState({ name: '', name_ar: '', price_delta: '0', cost_delta_lyd: '0', sort_order: 0, is_default: false })
+  const [editingId, setEditingId] = useState(null)
+  const [editCost, setEditCost] = useState('')
 
   const addModifier = async () => {
     if (!form.name) return
-    const payload = { ...form, group_id: group.id, price_delta: Number(form.price_delta) || 0 }
+    const payload = {
+      ...form, group_id: group.id,
+      price_delta: Number(form.price_delta) || 0,
+      cost_delta_lyd: Number(form.cost_delta_lyd) || 0,
+    }
     const { error } = await supabase.from('pos_modifiers').insert(payload)
     if (error) return toast.error(error.message)
-    setForm({ name: '', name_ar: '', price_delta: '0', sort_order: 0, is_default: false })
+    setForm({ name: '', name_ar: '', price_delta: '0', cost_delta_lyd: '0', sort_order: 0, is_default: false })
     setAdding(false)
+    onChanged()
+  }
+  const updateCost = async (id, val) => {
+    const { error } = await supabase.from('pos_modifiers').update({ cost_delta_lyd: Number(val) || 0 }).eq('id', id)
+    if (error) return toast.error(error.message)
+    setEditingId(null)
     onChanged()
   }
   const remove = async (id) => {
@@ -103,9 +115,25 @@ function ModifierRows({ group, onChanged }) {
               {m.is_default && <span className="text-noch-green ml-2">(default)</span>}
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-noch-muted">
-                {Number(m.price_delta) > 0 ? `+${Number(m.price_delta).toFixed(2)}` :
+              <span className="font-mono text-noch-muted text-[11px]" title="Price delta (revenue)">
+                price {Number(m.price_delta) > 0 ? `+${Number(m.price_delta).toFixed(2)}` :
                  Number(m.price_delta) < 0 ? `${Number(m.price_delta).toFixed(2)}` : '—'}
+              </span>
+              <span title="Cost delta (LYD) — used by Finance Menu Profitability">
+                {editingId === m.id ? (
+                  <span className="inline-flex items-center gap-1">
+                    <input type="number" step="0.01" autoFocus value={editCost}
+                      onChange={e => setEditCost(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') updateCost(m.id, editCost); if (e.key === 'Escape') setEditingId(null) }}
+                      onBlur={() => updateCost(m.id, editCost)}
+                      className="input py-0 px-1 text-xs w-16 text-right" />
+                  </span>
+                ) : (
+                  <button onClick={() => { setEditingId(m.id); setEditCost(String(m.cost_delta_lyd ?? 0)) }}
+                          className="font-mono text-yellow-400/80 text-[11px] underline">
+                    cost {Number(m.cost_delta_lyd || 0).toFixed(2)}
+                  </button>
+                )}
               </span>
               <button onClick={() => remove(m.id)} className="text-red-400"><Trash2 size={12} /></button>
             </div>
@@ -116,7 +144,8 @@ function ModifierRows({ group, onChanged }) {
         <div className="grid grid-cols-2 gap-2 mt-2">
           <input className="input col-span-2 text-sm" placeholder="Option name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           <input className="input text-sm" placeholder="Arabic" value={form.name_ar} onChange={e => setForm(f => ({ ...f, name_ar: e.target.value }))} dir="rtl" />
-          <input className="input text-sm" placeholder="Price delta" type="number" step="0.01" value={form.price_delta} onChange={e => setForm(f => ({ ...f, price_delta: e.target.value }))} />
+          <input className="input text-sm" placeholder="Price delta (revenue)" type="number" step="0.01" value={form.price_delta} onChange={e => setForm(f => ({ ...f, price_delta: e.target.value }))} />
+          <input className="input text-sm col-span-2" placeholder="Cost delta (LYD) — extra ingredient cost vs default" type="number" step="0.01" value={form.cost_delta_lyd} onChange={e => setForm(f => ({ ...f, cost_delta_lyd: e.target.value }))} />
           <label className="col-span-2 flex items-center gap-2 text-xs text-white">
             <input type="checkbox" checked={form.is_default} onChange={e => setForm(f => ({ ...f, is_default: e.target.checked }))} />
             Default (pre-selected at sale)

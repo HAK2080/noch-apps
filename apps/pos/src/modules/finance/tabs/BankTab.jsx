@@ -52,26 +52,82 @@ function parseCSV(text) {
   return rows
 }
 
+// Match many header variants (English + Arabic + common Libyan-bank
+// idioms). Arabic header detection works on first chars + keyword
+// substrings since CSV exports rarely have consistent diacritics.
+const FIELD_ALIASES = {
+  date: [
+    'date', 'posted at', 'posted_at', 'transaction date', 'value date',
+    'تاريخ', 'تاريخ العملية', 'تاريخ القيد', 'تاريخ المعاملة',
+  ],
+  description: [
+    'description', 'narrative', 'details', 'narration', 'memo', 'remarks',
+    'البيان', 'الوصف', 'التفاصيل', 'ملاحظات', 'ملاحظة',
+  ],
+  debit: [
+    'debit', 'dr', 'withdrawal', 'paid out', 'out',
+    'مدين', 'سحب', 'مسحوب',
+  ],
+  credit: [
+    'credit', 'cr', 'deposit', 'paid in', 'in',
+    'دائن', 'إيداع', 'مودع',
+  ],
+  amount: [
+    'amount', 'value', 'transaction amount',
+    'المبلغ', 'القيمة', 'مبلغ',
+  ],
+  balance: [
+    'balance', 'balance after', 'running balance',
+    'الرصيد', 'الرصيد المتبقي', 'رصيد',
+  ],
+}
+function pick(row, kind) {
+  const aliases = FIELD_ALIASES[kind]
+  for (const key of Object.keys(row)) {
+    const k = key.trim().toLowerCase()
+    for (const a of aliases) if (k === a.toLowerCase() || k.includes(a.toLowerCase())) return row[key]
+  }
+  return ''
+}
+function parseDate(s) {
+  s = (s || '').toString().trim()
+  if (!s) return new Date().toISOString().slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  const m = s.match(/(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/)
+  if (m) {
+    const [, d, mo, y] = m
+    const yyyy = y.length === 2 ? '20' + y : y
+    return `${yyyy}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+  // Arabic-Indic digit fallback (٠١٢٣٤٥٦٧٨٩ → 0123456789)
+  const ar = s.replace(/[٠-٩]/g, ch => String('٠١٢٣٤٥٦٧٨٩'.indexOf(ch)))
+  if (ar !== s) return parseDate(ar)
+  const d = new Date(s)
+  if (Number.isFinite(d.getTime())) return d.toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10)
+}
+function num(s) {
+  if (s == null) return 0
+  // Strip commas, currency symbols, Arabic-Indic digits.
+  let t = String(s).replace(/[٠-٩]/g, ch => String('٠١٢٣٤٥٦٧٨٩'.indexOf(ch)))
+  t = t.replace(/,/g, '').replace(/[^\d.-]/g, '')
+  const n = parseFloat(t)
+  return Number.isFinite(n) ? n : 0
+}
 function rowsToBankTx(parsed, accountLabel) {
-  // Try to map common header names.
   return parsed.map(r => {
-    const date = r.date || r['posted at'] || r['posted_at'] || r['transaction date'] || ''
-    const desc = r.description || r.narrative || r.details || ''
-    const dr   = parseFloat(String(r.debit  || r.dr || '').replace(/[^\d.-]/g, '')) || 0
-    const cr   = parseFloat(String(r.credit || r.cr || '').replace(/[^\d.-]/g, '')) || 0
-    const amt  = (cr - dr) || parseFloat(String(r.amount || '').replace(/[^\d.-]/g, '')) || 0
-    const bal  = parseFloat(String(r.balance || r['balance after'] || '').replace(/[^\d.-]/g, ''))
+    const desc = pick(r, 'description') || ''
+    const dr = num(pick(r, 'debit'))
+    const cr = num(pick(r, 'credit'))
+    let amt = cr - dr
+    if (amt === 0) amt = num(pick(r, 'amount'))
+    const bal = num(pick(r, 'balance'))
     return {
       account_label: accountLabel,
-      posted_at: date.length === 10 ? date : (() => {
-        // best-effort parse; expect dd/mm/yyyy or yyyy-mm-dd
-        const m = date.match(/(\d{2})[/-](\d{2})[/-](\d{4})/)
-        if (m) return `${m[3]}-${m[2]}-${m[1]}`
-        return new Date(date).toISOString().slice(0, 10)
-      })(),
+      posted_at: parseDate(pick(r, 'date')),
       description: desc || null,
-      amount_lyd: Number(amt) || 0,
-      balance_after_lyd: isFinite(bal) ? bal : null,
+      amount_lyd: amt,
+      balance_after_lyd: bal || null,
       raw_row: r,
       category: autoCat(desc),
       category_source: 'auto',
