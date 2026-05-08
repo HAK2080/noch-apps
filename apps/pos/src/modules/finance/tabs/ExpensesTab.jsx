@@ -1,9 +1,10 @@
 // ExpensesTab.jsx — list + create + edit + delete expense entries.
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2, X, Camera, Loader2, CheckCircle2 } from 'lucide-react'
 import {
   listExpenses, createExpense, updateExpense, deleteExpense, listBranches,
+  ocrInvoice,
 } from '../lib/finance-supabase'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
@@ -21,6 +22,8 @@ export default function ExpensesTab() {
   const [filterCat, setFilterCat] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanDraft, setScanDraft] = useState(null)
 
   const reload = async () => {
     setLoading(true)
@@ -60,9 +63,27 @@ export default function ExpensesTab() {
           </select>
           <span className="text-noch-muted text-xs">{filtered.length} entries · {lyd(totalLyd)}</span>
         </div>
-        <button onClick={() => setShowAdd(true)} className="btn-primary text-xs px-3 py-1 flex items-center gap-1">
-          <Plus size={12}/> Add expense
-        </button>
+        <div className="flex gap-2">
+          <label className={`btn-secondary text-xs px-3 py-1 flex items-center gap-1 cursor-pointer ${scanning ? 'opacity-50 pointer-events-none' : ''}`}>
+            {scanning ? <Loader2 size={12} className="animate-spin"/> : <Camera size={12}/>}
+            {scanning ? 'Scanning…' : 'Scan invoice'}
+            <input type="file" accept="image/*" capture="environment" hidden disabled={scanning}
+              onChange={async e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setScanning(true)
+                try {
+                  const data = await ocrInvoice(file)
+                  setScanDraft(data)
+                  toast.success('Scanned — review the draft')
+                } catch (err) { toast.error(err.message || 'OCR failed') }
+                finally { setScanning(false); e.target.value = '' }
+              }} />
+          </label>
+          <button onClick={() => setShowAdd(true)} className="btn-primary text-xs px-3 py-1 flex items-center gap-1">
+            <Plus size={12}/> Add expense
+          </button>
+        </div>
       </div>
 
       {loading ? <p className="text-noch-muted text-center py-12">Loading…</p> : (
@@ -109,11 +130,31 @@ export default function ExpensesTab() {
           onSave={(form) => onSave(form, editing?.id)}
         />
       )}
+
+      {scanDraft && (
+        <ExpenseFormModal
+          branches={branches}
+          initial={{
+            paid_at: scanDraft.date || new Date().toISOString().slice(0, 10),
+            category: scanDraft.category_guess || 'supplies',
+            amount_lyd: scanDraft.total ?? '',
+            vendor: scanDraft.vendor || '',
+            notes: [
+              scanDraft.invoice_number ? `Invoice ${scanDraft.invoice_number}` : null,
+              scanDraft.currency && scanDraft.currency !== 'LYD' ? `Currency: ${scanDraft.currency}` : null,
+              scanDraft.notes,
+            ].filter(Boolean).join(' · '),
+          }}
+          ocrPreview={scanDraft}
+          onClose={() => setScanDraft(null)}
+          onSave={(form) => onSave({ ...form, status: 'approved' }).then(() => setScanDraft(null))}
+        />
+      )}
     </div>
   )
 }
 
-function ExpenseFormModal({ branches, initial, onClose, onSave }) {
+function ExpenseFormModal({ branches, initial, onClose, onSave, ocrPreview }) {
   const [form, setForm] = useState(() => ({
     paid_at: initial?.paid_at || new Date().toISOString().slice(0, 10),
     category: initial?.category || 'other_opex',
@@ -140,9 +181,24 @@ function ExpenseFormModal({ branches, initial, onClose, onSave }) {
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-md p-5">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-white font-bold">{initial ? 'Edit expense' : 'Add expense'}</h2>
+          <h2 className="text-white font-bold flex items-center gap-2">
+            {ocrPreview ? <><CheckCircle2 className="text-noch-green" size={16}/> OCR draft — review</> : (initial ? 'Edit expense' : 'Add expense')}
+          </h2>
           <button onClick={onClose}><X className="text-noch-muted" size={16}/></button>
         </div>
+        {ocrPreview && ocrPreview.line_items?.length > 0 && (
+          <div className="bg-noch-dark/40 rounded-lg p-2 mb-3 text-xs">
+            <p className="text-noch-muted mb-1">{ocrPreview.line_items.length} line items extracted</p>
+            <ul className="text-white space-y-0.5">
+              {ocrPreview.line_items.slice(0, 5).map((li, i) => (
+                <li key={i} className="flex justify-between">
+                  <span className="truncate">{li.name}</span>
+                  <span className="font-mono shrink-0 ml-2">{li.qty || 1} × {li.unit_cost ?? '?'}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label block mb-1">Date</label>

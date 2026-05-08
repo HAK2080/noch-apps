@@ -2,17 +2,23 @@
 // Owner-only. Tabs: Channels · Customers · Cohorts.
 
 import { useState } from 'react'
-import { Megaphone, Users, BarChart3, Activity } from 'lucide-react'
+import { Megaphone, Users, BarChart3, Activity, Send, Calendar, Star } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import ChannelAnalyticsTab from './tabs/ChannelAnalyticsTab'
 import CustomersTab from './tabs/CustomersTab'
 import CohortsTab from './tabs/CohortsTab'
+import CampaignsTab from './tabs/CampaignsTab'
+import ContentCalendarTab from './tabs/ContentCalendarTab'
+import ReputationTab from './tabs/ReputationTab'
 
 const TABS = [
-  { id: 'channels',  label: 'Channels',  icon: BarChart3 },
-  { id: 'customers', label: 'Customers', icon: Users },
-  { id: 'cohorts',   label: 'Cohorts',   icon: Activity },
+  { id: 'channels',  label: 'Channels',   icon: BarChart3 },
+  { id: 'customers', label: 'Customers',  icon: Users },
+  { id: 'cohorts',   label: 'Cohorts',    icon: Activity },
+  { id: 'campaigns', label: 'Campaigns',  icon: Send },
+  { id: 'calendar',  label: 'Calendar',   icon: Calendar },
+  { id: 'reviews',   label: 'Reputation', icon: Star },
 ]
 
 export default function MarketingDashboard() {
@@ -51,6 +57,9 @@ export default function MarketingDashboard() {
         {tab === 'channels'  && <ChannelAnalyticsTab />}
         {tab === 'customers' && <CustomersTab />}
         {tab === 'cohorts'   && <CohortsTab />}
+        {tab === 'campaigns' && <CampaignsTab />}
+        {tab === 'calendar'  && <ContentCalendarTab />}
+        {tab === 'reviews'   && <ReputationTab />}
       </div>
     </Layout>
   )

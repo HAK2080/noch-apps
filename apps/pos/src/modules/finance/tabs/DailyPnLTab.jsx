@@ -14,6 +14,7 @@ export default function DailyPnLTab() {
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState(null) // null = all
   const [period, setPeriod] = useState(null)
+  const [netOfRefunds, setNetOfRefunds] = useState(false)
   const [pnl, setPnl] = useState(null)
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,7 +38,7 @@ export default function DailyPnLTab() {
       setTimeout(() => reject(new Error('Timed out fetching P&L (server slow)')), 12000)
     )
     Promise.race([
-      getPnL({ branchId, from: period.from, to: period.to }),
+      getPnL({ branchId, from: period.from, to: period.to, netOfRefunds }),
       timeoutPromise,
     ])
       .then(d => { if (!cancelled) setPnl(d) })
@@ -49,7 +50,8 @@ export default function DailyPnLTab() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [branchId, period?.from, period?.to])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId, period?.from, period?.to, netOfRefunds])
 
   const k = useMemo(() => {
     if (!pnl) return null
@@ -102,6 +104,10 @@ export default function DailyPnLTab() {
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
           <PeriodSelector value={period} onChange={setPeriod} />
+          <label className="flex items-center gap-1.5 text-xs text-noch-muted cursor-pointer">
+            <input type="checkbox" checked={netOfRefunds} onChange={e => setNetOfRefunds(e.target.checked)} />
+            Net of refunds
+          </label>
         </div>
         <div className="text-noch-muted text-xs flex items-center gap-1">
           <TrendingUp size={12} /> {k.orders} orders

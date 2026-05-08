@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import {
-  TrendingUp, BarChart3, Coffee, Wallet, Receipt, Clock, Upload, Link2,
+  TrendingUp, BarChart3, Coffee, Wallet, Receipt, Clock, Upload, Link2, Target, Wrench,
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { usePermission } from '../../lib/usePermission'
@@ -19,6 +19,9 @@ import ExpensesTab from './tabs/ExpensesTab'
 import ShiftsTab from './tabs/ShiftsTab'
 import BankTab from './tabs/BankTab'
 import RecipeLinkerTab from './tabs/RecipeLinkerTab'
+import VarianceTab from './tabs/VarianceTab'
+import CapexTab from './tabs/CapexTab'
+import ForecastTab from './tabs/ForecastTab'
 
 // Legacy tabs from /analytics — kept under "Overview" pill so previous
 // dashboards aren't lost.
@@ -33,6 +36,9 @@ const TABS = [
   { id: 'shifts',      label: 'Shifts',             icon: Clock,      feature: 'analytics', action: 'financial' },
   { id: 'bank',        label: 'Bank',               icon: Upload,     feature: 'analytics', action: 'financial' },
   { id: 'recipes',     label: 'Cost mapping',       icon: Link2,      feature: 'analytics', action: 'financial' },
+  { id: 'variance',    label: 'Variance',           icon: Target,     feature: 'analytics', action: 'financial' },
+  { id: 'capex',       label: 'CapEx',              icon: Wrench,     feature: 'analytics', action: 'financial' },
+  { id: 'forecast',    label: 'Forecast',           icon: TrendingUp, feature: 'analytics', action: 'financial' },
   { id: 'overview',    label: 'Overview (legacy)',  icon: BarChart3,  feature: 'analytics', action: 'view' },
   { id: 'ai',          label: 'AI insights',        icon: BarChart3,  feature: 'analytics', action: 'financial' },
 ]
@@ -82,6 +88,9 @@ export default function FinanceDashboard() {
           {activeTab === 'shifts'   && <ShiftsTab />}
           {activeTab === 'bank'     && <BankTab />}
           {activeTab === 'recipes'  && <RecipeLinkerTab />}
+          {activeTab === 'variance' && <VarianceTab />}
+          {activeTab === 'capex'    && <CapexTab />}
+          {activeTab === 'forecast' && <ForecastTab />}
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'ai'       && (
             <ProtectedFeature feature="analytics" action="financial" fallback={

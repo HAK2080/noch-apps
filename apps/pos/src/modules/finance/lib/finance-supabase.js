@@ -26,14 +26,126 @@ export async function updateFinanceSettings(updates) {
 }
 
 // ── P&L RPC ──────────────────────────────────────────────────────────
-export async function getPnL({ branchId = null, from, to }) {
+export async function getPnL({ branchId = null, from, to, netOfRefunds = false }) {
   const { data, error } = await supabase.rpc('finance_pnl', {
     p_branch_id: branchId,
     p_from: from,
     p_to: to,
+    p_net_of_refunds: netOfRefunds,
   })
   if (error) throw error
   return data || {}
+}
+
+// ── Variance vs budget ──────────────────────────────────────────────
+export async function getVariance({ branchId = null, periodMonth }) {
+  const { data, error } = await supabase.rpc('finance_variance', {
+    p_branch_id: branchId,
+    p_period_month: periodMonth,
+  })
+  if (error) throw error
+  return data || []
+}
+
+// ── Budgets ─────────────────────────────────────────────────────────
+export async function listBudgets({ periodMonth, branchId = null } = {}) {
+  let q = supabase.from('finance_budgets').select('*').order('category')
+  if (periodMonth) q = q.eq('period_month', periodMonth)
+  if (branchId)    q = q.eq('branch_id', branchId)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+export async function upsertBudget(row) {
+  const { data, error } = await supabase
+    .from('finance_budgets')
+    .upsert(row, { onConflict: 'branch_id,period_month,category' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ── CapEx ───────────────────────────────────────────────────────────
+export async function listCapex() {
+  const { data, error } = await supabase
+    .from('finance_capex')
+    .select('*')
+    .order('acquired_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+export async function createCapex(row) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('finance_capex')
+    .insert({ ...row, created_by: user?.id })
+    .select().single()
+  if (error) throw error
+  return data
+}
+export async function updateCapex(id, updates) {
+  const { data, error } = await supabase
+    .from('finance_capex')
+    .update(updates).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+// ── Forecast / scenarios ────────────────────────────────────────────
+export async function runForecast({ branchId = null, baselineFrom, baselineTo, horizonDays = 90, matchaCostDelta = 0, salesVolumeDelta = 0, laborHeadcountDelta = 0 }) {
+  const { data, error } = await supabase.rpc('finance_forecast', {
+    p_branch_id: branchId,
+    p_baseline_from: baselineFrom,
+    p_baseline_to: baselineTo,
+    p_horizon_days: horizonDays,
+    p_matcha_cost_pct_delta: matchaCostDelta,
+    p_sales_volume_pct_delta: salesVolumeDelta,
+    p_labor_headcount_delta: laborHeadcountDelta,
+  })
+  if (error) throw error
+  return data || {}
+}
+export async function listScenarios() {
+  const { data, error } = await supabase.from('finance_scenarios').select('*').order('saved_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+export async function saveScenario(row) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const { data, error } = await supabase.from('finance_scenarios').insert({ ...row, saved_by: user?.id }).select().single()
+  if (error) throw error
+  return data
+}
+
+// ── OCR invoice ────────────────────────────────────────────────────
+export async function ocrInvoice(file) {
+  const b64 = await fileToBase64(file)
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ocr-invoice`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ image_base64: b64, mime_type: file.type || 'image/jpeg' }),
+  })
+  const json = await res.json()
+  if (!json.ok) throw new Error(json.error || 'OCR failed')
+  return json.data
+}
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => {
+      const s = r.result
+      const idx = s.indexOf(',')
+      resolve(idx >= 0 ? s.slice(idx + 1) : s)
+    }
+    r.onerror = reject
+    r.readAsDataURL(file)
+  })
 }
 
 // ── Menu Profitability Matrix RPC ───────────────────────────────────

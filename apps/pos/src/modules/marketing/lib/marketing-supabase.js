@@ -92,6 +92,77 @@ export async function getWhatsappStats({ from, to } = {}) {
   return out
 }
 
+// ── Campaigns ───────────────────────────────────────────────────────
+export async function listCampaigns() {
+  const { data, error } = await supabase.from('marketing_campaigns').select('*').order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+export async function createCampaign(row) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const { data, error } = await supabase.from('marketing_campaigns').insert({ ...row, created_by: user?.id }).select().single()
+  if (error) throw error
+  return data
+}
+export async function updateCampaign(id, updates) {
+  const { data, error } = await supabase.from('marketing_campaigns').update(updates).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+// Recipients of a campaign (computed fresh from the chosen segment).
+export async function loadSegmentRecipients(segment) {
+  if (segment === 'all') {
+    const { data } = await supabase.from('loyalty_customers').select('id, full_name, phone_normalised').eq('marketing_opt_in', true).limit(500)
+    return data || []
+  }
+  const { data, error } = await supabase
+    .from('customer_segments')
+    .select('customer_id, loyalty_customers!customer_id(id, full_name, phone_normalised, marketing_opt_in)')
+    .eq('segment', segment)
+  if (error) throw error
+  return (data || []).filter(r => r.loyalty_customers?.marketing_opt_in !== false)
+                     .map(r => r.loyalty_customers)
+}
+
+// ── Reviews / reputation ───────────────────────────────────────────
+export async function listReviews({ status = null } = {}) {
+  let q = supabase.from('marketing_reviews').select('*').order('posted_at', { ascending: false }).limit(200)
+  if (status) q = q.eq('status', status)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+export async function createReview(row) {
+  const { data, error } = await supabase.from('marketing_reviews').insert(row).select().single()
+  if (error) throw error
+  return data
+}
+export async function updateReview(id, updates) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const payload = { ...updates }
+  if (updates.reply_text) {
+    payload.replied_at = new Date().toISOString()
+    payload.replied_by = user?.id
+    payload.status = 'replied'
+  }
+  const { data, error } = await supabase.from('marketing_reviews').update(payload).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
+// ── Content calendar (read-only over content_posts) ────────────────
+export async function listContentCalendar({ from, to } = {}) {
+  let q = supabase.from('content_posts')
+    .select('id, brand_id, format, platform, caption_final, image_url, status, scheduled_at, published_at, score_total')
+    .order('scheduled_at', { ascending: true, nullsFirst: false })
+  if (from) q = q.gte('scheduled_at', from)
+  if (to)   q = q.lte('scheduled_at', to)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
 // ── % of orders linked to loyalty (health metric for top of Customers) ──
 export async function loyaltyLinkRate({ from, to } = {}) {
   let qTotal = supabase.from('pos_orders').select('id', { count: 'exact', head: true }).eq('status', 'completed')
