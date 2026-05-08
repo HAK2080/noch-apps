@@ -193,14 +193,9 @@ as $$
       and created_at <  (p_to + interval '1 day')::timestamptz
   ),
   cogs as (
-    -- product unit cost + sum of any modifier cost deltas snapshotted on order
-    select coalesce(sum(coalesce(pp.cost_lyd, 0) * oi.quantity), 0) as cogs_lyd,
-           coalesce(sum(coalesce((
-             select sum(oim.price_delta * 0)
-                                  -- modifier price_delta on row is REVENUE delta;
-                                  -- the COST delta lives on pos_modifiers.cost_delta_lyd
-                                  -- via modifier_id link
-             ), 0) * oi.quantity), 0) as _ignore
+    -- product unit cost × qty. Modifier-cost is computed separately
+    -- in the modifier_cogs CTE below and added in the final select.
+    select coalesce(sum(coalesce(pp.cost_lyd, 0) * oi.quantity), 0) as cogs_lyd
     from pos_orders o
     join pos_order_items oi on oi.order_id = o.id
     left join pos_products pp on pp.id = oi.product_id
