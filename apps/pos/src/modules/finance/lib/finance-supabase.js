@@ -125,31 +125,21 @@ export async function setHourlyRate(userId, rate) {
   if (error) throw error
 }
 
-// ── Recipe linker ───────────────────────────────────────────────────
+// ── Cost mapping (was Recipe linker; pivoted 2026-05-08 to direct
+//    pos_products.cost_lyd entry — see RecipeLinkerTab.jsx header). ──
 export async function listProductsForLinking() {
   const { data, error } = await supabase
     .from('pos_products')
-    .select('id, name, name_ar, price, recipe_id, is_active, visible_on_menu, branch_id')
+    .select('id, name, name_ar, price, cost_lyd, is_active, branch_id')
     .eq('is_active', true)
     .order('name')
   if (error) throw error
   return data || []
 }
-
-export async function listRecipes() {
-  const { data, error } = await supabase
-    .from('recipes')
-    .select('id, code, name, name_ar, category, subcategory')
-    .eq('is_archived', false)
-    .order('name')
-  if (error) throw error
-  return data || []
-}
-
-export async function setProductRecipe(productId, recipeId) {
+export async function setProductCost(productId, costLyd) {
   const { error } = await supabase
     .from('pos_products')
-    .update({ recipe_id: recipeId, updated_at: new Date().toISOString() })
+    .update({ cost_lyd: Number(costLyd), updated_at: new Date().toISOString() })
     .eq('id', productId)
   if (error) throw error
 }

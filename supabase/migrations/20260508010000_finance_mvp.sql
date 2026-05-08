@@ -2,6 +2,18 @@
 -- Per docs/finance/01-mvp-plan.md.
 -- Pure additions; no destructive changes. Safe to apply on live before
 -- the client ships.
+--
+-- Note 2026-05-08 (revision):
+-- The original plan threaded cost via `recipes` → `recipe_ingredients` →
+-- `ingredients`. That path turned out to be incompatible with the cost
+-- calculator's actual schema (`cost_recipes`, `qty_used`, ingredient
+-- cost computed in JS via `calcCostPerBaseUnit` with FX rates).
+-- Replicating that in PL/pgSQL is a larger project than this MVP
+-- justifies. Instead: a single `pos_products.cost_lyd` column that the
+-- owner fills in (or imports from the cost calculator). The Recipe
+-- Linker tab becomes a Cost Mapping tab. The link to `recipes` (for the
+-- training-card system) is still added so it can be used later, but
+-- COGS reads from `cost_lyd` only.
 
 -- ──────────────────────────────────────────────────────────────────────
 -- 1. finance_settings (singleton)
@@ -9,7 +21,6 @@
 create table if not exists finance_settings (
   id text primary key default 'default'
     check (id = 'default'),
-  -- target bands for the threshold badges
   food_cost_min_pct numeric(5,2) default 28.00,
   food_cost_max_pct numeric(5,2) default 32.00,
   labor_cost_min_pct numeric(5,2) default 25.00,
@@ -17,14 +28,11 @@ create table if not exists finance_settings (
   prime_cost_min_pct numeric(5,2) default 55.00,
   prime_cost_max_pct numeric(5,2) default 65.00,
   runway_warn_weeks numeric(4,1) default 8.0,
-  -- monthly fixed-OpEx defaults (avoid manual entry every month)
   monthly_rent_lyd numeric(10,2) default 0,
   monthly_utilities_lyd numeric(10,2) default 0,
   monthly_other_fixed_lyd numeric(10,2) default 0,
-  -- USD reference rate (manual, monthly) — display-only, NOT for ledger conversion
   usd_reference_rate_lyd numeric(8,4),
   usd_reference_rate_set_at date,
-  -- cash on hand snapshot (manual; bank import is separate)
   cash_on_hand_lyd numeric(12,2) default 0,
   cash_on_hand_set_at timestamptz,
   updated_at timestamptz default now()
@@ -32,14 +40,17 @@ create table if not exists finance_settings (
 insert into finance_settings (id) values ('default') on conflict do nothing;
 
 alter table finance_settings enable row level security;
-create policy "finance_settings_owner_only" on finance_settings
-  for all to authenticated
-  using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
-  with check (exists (select 1 from profiles where id = auth.uid() and role = 'owner'));
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='finance_settings' and policyname='finance_settings_owner_only') then
+    create policy "finance_settings_owner_only" on finance_settings
+      for all to authenticated
+      using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
+      with check (exists (select 1 from profiles where id = auth.uid() and role = 'owner'));
+  end if;
+end $$;
 
 -- ──────────────────────────────────────────────────────────────────────
 -- 2. Shift / labor log
---    pos_shift_attendees already has clock_in/out; add wage data.
 -- ──────────────────────────────────────────────────────────────────────
 alter table profiles
   add column if not exists hourly_rate_lyd numeric(8,2);
@@ -47,7 +58,6 @@ alter table profiles
 alter table pos_shift_attendees
   add column if not exists hourly_rate_override_lyd numeric(8,2);
 
--- View: hours × rate per attendee per shift, capped at "now" for open shifts.
 create or replace view shift_labor_cost as
 select
   a.id                            as attendee_id,
@@ -74,7 +84,7 @@ grant select on shift_labor_cost to authenticated;
 -- ──────────────────────────────────────────────────────────────────────
 create table if not exists expense_entries (
   id uuid primary key default gen_random_uuid(),
-  branch_id uuid references pos_branches(id),  -- null = corporate / cross-branch
+  branch_id uuid references pos_branches(id),
   paid_at date not null,
   category text not null check (category in (
     'rent','utilities','marketing','supplies','maintenance',
@@ -94,10 +104,14 @@ create index if not exists expense_entries_paid_at_idx on expense_entries (paid_
 create index if not exists expense_entries_branch_idx  on expense_entries (branch_id, paid_at desc);
 
 alter table expense_entries enable row level security;
-create policy "expense_entries_owner_only" on expense_entries
-  for all to authenticated
-  using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
-  with check (exists (select 1 from profiles where id = auth.uid() and role = 'owner'));
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='expense_entries' and policyname='expense_entries_owner_only') then
+    create policy "expense_entries_owner_only" on expense_entries
+      for all to authenticated
+      using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
+      with check (exists (select 1 from profiles where id = auth.uid() and role = 'owner'));
+  end if;
+end $$;
 
 -- ──────────────────────────────────────────────────────────────────────
 -- 4. Bank transactions (CSV import target)
@@ -119,19 +133,20 @@ create table if not exists bank_transactions (
   imported_by uuid references profiles(id)
 );
 create index if not exists bank_transactions_date_idx on bank_transactions (posted_at desc);
--- Dedupe constraint to make CSV re-imports idempotent.
 create unique index if not exists bank_transactions_dedupe_uidx on bank_transactions
   (account_label, posted_at, amount_lyd, coalesce(description, ''));
 
 alter table bank_transactions enable row level security;
-create policy "bank_transactions_owner_only" on bank_transactions
-  for all to authenticated
-  using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
-  with check (exists (select 1 from profiles where id = auth.uid() and role = 'owner'));
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='bank_transactions' and policyname='bank_transactions_owner_only') then
+    create policy "bank_transactions_owner_only" on bank_transactions
+      for all to authenticated
+      using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
+      with check (exists (select 1 from profiles where id = auth.uid() and role = 'owner'));
+  end if;
+end $$;
 
--- Back-link FK from expense to bank (defined here once both tables exist).
-do $$
-begin
+do $$ begin
   if not exists (
     select 1 from information_schema.table_constraints
     where constraint_name = 'expense_entries_bank_transaction_fk'
@@ -143,19 +158,31 @@ begin
 end $$;
 
 -- ──────────────────────────────────────────────────────────────────────
--- 5. Recipe linkage for Menu Profitability Matrix
+-- 5. Per-product cost (LYD per unit) for COGS math.
+--    Fed manually by the owner via the Cost Mapping tab, or copied from
+--    the cost calculator as a one-time export.
 -- ──────────────────────────────────────────────────────────────────────
 alter table pos_products
-  add column if not exists recipe_id uuid references recipes(id) on delete set null;
-create index if not exists pos_products_recipe_idx on pos_products (recipe_id);
+  add column if not exists cost_lyd numeric(10,2) default 0;
+-- Optional link to the (training) recipes table — not used by COGS but
+-- handy for future drill-down. Conditional add: only if `recipes` table
+-- exists on this DB.
+do $$ begin
+  if exists (select 1 from information_schema.tables where table_schema='public' and table_name='recipes') then
+    if not exists (select 1 from information_schema.columns where table_schema='public' and table_name='pos_products' and column_name='recipe_id') then
+      execute 'alter table pos_products add column recipe_id uuid references recipes(id) on delete set null';
+      execute 'create index if not exists pos_products_recipe_idx on pos_products (recipe_id)';
+    end if;
+  end if;
+end $$;
 
 -- ──────────────────────────────────────────────────────────────────────
 -- 6. Reporting RPCs
 -- ──────────────────────────────────────────────────────────────────────
 
--- Daily P&L for a branch (or all) in a period.
+-- Daily P&L. COGS comes from pos_products.cost_lyd × oi.quantity.
 create or replace function public.finance_pnl(
-  p_branch_id uuid,        -- null = all branches
+  p_branch_id uuid,
   p_from date,
   p_to   date
 ) returns jsonb
@@ -171,27 +198,14 @@ as $$
     where (p_branch_id is null or branch_id = p_branch_id)
       and created_at::date >= p_from and created_at::date <= p_to
   ),
-  cogs_per_order as (
-    select
-      o.id,
-      coalesce(sum(
-        coalesce((
-          select sum(ri.amount * i.cost_per_unit)
-          from recipe_ingredients ri
-          join ingredients i on i.id = ri.ingredient_id
-          where ri.recipe_id = pp.recipe_id
-        ), 0) * oi.quantity
-      ), 0) as cogs_lyd
+  cogs as (
+    select coalesce(sum(coalesce(pp.cost_lyd, 0) * oi.quantity), 0) as cogs_lyd
     from pos_orders o
     join pos_order_items oi on oi.order_id = o.id
     left join pos_products pp on pp.id = oi.product_id
     where (p_branch_id is null or o.branch_id = p_branch_id)
       and o.created_at::date >= p_from and o.created_at::date <= p_to
       and o.status = 'completed'
-    group by o.id
-  ),
-  cogs as (
-    select coalesce(sum(cogs_lyd),0) as cogs_lyd from cogs_per_order
   ),
   labor as (
     select coalesce(sum(labor_cost_lyd),0) as labor_lyd
@@ -229,7 +243,7 @@ as $$
 $$;
 grant execute on function public.finance_pnl(uuid, date, date) to authenticated;
 
--- Menu profitability per pos_product in a period.
+-- Menu profitability per pos_product in a period. Cost = pp.cost_lyd.
 create or replace function public.finance_menu_matrix(
   p_branch_id uuid,
   p_from date,
@@ -263,35 +277,23 @@ as $$
       and o.status = 'completed'
       and o.created_at::date >= p_from and o.created_at::date <= p_to
     group by oi.product_id
-  ),
-  costed as (
-    select
-      pp.id  as product_id,
-      pp.recipe_id,
-      coalesce((
-        select sum(ri.amount * i.cost_per_unit)
-        from recipe_ingredients ri
-        join ingredients i on i.id = ri.ingredient_id
-        where ri.recipe_id = pp.recipe_id
-      ), 0)::numeric as unit_cost
-    from pos_products pp
   )
   select
     s.product_id,
     s.product_name,
-    c.recipe_id,
-    (c.recipe_id is not null) as has_cost,
+    null::uuid as recipe_id,
+    (coalesce(pp.cost_lyd, 0) > 0) as has_cost,
     s.unit_price,
-    coalesce(c.unit_cost, 0) as unit_cost,
-    (s.unit_price - coalesce(c.unit_cost, 0)) as contribution_margin,
+    coalesce(pp.cost_lyd, 0)::numeric as unit_cost,
+    (s.unit_price - coalesce(pp.cost_lyd, 0))::numeric as contribution_margin,
     case when s.unit_price > 0
-         then (s.unit_price - coalesce(c.unit_cost, 0)) / s.unit_price
+         then (s.unit_price - coalesce(pp.cost_lyd, 0)) / s.unit_price
          else 0 end as contribution_margin_ratio,
     s.units_sold,
     s.revenue,
-    (s.unit_price - coalesce(c.unit_cost, 0)) * s.units_sold as total_contribution
+    ((s.unit_price - coalesce(pp.cost_lyd, 0)) * s.units_sold)::numeric as total_contribution
   from sold s
-  left join costed c on c.product_id = s.product_id;
+  left join pos_products pp on pp.id = s.product_id;
 $$;
 grant execute on function public.finance_menu_matrix(uuid, date, date) to authenticated;
 
@@ -310,7 +312,6 @@ declare
 begin
   select cash_on_hand_lyd into v_cash from finance_settings where id='default';
 
-  -- Average weekly burn over last 4 weeks: opex (expenses) excluding capex.
   with weekly as (
     select date_trunc('week', paid_at)::date as wk,
            sum(amount_lyd) as opex

@@ -125,7 +125,7 @@ export default function DailyPnLTab() {
       {/* Hint when COGS is zero (means no recipe links) */}
       {k.rev > 0 && k.cogs === 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-yellow-300 text-sm">
-          COGS is 0 — link products to recipes in the <strong>Recipe Linker</strong> tab so the Menu Profitability Matrix and Prime Cost numbers reflect reality.
+          COGS is 0 — set per-product cost in the <strong>Cost mapping</strong> tab so the Menu Profitability Matrix and Prime Cost reflect reality.
         </div>
       )}
       {/* Hint when labor is zero */}

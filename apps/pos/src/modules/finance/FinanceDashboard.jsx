@@ -32,7 +32,7 @@ const TABS = [
   { id: 'expenses',    label: 'Expenses',           icon: Receipt,    feature: 'analytics', action: 'financial' },
   { id: 'shifts',      label: 'Shifts',             icon: Clock,      feature: 'analytics', action: 'financial' },
   { id: 'bank',        label: 'Bank',               icon: Upload,     feature: 'analytics', action: 'financial' },
-  { id: 'recipes',     label: 'Recipe linker',      icon: Link2,      feature: 'analytics', action: 'financial' },
+  { id: 'recipes',     label: 'Cost mapping',       icon: Link2,      feature: 'analytics', action: 'financial' },
   { id: 'overview',    label: 'Overview (legacy)',  icon: BarChart3,  feature: 'analytics', action: 'view' },
   { id: 'ai',          label: 'AI insights',        icon: BarChart3,  feature: 'analytics', action: 'financial' },
 ]

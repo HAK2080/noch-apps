@@ -87,7 +87,7 @@ export default function MenuProfitabilityTab() {
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 flex items-start gap-2">
           <AlertTriangle className="text-yellow-400 shrink-0 mt-0.5" size={16} />
           <div className="text-yellow-200 text-sm">
-            <strong>{withoutCost.length} product{withoutCost.length === 1 ? '' : 's'}</strong> sold but not linked to a recipe — they show 0 cost (overstating margin). Use the <strong>Recipe Linker</strong> tab to map them.
+            <strong>{withoutCost.length} product{withoutCost.length === 1 ? '' : 's'}</strong> sold but no per-unit cost set — they show 0 cost (overstating margin). Set cost in the <strong>Cost mapping</strong> tab.
             <ul className="text-yellow-300/90 text-xs mt-1 list-disc list-inside">
               {withoutCost.slice(0, 6).map(p => <li key={p.product_id}>{p.product_name} ({Number(p.units_sold).toFixed(0)} sold)</li>)}
               {withoutCost.length > 6 && <li>…and {withoutCost.length - 6} more</li>}
