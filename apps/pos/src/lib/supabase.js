@@ -84,6 +84,15 @@ export async function getStaffProfiles() {
   return data
 }
 
+export async function getAllTeamMembers() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('full_name')
+  if (error) throw error
+  return data
+}
+
 export async function createStaffProfile(nameOrPayload, telegramChatId) {
   const id = crypto.randomUUID()
   const payload = typeof nameOrPayload === 'string'
@@ -106,11 +115,15 @@ export async function updateProfile(id, updates) {
 }
 
 export async function deleteProfile(id) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .delete()
     .eq('id', id)
+    .select('id')
   if (error) throw error
+  if (!data || data.length === 0) {
+    throw new Error('Delete blocked — check permissions (RLS). Owner role required.')
+  }
 }
 
 // ============================================================

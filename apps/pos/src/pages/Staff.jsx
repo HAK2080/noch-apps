@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Send, CheckSquare, Trash2, X, RefreshCw, UserCheck, Share2, Pencil, Save, Bell, Eye, EyeOff, Shield, Link as LinkIcon } from 'lucide-react'
-import { getStaffProfiles, createStaffProfile, deleteProfile, getTasks, updateProfile, supabase } from '../lib/supabase'
+import { getAllTeamMembers, createStaffProfile, deleteProfile, getTasks, updateProfile, supabase } from '../lib/supabase'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePermission } from '../lib/usePermission'
 import { useNavigate } from 'react-router-dom'
@@ -506,7 +506,7 @@ export default function Staff() {
 
   useEffect(() => {
     Promise.all([
-      getStaffProfiles(),
+      getAllTeamMembers(),
       getTasks(),
       supabase.from('pos_branches').select('id, name').eq('is_active', true),
     ])
@@ -546,8 +546,8 @@ export default function Staff() {
       setStaff(prev => prev.filter(s => s.id !== deleteId))
       setDeleteId(null)
       toast.success('Staff removed')
-    } catch {
-      toast.error(t('error'))
+    } catch (err) {
+      toast.error(err?.message || t('error'))
     }
   }
 
@@ -810,7 +810,7 @@ export default function Staff() {
           fromRequest={approvingRequest}
           onSave={() => {
             setApprovingRequest(null)
-            getStaffProfiles().then(setStaff).catch(() => {})
+            getAllTeamMembers().then(setStaff).catch(() => {})
             loadPendingRequests()
           }}
           onClose={() => setApprovingRequest(null)}
@@ -826,7 +826,7 @@ export default function Staff() {
           canEditRole={canEditRole}
           onSave={() => {
             setEditingStaff(null)
-            getStaffProfiles().then(setStaff).catch(() => {})
+            getAllTeamMembers().then(setStaff).catch(() => {})
           }}
           onClose={() => setEditingStaff(null)}
         />
