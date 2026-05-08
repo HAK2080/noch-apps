@@ -71,7 +71,8 @@ export default function Layout({ children }) {
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
     { to: '/pos', icon: ShoppingCart, label: 'POS' },
     { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
-    { to: '/expenses', icon: Receipt, label: 'Expenses' },
+    // /expenses removed from staff sidebar 2026-05-08 — route is now
+    // OwnerRoute-gated, so the link would only redirect anyway.
     { to: '/inventory', icon: Package, label: 'Inventory' },
     { to: '/products', icon: ShoppingBag, label: 'Products' },
     { to: '/recipes', icon: Coffee, label: t('recipes') },
