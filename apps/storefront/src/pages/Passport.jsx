@@ -1,7 +1,7 @@
-// Passport.jsx — public customer Passport (Phase 2)
+// Passport.jsx — public Nochi Pass page (Phase 2)
 // Route: /passport/:token  (HashRouter)
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -12,6 +12,14 @@ const NOCHI_LABEL_AR = {
 }
 const TIER_LABEL_AR = {
   bronze: 'برونزي', silver: 'فضي', gold: 'ذهبي', legend: 'أسطوري',
+}
+
+const NOCHI_IMG = {
+  happy: '/assets/nochi/nochi-happy.png',
+  sad: '/assets/nochi/nochi-sad.png',
+  tired: '/assets/nochi/nochi-tired.png',
+  deathbed: '/assets/nochi/nochi-deathbed.png',
+  dead: '/assets/nochi/nochi-dead.png',
 }
 
 const MILK_OPTIONS = [
@@ -32,16 +40,11 @@ const SWEETNESS_OPTIONS = [
   { value: 'extra',    ar: 'زيادة',    en: 'Extra' },
 ]
 
-function iconForState(state) {
-  switch (state) {
-    case 'happy': return '🐰'
-    case 'sad': return '😔'
-    case 'tired': return '😴'
-    case 'deathbed': return '🤒'
-    case 'dead': return '💤'
-    default: return '🐰'
-  }
-}
+const OTHER_DRINK = '__other__'
+
+// Heuristic for "is this menu item a drink" — categories with these
+// substrings (en or ar) get pulled into the drinks dropdown.
+const DRINK_KEYWORDS = ['drink', 'coffee', 'tea', 'latte', 'cappuccino', 'espresso', 'matcha', 'juice', 'beverage', 'smoothie', 'soda', 'مشروب', 'قهوة', 'شاي', 'لاتيه', 'عصير']
 
 function labelFor(options, value, ar) {
   const o = options.find(x => x.value === value)
@@ -50,7 +53,6 @@ function labelFor(options, value, ar) {
 }
 
 export default function Passport({ lang = 'ar' }) {
-  // Default to Arabic — the receipt audience is Tripoli walk-ins.
   const isAr = lang !== 'en'
   const { token } = useParams()
   const [data, setData] = useState(null)
@@ -89,9 +91,8 @@ export default function Passport({ lang = 'ar' }) {
           <Link to="/" className="back">→ الرئيسية</Link>
         </nav>
         <div className="card" style={{ maxWidth: 520, margin: '40px auto', textAlign: 'center' }}>
-          <h1 style={{ marginBottom: 12 }}>Nochi Passport</h1>
-          <p>هذه البطاقة غير موجودة. اطلب من الموظف بطاقتك.</p>
-          <p style={{ opacity: 0.6, fontSize: 13, marginTop: 8 }}>This Passport doesn’t exist. Ask staff at the counter.</p>
+          <h1 style={{ marginBottom: 12 }}>{isAr ? 'بطاقة نوخ' : 'Nochi Pass'}</h1>
+          <p>{isAr ? 'هذه البطاقة غير موجودة. اطلب من الموظف بطاقتك.' : "This pass doesn't exist. Ask staff at the counter."}</p>
         </div>
       </div>
     )
@@ -101,6 +102,7 @@ export default function Passport({ lang = 'ar' }) {
   const stampsLeft = Math.max(0, STAMP_GOAL - cycleProgress)
   const cycleStamps = Array.from({ length: STAMP_GOAL }, (_, i) => i < cycleProgress)
   const pendingRewards = Array.isArray(data.pending_rewards) ? data.pending_rewards : []
+  const nochiSrc = NOCHI_IMG[data.nochi_state] || NOCHI_IMG.happy
 
   return (
     <div className={`menu-page${isAr ? ' rtl' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
@@ -115,12 +117,20 @@ export default function Passport({ lang = 'ar' }) {
       <div className="card" style={{ maxWidth: 520, margin: '24px auto', padding: 20 }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 40, marginBottom: 4 }}>{iconForState(data.nochi_state)}</div>
+          <img
+            src={nochiSrc}
+            alt={`Nochi ${data.nochi_state || 'happy'}`}
+            style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 4 }}
+            loading="eager"
+          />
           <p style={{ opacity: 0.6, fontSize: 13, margin: 0 }}>
             {isAr ? (NOCHI_LABEL_AR[data.nochi_state] || data.nochi_state) : data.nochi_state}
           </p>
           <h1 style={{ margin: '6px 0 2px' }}>{data.full_name}</h1>
-          <p style={{ opacity: 0.7, fontSize: 14, margin: 0 }}>
+          <p style={{ opacity: 0.5, fontSize: 12, margin: '2px 0 0', letterSpacing: 0.5 }}>
+            {isAr ? '🐰 بطاقة نوخ' : '🐰 Nochi Pass'}
+          </p>
+          <p style={{ opacity: 0.7, fontSize: 14, margin: '8px 0 0' }}>
             {isAr
               ? `${TIER_LABEL_AR[data.tier] || data.tier} · ${data.total_visits || 0} زيارة`
               : `${data.tier} · ${data.total_visits || 0} visits`}
@@ -173,7 +183,7 @@ export default function Passport({ lang = 'ar' }) {
         )}
 
         {/* Your usual */}
-        {(data.favorite_drink || data.milk_preference || data.sweetness_preference) && (
+        {(data.favorite_drink || data.favorite_other || data.milk_preference || data.sweetness_preference) && (
           <section style={{ marginTop: 16 }}>
             <h2 style={{ fontSize: 16, marginBottom: 8 }}>{isAr ? 'المعتاد' : 'Your usual'}</h2>
             <p style={{ fontSize: 15, margin: 0 }}>
@@ -185,6 +195,11 @@ export default function Passport({ lang = 'ar' }) {
                 <span style={{ opacity: 0.7, marginLeft: 8 }}> · {labelFor(SWEETNESS_OPTIONS, data.sweetness_preference, isAr)}</span>
               )}
             </p>
+            {data.favorite_other && (
+              <p style={{ fontSize: 14, margin: '6px 0 0', opacity: 0.85 }}>
+                {isAr ? '🥐 وأيضاً: ' : '🥐 Also loves: '}{data.favorite_other}
+              </p>
+            )}
           </section>
         )}
 
@@ -220,15 +235,82 @@ export default function Passport({ lang = 'ar' }) {
   )
 }
 
+function useDrinkOptions() {
+  // Pull active menu items from any "drinks-y" category. Public anon
+  // reads pos_products via the storefront menu policy.
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('pos_products')
+          .select('id, name, name_ar, pos_categories(name, name_ar)')
+          .eq('is_active', true)
+          .order('name')
+        if (error) throw error
+        const drinks = (data || []).filter(p => {
+          const cat = ((p.pos_categories?.name || '') + ' ' + (p.pos_categories?.name_ar || '')).toLowerCase()
+          if (!cat.trim()) return false
+          return DRINK_KEYWORDS.some(k => cat.includes(k))
+        })
+        // De-dup by name (multiple branches can have the same name)
+        const seen = new Set()
+        const out = []
+        for (const p of drinks) {
+          const key = (p.name || '').trim().toLowerCase()
+          if (!key || seen.has(key)) continue
+          seen.add(key)
+          out.push({ name: p.name, name_ar: p.name_ar })
+        }
+        if (!cancelled) setItems(out)
+      } catch {
+        // Silent — drinks list is decorative; manual entry still works.
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  return { items, loading }
+}
+
 function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
+  const { items: drinkOptions } = useDrinkOptions()
   const [last4, setLast4] = useState('')
-  const [favoriteDrink, setFavoriteDrink] = useState(initial.favorite_drink || '')
+
+  // Drink picker: if the saved value matches a known menu item, preselect
+  // it; otherwise treat as "Other" with the manual text already filled.
+  const matchesKnown = useMemo(() => {
+    if (!initial.favorite_drink) return false
+    const v = initial.favorite_drink.trim().toLowerCase()
+    return drinkOptions.some(d => (d.name || '').trim().toLowerCase() === v)
+  }, [drinkOptions, initial.favorite_drink])
+
+  const [drinkSel, setDrinkSel] = useState(initial.favorite_drink || '')
+  const [drinkOther, setDrinkOther] = useState(matchesKnown ? '' : (initial.favorite_drink || ''))
+
+  // When the menu list arrives, recompute the initial selection.
+  useEffect(() => {
+    if (!initial.favorite_drink) { setDrinkSel(''); return }
+    if (matchesKnown) {
+      setDrinkSel(initial.favorite_drink)
+      setDrinkOther('')
+    } else {
+      setDrinkSel(OTHER_DRINK)
+      setDrinkOther(initial.favorite_drink)
+    }
+  }, [matchesKnown, initial.favorite_drink])
+
+  const [favoriteOther, setFavoriteOther] = useState(initial.favorite_other || '')
   const [milk, setMilk] = useState(initial.milk_preference || '')
   const [sweet, setSweet] = useState(initial.sweetness_preference || '')
   const [ig, setIg] = useState(initial.instagram_handle || '')
   const [tt, setTt] = useState(initial.tiktok_handle || '')
   const [waOptIn, setWaOptIn] = useState(!!initial.whatsapp_opt_in)
-  const [ugc, setUgc] = useState(!!initial.ugc_consent)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -239,25 +321,29 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
       setErr(isAr ? 'بنحتاج آخر 4 أرقام من هاتفك للتحقق.' : "Enter the last 4 digits of your phone to verify.")
       return
     }
+    const resolvedDrink =
+      drinkSel === OTHER_DRINK ? drinkOther.trim() :
+      drinkSel ? drinkSel : ''
+
     setSaving(true)
     try {
       const { data, error } = await supabase.rpc('update_passport_preferences', {
         p_token: token,
         p_phone_last4: last4,
         p_updates: {
-          favorite_drink: favoriteDrink,
+          favorite_drink: resolvedDrink,
+          favorite_other: favoriteOther,
           milk_preference: milk,
           sweetness_preference: sweet,
           instagram_handle: ig.replace(/^@/, ''),
           tiktok_handle: tt.replace(/^@/, ''),
           whatsapp_opt_in: waOptIn,
-          ugc_consent: ugc,
         },
       })
       if (error) throw error
       if (!data?.ok) {
         if (data?.error === 'verify_failed') setErr(isAr ? 'آخر 4 أرقام غير مطابقة. اطلب من الموظف.' : "Last 4 don't match — ask staff.")
-        else if (data?.error === 'not_found') setErr(isAr ? 'البطاقة غير موجودة.' : 'Passport not found.')
+        else if (data?.error === 'not_found') setErr(isAr ? 'البطاقة غير موجودة.' : 'Pass not found.')
         else setErr(isAr ? 'تعذر الحفظ.' : "Couldn't save.")
         return
       }
@@ -291,12 +377,33 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
       </label>
 
       <label style={fieldStyle}>
-        <span style={{ fontSize: 13 }}>{isAr ? 'مشروبي المفضل' : 'Favourite drink'}</span>
+        <span style={{ fontSize: 13 }}>{isAr ? 'مشروبي المفضل' : 'My favourite drink'}</span>
+        <select style={inputStyle} value={drinkSel} onChange={e => setDrinkSel(e.target.value)}>
+          <option value="">{isAr ? '— اختر مشروب —' : '— Pick a drink —'}</option>
+          {drinkOptions.map(d => (
+            <option key={d.name} value={d.name}>
+              {isAr && d.name_ar ? `${d.name_ar} (${d.name})` : d.name}
+            </option>
+          ))}
+          <option value={OTHER_DRINK}>{isAr ? 'أخرى (أدخلها أسفل)' : 'Other (type below)'}</option>
+        </select>
+        {drinkSel === OTHER_DRINK && (
+          <input
+            style={{ ...inputStyle, marginTop: 6 }}
+            value={drinkOther}
+            onChange={e => setDrinkOther(e.target.value)}
+            placeholder={isAr ? 'مشروبي…' : 'My drink…'}
+          />
+        )}
+      </label>
+
+      <label style={fieldStyle}>
+        <span style={{ fontSize: 13 }}>{isAr ? '🥐 معجنات / حلويات / غير ذلك' : '🥐 Bakery / desserts / other items I love'}</span>
         <input
           style={inputStyle}
-          value={favoriteDrink}
-          onChange={e => setFavoriteDrink(e.target.value)}
-          placeholder={isAr ? 'مثل: لاتيه إسباني' : 'e.g. Spanish Latte'}
+          value={favoriteOther}
+          onChange={e => setFavoriteOther(e.target.value)}
+          placeholder={isAr ? 'مثل: كرواسون، تشيز كيك…' : 'e.g. croissant, cheesecake…'}
         />
       </label>
 
@@ -324,14 +431,18 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
         <input style={inputStyle} value={tt} onChange={e => setTt(e.target.value)} placeholder="@yourhandle" dir="ltr" />
       </label>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <input type="checkbox" checked={waOptIn} onChange={e => setWaOptIn(e.target.checked)} />
-        <span style={{ fontSize: 14 }}>{isAr ? 'أوافق على استلام تنبيهات على واتساب' : "Send me WhatsApp updates"}</span>
-      </label>
-
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <input type="checkbox" checked={ugc} onChange={e => setUgc(e.target.checked)} />
-        <span style={{ fontSize: 14 }}>{isAr ? 'أوافق على إعادة نشر صوري إذا قمت بوسمكم' : "Repost my photos if I tag you"}</span>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, padding: '10px 12px', border: '1px dashed currentColor', borderRadius: 8 }}>
+        <input
+          type="checkbox"
+          checked={waOptIn}
+          onChange={e => setWaOptIn(e.target.checked)}
+          style={{ marginTop: 3 }}
+        />
+        <span style={{ fontSize: 14 }}>
+          {isAr
+            ? '📱 أوافق على استلام عروض، هدايا، ومفاجآت على واتساب'
+            : "📱 Send me offers, freebies, and surprises on WhatsApp"}
+        </span>
       </label>
 
       {err && <p style={{ color: '#e63946', fontSize: 13, marginBottom: 8 }}>{err}</p>}

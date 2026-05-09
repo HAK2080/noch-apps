@@ -155,7 +155,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
                     height={120}
                   />
                 )}
-                <p className="text-noch-muted text-[10px]">Scan for your Passport</p>
+                <p className="text-noch-muted text-[10px]">Scan for your Nochi Pass</p>
                 <p className="text-white text-[10px] break-all">{PASSPORT_BASE}/{passportToken}</p>
               </div>
             )}
