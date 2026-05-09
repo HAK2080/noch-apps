@@ -1,19 +1,37 @@
 // ReceiptModal.jsx — Post-sale receipt preview and actions
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Printer, DollarSign, Plus } from 'lucide-react'
+import QRCode from 'qrcode'
 import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
+
+// Where the customer-facing Passport page lives. Phase 2 builds it on
+// the storefront at noch.cloud/#/passport/<token>.
+const PASSPORT_BASE = 'noch.cloud/#/passport'
 
 // Local-only POS translation — see CartPanel for rationale.
 const posT = (key, lang) =>
   translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
 
-export default function ReceiptModal({ order, items, branch, onNewOrder, onClose, posLang = 'en' }) {
+export default function ReceiptModal({ order, items, branch, loyaltyCustomer, onNewOrder, onClose, posLang = 'en' }) {
   const t = (k) => posT(k, posLang)
   const [printing, setPrinting] = useState(false)
   const [openingDrawer, setOpeningDrawer] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState(null)
+
+  const passportToken = loyaltyCustomer?.passport_token
+  const passportUrl = passportToken ? `https://${PASSPORT_BASE}/${passportToken}` : null
+
+  useEffect(() => {
+    if (!passportUrl) { setQrDataUrl(null); return }
+    let cancelled = false
+    QRCode.toDataURL(passportUrl, { margin: 1, width: 160 })
+      .then(url => { if (!cancelled) setQrDataUrl(url) })
+      .catch(() => { if (!cancelled) setQrDataUrl(null) })
+    return () => { cancelled = true }
+  }, [passportUrl])
 
   const handlePrint = async () => {
     if (!isPrinterConnected()) {
@@ -126,6 +144,22 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
                 {t('receiptStampsAwardedSuffix') && ' ' + t('receiptStampsAwardedSuffix')}
               </div>
             )}
+            {passportUrl && (
+              <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center">
+                {qrDataUrl && (
+                  <img
+                    src={qrDataUrl}
+                    alt="Passport QR"
+                    className="mx-auto mb-1"
+                    width={120}
+                    height={120}
+                  />
+                )}
+                <p className="text-noch-muted text-[10px]">Scan for your Passport</p>
+                <p className="text-white text-[10px] break-all">{PASSPORT_BASE}/{passportToken}</p>
+              </div>
+            )}
+
             <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center text-noch-muted" dir="rtl">
               {branch?.receipt_footer || 'شكراً لزيارتكم'}
             </div>

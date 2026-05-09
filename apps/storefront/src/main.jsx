@@ -5,6 +5,7 @@ import Hub from './pages/Hub.jsx'
 import Menu from './pages/Menu.jsx'
 import Shop from './pages/Shop.jsx'
 import Loyalty from './pages/Loyalty.jsx'
+import Passport from './pages/Passport.jsx'
 import './styles.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/menu" element={<Menu />} />
         <Route path="/shop" element={<Shop />} />
         <Route path="/loyalty" element={<Loyalty />} />
+        <Route path="/passport/:token" element={<Passport />} />
       </Routes>
     </HashRouter>
   </React.StrictMode>
