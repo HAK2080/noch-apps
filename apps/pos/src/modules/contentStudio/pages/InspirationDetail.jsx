@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Sparkles, Loader2, Trash2, Copy, Brain, Layers } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Sparkles, Loader2, Trash2, Copy, Brain, Layers, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getInspiration, updateInspiration, deleteInspiration } from '../services/inspirations'
 import { getConceptByInspirationId, createConcept, updateConcept } from '../services/concepts'
 import { extractConcept, extractConceptBoth, logExtraction } from '../ai/extractConcept'
+import { createBrief, fromConcept, fromInspiration } from '../services/briefs'
 import ConceptFields from '../components/ConceptFields'
 
 // Project the AI's flat concept JSON onto the cs_extracted_concepts row
@@ -171,6 +172,15 @@ export default function InspirationDetail() {
     } catch (e) { toast.error(e.message || 'Failed') }
   }
 
+  async function handleCreateBrief() {
+    try {
+      const draft = concept ? fromConcept(concept, inspiration) : fromInspiration(inspiration)
+      const row = await createBrief({ ...draft, business_id: inspiration?.business_id || null })
+      toast.success('Brief created')
+      navigate(`/content-studio/briefs/${row.id}`)
+    } catch (e) { toast.error(e.message || 'Failed to create brief') }
+  }
+
   if (loading) return <div className="text-noch-muted text-sm">Loading…</div>
   if (!inspiration) return <div className="text-noch-muted text-sm">Not found</div>
 
@@ -180,12 +190,20 @@ export default function InspirationDetail() {
         <Link to="/content-studio/inspiration" className="flex items-center gap-1.5 text-noch-muted hover:text-white text-sm">
           <ArrowLeft size={14} /> Back to inspiration
         </Link>
-        <button
-          onClick={handleDelete}
-          className="flex items-center gap-1.5 text-noch-muted hover:text-red-400 text-sm"
-        >
-          <Trash2 size={14} /> Delete
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCreateBrief}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-noch-green/15 border border-noch-green/30 text-noch-green text-xs font-medium hover:bg-noch-green/25"
+          >
+            <FileText size={12} /> Create brief from this
+          </button>
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 text-noch-muted hover:text-red-400 text-sm"
+          >
+            <Trash2 size={14} /> Delete
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

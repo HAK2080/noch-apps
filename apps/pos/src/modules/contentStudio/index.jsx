@@ -13,6 +13,11 @@ import VoiceLab from './pages/VoiceLab'
 import DialectTrainer from './pages/DialectTrainer'
 import ContentBank from './pages/ContentBank'
 import Settings from './pages/Settings'
+import Briefs from './pages/Briefs'
+import BriefDetail from './pages/BriefDetail'
+import Signals from './pages/Signals'
+import Campaigns from './pages/Campaigns'
+import CampaignDetail from './pages/CampaignDetail'
 
 /**
  * Mount at <Route path="/content-studio/*" element={<ContentStudio />}/>.
@@ -30,6 +35,11 @@ export default function ContentStudio() {
         <Route path="inspiration/:id" element={<InspirationDetail />} />
         <Route path="concepts" element={<Concepts />} />
         <Route path="concepts/:id" element={<ConceptWorkbench />} />
+        <Route path="briefs" element={<Briefs />} />
+        <Route path="briefs/:id" element={<BriefDetail />} />
+        <Route path="signals" element={<Signals />} />
+        <Route path="campaigns" element={<Campaigns />} />
+        <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="drafts" element={<Drafts />} />
         <Route path="voice-lab" element={<VoiceLab />} />
         <Route path="dialect-trainer" element={<DialectTrainer />} />

@@ -28,6 +28,10 @@ export default function VoiceProfileEditor({ profile, onChanged, onDeleted }) {
         audience_descriptors: splitList(v.audience_descriptors),
         banned_phrases: splitList(v.banned_phrases),
         preferred_phrases: splitList(v.preferred_phrases),
+        // Phase 5 — newline-delimited samples → text[]
+        good_caption_samples: splitLines(v.good_caption_samples),
+        bad_caption_samples:  splitLines(v.bad_caption_samples),
+        hybrid_language_notes: v.hybrid_language_notes || null,
         notes: v.notes || null,
         dialect_rules: v.dialect_rules || null,
         dialect_lexicon: v.dialect_lexicon,
@@ -90,6 +94,36 @@ export default function VoiceProfileEditor({ profile, onChanged, onDeleted }) {
       <Field label="Audience (comma-separated)"><input value={v.audience_descriptors} onChange={e => up('audience_descriptors', e.target.value)} className={inputCls} /></Field>
       <Field label="Preferred phrases (comma-separated)"><input value={v.preferred_phrases} onChange={e => up('preferred_phrases', e.target.value)} className={inputCls} /></Field>
       <Field label="Banned phrases (comma-separated)"><input value={v.banned_phrases} onChange={e => up('banned_phrases', e.target.value)} className={inputCls} /></Field>
+
+      {/* Phase 5 — sample captions + hybrid-language notes */}
+      <Field label="Good caption samples (one per line — what sounds right)">
+        <textarea
+          rows={3}
+          value={v.good_caption_samples || ''}
+          onChange={e => up('good_caption_samples', e.target.value)}
+          className={inputCls}
+          placeholder="ماتش سيول · لاتيه · صباح"
+        />
+      </Field>
+      <Field label="Bad caption samples (one per line — what sounds wrong)">
+        <textarea
+          rows={3}
+          value={v.bad_caption_samples || ''}
+          onChange={e => up('bad_caption_samples', e.target.value)}
+          className={inputCls}
+          placeholder="overly polished MSA, Gulf phrasing, fake slang…"
+        />
+      </Field>
+      <Field label="Hybrid-language notes (when to mix English + Arabic)">
+        <textarea
+          rows={2}
+          value={v.hybrid_language_notes || ''}
+          onChange={e => up('hybrid_language_notes', e.target.value)}
+          className={inputCls}
+          placeholder="e.g. menu items always in English; replies in Libyan dialect; emojis OK on stories not posts"
+        />
+      </Field>
+
       <Field label="Notes"><textarea rows={2} value={v.notes || ''} onChange={e => up('notes', e.target.value)} className={inputCls} /></Field>
 
       {/* Dialect training section */}
@@ -319,6 +353,11 @@ function init(p) {
     audience_descriptors: (p?.audience_descriptors || []).join(', '),
     banned_phrases: (p?.banned_phrases || []).join(', '),
     preferred_phrases: (p?.preferred_phrases || []).join(', '),
+    // Phase 5 — sample captions stored as text[] in DB; rendered as
+    // newline-delimited textareas for ergonomics.
+    good_caption_samples: (p?.good_caption_samples || []).join('\n'),
+    bad_caption_samples:  (p?.bad_caption_samples  || []).join('\n'),
+    hybrid_language_notes: p?.hybrid_language_notes || '',
     notes: p?.notes || '',
     dialect_rules: p?.dialect_rules || '',
     dialect_lexicon: Array.isArray(p?.dialect_lexicon) ? p.dialect_lexicon : [],
@@ -327,6 +366,7 @@ function init(p) {
   }
 }
 function splitList(s) { return String(s || '').split(',').map(x => x.trim()).filter(Boolean) }
+function splitLines(s) { return String(s || '').split('\n').map(x => x.trim()).filter(Boolean) }
 
 // ── Training health ──────────────────────────────────────────────────────────
 const METRICS = [

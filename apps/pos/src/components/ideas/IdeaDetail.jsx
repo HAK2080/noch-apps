@@ -1,8 +1,10 @@
 // src/components/ideas/IdeaDetail.jsx
 import { useState, useEffect, useRef } from 'react'
-import { X, ExternalLink, Trash2, ArrowRight, Paperclip, Download, Eye, Loader2, FileText, Image } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { X, ExternalLink, Trash2, ArrowRight, Paperclip, Download, Eye, Loader2, FileText, Image, Wand2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { createBrief, fromIdea } from '../../modules/contentStudio/services/briefs'
 import toast from 'react-hot-toast'
 
 const STATUSES = ['raw', 'exploring', 'in_progress', 'shelved', 'done', 'discarded']
@@ -308,10 +310,22 @@ export default function IdeaDetail({ idea, categories, isOwner, currentUserId, o
             </button>
           )}
 
+          {/* Convert to Content Brief — Phase 4 bridge into Content Studio. */}
+          {isOwner && !isReadOnly && (
+            <ConvertToBriefButton idea={idea} onUpdate={onUpdate} />
+          )}
+
           {/* View Task link */}
           {idea.converted_task_id && (
             <a href={`/tasks/${idea.converted_task_id}`} className="btn-secondary w-full flex items-center justify-center gap-2 py-3 text-noch-green border-noch-green/30">
               <ArrowRight size={16} /> View Task
+            </a>
+          )}
+
+          {/* View linked brief (if previously converted) */}
+          {idea.converted_brief_id && (
+            <a href={`/content-studio/briefs/${idea.converted_brief_id}`} className="btn-secondary w-full flex items-center justify-center gap-2 py-3 text-noch-green border-noch-green/30">
+              <Wand2 size={16} /> View Content Brief
             </a>
           )}
 
@@ -333,5 +347,53 @@ export default function IdeaDetail({ idea, categories, isOwner, currentUserId, o
         )}
       </div>
     </div>
+  )
+}
+
+// Phase 4 bridge — turn a local idea into a Content Studio brief.
+// Maps idea fields → brief defaults via fromIdea(), persists, marks the
+// idea row with converted_brief_id (best-effort), and navigates.
+function ConvertToBriefButton({ idea, onUpdate }) {
+  const [busy, setBusy] = useState(false)
+  const navigate = useNavigate()
+
+  const convert = async () => {
+    setBusy(true)
+    try {
+      const draft = fromIdea(idea)
+      const row = await createBrief(draft)
+
+      // Best-effort: mark the idea so we can show "View brief" on
+      // re-open. Tolerate the column not existing yet.
+      try {
+        const { error } = await supabase
+          .from('ideas')
+          .update({ converted_brief_id: row.id, status: 'in_progress' })
+          .eq('id', idea.id)
+        if (error && !/converted_brief_id/.test(error.message)) throw error
+      } catch (e) {
+        console.warn('idea.converted_brief_id update failed (column may not exist yet):', e)
+      }
+
+      try { onUpdate?.({ ...idea, converted_brief_id: row.id, status: 'in_progress' }) } catch {}
+
+      toast.success('Content brief created')
+      navigate(`/content-studio/briefs/${row.id}`)
+    } catch (e) {
+      toast.error(e.message || 'Convert failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={convert}
+      disabled={busy}
+      className="btn-secondary w-full flex items-center justify-center gap-2 py-3 text-noch-green border-noch-green/30"
+    >
+      {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+      Convert to Content Brief
+    </button>
   )
 }

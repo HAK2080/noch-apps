@@ -11,7 +11,7 @@ import { recordSignal } from '../services/learningSignals'
 import { approveDraftToBank } from '../services/contentBank'
 import { lineDiff } from '../lib/diff'
 import { classifyEdit } from '../lib/classifyEdit'
-import { REWRITE_ACTIONS, USE_LIKELIHOOD_LABELS } from '../lib/constants'
+import { REWRITE_ACTIONS, USE_LIKELIHOOD_LABELS, VOICE_SCORE_FIELDS } from '../lib/constants'
 
 const STATUS_TONE = {
   generated:     'bg-zinc-500/10 text-zinc-400',
@@ -265,6 +265,25 @@ export default function DraftVariantCard({ draft, voiceProfile, onChanged }) {
             {Object.entries(evaluation.scores).map(([k, v]) => (
               <div key={k}><span className="text-noch-muted/60">{k}:</span> {v}</div>
             ))}
+          </div>
+        </details>
+      )}
+
+      {/* Phase 5 — voice/quality sub-scores stored on the draft itself */}
+      {VOICE_SCORE_FIELDS.some(f => Number.isFinite(draft[f.id])) && (
+        <details className="mt-2" open>
+          <summary className="text-noch-muted text-xs cursor-pointer">Voice scores</summary>
+          <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 text-[11px]">
+            {VOICE_SCORE_FIELDS.map(f => {
+              const v = draft[f.id]
+              if (!Number.isFinite(v)) return null
+              return (
+                <div key={f.id} className="flex items-center justify-between gap-2">
+                  <span className="text-noch-muted">{f.label}</span>
+                  <span className={`font-medium ${v >= 4 ? 'text-noch-green' : v >= 3 ? 'text-yellow-400' : 'text-red-400'}`}>{v}/5</span>
+                </div>
+              )
+            })}
           </div>
         </details>
       )}
