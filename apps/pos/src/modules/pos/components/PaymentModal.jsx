@@ -1,9 +1,11 @@
 // PaymentModal.jsx — Payment collection modal
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
-import BarcodeScanner from './BarcodeScanner'
-import QRScanner from './QRScanner'
+// Scanners are heavy (@zxing/html5-qrcode). Lazy so the eager POSTerminal
+// import chain doesn't drag them into the cold bundle.
+const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
+const QRScanner      = lazy(() => import('./QRScanner'))
 import { lookupLoyaltyQR } from '../../../lib/supabase'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
@@ -113,16 +115,20 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
   return (
     <>
       {showScanner && (
-        <BarcodeScanner
-          onScan={handleBarcodeScan}
-          onClose={() => setShowScanner(false)}
-        />
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            onScan={handleBarcodeScan}
+            onClose={() => setShowScanner(false)}
+          />
+        </Suspense>
       )}
       {showQRScanner && (
-        <QRScanner
-          onScan={handleLoyaltyScan}
-          onClose={() => setShowQRScanner(false)}
-        />
+        <Suspense fallback={null}>
+          <QRScanner
+            onScan={handleLoyaltyScan}
+            onClose={() => setShowQRScanner(false)}
+          />
+        </Suspense>
       )}
 
       <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">

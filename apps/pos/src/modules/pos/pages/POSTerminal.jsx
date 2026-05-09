@@ -1,11 +1,14 @@
 // POSTerminal.jsx — Main POS terminal page
 // Route: /pos/:branchId
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode } from 'lucide-react'
 import { supabase, recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../../lib/supabase'
-import QRScanner from '../components/QRScanner'
+// Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
+// initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
+const QRScanner      = lazy(() => import('../components/QRScanner'))
+const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
@@ -26,7 +29,6 @@ import ProductGrid from '../components/ProductGrid'
 import CartPanel from '../components/CartPanel'
 import PaymentModal from '../components/PaymentModal'
 import ReceiptModal from '../components/ReceiptModal'
-import BarcodeScanner from '../components/BarcodeScanner'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
@@ -655,7 +657,9 @@ export default function POSTerminal() {
 
       {/* Modals */}
       {showScanner && (
-        <BarcodeScanner onScan={handleScan} onClose={() => setShowScanner(false)} />
+        <Suspense fallback={null}>
+          <BarcodeScanner onScan={handleScan} onClose={() => setShowScanner(false)} />
+        </Suspense>
       )}
 
       {showPayment && (
@@ -906,7 +910,9 @@ function CustomerSearchModal({ onSelect, onClose }) {
   return (
     <>
       {showScan && (
-        <QRScanner onScan={handleScan} onClose={() => setShowScan(false)} />
+        <Suspense fallback={null}>
+          <QRScanner onScan={handleScan} onClose={() => setShowScan(false)} />
+        </Suspense>
       )}
       <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 pt-20" onClick={onClose}>
         <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
