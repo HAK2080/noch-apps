@@ -302,20 +302,37 @@ export default function Dashboard() {
       <StatsBar stats={stats} />
 
       {/* Command Center — Suggested Actions (Phase 2) */}
-      {isOwner && suggestedActions.length > 0 && (
+      {isOwner && (
         <section className="mb-6">
           <div className="flex items-center gap-2 mb-3 text-yellow-300">
             <Zap size={16} />
             <h2 className="font-semibold text-sm uppercase tracking-wide">
               {lang === 'ar' ? 'إجراءات مقترحة' : 'Suggested Actions'}
             </h2>
-            <span className="text-noch-muted text-xs">({suggestedActions.length})</span>
+            {suggestedActions.length > 0 && (
+              <span className="text-noch-muted text-xs">({suggestedActions.length})</span>
+            )}
           </div>
-          <div className="space-y-3">
-            {suggestedActions.map(a => (
-              <ActionCard key={a.id} action={a} onAction={loadSuggestedActions} />
-            ))}
-          </div>
+          {suggestedActions.length > 0 ? (
+            <div className="space-y-3">
+              {suggestedActions.map(a => (
+                <ActionCard key={a.id} action={a} onAction={loadSuggestedActions} />
+              ))}
+            </div>
+          ) : (
+            <div className="card border-noch-border bg-noch-card/50 py-5 px-4 text-center">
+              <p className="text-noch-muted text-sm">
+                {lang === 'ar'
+                  ? 'لا توجد إجراءات مقترحة الآن — كل شيء تحت السيطرة.'
+                  : "Nothing flagged right now — you're on top of things."}
+              </p>
+              <p className="text-noch-muted/70 text-xs mt-1">
+                {lang === 'ar'
+                  ? 'تظهر هنا تلقائيًا عند رصد إشارة من المخزون أو الولاء أو نقطة البيع.'
+                  : 'Surfaces here automatically when inventory, loyalty, or POS signals fire.'}
+              </p>
+            </div>
+          )}
         </section>
       )}
 

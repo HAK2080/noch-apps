@@ -36,8 +36,9 @@ function NavItem({ to, icon: Icon, label, end }) {
 
 export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const navigate = useNavigate()
+  const ar = lang === 'ar'
 
   const handleSignOut = async () => {
     await signOut()
@@ -46,38 +47,38 @@ export default function Layout({ children }) {
 
   const ownerNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
-    { type: 'group', label: 'OPERATIONS' },
+    { type: 'group', label: ar ? 'العمليات' : 'OPERATIONS' },
     { to: '/tasks', icon: CheckSquare, label: t('tasks') },
-    { to: '/expenses', icon: Receipt, label: 'Expenses' },
-    { to: '/inventory', icon: Package, label: 'Inventory' },
-    { to: '/pos', icon: ShoppingCart, label: 'POS' },
-    { to: '/products', icon: ShoppingBag, label: 'Products' },
-    { to: '/staff', icon: Users, label: 'Team' },
-    { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
-    { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
-    { type: 'group', label: 'MANAGEMENT' },
+    { to: '/expenses', icon: Receipt, label: ar ? 'المصاريف' : 'Expenses' },
+    { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
+    { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
+    { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
+    { to: '/staff', icon: Users, label: ar ? 'الفريق' : 'Team' },
+    { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
+    { to: '/vestaboard', icon: Monitor, label: ar ? 'فيستابورد' : 'Vestaboard' },
+    { type: 'group', label: ar ? 'الإدارة' : 'MANAGEMENT' },
     { to: '/report', icon: BarChart2, label: t('report') },
-    { to: '/finance', icon: BarChart3, label: 'Finance' },
-    { to: '/marketing', icon: BarChart3, label: 'Marketing' },
-    { type: 'group', label: 'CONTENT' },
-    { to: '/content-studio', icon: Sparkles, label: 'Content Studio' },
-    { type: 'group', label: 'TOOLS' },
-    { to: '/ideas', icon: Lightbulb, label: 'Ideas' },
-    { to: '/cost-calculator', icon: Calculator, label: 'Cost Calculator' },
+    { to: '/finance', icon: BarChart3, label: ar ? 'المالية' : 'Finance' },
+    { to: '/marketing', icon: BarChart3, label: ar ? 'التسويق' : 'Marketing' },
+    { type: 'group', label: ar ? 'المحتوى' : 'CONTENT' },
+    { to: '/content-studio', icon: Sparkles, label: ar ? 'استوديو المحتوى' : 'Content Studio' },
+    { type: 'group', label: ar ? 'الأدوات' : 'TOOLS' },
+    { to: '/ideas', icon: Lightbulb, label: ar ? 'الأفكار' : 'Ideas' },
+    { to: '/cost-calculator', icon: Calculator, label: ar ? 'حاسبة التكلفة' : 'Cost Calculator' },
     { to: '/recipes', icon: Coffee, label: t('recipes') },
   ]
 
   const staffNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
-    { to: '/pos', icon: ShoppingCart, label: 'POS' },
+    { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
     { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
     // /expenses removed from staff sidebar 2026-05-08 — route is now
     // OwnerRoute-gated, so the link would only redirect anyway.
-    { to: '/inventory', icon: Package, label: 'Inventory' },
-    { to: '/products', icon: ShoppingBag, label: 'Products' },
+    { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
+    { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
     { to: '/recipes', icon: Coffee, label: t('recipes') },
-    { to: '/vestaboard', icon: Monitor, label: 'Vestaboard' },
-    { to: '/loyalty', icon: Heart, label: 'Nochi Loyalty' },
+    { to: '/vestaboard', icon: Monitor, label: ar ? 'فيستابورد' : 'Vestaboard' },
+    { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
   ]
 
   const navItems = profile?.role === 'owner' ? ownerNav : staffNav
