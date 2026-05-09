@@ -2,7 +2,7 @@
 // Owner-only. Tabs: Channels · Customers · Cohorts.
 
 import { useState } from 'react'
-import { Megaphone, Users, BarChart3, Activity, Send, Calendar, Star } from 'lucide-react'
+import { Megaphone, Users, BarChart3, Activity, Send, Calendar, Star, Image } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import ChannelAnalyticsTab from './tabs/ChannelAnalyticsTab'
@@ -11,12 +11,14 @@ import CohortsTab from './tabs/CohortsTab'
 import CampaignsTab from './tabs/CampaignsTab'
 import ContentCalendarTab from './tabs/ContentCalendarTab'
 import ReputationTab from './tabs/ReputationTab'
+import UgcTab from './tabs/UgcTab'
 
 const TABS = [
   { id: 'channels',  label: 'Channels',   icon: BarChart3 },
   { id: 'customers', label: 'Customers',  icon: Users },
   { id: 'cohorts',   label: 'Cohorts',    icon: Activity },
   { id: 'campaigns', label: 'Campaigns',  icon: Send },
+  { id: 'fanwall',   label: 'Fan wall',   icon: Image },
   { id: 'calendar',  label: 'Calendar',   icon: Calendar },
   { id: 'reviews',   label: 'Reputation', icon: Star },
 ]
@@ -58,6 +60,7 @@ export default function MarketingDashboard() {
         {tab === 'customers' && <CustomersTab />}
         {tab === 'cohorts'   && <CohortsTab />}
         {tab === 'campaigns' && <CampaignsTab />}
+        {tab === 'fanwall'   && <UgcTab />}
         {tab === 'calendar'  && <ContentCalendarTab />}
         {tab === 'reviews'   && <ReputationTab />}
       </div>

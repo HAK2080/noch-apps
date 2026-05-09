@@ -238,6 +238,35 @@ export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArg
   return { sent, failed, total }
 }
 
+// ── UGC moderation (Phase 7) ─────────────────────────────────────────
+export async function listUgcSubmissions(status = null) {
+  let q = supabase.from('ugc_submissions').select(`
+    id, customer_id, photo_url, caption, handle, display_name, consent,
+    status, rejection_reason, created_at, reviewed_at,
+    loyalty_customers!customer_id ( full_name, phone, tier )
+  `).order('created_at', { ascending: false }).limit(200)
+  if (status) q = q.eq('status', status)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
+export async function approveUgc(id, displayName) {
+  const { data, error } = await supabase.rpc('approve_ugc', {
+    p_id: id, p_display_name: displayName || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function rejectUgc(id, reason) {
+  const { data, error } = await supabase.rpc('reject_ugc', {
+    p_id: id, p_reason: reason || null,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function approveCampaign(id) {
   const { data: { user } = {} } = await supabase.auth.getUser()
   const { data, error } = await supabase

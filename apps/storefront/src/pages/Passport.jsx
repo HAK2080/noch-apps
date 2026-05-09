@@ -293,6 +293,9 @@ export default function Passport() {
           />
         )}
 
+        {/* UGC — share photos with explicit consent (Phase 7) */}
+        <UgcSection token={token} isAr={isAr} />
+
         {/* Edit */}
         <div style={{ marginTop: 16 }}>
           {showEdit ? (
@@ -618,6 +621,176 @@ function ReferralSection({ code, customerName, isAr }) {
       <a href={waUrl} target="_blank" rel="noreferrer" className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', padding: '10px 16px' }}>
         {isAr ? '📱 شارك على واتساب' : '📱 Share on WhatsApp'}
       </a>
+    </section>
+  )
+}
+
+function UgcSection({ token, isAr }) {
+  const [phone, setPhone] = useState('')
+  const [photoUrl, setPhotoUrl] = useState('')
+  const [caption, setCaption] = useState('')
+  const [handle, setHandle] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [consent, setConsent] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [my, setMy] = useState([])
+  const [err, setErr] = useState(null)
+
+  const loadMy = async (phoneArg) => {
+    if (!phoneArg) return
+    try {
+      const { data, error } = await supabase.rpc('list_my_ugc', { p_token: token, p_phone: phoneArg })
+      if (!error) setMy(data || [])
+    } catch {}
+  }
+
+  const submit = async (e) => {
+    e.preventDefault(); setErr(null)
+    if (!consent) { setErr(isAr ? 'الموافقة مطلوبة قبل الإرسال.' : 'Consent is required to submit.'); return }
+    if (!photoUrl.trim()) { setErr(isAr ? 'رابط الصورة مطلوب.' : 'Photo URL is required.'); return }
+    if (phone.replace(/[^0-9]/g, '').length < 6) { setErr(isAr ? 'أدخل رقم واتساب الكامل.' : 'Enter your full WhatsApp number.'); return }
+    setSubmitting(true)
+    try {
+      const { data, error } = await supabase.rpc('submit_ugc', {
+        p_token: token, p_phone: phone,
+        p_photo_url: photoUrl, p_caption: caption,
+        p_handle: handle, p_display_name: displayName,
+        p_consent: true,
+      })
+      if (error) throw error
+      if (!data?.ok) {
+        if (data?.error === 'verify_failed') setErr(isAr ? 'الرقم لا يطابق المسجّل.' : "That number doesn't match what's on file.")
+        else if (data?.error === 'consent_required') setErr(isAr ? 'الموافقة مطلوبة.' : 'Consent required.')
+        else if (data?.error === 'photo_required') setErr(isAr ? 'رابط الصورة مطلوب.' : 'Photo URL required.')
+        else setErr(isAr ? 'تعذر الإرسال.' : "Couldn't submit.")
+        return
+      }
+      setPhotoUrl(''); setCaption(''); setHandle(''); setDisplayName(''); setConsent(false)
+      await loadMy(phone)
+      setShowForm(false)
+    } catch (e) {
+      setErr(e.message || (isAr ? 'تعذر الإرسال.' : "Couldn't submit."))
+    } finally { setSubmitting(false) }
+  }
+
+  const withdraw = async (id) => {
+    if (phone.replace(/[^0-9]/g, '').length < 6) { setErr(isAr ? 'أدخل رقم واتساب لتأكيد السحب.' : 'Enter your WhatsApp number to confirm.'); return }
+    if (!confirm(isAr ? 'تأكيد سحب هذه الصورة؟' : 'Withdraw this photo from the wall?')) return
+    try {
+      const { data, error } = await supabase.rpc('withdraw_ugc', {
+        p_token: token, p_phone: phone, p_submission_id: id,
+      })
+      if (error) throw error
+      if (!data?.ok) { setErr(isAr ? 'لم يتم السحب.' : 'Withdraw failed.'); return }
+      await loadMy(phone)
+    } catch (e) {
+      setErr(e.message || (isAr ? 'لم يتم السحب.' : 'Withdraw failed.'))
+    }
+  }
+
+  const fieldStyle = { display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }
+  const inputStyle = { padding: '8px 10px', borderRadius: 8, border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit' }
+  const statusLabel = (s) => isAr
+    ? ({ pending: 'قيد المراجعة', approved: 'منشور', rejected: 'مرفوض', withdrawn: 'مسحوب' }[s] || s)
+    : ({ pending: 'pending', approved: 'live', rejected: 'rejected', withdrawn: 'withdrawn' }[s] || s)
+
+  return (
+    <section style={{ marginTop: 16, padding: 12, background: 'rgba(70, 200, 130, 0.06)', border: '1px solid rgba(70, 200, 130, 0.25)', borderRadius: 10 }}>
+      <h2 style={{ fontSize: 16, marginBottom: 4 }}>
+        {isAr ? '📸 شاركنا صورتك' : '📸 Share a photo'}
+      </h2>
+      <p style={{ fontSize: 12, opacity: 0.8, margin: '0 0 10px' }}>
+        {isAr
+          ? 'إذا حابة نشاركها على جدار العملاء — نوتشي يحب صور الزبائن!'
+          : "If you'd like, send a photo to feature on the fan wall — Nochi loves seeing your visits."}
+      </p>
+
+      {!showForm ? (
+        <button type="button" className="btn ghost" onClick={() => setShowForm(true)} style={{ width: '100%' }}>
+          {isAr ? '➕ إرسال صورة' : '➕ Submit a photo'}
+        </button>
+      ) : (
+        <form onSubmit={submit}>
+          <label style={fieldStyle}>
+            <span style={{ fontSize: 13 }}>{isAr ? '📱 رقم واتساب (للتأكد)' : '📱 WhatsApp number (to confirm)'}</span>
+            <input style={inputStyle} inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} dir="ltr" placeholder={isAr ? '‎+218 9X XXX XXXX' : '+218 9X XXX XXXX'} required />
+          </label>
+
+          <label style={fieldStyle}>
+            <span style={{ fontSize: 13 }}>{isAr ? 'رابط الصورة (انستغرام / Drive / موقع)' : 'Photo URL (Instagram / Drive / hosted)'}</span>
+            <input style={inputStyle} value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} dir="ltr" placeholder="https://…" required />
+            <span style={{ fontSize: 11, opacity: 0.55 }}>
+              {isAr ? 'انسخي رابط منشورك على انستغرام أو رفعي الصورة في Drive وألصقي الرابط' : 'Paste an Instagram post link, or upload to Drive and paste the link.'}
+            </span>
+          </label>
+
+          <label style={fieldStyle}>
+            <span style={{ fontSize: 13 }}>{isAr ? 'وصف قصير (اختياري)' : 'Short caption (optional)'}</span>
+            <input style={inputStyle} value={caption} onChange={e => setCaption(e.target.value)} maxLength={140} />
+          </label>
+
+          <label style={fieldStyle}>
+            <span style={{ fontSize: 13 }}>{isAr ? 'حساب انستغرام (اختياري — للنسبة)' : 'Instagram handle (optional — for credit)'}</span>
+            <input style={inputStyle} value={handle} onChange={e => setHandle(e.target.value)} placeholder="@yourhandle" dir="ltr" />
+          </label>
+
+          <label style={fieldStyle}>
+            <span style={{ fontSize: 13 }}>{isAr ? 'الاسم على الجدار (اختياري — يمكن اسم مستعار)' : 'Display name on the wall (optional — alias is fine)'}</span>
+            <input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={40} />
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10, padding: '10px 12px', border: '1px dashed currentColor', borderRadius: 8 }}>
+            <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} style={{ marginTop: 3 }} />
+            <span style={{ fontSize: 13 }}>
+              {isAr
+                ? '✅ أوافق على نشر هذه الصورة على الجدار العام لنوتشي. أعرف أني أقدر أسحبها وقت ما أبي.'
+                : "✅ I'm OK with Nochi publishing this photo on the public fan wall. I know I can withdraw it anytime."}
+            </span>
+          </label>
+
+          {err && <p style={{ color: '#e63946', fontSize: 13, marginBottom: 8 }}>{err}</p>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" className="btn ghost" onClick={() => setShowForm(false)} style={{ flex: 1 }}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </button>
+            <button type="submit" className="btn" disabled={submitting || !consent} style={{ flex: 1 }}>
+              {submitting ? (isAr ? 'إرسال…' : 'Submitting…') : (isAr ? 'إرسال للمراجعة' : 'Submit for review')}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {phone && (
+        <div style={{ marginTop: 12 }}>
+          <button type="button" className="btn ghost" style={{ width: '100%', fontSize: 13 }} onClick={() => loadMy(phone)}>
+            {isAr ? '🔄 عرض إرسالاتي' : '🔄 Show my submissions'}
+          </button>
+        </div>
+      )}
+
+      {my.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {my.map(m => (
+            <li key={m.id} style={{ background: 'rgba(0,0,0,0.06)', borderRadius: 8, padding: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <img src={m.photo_url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, background: '#222' }} onError={e => { e.currentTarget.style.display = 'none' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 12, margin: 0, opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.caption || m.photo_url}</p>
+                <p style={{ fontSize: 11, margin: '2px 0 0', opacity: 0.6 }}>
+                  {statusLabel(m.status)}
+                  {m.status === 'rejected' && m.rejection_reason ? ` · ${m.rejection_reason}` : ''}
+                </p>
+              </div>
+              {m.status !== 'withdrawn' && m.status !== 'rejected' && (
+                <button type="button" onClick={() => withdraw(m.id)} className="btn ghost" style={{ padding: '4px 8px', fontSize: 11 }}>
+                  {isAr ? 'سحب' : 'Withdraw'}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
