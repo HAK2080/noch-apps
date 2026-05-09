@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 
@@ -15,6 +15,7 @@ import MyTasks from './pages/MyTasks'
 // POS — eager. Daily critical path; baristas tap this instantly.
 import POSHome from './modules/pos/pages/POSHome'
 import POSTerminal from './modules/pos/pages/POSTerminal'
+import { enableKioskMode } from './modules/pos/lib/pos-kiosk'
 
 // Storefront (Public, customer-facing) — eager so the menu loads fast
 // for customers on the worst connections.
@@ -82,13 +83,25 @@ const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   const { t } = useLanguage()
+  const location = useLocation()
   if (loading) return (
     <div className="min-h-screen bg-noch-dark flex items-center justify-center">
       <p className="text-noch-muted">{t('loading')}</p>
     </div>
   )
-  if (!user) return <Navigate to="/login" replace />
+  if (!user) {
+    // Preserve where the user was heading (e.g. /kiosk) so login can return them.
+    const next = encodeURIComponent(location.pathname + location.search)
+    return <Navigate to={`/login?next=${next}`} replace />
+  }
   return children
+}
+
+function KioskEntry() {
+  // Flip kiosk mode on for this tab so POSHome and POSTerminal render
+  // chromeless. Then render POSHome (the branch picker).
+  enableKioskMode()
+  return <POSHome />
 }
 
 function OwnerRoute({ children }) {
@@ -242,6 +255,7 @@ export default function App() {
         {/* /my-card and /loyalty/register removed — customers use noch.cloud/#loyalty */}
 
         {/* POS System */}
+        <Route path="/kiosk" element={<ProtectedRoute><KioskEntry /></ProtectedRoute>} />
         <Route path="/pos" element={<ProtectedRoute><POSHome /></ProtectedRoute>} />
         <Route path="/pos/:branchId" element={<ProtectedRoute><POSTerminal /></ProtectedRoute>} />
         <Route path="/pos/:branchId/end-of-day" element={<ProtectedRoute><POSEndOfDay /></ProtectedRoute>} />

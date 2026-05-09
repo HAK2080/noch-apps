@@ -1,16 +1,9 @@
 // ProductGrid.jsx — POS product selection grid.
 //
-// Redesigned 2026-05-08 for go-live. Design priorities:
-//   1. Big tappable targets (110-140px). Café tablets get hit fast.
-//   2. Name + price both readable from arm's length under café lights.
-//   3. Category color drives the LEFT BORDER (not a tiny dot) so eyes
-//      sort by colour without reading.
-//   4. Image is either a clean thumbnail (small, full opacity) OR a
-//      coloured initial — no 30%-opacity ghost images.
-//   5. Status pills (sold out / low stock) sit OUTSIDE the name area
-//      so the name never gets clipped.
-//   6. Active state is a press-shrink, not a hover-glow — feels solid
-//      under thumb.
+// Image-hero layout: photo fills the top ~60% of the tile, dark card
+// below with English name, Arabic name, price, and a thin category
+// accent line. Optimised for fast visual scanning by Arabic-first
+// café staff.
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { AlertTriangle, Ban } from 'lucide-react'
@@ -31,6 +24,7 @@ function tintFor(hex) {
 export default function ProductGrid({
   products = [], categories = [], onSelect, onLongPress,
   blockOutOfStock = false, searchQuery = '',
+  tileLang = 'both',  // 'both' | 'en' | 'ar'
 }) {
   const [activeCategory, setActiveCategory] = useState('all')
   useEffect(() => {
@@ -116,7 +110,8 @@ export default function ProductGrid({
       </div>
 
       {/* Product grid — 2 cols on phones, 3 on tablets, 4 on desktop.
-          Each tile fixed-height (h-[120px] sm:h-[136px]) for visual rhythm. */}
+          Tiles are taller (h-[180px]/[200px]) to give the hero photo
+          real estate while keeping name + Arabic + price below. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 overflow-y-auto flex-1 pt-2 pb-3">
         {filtered.length === 0 && (
           <div className="col-span-full text-center text-noch-muted py-16 text-sm">
@@ -140,60 +135,84 @@ export default function ProductGrid({
               onTouchCancel={cancelPress}
               onContextMenu={(e) => e.preventDefault()}
               disabled={unavailable}
-              className={`relative rounded-xl text-left h-[120px] sm:h-[136px] flex flex-col overflow-hidden
+              className={`relative rounded-2xl text-left h-[180px] sm:h-[200px] flex flex-col overflow-hidden
+                bg-noch-card border border-noch-border/40
                 transition-transform duration-75
                 ${unavailable
                   ? 'opacity-40 grayscale cursor-not-allowed'
                   : 'active:scale-[0.96] hover:brightness-110'}`}
-              style={{
-                backgroundColor: tint.bg,
-                borderLeft: `4px solid ${tint.border}`,
-                borderTop: '1px solid rgba(255,255,255,0.05)',
-                borderRight: '1px solid rgba(255,255,255,0.05)',
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
-              }}
             >
-              {/* Status pill — top-right, never overlaps name area */}
+              {/* Status pill — top-right, sits over the photo */}
               {product.is_sold_out ? (
-                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-red-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-red-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg">
                   <Ban size={10} /> Sold out
                 </div>
               ) : isOutOfStock(product) ? (
-                <div className="absolute top-1.5 right-1.5 z-20 bg-red-500/85 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+                <div className="absolute top-1.5 right-1.5 z-20 bg-red-500/90 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg">
                   Out
                 </div>
               ) : isLowStock(product) ? (
-                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-yellow-500/85 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-yellow-500/90 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg">
                   <AlertTriangle size={10} /> Low
                 </div>
               ) : null}
 
-              {/* Image: small thumbnail in the top-left so the name has full
-                  width below; falls back to a coloured monogram. */}
-              <div className="flex items-start gap-2 px-2.5 pt-2.5 pb-1">
+              {/* Hero photo — top ~60% of the tile. Falls back to a big
+                  coloured monogram on the tinted bg when no image. */}
+              <div
+                className="flex-[3] relative overflow-hidden flex items-center justify-center"
+                style={{ backgroundColor: tint.bg }}
+              >
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt=""
-                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg object-cover bg-black/20 shrink-0"
+                    className="absolute inset-0 w-full h-full object-cover"
                     loading="lazy"
                   />
                 ) : (
-                  <div
-                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg flex items-center justify-center shrink-0 text-white text-xl font-bold"
-                    style={{ backgroundColor: tint.border }}
+                  <span
+                    className="text-4xl sm:text-5xl font-extrabold opacity-80"
+                    style={{ color: tint.border }}
                   >
                     {product.name.charAt(0).toUpperCase()}
-                  </div>
+                  </span>
                 )}
               </div>
 
-              {/* Name + price */}
-              <div className="px-2.5 pb-2 mt-auto">
-                <p className="text-white text-sm sm:text-[15px] font-semibold leading-tight line-clamp-2 mb-1">
-                  {product.name}
-                </p>
-                <div className="flex items-baseline justify-between gap-1">
+              {/* Text card — bottom ~40%. Thin top accent line uses the
+                  category colour so eyes can still group by colour. */}
+              <div
+                className="flex-[2] px-2.5 py-2 flex flex-col justify-between bg-noch-dark/95 border-t-2"
+                style={{ borderTopColor: tint.border }}
+              >
+                <div className="min-h-0">
+                  {tileLang !== 'ar' && (
+                    <p className="text-white text-sm sm:text-[15px] font-semibold leading-tight line-clamp-1">
+                      {product.name}
+                    </p>
+                  )}
+                  {tileLang !== 'en' && product.name_ar && (
+                    <p
+                      className={`text-noch-muted leading-tight line-clamp-1 ${
+                        tileLang === 'ar'
+                          ? 'text-white text-sm sm:text-[15px] font-semibold'
+                          : 'text-[12px] sm:text-[13px] mt-0.5'
+                      }`}
+                      dir="rtl"
+                      lang="ar"
+                    >
+                      {product.name_ar}
+                    </p>
+                  )}
+                  {/* Fallback when AR mode but no name_ar exists */}
+                  {tileLang === 'ar' && !product.name_ar && (
+                    <p className="text-white text-sm sm:text-[15px] font-semibold leading-tight line-clamp-1">
+                      {product.name}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between gap-1 mt-1">
                   <span className="text-white font-bold text-base sm:text-lg leading-none">
                     {parseFloat(product.price).toFixed(2)}
                   </span>

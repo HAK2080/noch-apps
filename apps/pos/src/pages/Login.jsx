@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from '../components/shared/LanguageToggle'
@@ -35,10 +35,14 @@ export default function Login() {
     }
   }
 
+  const location = useLocation()
   // Navigate once React has committed the updated user state.
   // This avoids the race where navigate('/') fires before the state batch lands.
+  // Honour ?next=/some/path so kiosk-mode bookmarks land back on /kiosk.
   useEffect(() => {
-    if (user) navigate('/', { replace: true })
+    if (!user) return
+    const next = new URLSearchParams(location.search).get('next')
+    navigate(next && next.startsWith('/') ? next : '/', { replace: true })
   }, [user])
 
   const handleSubmit = async (e) => {

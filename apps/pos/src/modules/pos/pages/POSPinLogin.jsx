@@ -154,8 +154,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           {verifying ? 'Verifying...' : 'Enter'}
         </button>
 
-        {/* Skip (owner bypass) — gated to actual owner profile only.
-            Audit fix 2026-05-06: previously this button rendered for anyone. */}
+        {/* Skip (owner bypass) — gated to actual owner profile only. */}
         {onSkip && isOwner && (
           <button
             onClick={() => { setServedBy(null); onSkip() }}

@@ -28,6 +28,7 @@ import ReceiptModal from '../components/ReceiptModal'
 import BarcodeScanner from '../components/BarcodeScanner'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
+import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
 
@@ -109,6 +110,14 @@ export default function POSTerminal() {
   // Cart state
   const [cart, setCart] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Tile-language preference: 'both' | 'en' | 'ar'. Persisted per device.
+  const [tileLang, setTileLang] = useState(() => localStorage.getItem('pos-tile-lang') || 'both')
+  const cycleTileLang = () => {
+    const next = tileLang === 'both' ? 'en' : tileLang === 'en' ? 'ar' : 'both'
+    setTileLang(next)
+    localStorage.setItem('pos-tile-lang', next)
+  }
 
   // Online orders
   const [onlineOrders, setOnlineOrders] = useState([])
@@ -399,13 +408,14 @@ export default function POSTerminal() {
   // PIN gate. The branch's pos_settings.require_pin defaults to true; the
   // terminal will not render until a barista is verified. POSPinLogin
   // routes through the verify_pos_pin RPC (rate-limited, per-user salt).
+  // Owners can skip — POSPinLogin gates the Skip button on isOwner from
+  // AuthContext, so non-owners never see it.
   if (settings?.require_pin !== false && !pinVerified) {
     return (
       <POSPinLogin
         branchId={branchId}
         onSuccess={() => setPinVerified(true)}
-        // No skip option here: PIN is mandatory. The Owner Mode skip in
-        // POSHome remains gated on isOwner.
+        onSkip={() => setPinVerified(true)}
       />
     )
   }
@@ -414,7 +424,7 @@ export default function POSTerminal() {
     <div className="flex flex-col h-screen bg-noch-dark overflow-hidden">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-noch-card border-b border-noch-border shrink-0">
-        <button onClick={() => navigate('/pos')} className="text-noch-muted hover:text-white p-1">
+        <button onClick={() => navigate(isKioskMode() ? '/kiosk' : '/pos')} className="text-noch-muted hover:text-white p-1">
           <ArrowLeft size={18} />
         </button>
 
@@ -459,6 +469,13 @@ export default function POSTerminal() {
         </button>
 
         {/* Actions */}
+        <button
+          onClick={cycleTileLang}
+          className="px-2 py-1.5 text-noch-muted hover:text-white text-[11px] font-bold uppercase tracking-wider border border-noch-border rounded"
+          title="Toggle product label language"
+        >
+          {tileLang === 'both' ? 'EN+AR' : tileLang === 'en' ? 'EN' : 'AR'}
+        </button>
         <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white">
           <ScanLine size={18} />
         </button>
@@ -541,6 +558,7 @@ export default function POSTerminal() {
             onLongPress={handleSoldOutToggle}
             blockOutOfStock={!!settings?.block_out_of_stock}
             searchQuery={searchQuery}
+            tileLang={tileLang}
           />
         </div>
 

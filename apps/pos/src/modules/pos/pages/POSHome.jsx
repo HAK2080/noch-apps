@@ -7,7 +7,7 @@ import { ShoppingCart, MapPin, Plus, Clock } from 'lucide-react'
 import { getPOSBranches, getOpenShift, openShift } from '../lib/pos-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
-import POSPinLogin from './POSPinLogin'
+import { isKioskMode } from '../lib/pos-kiosk'
 import toast from 'react-hot-toast'
 
 function BranchCard({ branch, onOpen, onSelect }) {
@@ -80,9 +80,14 @@ export default function POSHome() {
   const [loading, setLoading] = useState(true)
   const [openingShift, setOpeningShift] = useState(null) // branch being opened
   const [openingCash, setOpeningCash] = useState('')
-  const [pinTarget, setPinTarget] = useState(null) // branch awaiting PIN
   const { user } = useAuth()
   const navigate = useNavigate()
+  const kiosk = isKioskMode()
+  // In kiosk mode we render a minimal full-screen branch picker instead
+  // of wrapping in <Layout> (which adds the app sidebar/back-to-dashboard).
+  const Wrapper = kiosk
+    ? ({ children }) => <div className="min-h-screen bg-noch-dark px-4 py-8 sm:py-12">{children}</div>
+    : Layout
 
   useEffect(() => {
     getPOSBranches()
@@ -104,24 +109,13 @@ export default function POSHome() {
   }
 
   if (loading) return (
-    <Layout>
+    <Wrapper>
       <p className="text-noch-muted text-center py-16">Loading branches...</p>
-    </Layout>
+    </Wrapper>
   )
 
-  // Show PIN login overlay if branch selected
-  if (pinTarget) {
-    return (
-      <POSPinLogin
-        branchId={pinTarget.id}
-        onSuccess={() => navigate(`/pos/${pinTarget.id}`)}
-        onSkip={() => navigate(`/pos/${pinTarget.id}`)}
-      />
-    )
-  }
-
   return (
-    <Layout>
+    <Wrapper>
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -139,7 +133,7 @@ export default function POSHome() {
               key={branch.id}
               branch={branch}
               onOpen={(b) => { setOpeningShift(b); setOpeningCash('') }}
-              onSelect={(b) => setPinTarget(b)}
+              onSelect={(b) => navigate(`/pos/${b.id}`)}
             />
           ))}
         </div>
@@ -182,6 +176,6 @@ export default function POSHome() {
           </div>
         </div>
       )}
-    </Layout>
+    </Wrapper>
   )
 }

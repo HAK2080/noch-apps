@@ -5,7 +5,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: false,
+    // Refresh tokens silently so kiosk devices stay logged in indefinitely
+    // and regular staff don't get bounced after the 1h access-token TTL.
+    autoRefreshToken: true,
     persistSession: true,
   }
 })
