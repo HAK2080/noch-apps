@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Gift, Send, Trash2, Star } from 'lucide-react'
+import { ArrowRight, Gift, Send, Trash2, Star, Copy, ExternalLink, QrCode } from 'lucide-react'
+import QRCode from 'qrcode'
 import { getLoyaltyCustomer, awardLoyaltyStamp, redeemLoyaltyReward, sendLoyaltyNotification, deleteLoyaltyCustomer, requestGoogleReview } from '../../../lib/supabase'
 import { getCustomerSegment } from '../../marketing/lib/marketing-supabase'
 import SegmentBadge from '../../marketing/components/SegmentBadge'
@@ -167,6 +168,9 @@ export default function CustomerDetail() {
         </div>
       </div>
 
+      {/* Nochi Passport — public link, QR, preferences */}
+      <PassportSection customer={customer} ar={ar} />
+
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="card text-center">
@@ -330,5 +334,130 @@ export default function CustomerDetail() {
         />
       )}
     </Layout>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Passport section — staff view of the customer's public Nochi Pass.
+// Shows the URL, QR (for re-printing or scanning), and current
+// preferences. Read-only here; customer self-edits via the public
+// passport page.
+// ────────────────────────────────────────────────────────────────────
+const MILK_LABEL = {
+  whole: 'Whole', skim: 'Skim', oat: 'Oat', almond: 'Almond',
+  soy: 'Soy', lactose_free: 'Lactose-free',
+}
+const SWEET_LABEL = {
+  no_sugar: 'No sugar', less: 'Less', normal: 'Normal', extra: 'Extra',
+}
+
+function PassportSection({ customer, ar }) {
+  const [qrUrl, setQrUrl] = useState(null)
+  const [showQr, setShowQr] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const token = customer?.passport_token
+  const passportUrl = token ? `https://noch.cloud/passport/?t=${token}` : null
+
+  useEffect(() => {
+    if (!showQr || !passportUrl) return
+    let cancelled = false
+    QRCode.toDataURL(passportUrl, { margin: 1, width: 220 })
+      .then(u => { if (!cancelled) setQrUrl(u) })
+      .catch(() => { if (!cancelled) setQrUrl(null) })
+    return () => { cancelled = true }
+  }, [showQr, passportUrl])
+
+  const copy = async () => {
+    if (!passportUrl) return
+    try {
+      await navigator.clipboard.writeText(passportUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      toast.error(ar ? 'تعذر النسخ' : 'Copy failed')
+    }
+  }
+
+  if (!token) {
+    return (
+      <div className="card mb-4 text-center py-3 text-noch-muted text-sm">
+        {ar ? 'لا توجد بطاقة نوتشي بعد' : 'No Nochi Pass token yet — apply the passport_phase1 migration to backfill.'}
+      </div>
+    )
+  }
+
+  const drinks = Array.isArray(customer.favorite_drinks) ? customer.favorite_drinks : []
+  const hasPrefs = drinks.length > 0 || customer.favorite_other || customer.milk_preference || customer.sweetness_preference
+
+  return (
+    <div className="card mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-white font-bold text-sm">
+          {ar ? '🐰 بطاقة نوتشي' : '🐰 Nochi Pass'}
+        </h2>
+        <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${customer.whatsapp_opt_in ? 'bg-noch-green/20 text-noch-green' : 'bg-noch-border/40 text-noch-muted'}`}>
+          {customer.whatsapp_opt_in ? (ar ? 'WhatsApp ✓' : 'WhatsApp ✓') : (ar ? 'لا واتساب' : 'No WhatsApp')}
+        </span>
+      </div>
+
+      <p className="text-noch-muted text-[11px] mb-2 break-all font-mono">{passportUrl}</p>
+
+      <div className="flex gap-2 mb-3">
+        <a
+          href={passportUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="btn-secondary flex-1 flex items-center justify-center gap-1.5 text-xs"
+        >
+          <ExternalLink size={13} />
+          {ar ? 'فتح' : 'Open'}
+        </a>
+        <button onClick={copy} className="btn-secondary flex-1 flex items-center justify-center gap-1.5 text-xs">
+          <Copy size={13} />
+          {copied ? (ar ? 'نُسخ' : 'Copied') : (ar ? 'نسخ' : 'Copy')}
+        </button>
+        <button onClick={() => setShowQr(v => !v)} className="btn-secondary flex-1 flex items-center justify-center gap-1.5 text-xs">
+          <QrCode size={13} />
+          {showQr ? (ar ? 'إخفاء' : 'Hide QR') : (ar ? 'كود' : 'QR')}
+        </button>
+      </div>
+
+      {showQr && qrUrl && (
+        <div className="bg-white rounded-lg p-3 flex justify-center mb-3">
+          <img src={qrUrl} alt="Passport QR" className="w-40 h-40" />
+        </div>
+      )}
+
+      {hasPrefs ? (
+        <div className="border-t border-noch-border pt-3 text-sm space-y-1.5">
+          {drinks.length > 0 && (
+            <p className="text-white">
+              <span className="text-noch-muted">{ar ? 'المشروبات:' : 'Drinks:'} </span>
+              {drinks.join(' · ')}
+            </p>
+          )}
+          {customer.favorite_other && (
+            <p className="text-white">
+              <span className="text-noch-muted">{ar ? 'يحب أيضاً:' : 'Also loves:'} </span>
+              {customer.favorite_other}
+            </p>
+          )}
+          {(customer.milk_preference || customer.sweetness_preference) && (
+            <p className="text-noch-muted text-xs">
+              {customer.milk_preference && (MILK_LABEL[customer.milk_preference] || customer.milk_preference)}
+              {customer.milk_preference && customer.sweetness_preference && ' · '}
+              {customer.sweetness_preference && (SWEET_LABEL[customer.sweetness_preference] || customer.sweetness_preference)}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="border-t border-noch-border pt-3 text-noch-muted text-xs italic">
+          {ar
+            ? 'لم يحدد العميل تفضيلاته بعد — اطلب منه فتح بطاقته وملء التفضيلات.'
+            : 'Customer hasn\'t set preferences yet — ask them to scan the QR and fill them in.'}
+        </p>
+      )}
+    </div>
   )
 }

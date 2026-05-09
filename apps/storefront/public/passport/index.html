@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nochi Pass</title>
+  <meta name="theme-color" content="#0B1020" />
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #0B1020; color: #fff;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: grid; place-items: center;
+    }
+    .wrap { text-align: center; padding: 24px; }
+    .dot { display: inline-block; width: 12px; height: 12px; border-radius: 99px;
+      background: #F5922E; opacity: 0.85;
+      animation: blink 1.2s ease-in-out infinite alternate; margin: 0 4px; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { from { opacity: 0.25; } to { opacity: 1; } }
+    .fallback { margin-top: 24px; font-size: 13px; opacity: 0.7; }
+    .fallback a { color: #F5922E; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p>🐰 Nochi Pass</p>
+    <div><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <noscript class="fallback">
+      JavaScript is required. <a href="/#/loyalty">Open by phone number instead</a>.
+    </noscript>
+    <p class="fallback" id="fallback" style="display:none;">
+      Taking too long? <a href="/#/loyalty">Open by phone number</a>.
+    </p>
+  </div>
+  <script>
+    // Resolve the passport token from one of:
+    //   /passport/?t=<token>     ← QR-printed receipt URL (preferred)
+    //   /passport/?token=<token>
+    //   /passport/<token>        ← fallback if nginx ever serves /passport/* via SPA fallback
+    //   /passport/#/<token>      ← exotic
+    //   /passport.html?t=<token> ← tolerated
+    (function () {
+      try {
+        var qs = new URLSearchParams(window.location.search);
+        var token = qs.get('t') || qs.get('token');
+        if (!token) {
+          // Try path: /passport/<token>/  → split, last non-empty segment
+          var parts = window.location.pathname.split('/').filter(Boolean);
+          if (parts.length >= 2 && parts[0] === 'passport') token = parts[parts.length - 1];
+        }
+        if (!token && window.location.hash) {
+          var h = window.location.hash.replace(/^#\/?/, '');
+          if (h && h !== 'loyalty') token = h;
+        }
+        if (token && /^[a-z0-9-]{8,}$/i.test(token)) {
+          window.location.replace('/#/passport/' + encodeURIComponent(token));
+          return;
+        }
+        // No usable token → nudge to phone-lookup as a graceful fallback
+        window.location.replace('/#/loyalty');
+      } catch (e) {
+        window.location.replace('/#/loyalty');
+      }
+    })();
+    setTimeout(function () {
+      var el = document.getElementById('fallback');
+      if (el) el.style.display = 'block';
+    }, 2500);
+  </script>
+</body>
+</html>

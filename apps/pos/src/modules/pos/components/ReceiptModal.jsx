@@ -7,9 +7,12 @@ import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 
-// Where the customer-facing Passport page lives. Phase 2 builds it on
-// the storefront at noch.cloud/#/passport/<token>.
-const PASSPORT_BASE = 'noch.cloud/#/passport'
+// Where the customer-facing Passport page lives. The clean URL is
+// served by /var/www/html/passport/index.html (a redirect file from the
+// storefront's public/passport/index.html), which forwards the token
+// into the SPA's /#/passport/<token> route. Keeps the URL printed on
+// receipts free of the # symbol.
+const PASSPORT_BASE = 'noch.cloud/passport'
 
 // Cheeky Arabic sign-offs in Nochi's voice — rotates per order so
 // regulars don't see the same line every time. Picked deterministically
@@ -49,7 +52,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
   const [qrDataUrl, setQrDataUrl] = useState(null)
 
   const passportToken = loyaltyCustomer?.passport_token
-  const passportUrl = passportToken ? `https://${PASSPORT_BASE}/${passportToken}` : null
+  const passportUrl = passportToken ? `https://${PASSPORT_BASE}/?t=${passportToken}` : null
 
   useEffect(() => {
     if (!passportUrl) { setQrDataUrl(null); return }
