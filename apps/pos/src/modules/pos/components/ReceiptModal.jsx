@@ -11,6 +11,34 @@ import toast from 'react-hot-toast'
 // the storefront at noch.cloud/#/passport/<token>.
 const PASSPORT_BASE = 'noch.cloud/#/passport'
 
+// Cheeky Arabic sign-offs in Nochi's voice — rotates per order so
+// regulars don't see the same line every time. Picked deterministically
+// from order_number so the same receipt always renders the same line
+// (matters when staff reprints).
+const NOCHI_FOOTERS_AR = [
+  '🐰 شكراً! نوخي بستناك مرة ثانية',
+  '🐰 لا تطوّل علينا — نوخي بيشتاقلك',
+  '🐰 شكراً، حبيبنا. إلى اللقاء قريب!',
+  '🐰 طيّب… متى الزيارة الجاية؟',
+  '🐰 إذا ما رجعت، نوخي بيزعل',
+  '🐰 يومك أحلى مع نوخي — نشوفك قريب',
+]
+const NOCHI_FOOTERS_EN = [
+  '🐰 Thanks! Nochi is already missing you',
+  "🐰 Don't be a stranger — Nochi will pout",
+  '🐰 Cheers from Nochi — back soon?',
+  '🐰 Until next time, friend',
+  "🐰 If you don't come back, Nochi gets sad",
+]
+
+function pickFooter(order, isAr) {
+  const list = isAr ? NOCHI_FOOTERS_AR : NOCHI_FOOTERS_EN
+  const seed = String(order?.order_number || order?.id || '')
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0
+  return list[Math.abs(h) % list.length]
+}
+
 // Local-only POS translation — see CartPanel for rationale.
 const posT = (key, lang) =>
   translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
@@ -161,7 +189,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
             )}
 
             <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center text-noch-muted" dir="rtl">
-              {branch?.receipt_footer || 'شكراً لزيارتكم'}
+              {branch?.receipt_footer || pickFooter(order, posLang !== 'en')}
             </div>
           </div>
 
