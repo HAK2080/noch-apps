@@ -111,18 +111,143 @@ export async function updateCampaign(id, updates) {
 }
 
 // Recipients of a campaign (computed fresh from the chosen segment).
-export async function loadSegmentRecipients(segment) {
+// Phase 6 segments (birthday/inactive/reward_ready) are consent-gated:
+// they ONLY return rows where whatsapp_opt_in = true. The legacy RFM
+// segments still use the older marketing_opt_in flag for backward compat
+// — set channel to 'whatsapp' to force the consent-gated path.
+export async function loadSegmentRecipients(segment, opts = {}) {
+  // Phase 6 — explicit WhatsApp segments backed by RPCs that already
+  // filter to whatsapp_opt_in = true.
+  if (segment === 'birthday_this_week') {
+    const { data, error } = await supabase.rpc('wa_segment_birthday_this_week')
+    if (error) throw error
+    return (data || []).map(r => ({
+      id: r.customer_id, full_name: r.full_name, phone: r.phone,
+      top_drink: r.top_drink, context: { birthday_day: r.birthday_day, birthday_month: r.birthday_month },
+    }))
+  }
+  if (segment === 'inactive') {
+    const days = Number(opts.days) > 0 ? Number(opts.days) : 30
+    const { data, error } = await supabase.rpc('wa_segment_inactive', { p_days: days })
+    if (error) throw error
+    return (data || []).map(r => ({
+      id: r.customer_id, full_name: r.full_name, phone: r.phone,
+      top_drink: r.top_drink, context: { days_since: r.days_since, total_visits: r.total_visits },
+    }))
+  }
+  if (segment === 'reward_ready') {
+    const { data, error } = await supabase.rpc('wa_segment_reward_ready')
+    if (error) throw error
+    return (data || []).map(r => ({
+      id: r.customer_id, full_name: r.full_name, phone: r.phone,
+      top_drink: r.top_drink, context: { reward_count: r.reward_count, oldest_pending: r.oldest_pending },
+    }))
+  }
+
+  // Legacy RFM path (vip / regular / at_risk / etc.) — used by older
+  // campaigns; still respects marketing_opt_in but NOT whatsapp_opt_in.
   if (segment === 'all') {
-    const { data } = await supabase.from('loyalty_customers').select('id, full_name, phone_normalised').eq('marketing_opt_in', true).limit(500)
-    return data || []
+    const { data } = await supabase.from('loyalty_customers').select('id, full_name, phone, phone_normalised').eq('marketing_opt_in', true).limit(500)
+    return (data || []).map(r => ({ id: r.id, full_name: r.full_name, phone: r.phone || r.phone_normalised }))
   }
   const { data, error } = await supabase
     .from('customer_segments')
-    .select('customer_id, loyalty_customers!customer_id(id, full_name, phone_normalised, marketing_opt_in)')
+    .select('customer_id, loyalty_customers!customer_id(id, full_name, phone, phone_normalised, marketing_opt_in)')
     .eq('segment', segment)
   if (error) throw error
-  return (data || []).filter(r => r.loyalty_customers?.marketing_opt_in !== false)
-                     .map(r => r.loyalty_customers)
+  return (data || [])
+    .filter(r => r.loyalty_customers?.marketing_opt_in !== false)
+    .map(r => ({
+      id: r.loyalty_customers.id,
+      full_name: r.loyalty_customers.full_name,
+      phone: r.loyalty_customers.phone || r.loyalty_customers.phone_normalised,
+    }))
+}
+
+// Phase 6 — render a message template against a recipient row, supporting
+// {{name}}, {{drink}}, and a couple of segment-specific placeholders.
+export function renderTemplate(template, recipient) {
+  if (!template) return ''
+  return String(template)
+    .replaceAll('{{name}}',  recipient?.full_name || '')
+    .replaceAll('{{drink}}', recipient?.top_drink || '')
+    .replaceAll('{{days}}',  String(recipient?.context?.days_since ?? ''))
+}
+
+// Phase 6 — dispatch a WhatsApp campaign by looping through the chosen
+// segment's recipients and invoking the send-whatsapp edge function.
+// Each send is logged via record_whatsapp_send for dedupe + audit.
+// Returns { sent, failed, total } when the loop finishes.
+export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArgs, template, onProgress }) {
+  const recipients = await loadSegmentRecipients(segment, segmentArgs || {})
+  const total = recipients.length
+  let sent = 0, failed = 0
+
+  // Mark campaign as "sending" with a started_at stamp.
+  if (campaignId) {
+    await supabase.from('marketing_campaigns')
+      .update({ status: 'sending', send_started_at: new Date().toISOString(), recipients_count: total })
+      .eq('id', campaignId)
+  }
+
+  for (const r of recipients) {
+    const message = renderTemplate(template, r)
+    let status = 'sent', error = null
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke('send-whatsapp', {
+        body: { to: r.phone, message },
+      })
+      if (invokeErr) { status = 'failed'; error = invokeErr.message || 'invoke_failed' }
+      else if (data?.error) { status = 'failed'; error = data.error }
+    } catch (err) {
+      status = 'failed'; error = err.message || 'exception'
+    }
+
+    if (status === 'sent') sent++; else failed++
+
+    // Log for dedupe + audit. Trigger name = `campaign:<segment>` so the
+    // existing whatsapp_sends history table holds the full picture.
+    try {
+      await supabase.rpc('record_whatsapp_send', {
+        p_customer_id: r.id,
+        p_phone:       r.phone,
+        p_template:    template?.slice(0, 200) || null,
+        p_trigger:     `campaign:${segment}`,
+        p_status:      status,
+        p_error:       error,
+        p_payload_key: campaignId ? `campaign:${campaignId}:${r.id}` : null,
+      })
+    } catch {
+      // Don't let audit-log failure block the loop.
+    }
+
+    if (onProgress) onProgress({ recipient: r, status, error, sent, failed, total })
+  }
+
+  if (campaignId) {
+    await supabase.from('marketing_campaigns')
+      .update({
+        status: failed === 0 ? 'sent' : (sent === 0 ? 'failed' : 'sent'),
+        send_finished_at: new Date().toISOString(),
+        sent_count: sent,
+        failed_count: failed,
+      })
+      .eq('id', campaignId)
+  }
+
+  return { sent, failed, total }
+}
+
+export async function approveCampaign(id) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('marketing_campaigns')
+    .update({ status: 'approved', approved_by: user?.id, approved_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }
 
 // ── Reviews / reputation ───────────────────────────────────────────
