@@ -48,7 +48,7 @@ export default function Dashboard() {
     try {
       // Run event producers (idempotent — they only insert if a matching open event isn't there yet)
       await runAllEventProducers()
-      const actions = await listSuggestedActions({ status: 'pending' })
+      const actions = await listSuggestedActions({ status: 'suggested' })
       setSuggestedActions(actions || [])
     } catch (e) {
       // Non-fatal — Command Center is additive, never block the dashboard
