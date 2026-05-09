@@ -1765,6 +1765,15 @@ export async function getPublicPassport(token) {
   return data
 }
 
+// Phase 4 — staff resolves a Passport-token QR scanned at the counter.
+// Returns the same shape CustomerSearchModal uses to attach a customer.
+export async function lookupCustomerByPassportToken(token) {
+  if (!token) return null
+  const { data, error } = await supabase.rpc('lookup_customer_by_passport_token', { p_token: token })
+  if (error) throw error
+  return data
+}
+
 // Passport Phase 2
 export async function updatePassportPreferences(token, phoneLast4, updates) {
   const { data, error } = await supabase.rpc('update_passport_preferences', {

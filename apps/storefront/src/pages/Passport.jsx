@@ -3,7 +3,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import QRCode from 'qrcode'
 import { supabase } from '../lib/supabase'
+
+// Months in Arabic + English for the birthday badge.
+const MONTHS_AR = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+const MONTHS_EN = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 const STAMP_GOAL = 9
 
@@ -46,6 +51,22 @@ function labelFor(options, value, ar) {
   const o = options.find(x => x.value === value)
   if (!o) return value
   return ar ? o.ar : o.en
+}
+
+// Render a passport-token QR. Returns a data URL the caller paints
+// into an <img>. The token alone is encoded — POS recognizes the
+// shape and resolves via lookup_customer_by_passport_token.
+function useQrDataUrl(value, size = 160) {
+  const [url, setUrl] = useState(null)
+  useEffect(() => {
+    if (!value) { setUrl(null); return }
+    let cancelled = false
+    QRCode.toDataURL(String(value), { margin: 1, width: size })
+      .then(u => { if (!cancelled) setUrl(u) })
+      .catch(() => { if (!cancelled) setUrl(null) })
+    return () => { cancelled = true }
+  }, [value, size])
+  return url
 }
 
 export default function Passport() {
@@ -122,6 +143,7 @@ export default function Passport() {
   const cycleStamps = Array.from({ length: STAMP_GOAL }, (_, i) => i < cycleProgress)
   const pendingRewards = Array.isArray(data.pending_rewards) ? data.pending_rewards : []
   const nochiSrc = NOCHI_IMG[data.nochi_state] || NOCHI_IMG.happy
+  const staffScanQr = useQrDataUrl(token, 160)
 
   // Display value: prefer the array, fall back to legacy single field.
   const drinksList =
@@ -221,13 +243,54 @@ export default function Passport() {
           </section>
         )}
 
-        {/* Show-this-to-staff — only when there's an actual reward to claim */}
+        {/* Reward CTA — only when there's an actual reward to claim,
+            with explicit redeem steps. */}
         {pendingRewards.length > 0 && (
-          <div style={{ marginTop: 16, padding: 10, border: '1px dashed currentColor', borderRadius: 8, textAlign: 'center', opacity: 0.9 }}>
-            <p style={{ margin: 0, fontSize: 14 }}>
-              {isAr ? '🎁 أظهر هذه الصفحة للموظف لاستلام الجائزة' : '🎁 Show this page to staff to claim your reward'}
+          <div style={{ marginTop: 16, padding: 12, background: 'rgba(245,146,46,0.10)', border: '1.5px solid rgba(245,146,46,0.45)', borderRadius: 10 }}>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>
+              {isAr ? '🎁 جائزة جاهزة للاستلام' : '🎁 Reward ready to claim'}
             </p>
+            <ol style={{ margin: '8px 0 0', paddingInlineStart: 18, fontSize: 13, opacity: 0.9, lineHeight: 1.6 }}>
+              <li>{isAr ? 'اطلب مشروبك من الكاشير' : 'Order your drink at the counter'}</li>
+              <li>{isAr ? 'أرِ الموظف هذه الصفحة' : 'Show this page to the barista'}</li>
+              <li>{isAr ? 'الموظف يمسح الكود وتاخذ مشروبك مجاناً' : 'They scan your code and the drink is on us'}</li>
+            </ol>
           </div>
+        )}
+
+        {/* Staff-scan QR — fastest path for staff to attach customer */}
+        {staffScanQr && (
+          <div style={{ marginTop: 16, padding: 12, border: '1px dashed currentColor', borderRadius: 10, textAlign: 'center' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 13, opacity: 0.85 }}>
+              {isAr ? '🐰 أرِ هذا الكود للموظف' : '🐰 Show this code at the counter'}
+            </p>
+            <img src={staffScanQr} alt="Staff scan code" style={{ width: 160, height: 160, margin: '0 auto', display: 'block' }} />
+            {data.referral_code && (
+              <p style={{ margin: '6px 0 0', fontSize: 11, opacity: 0.55, letterSpacing: 0.5 }}>
+                {isAr ? 'أو اذكر كودك:' : 'or tell them your code:'} <strong style={{ letterSpacing: 1.5 }}>{data.referral_code}</strong>
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Birthday badge — display only, no automation */}
+        {data.birthday_day && data.birthday_month && (
+          <section style={{ marginTop: 16, padding: 10, background: 'rgba(255, 215, 0, 0.10)', border: '1px solid rgba(255, 215, 0, 0.35)', borderRadius: 10 }}>
+            <p style={{ margin: 0, fontSize: 14 }}>
+              🎂 {isAr
+                ? `يوم ميلادك: ${data.birthday_day} ${MONTHS_AR[data.birthday_month] || ''} — مشروب مجاني هدية مننا`
+                : `Birthday: ${data.birthday_day} ${MONTHS_EN[data.birthday_month] || ''} — a drink on us, on the day`}
+            </p>
+          </section>
+        )}
+
+        {/* Referral — share code with friends */}
+        {data.referral_code && (
+          <ReferralSection
+            code={data.referral_code}
+            customerName={data.full_name}
+            isAr={isAr}
+          />
         )}
 
         {/* Edit */}
@@ -501,5 +564,48 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
         </button>
       </div>
     </form>
+  )
+}
+
+function ReferralSection({ code, customerName, isAr }) {
+  const [copied, setCopied] = useState(false)
+
+  const shareTextAr = `هلا! أنا ${customerName} وعندي بطاقة نوتشي. سجّل معايا واستخدم كودي ${code} وخود ختمك الأول هدية. noch.cloud/#/loyalty`
+  const shareTextEn = `Hey! I'm on Nochi loyalty — sign up with my code ${code} and your first stamp is on me. noch.cloud/#/loyalty`
+  const shareText = isAr ? shareTextAr : shareTextEn
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      // ignore — older browsers / no permission
+    }
+  }
+
+  return (
+    <section style={{ marginTop: 16, padding: 12, background: 'rgba(112, 84, 245, 0.08)', border: '1px solid rgba(112, 84, 245, 0.3)', borderRadius: 10 }}>
+      <h2 style={{ fontSize: 16, marginBottom: 6 }}>
+        {isAr ? '🤝 اشركها مع صديق' : '🤝 Share with a friend'}
+      </h2>
+      <p style={{ fontSize: 13, opacity: 0.8, margin: '0 0 10px' }}>
+        {isAr
+          ? 'كل صديق يسجّل بكودك يبدأ بختم هدية وأنت كذلك'
+          : 'Each friend who signs up with your code starts with a free stamp — and so do you.'}
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <code style={{ flex: 1, fontSize: 18, letterSpacing: 2, padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.06)', textAlign: 'center', fontWeight: 700 }} dir="ltr">
+          {code}
+        </code>
+        <button type="button" className="btn ghost" onClick={copyCode} style={{ padding: '8px 12px', fontSize: 13 }}>
+          {copied ? (isAr ? '✓ تم النسخ' : '✓ Copied') : (isAr ? 'نسخ' : 'Copy')}
+        </button>
+      </div>
+      <a href={waUrl} target="_blank" rel="noreferrer" className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', padding: '10px 16px' }}>
+        {isAr ? '📱 شارك على واتساب' : '📱 Share on WhatsApp'}
+      </a>
+    </section>
   )
 }
