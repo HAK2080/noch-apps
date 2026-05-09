@@ -182,6 +182,11 @@ function PerfPanel({ item, onSaved }) {
       && saved.perf_orders_after > saved.perf_orders_before * 1.15) out.push('strong_product_push')
     if (Number.isFinite(saved.perf_orders_after) && Number.isFinite(saved.perf_orders_before)
       && saved.perf_orders_after < saved.perf_orders_before * 0.85) out.push('weak_product_push')
+    // Dialect signals: derived from the worked / did_not_work qualitative
+    // notes when the owner mentions language/dialect explicitly.
+    const dialectKeyword = /(dialect|libyan|tripoli|arabic|msa|lehji|ليبي|طرابلس|لهجة)/i
+    if (saved.perf_worked_because && dialectKeyword.test(saved.perf_worked_because)) out.push('good_dialect')
+    if (saved.perf_did_not_work_because && dialectKeyword.test(saved.perf_did_not_work_because)) out.push('bad_dialect')
     return out
   }
 

@@ -4,8 +4,9 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Megaphone, Save, Loader2, Trash2, FileText } from 'lucide-react'
+import { ArrowLeft, Megaphone, Save, Loader2, Trash2, FileText, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { supabase } from '../../../lib/supabase'
 import { getCampaign, updateCampaign, deleteCampaign, CAMPAIGN_STATUSES } from '../services/campaigns'
 import { listBriefs } from '../services/briefs'
 
@@ -14,6 +15,7 @@ export default function CampaignDetail() {
   const navigate = useNavigate()
   const [campaign, setCampaign] = useState(null)
   const [briefs, setBriefs] = useState([])
+  const [drafts, setDrafts] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -22,6 +24,18 @@ export default function CampaignDetail() {
     try {
       const [c, b] = await Promise.all([getCampaign(id), listBriefs({ campaignId: id }).catch(() => [])])
       setCampaign(c); setBriefs(b || [])
+      // Pull drafts for these briefs in one query
+      const briefIds = (b || []).map(x => x.id)
+      if (briefIds.length > 0) {
+        const { data } = await supabase
+          .from('cs_draft_variants')
+          .select('id, body, status, brief_id, created_at')
+          .in('brief_id', briefIds)
+          .order('created_at', { ascending: false })
+        setDrafts(data || [])
+      } else {
+        setDrafts([])
+      }
     } catch (e) { toast.error(e.message || 'Load failed') }
     finally { setLoading(false) }
   }
@@ -98,31 +112,96 @@ export default function CampaignDetail() {
           <Field label="Notes"><textarea rows={3} className={cls} value={campaign.notes || ''} onChange={e => set('notes', e.target.value)} /></Field>
         </div>
 
-        {/* Linked briefs */}
-        <div className="bg-noch-card border border-noch-border rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <FileText size={14} className="text-noch-green" />
-            <h3 className="text-white text-sm font-semibold">Linked briefs</h3>
-            <span className="text-noch-muted text-xs">{briefs.length}</span>
+        {/* Right column: progress + linked briefs + linked drafts */}
+        <div className="space-y-4">
+          {/* Progress overview */}
+          <div className="bg-noch-card border border-noch-border rounded-2xl p-4">
+            <h3 className="text-white text-sm font-semibold mb-3">Progress</h3>
+            <ProgressStrip briefs={briefs} drafts={drafts} status={campaign.status} />
           </div>
-          {briefs.length === 0 ? (
-            <p className="text-noch-muted text-xs">
-              No briefs linked. Open a brief and pick this campaign in its Campaign field.
-            </p>
-          ) : (
-            <ul className="space-y-2 text-xs">
-              {briefs.map(b => (
-                <li key={b.id}>
-                  <Link to={`/content-studio/briefs/${b.id}`} className="block px-2 py-1.5 rounded-lg hover:bg-noch-green/10 border border-transparent hover:border-noch-green/30">
-                    <p className="text-white text-xs line-clamp-1">{b.title || 'Untitled'}</p>
-                    <p className="text-noch-muted text-[11px]">{b.status} · {b.nochi_format || b.platform || '—'}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+
+          {/* Linked briefs */}
+          <div className="bg-noch-card border border-noch-border rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText size={14} className="text-noch-green" />
+              <h3 className="text-white text-sm font-semibold">Linked briefs</h3>
+              <span className="text-noch-muted text-xs">{briefs.length}</span>
+            </div>
+            {briefs.length === 0 ? (
+              <p className="text-noch-muted text-xs">
+                No briefs linked. Open a brief and pick this campaign in its Campaign field.
+              </p>
+            ) : (
+              <ul className="space-y-2 text-xs">
+                {briefs.map(b => (
+                  <li key={b.id}>
+                    <Link to={`/content-studio/briefs/${b.id}`} className="block px-2 py-1.5 rounded-lg hover:bg-noch-green/10 border border-transparent hover:border-noch-green/30">
+                      <p className="text-white text-xs line-clamp-1">{b.title || 'Untitled'}</p>
+                      <p className="text-noch-muted text-[11px]">{b.status} · {b.nochi_format || b.platform || '—'}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Linked drafts */}
+          <div className="bg-noch-card border border-noch-border rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles size={14} className="text-noch-green" />
+              <h3 className="text-white text-sm font-semibold">Drafts</h3>
+              <span className="text-noch-muted text-xs">{drafts.length}</span>
+            </div>
+            {drafts.length === 0 ? (
+              <p className="text-noch-muted text-xs">
+                Drafts generated against any linked brief will surface here.
+              </p>
+            ) : (
+              <ul className="space-y-2 text-xs">
+                {drafts.slice(0, 8).map(d => (
+                  <li key={d.id} className="px-2 py-1.5 rounded-lg border border-noch-border">
+                    <p className="text-white text-xs line-clamp-2">{d.body}</p>
+                    <p className="text-noch-muted text-[11px]">{d.status}</p>
+                  </li>
+                ))}
+                {drafts.length > 8 && (
+                  <li className="text-noch-muted text-[11px] text-center">+ {drafts.length - 8} more</li>
+                )}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ProgressStrip({ briefs, drafts, status }) {
+  const total = drafts.length
+  const counts = drafts.reduce((m, d) => { m[d.status] = (m[d.status] || 0) + 1; return m }, {})
+  const briefsReady = briefs.filter(b => b.status === 'ready' || b.status === 'used').length
+  const draftsApproved = counts.approved || 0
+  const draftsGenerated = counts.generated || 0
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="text-noch-muted">Status</span>
+        <span className="text-white capitalize">{status || 'planning'}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-noch-muted">Briefs ready/used</span>
+        <span className="text-white">{briefsReady} / {briefs.length}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-noch-muted">Drafts approved</span>
+        <span className="text-white">{draftsApproved} / {total}</span>
+      </div>
+      {draftsGenerated > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-noch-muted">Drafts pending review</span>
+          <span className="text-yellow-300">{draftsGenerated}</span>
+        </div>
+      )}
     </div>
   )
 }

@@ -277,11 +277,177 @@ export async function loadLoyaltySignals() {
   return { signals: out, error: null }
 }
 
+// ──────────────────────────────────────────────────────────────
+// Time-of-day signals — products that over-index in a daypart.
+// ──────────────────────────────────────────────────────────────
+
+const DAYPARTS = [
+  { id: 'morning',   label: 'morning (5–11am)',  fromHour: 5,  toHour: 11 },
+  { id: 'afternoon', label: 'afternoon (11–5pm)', fromHour: 11, toHour: 17 },
+  { id: 'evening',   label: 'evening (5–10pm)',  fromHour: 17, toHour: 22 },
+  { id: 'late',      label: 'late night (10pm–5am)', fromHour: 22, toHour: 29 }, // wraps
+]
+
+function dayparOfHour(h) {
+  if (h >= 5 && h < 11) return 'morning'
+  if (h >= 11 && h < 17) return 'afternoon'
+  if (h >= 17 && h < 22) return 'evening'
+  return 'late'
+}
+
+export async function loadTimeOfDaySignals() {
+  const out = []
+  const since30 = new Date(Date.now() - 30 * 86400 * 1000).toISOString()
+
+  const items = await supabase.from('pos_order_items')
+    .select('product_id, product_name, quantity, pos_orders!inner(created_at, status)')
+    .eq('pos_orders.status', 'completed')
+    .gte('pos_orders.created_at', since30)
+  if (items.error) return { signals: [], error: items.error }
+
+  // For each product, qty per daypart + total qty
+  const perProduct = new Map() // pid -> { name, total, parts: {morning, afternoon, evening, late} }
+  for (const r of items.data || []) {
+    if (!r.product_id) continue
+    const entry = perProduct.get(r.product_id) || { name: r.product_name, total: 0, parts: { morning: 0, afternoon: 0, evening: 0, late: 0 } }
+    const h = new Date(r.pos_orders?.created_at).getHours()
+    const part = dayparOfHour(h)
+    const q = Number(r.quantity) || 0
+    entry.total += q
+    entry.parts[part] += q
+    perProduct.set(r.product_id, entry)
+  }
+
+  // A product over-indexes in a daypart if that daypart contributes >= 50%
+  // of its sales AND the product has at least 10 units total.
+  for (const [pid, e] of perProduct.entries()) {
+    if (e.total < 10) continue
+    for (const dp of DAYPARTS) {
+      const share = e.parts[dp.id] / e.total
+      if (share >= 0.5) {
+        out.push({
+          id: `pos-tod-${pid}-${dp.id}`,
+          signal_source: 'pos', kind: 'time_of_day', severity: 'info',
+          title: `${e.name} is a ${dp.label} drink`,
+          explanation: `${Math.round(share * 100)}% of ${e.name} orders happen in the ${dp.label} (${e.parts[dp.id]} of ${e.total} units, last 30 days).`,
+          suggested_mission: `Lean into the ritual — show ${e.name} as a ${dp.label} ritual, not a 24/7 menu item.`,
+          suggested_audience: `Tripoli regulars in their ${dp.label} routine`,
+          suggested_product: e.name,
+          suggested_nochi_format: 'Product Ritual / Tripoli Mood',
+          count: e.parts[dp.id],
+        })
+        break // one daypart per product
+      }
+    }
+  }
+
+  return { signals: out, error: null }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Pairing signals — products frequently bought together.
+// ──────────────────────────────────────────────────────────────
+
+export async function loadPairingSignals() {
+  const out = []
+  const since30 = new Date(Date.now() - 30 * 86400 * 1000).toISOString()
+
+  const items = await supabase.from('pos_order_items')
+    .select('order_id, product_id, product_name, pos_orders!inner(created_at, status)')
+    .eq('pos_orders.status', 'completed')
+    .gte('pos_orders.created_at', since30)
+  if (items.error) return { signals: [], error: items.error }
+
+  // Group product_ids by order_id, then count co-occurrences.
+  const byOrder = new Map()
+  for (const r of items.data || []) {
+    if (!r.order_id || !r.product_id) continue
+    if (!byOrder.has(r.order_id)) byOrder.set(r.order_id, new Map())
+    byOrder.get(r.order_id).set(r.product_id, r.product_name)
+  }
+
+  const pairs = new Map() // "a|b" -> { a, b, nameA, nameB, count }
+  for (const productMap of byOrder.values()) {
+    const ids = [...productMap.keys()]
+    if (ids.length < 2) continue
+    ids.sort()
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const k = `${ids[i]}|${ids[j]}`
+        const entry = pairs.get(k) || { a: ids[i], b: ids[j], nameA: productMap.get(ids[i]), nameB: productMap.get(ids[j]), count: 0 }
+        entry.count += 1
+        pairs.set(k, entry)
+      }
+    }
+  }
+
+  // Top 5 pairs that appear in at least 5 orders
+  const top = [...pairs.values()].filter(p => p.count >= 5).sort((a, b) => b.count - a.count).slice(0, 5)
+  for (const p of top) {
+    out.push({
+      id: `pos-pair-${p.a}-${p.b}`,
+      signal_source: 'pos', kind: 'pairing', severity: 'info',
+      title: `${p.nameA} + ${p.nameB} go together`,
+      explanation: `Bought together in ${p.count} orders in the last 30 days.`,
+      suggested_mission: `Surface the duo as a quiet bundle — let regulars feel they cracked a code.`,
+      suggested_audience: 'Repeat customers',
+      suggested_product: `${p.nameA} + ${p.nameB}`,
+      suggested_nochi_format: 'Drink Drama / Regulars Club',
+      count: p.count,
+    })
+  }
+
+  return { signals: out, error: null }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Review request opportunities — VIPs without feedback rows.
+// ──────────────────────────────────────────────────────────────
+
+export async function loadReviewRequestSignals() {
+  const out = []
+
+  const [customersRes, feedbackRes] = await Promise.all([
+    supabase.from('loyalty_customers')
+      .select('id, total_visits')
+      .gte('total_visits', 5)
+      .limit(2000),
+    supabase.from('loyalty_feedback')
+      .select('customer_id'),
+  ])
+  if (customersRes.error || feedbackRes.error) {
+    return { signals: [], error: customersRes.error || feedbackRes.error }
+  }
+  const haveFeedback = new Set((feedbackRes.data || []).map(r => r.customer_id).filter(Boolean))
+  const targets = (customersRes.data || []).filter(c => !haveFeedback.has(c.id))
+
+  if (targets.length > 0) {
+    out.push({
+      id: 'loyalty-review-request',
+      signal_source: 'loyalty', kind: 'review_request', severity: 'good',
+      title: `${targets.length} regulars never gave feedback`,
+      explanation: '5+ visits and no feedback row yet — these are quiet fans worth asking.',
+      suggested_mission: 'Soft-ask for feedback or a Google review — playful Nochi voice, no scripts.',
+      suggested_audience: 'Regulars with 5+ visits, no feedback',
+      suggested_nochi_format: 'Counter Talk / Nochi Confession',
+      count: targets.length,
+    })
+  }
+
+  return { signals: out, error: null }
+}
+
 export async function loadAllSignals() {
-  const [pos, loyalty] = await Promise.all([loadPosSignals(), loadLoyaltySignals()])
+  const [pos, loyalty, tod, pair, review] = await Promise.all([
+    loadPosSignals(),
+    loadLoyaltySignals(),
+    loadTimeOfDaySignals(),
+    loadPairingSignals(),
+    loadReviewRequestSignals(),
+  ])
   return {
-    pos: pos.signals,
-    loyalty: loyalty.signals,
-    error: pos.error || loyalty.error,
+    pos: [...(pos.signals || []), ...(tod.signals || []), ...(pair.signals || [])],
+    loyalty: [...(loyalty.signals || []), ...(review.signals || [])],
+    error: pos.error || loyalty.error || tod.error || pair.error || review.error,
   }
 }
