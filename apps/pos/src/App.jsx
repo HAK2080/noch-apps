@@ -80,6 +80,13 @@ const LoyaltySpinWheel = lazy(() => import('./modules/loyalty/pages/LoyaltySpinW
 
 const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 
+// Experience OS — Phase 1-10
+const InventoryIntelligence = lazy(() => import('./pages/inventory/InventoryIntelligence'))
+const LoyaltyIntelligence   = lazy(() => import('./modules/loyalty/pages/LoyaltyIntelligence'))
+const Experiments           = lazy(() => import('./pages/Experiments'))
+const ExperimentDetail      = lazy(() => import('./pages/ExperimentDetail'))
+const Messages              = lazy(() => import('./pages/Messages'))
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   const { t } = useLanguage()
@@ -227,6 +234,7 @@ export default function App() {
         <Route path="/inventory/stock" element={<ProtectedRoute><StockManager /></ProtectedRoute>} />
         <Route path="/inventory/procurement" element={<ProtectedRoute><OwnerRoute><ProcurementOrders /></OwnerRoute></ProtectedRoute>} />
         <Route path="/inventory/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+        <Route path="/inventory/intelligence" element={<ProtectedRoute><OwnerRoute><InventoryIntelligence /></OwnerRoute></ProtectedRoute>} />
 
         {/* Analytics (owner only) */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
@@ -245,6 +253,12 @@ export default function App() {
         <Route path="/loyalty/stamp" element={<ProtectedRoute><LoyaltyStamp /></ProtectedRoute>} />
         <Route path="/loyalty/gestures" element={<ProtectedRoute><LoyaltyGestures /></ProtectedRoute>} />
         <Route path="/loyalty/spin" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
+        <Route path="/loyalty/intelligence" element={<ProtectedRoute><OwnerRoute><LoyaltyIntelligence /></OwnerRoute></ProtectedRoute>} />
+
+        {/* Experience OS — Experiments + Messages */}
+        <Route path="/experiments" element={<ProtectedRoute><OwnerRoute><Experiments /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/experiments/:id" element={<ProtectedRoute><OwnerRoute><ExperimentDetail /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><OwnerRoute><Messages /></OwnerRoute></ProtectedRoute>} />
 
         {/* Ideas Module */}
         <Route path="/ideas" element={<ProtectedRoute><IdeasBoard /></ProtectedRoute>} />
