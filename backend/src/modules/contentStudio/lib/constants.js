@@ -25,7 +25,15 @@ export const INSPIRATION_SOURCE_TYPES = [
 ]
 
 export const INSPIRATION_STATUSES = ['new', 'reviewed', 'extracted', 'archived']
-export const DRAFT_STATUSES = ['generated', 'edited', 'approved', 'rejected', 'archived']
+export const DRAFT_STATUSES = ['generated', 'edited', 'approved', 'has_potential', 'rejected', 'archived']
+
+export const USE_LIKELIHOOD_LABELS = {
+  0: "Won't use",
+  1: 'Needs heavy work',
+  2: 'Has potential',
+  3: 'Post with edits',
+  4: 'Post as-is',
+}
 
 export const EVALUATOR_LABELS = {
   safe:               { label: 'Safe',                tone: 'green' },
@@ -64,10 +72,26 @@ export const SUB_NAV = [
   { to: '/content-studio/businesses',   label: 'Businesses' },
   { to: '/content-studio/inspiration',  label: 'Inspiration' },
   { to: '/content-studio/concepts',     label: 'Concepts' },
+  { to: '/content-studio/briefs',       label: 'Briefs' },
   { to: '/content-studio/drafts',       label: 'Drafts' },
-  { to: '/content-studio/voice-lab',    label: 'Voice Lab' },
-  { to: '/content-studio/bank',         label: 'Content Bank' },
+  { to: '/content-studio/voice-lab',       label: 'Voice Lab' },
+  { to: '/content-studio/dialect-trainer', label: 'Dialect Trainer' },
+  { to: '/content-studio/bank',            label: 'Content Bank' },
   { to: '/content-studio/settings',     label: 'Settings' },
+]
+
+export const BRIEF_STATUSES = ['draft', 'ready', 'in_progress', 'completed', 'archived']
+
+export const ADAPTATION_MODES = [
+  { id: 'copy_adapt',         label: 'Copy / Adapt Fast',     desc: 'Rewrite the post angle for Noch brand' },
+  { id: 'extract_mechanism',  label: 'Extract Mechanism',     desc: 'Study how it works, create something original' },
+  { id: 'both',               label: 'Do Both',               desc: 'Fast copy + deep mechanism extraction' },
+]
+
+export const COPY_RISK_LEVELS = [
+  { id: 'low',    label: 'Low risk',    color: 'green' },
+  { id: 'medium', label: 'Medium risk', color: 'amber' },
+  { id: 'high',   label: 'High risk',   color: 'red' },
 ]
 
 export const SELECTED_BUSINESS_KEY = 'cs_selected_business_id'

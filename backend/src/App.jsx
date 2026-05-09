@@ -34,6 +34,12 @@ import StockManager from './pages/inventory/StockManager'
 import ProcurementOrders from './pages/inventory/ProcurementOrders'
 import StockCheckAll from './pages/StockCheckAll'
 import BusinessAnalytics from './pages/BusinessAnalytics'
+import InventoryIntelligence from './pages/inventory/InventoryIntelligence'
+
+// Experiments + Messages (Phase 9 + 10)
+import Experiments from './pages/Experiments'
+import ExperimentDetail from './pages/ExperimentDetail'
+import Messages from './pages/Messages'
 
 // POS System
 import POSHome from './modules/pos/pages/POSHome'
@@ -64,6 +70,7 @@ import LoyaltyStamp from './modules/loyalty/pages/LoyaltyStamp'
 import LoyaltySpinWheel from './modules/loyalty/pages/LoyaltySpinWheel'
 import LoyaltyGestures from './modules/loyalty/pages/LoyaltyGestures'
 import LoyaltyFeedback from './modules/loyalty/pages/LoyaltyFeedback'
+import LoyaltyIntelligence from './modules/loyalty/pages/LoyaltyIntelligence'
 import MyCard from './modules/loyalty/customer/MyCard'
 
 import ExpensesPage from './pages/expenses/ExpensesPage'
@@ -192,6 +199,7 @@ export default function App() {
         <Route path="/inventory/stock-check" element={<ProtectedRoute><StockCheckAll /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<ProtectedRoute><StockManager /></ProtectedRoute>} />
         <Route path="/inventory/procurement" element={<ProtectedRoute><OwnerRoute><ProcurementOrders /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/inventory/intelligence" element={<ProtectedRoute><OwnerRoute><InventoryIntelligence /></OwnerRoute></ProtectedRoute>} />
 
         {/* Analytics (owner only) */}
         <Route path="/analytics" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
@@ -208,6 +216,12 @@ export default function App() {
         <Route path="/loyalty/spin" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
         <Route path="/loyalty/gestures" element={<ProtectedRoute><LoyaltyGestures /></ProtectedRoute>} />
         <Route path="/loyalty/feedback" element={<ProtectedRoute><LoyaltyFeedback /></ProtectedRoute>} />
+        <Route path="/loyalty/intelligence" element={<ProtectedRoute><OwnerRoute><LoyaltyIntelligence /></OwnerRoute></ProtectedRoute>} />
+
+        {/* Experiments + Messages */}
+        <Route path="/experiments" element={<ProtectedRoute><OwnerRoute><Experiments /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/experiments/:id" element={<ProtectedRoute><OwnerRoute><ExperimentDetail /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><OwnerRoute><Messages /></OwnerRoute></ProtectedRoute>} />
 
         {/* Ideas Module */}
         <Route path="/ideas" element={<ProtectedRoute><IdeasBoard /></ProtectedRoute>} />

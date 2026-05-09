@@ -8,8 +8,11 @@ import Inspiration from './pages/Inspiration'
 import InspirationDetail from './pages/InspirationDetail'
 import Concepts from './pages/Concepts'
 import ConceptWorkbench from './pages/ConceptWorkbench'
+import ContentBriefs from './pages/ContentBriefs'
+import ContentBriefDetail from './pages/ContentBriefDetail'
 import Drafts from './pages/Drafts'
 import VoiceLab from './pages/VoiceLab'
+import DialectTrainer from './pages/DialectTrainer'
 import ContentBank from './pages/ContentBank'
 import Settings from './pages/Settings'
 
@@ -29,8 +32,11 @@ export default function ContentStudio() {
         <Route path="inspiration/:id" element={<InspirationDetail />} />
         <Route path="concepts" element={<Concepts />} />
         <Route path="concepts/:id" element={<ConceptWorkbench />} />
+        <Route path="briefs" element={<ContentBriefs />} />
+        <Route path="briefs/:id" element={<ContentBriefDetail />} />
         <Route path="drafts" element={<Drafts />} />
         <Route path="voice-lab" element={<VoiceLab />} />
+        <Route path="dialect-trainer" element={<DialectTrainer />} />
         <Route path="bank" element={<ContentBank />} />
         <Route path="settings" element={<Settings />} />
       </Route>

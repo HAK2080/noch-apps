@@ -1,14 +1,44 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight } from 'lucide-react'
-import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment, getStaffProfiles } from '../lib/supabase'
+import {
+  AlertTriangle, CheckCircle, Clock, Package, ShoppingBag,
+  RefreshCw, Plus, ChevronRight, UserCheck, X,
+  Layers, Users, BarChart2, Megaphone, UserCog, DollarSign,
+  Zap
+} from 'lucide-react'
+import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment, getStaffProfiles, supabase } from '../lib/supabase'
+import { listSuggestedActions, runAllEventProducers } from '../lib/businessEvents'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import StatsBar from '../components/dashboard/StatsBar'
 import TaskForm from '../components/tasks/TaskForm'
+import ActionCard from '../components/intelligence/ActionCard'
 import toast from 'react-hot-toast'
+
+// Groups that actions can belong to
+const ACTION_GROUPS = [
+  { key: 'operations', label: 'Operations',         icon: <Layers size={14} />,    modules: ['tasks', 'pos'] },
+  { key: 'customers',  label: 'Customers',           icon: <Users size={14} />,     modules: ['loyalty'] },
+  { key: 'inventory',  label: 'Inventory',           icon: <Package size={14} />,   modules: ['inventory'] },
+  { key: 'content',    label: 'Content / Marketing', icon: <Megaphone size={14} />, modules: ['content'] },
+  { key: 'staff',      label: 'Staff',               icon: <UserCog size={14} />,   modules: ['staff'] },
+  { key: 'finance',    label: 'Finance',             icon: <DollarSign size={14} />,modules: ['analytics'] },
+]
+
+function groupActions(actions) {
+  const grouped = {}
+  for (const g of ACTION_GROUPS) grouped[g.key] = []
+
+  for (const a of actions) {
+    const group = ACTION_GROUPS.find(g => g.modules.includes(a.target_module))
+    if (group) grouped[group.key].push(a)
+    else grouped['operations'].push(a) // fallback
+  }
+
+  return ACTION_GROUPS.filter(g => grouped[g.key].length > 0).map(g => ({ ...g, actions: grouped[g.key] }))
+}
 
 export default function Dashboard() {
   const { t, lang } = useLanguage()
@@ -18,6 +48,84 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [accessRequests, setAccessRequests] = useState([])
+  const [busyRequestId, setBusyRequestId] = useState(null)
+  const [foundersClub, setFoundersClub] = useState(null)
+  const [suggestedActions, setSuggestedActions] = useState([])
+  const [actionsLoading, setActionsLoading] = useState(true)
+
+  const isOwner = profile?.role === 'owner'
+
+  const loadAccessRequests = useCallback(async () => {
+    if (!isOwner) return
+    const { data } = await supabase
+      .from('staff_access_requests')
+      .select('id, full_name, email, phone, note, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+    setAccessRequests(data || [])
+  }, [isOwner])
+
+  const loadFoundersClub = useCallback(async () => {
+    if (!isOwner) return
+    const { data } = await supabase.from('founders_club_status').select('*').single()
+    setFoundersClub(data || null)
+  }, [isOwner])
+
+  const loadSuggestedActions = useCallback(async () => {
+    setActionsLoading(true)
+    try {
+      // Run producers first (idempotent — skip if already fired in last 24h)
+      await runAllEventProducers()
+      const actions = await listSuggestedActions({ status: 'suggested', limit: 30 })
+      setSuggestedActions(actions || [])
+    } catch {
+      // non-fatal — dashboard still works without this
+    } finally {
+      setActionsLoading(false)
+    }
+  }, [])
+
+  const approveAccess = async (req) => {
+    setBusyRequestId(req.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('approve-staff-request', {
+        body: {
+          request_id: req.id,
+          profile: { full_name: req.full_name, phone: req.phone || null },
+          redirectTo: `${window.location.origin}/login`,
+        },
+      })
+      if (error || data?.error) {
+        let msg = data?.error || error?.message
+        try { const b = await error?.context?.json(); msg = b?.error || msg } catch (parseErr) { void parseErr }
+        throw new Error(msg)
+      }
+      setAccessRequests(prev => prev.filter(r => r.id !== req.id))
+      toast.success(`${req.full_name} approved — invite sent`)
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setBusyRequestId(null)
+    }
+  }
+
+  const rejectAccess = async (req) => {
+    setBusyRequestId(req.id)
+    try {
+      const { error } = await supabase
+        .from('staff_access_requests')
+        .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+        .eq('id', req.id)
+      if (error) throw error
+      setAccessRequests(prev => prev.filter(r => r.id !== req.id))
+      toast.success('Rejected')
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setBusyRequestId(null)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -30,9 +138,14 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+    loadAccessRequests()
+    loadFoundersClub()
+  }, [loadAccessRequests, loadFoundersClub])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    loadSuggestedActions()
+  }, [load, loadSuggestedActions])
 
   const handleSave = async (payload, files) => {
     const { notifyTelegram, assigneeIds, ...taskPayload } = payload
@@ -48,7 +161,6 @@ export default function Dashboard() {
       }
       if (notifyTelegram) {
         try {
-          // Use assigneeIds directly — task.assignees is empty at creation time (assignments added after)
           const idsToNotify = assigneeIds?.length ? assigneeIds : (taskPayload.assigned_to ? [taskPayload.assigned_to] : [])
           if (idsToNotify.length > 0) {
             const allStaff = await getStaffProfiles()
@@ -64,7 +176,6 @@ export default function Dashboard() {
                 msg += `\n— فريق بلوم - نوتش ☕`
                 return sendTelegram(p.telegram_chat_id, msg)
               }))
-              // Notify admin/owner that messages were sent
               if (profile?.telegram_chat_id) {
                 const names = recipients.map(p => p.full_name).join('، ')
                 await sendTelegram(profile.telegram_chat_id, `✅ تم إرسال المهمة "${task.title}" إلى: ${names}`)
@@ -91,7 +202,7 @@ export default function Dashboard() {
 
   const l = {
     ar: {
-      title: 'لوحة التحكم',
+      title: 'مركز القيادة',
       attention: 'يحتاج انتباهك',
       allClear: 'لا يوجد شيء يحتاج انتباهك الآن',
       allClearHint: 'كل المهام في وقتها والمخزون كافٍ',
@@ -108,9 +219,11 @@ export default function Dashboard() {
       newTask: 'مهمة جديدة',
       refresh: 'تحديث',
       items: 'عنصر',
+      todaysActions: 'الإجراءات الموصى بها اليوم',
+      noActions: 'لا توجد إجراءات مقترحة الآن',
     },
     en: {
-      title: 'Dashboard',
+      title: 'Command Center',
       attention: 'Needs Your Attention',
       allClear: 'All clear — nothing needs your attention',
       allClearHint: 'All tasks are on track and stock levels are fine',
@@ -127,10 +240,14 @@ export default function Dashboard() {
       newTask: 'New Task',
       refresh: 'Refresh',
       items: 'items',
+      todaysActions: "Today's Recommended Actions",
+      noActions: 'No suggested actions right now',
     }
   }[lang]
 
   const paymentLabel = { pickup: lang === 'ar' ? 'استلام' : 'Pickup', bank_transfer: lang === 'ar' ? 'تحويل' : 'Transfer', cod: lang === 'ar' ? 'عند الاستلام' : 'COD' }
+
+  const groupedActions = groupActions(suggestedActions)
 
   return (
     <Layout>
@@ -143,9 +260,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} disabled={loading} className="btn-secondary p-2.5 disabled:opacity-60" title={l.refresh}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <button onClick={() => { load(); loadSuggestedActions() }} className="btn-secondary p-2.5" title={l.refresh}><RefreshCw size={16} /></button>
           <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
             <Plus size={16} />
             <span className="hidden sm:inline">{l.newTask}</span>
@@ -153,13 +268,121 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* ── TODAY'S RECOMMENDED ACTIONS ── */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Zap size={16} className="text-noch-green" />
+          <h2 className="text-white font-semibold text-sm uppercase tracking-wide">{l.todaysActions}</h2>
+          {suggestedActions.length > 0 && (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-noch-green/15 text-noch-green">
+              {suggestedActions.length}
+            </span>
+          )}
+        </div>
+
+        {actionsLoading ? (
+          <p className="text-noch-muted text-sm text-center py-6">Analysing signals...</p>
+        ) : groupedActions.length === 0 ? (
+          <div className="card text-center py-8">
+            <p className="text-noch-muted text-sm">{l.noActions}</p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {groupedActions.map(group => (
+              <div key={group.key}>
+                <div className="flex items-center gap-2 mb-2 text-noch-muted">
+                  {group.icon}
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">{group.label}</span>
+                  <span className="text-[11px]">({group.actions.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {group.actions.map(action => (
+                    <ActionCard
+                      key={action.id}
+                      action={action}
+                      onUpdate={loadSuggestedActions}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── PENDING ACCESS REQUESTS ── */}
+      {isOwner && accessRequests.length > 0 && (
+        <div className="card mb-4 border-noch-green/40 bg-noch-green/5">
+          <div className="flex items-center gap-2 mb-3 text-noch-green">
+            <UserCheck size={16} />
+            <h2 className="font-semibold text-sm uppercase tracking-wide">
+              Access requests ({accessRequests.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            {accessRequests.map(r => (
+              <div key={r.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-noch-border bg-noch-dark">
+                <div className="min-w-0 flex-1">
+                  <p className="text-white text-sm font-medium truncate">{r.full_name}</p>
+                  <p className="text-noch-muted text-xs truncate">
+                    {r.email}{r.phone ? ` · ${r.phone}` : ''}
+                  </p>
+                  {r.note && <p className="text-noch-muted text-xs italic truncate mt-0.5">{r.note}</p>}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => approveAccess(r)}
+                    disabled={busyRequestId === r.id}
+                    className="text-xs bg-noch-green/15 border border-noch-green/40 text-noch-green px-3 py-1.5 rounded-lg hover:bg-noch-green/25 transition-colors disabled:opacity-50"
+                  >
+                    {busyRequestId === r.id ? '...' : '✓ Approve'}
+                  </button>
+                  <button
+                    onClick={() => rejectAccess(r)}
+                    disabled={busyRequestId === r.id}
+                    className="text-xs bg-red-500/10 border border-red-500/30 text-red-400 px-2 py-1.5 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                    title="Reject"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-noch-muted text-[11px] mt-3">
+            Approve sends an invite email so they can set their own password. Edit role/branch later in Staff.
+          </p>
+        </div>
+      )}
+
+      {/* ── FOUNDERS CLUB ── */}
+      {isOwner && foundersClub && (
+        <div className="card mb-4 border-purple-400/30 bg-gradient-to-r from-purple-400/5 to-pink-400/5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-purple-300 text-xs font-bold tracking-widest uppercase mb-1">🏛 Noch Founders Club</p>
+              <p className="text-white text-sm">
+                <span className="font-bold text-2xl text-purple-300">{foundersClub.filled}</span>
+                <span className="text-noch-muted"> / {foundersClub.total} seats taken</span>
+              </p>
+              <p className="text-noch-muted text-xs mt-1">
+                {foundersClub.seats_left > 0
+                  ? `${foundersClub.seats_left} founder seats remain. Closes forever once full.`
+                  : 'The Founders Club is closed. No new founders, ever.'}
+              </p>
+            </div>
+            <div className="text-3xl">🏛</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STATS ── */}
       <StatsBar stats={stats} />
 
+      {/* ── ATTENTION ALERTS ── */}
       {loading ? (
         <p className="text-noch-muted text-center py-12">{t('loading')}</p>
       ) : totalAlerts === 0 ? (
-        /* All clear state */
         <div className="card text-center py-14">
           <div className="text-5xl mb-4">✅</div>
           <p className="text-white font-semibold text-lg">{l.allClear}</p>

@@ -3,61 +3,15 @@
 import { useState, useEffect } from 'react'
 import { Brain, Zap, TrendingDown, AlertTriangle, Printer, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { getApiKey } from '../../lib/claudeClient'
 import toast from 'react-hot-toast'
 
 async function runIntelligence(salesData, costsData, lowStockItems) {
-  const apiKey = getApiKey()
-  if (!apiKey) throw new Error('Anthropic API key not set — configure it in Brand Settings')
-
-  const summary = `
-SALES (last 30 days):
-Total revenue: ${salesData.totalRevenue.toFixed(0)} LYD
-Total orders: ${salesData.orderCount}
-Top categories: ${salesData.topCategories.slice(0, 5).map(c => `${c.label}: ${c.revenue.toFixed(0)} LYD`).join(', ')}
-Avg order value: ${salesData.avgOrder.toFixed(1)} LYD
-
-OPERATING COSTS:
-${costsData.map(c => `${c.cost_type}: ${c.amount} LYD (${c.period_start} to ${c.period_end})`).join('\n') || 'No cost data entered yet'}
-
-INVENTORY ALERTS:
-${lowStockItems.slice(0, 10).map(i => `${i.name}: ${i.qty_available} ${i.base_unit} (min: ${i.min_threshold})`).join('\n') || 'No critical stock issues'}
-`
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system: `You are a senior financial and operations consultant for a specialty café chain in Libya.
-Analyze the provided data and return a JSON object with:
-- opportunities: array of 3 objects {title, detail, estimated_impact}
-- cost_cuts: array of 3 objects {title, detail, estimated_saving}
-- anomalies: array of detected anomalies {title, detail}
-- actions: array of 5 priority actions {priority (1-5), action, expected_impact}
-Be specific, quantitative, and practical for the Libyan café market.`,
-      messages: [{ role: 'user', content: `Analyze this business data:\n\n${summary}\n\nReturn JSON only.` }],
-    }),
+  const { data, error } = await supabase.functions.invoke('analytics-ai-insights', {
+    body: { salesData, costsData, lowStockItems },
   })
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    throw new Error(err.error?.message || 'AI analysis failed')
-  }
-
-  const data = await response.json()
-  const text = data.content?.[0]?.text || ''
-
-  // Extract JSON
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('Could not parse AI response')
-  return JSON.parse(jsonMatch[0])
+  if (error) throw new Error(error.message || 'AI analysis failed')
+  if (data?.error) throw new Error(data.error)
+  return data
 }
 
 export default function IntelligenceTab() {
@@ -71,13 +25,10 @@ export default function IntelligenceTab() {
   async function loadAutoInsights() {
     setLoadingInsights(true)
     try {
-      const since = new Date(Date.now() - 30 * 86400000).toISOString()
-      const prevSince = new Date(Date.now() - 60 * 86400000).toISOString()
-
-      const [{ data: orders }, { data: stock }] = await Promise.all([
-        supabase.from('pos_orders').select('total, created_at, status').eq('status', 'completed').gte('created_at', since),
-        supabase.from('stock').select('qty_available, min_threshold, ingredient:ingredients(name, base_unit)').lt('qty_available', 7),
-      ])
+      const { data: stock } = await supabase
+        .from('stock')
+        .select('qty_available, min_threshold, ingredient:ingredients(name, base_unit)')
+        .lt('qty_available', 7)
 
       const insights = []
 
@@ -92,7 +43,7 @@ export default function IntelligenceTab() {
       }
 
       setAutoInsights(insights)
-    } catch {}
+    } catch (err) { void err }
     finally { setLoadingInsights(false) }
   }
 
