@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight, UserCheck, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight, UserCheck, X, Zap } from 'lucide-react'
 import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment, getStaffProfiles, supabase } from '../lib/supabase'
+import { listSuggestedActions, runAllEventProducers } from '../lib/businessEvents'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import StatsBar from '../components/dashboard/StatsBar'
 import TaskForm from '../components/tasks/TaskForm'
+import ActionCard from '../components/intelligence/ActionCard'
 import toast from 'react-hot-toast'
 
 export default function Dashboard() {
@@ -21,6 +23,7 @@ export default function Dashboard() {
   const [accessRequests, setAccessRequests] = useState([])
   const [busyRequestId, setBusyRequestId] = useState(null)
   const [foundersClub, setFoundersClub] = useState(null)
+  const [suggestedActions, setSuggestedActions] = useState([])
 
   const isOwner = profile?.role === 'owner'
 
@@ -38,6 +41,19 @@ export default function Dashboard() {
     if (!isOwner) return
     const { data } = await supabase.from('founders_club_status').select('*').single()
     setFoundersClub(data || null)
+  }, [isOwner])
+
+  const loadSuggestedActions = useCallback(async () => {
+    if (!isOwner) return
+    try {
+      // Run event producers (idempotent — they only insert if a matching open event isn't there yet)
+      await runAllEventProducers()
+      const actions = await listSuggestedActions({ status: 'pending' })
+      setSuggestedActions(actions || [])
+    } catch (e) {
+      // Non-fatal — Command Center is additive, never block the dashboard
+      console.warn('listSuggestedActions failed:', e?.message || e)
+    }
   }, [isOwner])
 
   const approveAccess = async (req) => {
@@ -94,7 +110,8 @@ export default function Dashboard() {
     }
     loadAccessRequests()
     loadFoundersClub()
-  }, [loadAccessRequests, loadFoundersClub])
+    loadSuggestedActions()
+  }, [loadAccessRequests, loadFoundersClub, loadSuggestedActions])
 
   useEffect(() => { load() }, [load])
 
@@ -283,6 +300,24 @@ export default function Dashboard() {
 
       {/* Stats */}
       <StatsBar stats={stats} />
+
+      {/* Command Center — Suggested Actions (Phase 2) */}
+      {isOwner && suggestedActions.length > 0 && (
+        <section className="mb-6">
+          <div className="flex items-center gap-2 mb-3 text-yellow-300">
+            <Zap size={16} />
+            <h2 className="font-semibold text-sm uppercase tracking-wide">
+              {lang === 'ar' ? 'إجراءات مقترحة' : 'Suggested Actions'}
+            </h2>
+            <span className="text-noch-muted text-xs">({suggestedActions.length})</span>
+          </div>
+          <div className="space-y-3">
+            {suggestedActions.map(a => (
+              <ActionCard key={a.id} action={a} onAction={loadSuggestedActions} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading ? (
         <p className="text-noch-muted text-center py-12">{t('loading')}</p>

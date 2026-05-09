@@ -501,10 +501,22 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
   )
 }
 
+// ─── Role permissions ─────────────────────────────────────────
+// Phase 3: what each role can do in the product catalog.
+function getProductPerms(role) {
+  if (role === 'owner')      return { canEdit: true,  allFields: true,  availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: true }
+  if (role === 'supervisor') return { canEdit: true,  allFields: false, availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: false }
+  if (role === 'staff')      return { canEdit: true,  allFields: false, availability: true,  image: false, branchVisibility: false, stock: false, cost: false }
+  if (role === 'accountant') return { canEdit: true,  allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: true }
+  // limited_staff and unknown: view only
+  return { canEdit: false, allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: false }
+}
+
 // ─── Main page ────────────────────────────────────────────────
 export default function ProductCatalog() {
-  const { isOwner } = useAuth()
-  const canEdit = true   // owners + all staff can add/edit products
+  const { isOwner, profile } = useAuth()
+  const perms = getProductPerms(profile?.role)
+  const canEdit = perms.canEdit
 
   const [branches, setBranches] = useState([])
   const [activeBranch, setActiveBranch] = useState(null)

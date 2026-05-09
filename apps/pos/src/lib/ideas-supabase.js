@@ -100,3 +100,10 @@ export async function convertIdeaToTask(ideaId, taskId) {
     status: 'in_progress',
   })
 }
+
+export async function convertIdeaToBrief(ideaId, briefId) {
+  return updateIdea(ideaId, {
+    converted_brief_id: briefId,
+    status: 'in_progress',
+  })
+}
