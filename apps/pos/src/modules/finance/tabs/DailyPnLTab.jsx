@@ -10,10 +10,23 @@ import { getPnL, getFinanceSettings, listBranches } from '../lib/finance-supabas
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
+// Seed a default 7-day period synchronously so the data-fetch effect can
+// fire on first render. Previously `period` defaulted to null and was only
+// set when `<PeriodSelector>` mounted — but the component was returning
+// "Loading…" before reaching the JSX that mounts PeriodSelector, leaving
+// /finance hung forever.
+function defaultPeriod() {
+  const to = new Date(); to.setHours(23, 59, 59, 999)
+  const from = new Date(); from.setHours(0, 0, 0, 0)
+  from.setDate(from.getDate() - 6)
+  const ymd = (d) => d.toISOString().slice(0, 10)
+  return { preset: '7d', from: ymd(from), to: ymd(to) }
+}
+
 export default function DailyPnLTab() {
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState(null) // null = all
-  const [period, setPeriod] = useState(null)
+  const [period, setPeriod] = useState(defaultPeriod)
   const [netOfRefunds, setNetOfRefunds] = useState(false)
   const [pnl, setPnl] = useState(null)
   const [settings, setSettings] = useState(null)
