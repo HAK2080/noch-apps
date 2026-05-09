@@ -195,6 +195,49 @@ export async function deletePOSProduct(id) {
   if (error) throw error
 }
 
+// Share another branch's menu with this branch.
+// For each product/category visible at sourceBranchId, append targetBranchId
+// to its visible_branch_ids array (Postgres set-union via array_append + dedupe).
+// Returns { products: n, categories: m } counts of items newly visible at target.
+// Idempotent — running twice does nothing because targetBranchId is already in the array.
+export async function shareBranchMenu(sourceBranchId, targetBranchId) {
+  if (!sourceBranchId || !targetBranchId) throw new Error('Both branches are required')
+  if (sourceBranchId === targetBranchId) throw new Error('Source and target must differ')
+
+  // Helper: pull rows visible at source but not yet visible at target.
+  const fetchToShare = async (table) => {
+    const { data, error } = await supabase
+      .from(table)
+      .select('id, visible_branch_ids, branch_id')
+      .or(`visible_branch_ids.cs.{${sourceBranchId}},branch_id.eq.${sourceBranchId}`)
+      .eq('is_active', true)
+    if (error) throw error
+    return (data || []).filter(row => {
+      const arr = Array.isArray(row.visible_branch_ids) ? row.visible_branch_ids : []
+      return !arr.includes(targetBranchId)
+    })
+  }
+
+  const productsToShare = await fetchToShare('pos_products')
+  const categoriesToShare = await fetchToShare('pos_categories')
+
+  const updateRow = async (table, row) => {
+    const arr = Array.isArray(row.visible_branch_ids) ? row.visible_branch_ids : []
+    // Make sure the source branch is also in the array (legacy rows may have only branch_id).
+    const next = Array.from(new Set([...arr, sourceBranchId, targetBranchId]))
+    const { error } = await supabase
+      .from(table)
+      .update({ visible_branch_ids: next, updated_at: new Date().toISOString() })
+      .eq('id', row.id)
+    if (error) throw error
+  }
+
+  for (const p of productsToShare) await updateRow('pos_products', p)
+  for (const c of categoriesToShare) await updateRow('pos_categories', c)
+
+  return { products: productsToShare.length, categories: categoriesToShare.length }
+}
+
 export async function getPOSProductByBarcode(branchId, barcode) {
   const { data, error } = await supabase
     .from('pos_products')
