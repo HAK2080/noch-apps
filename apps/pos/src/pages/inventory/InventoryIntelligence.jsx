@@ -33,34 +33,28 @@ export default function InventoryIntelligence() {
   useEffect(() => {
     async function load() {
       try {
-        // The `stock` table is keyed by ingredient_id; name + name_ar + unit
-        // live on the joined `ingredients` row. (Earlier this query selected
-        // `name` directly from stock and threw "column stock.name does not
-        // exist" — fixed by joining ingredients the same way InventoryHub
-        // and analytics IntelligenceTab do.)
+        // `stock` only has qty_available + min_threshold; name/unit live on
+        // the joined `ingredients` row. consumption_rate and manual_daily_rate
+        // don't exist on this DB — port assumed a different schema. We skip
+        // days-to-out prediction here and just flag out/low/ok from threshold.
         const { data, error } = await supabase
           .from('stock')
-          .select('id, qty_available, min_threshold, consumption_rate, manual_daily_rate, ingredient:ingredients(id, name, name_ar, base_unit)')
+          .select('id, qty_available, min_threshold, ingredient:ingredients(id, name, name_ar, base_unit)')
           .gt('min_threshold', 0)
         if (error) throw error
 
         const enriched = (data || []).map(it => {
-          const rate = it.consumption_rate > 0 ? it.consumption_rate : (it.manual_daily_rate || 0)
-          const dto = daysToOut(it.qty_available, rate)
           let flag = 'ok'
           if (it.qty_available <= 0) flag = 'out'
           else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold) flag = 'low'
-          else if (dto !== null && dto < 7) flag = 'urgent'
-          else if (dto !== null && dto <= 14) flag = 'watch'
+          else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold * 1.5) flag = 'urgent'
+          else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold * 2)   flag = 'watch'
           return {
             ...it,
-            // Surface the joined columns at the top level so the rest of the
-            // component (which still references `it.name`, `it.unit`) keeps
-            // working without a deeper rewrite.
-            name:    it.ingredient?.name    || '—',
-            name_ar: it.ingredient?.name_ar || '',
-            unit:    it.ingredient?.base_unit || '',
-            daysToOut: dto,
+            name:      it.ingredient?.name    || '—',
+            name_ar:   it.ingredient?.name_ar || '',
+            unit:      it.ingredient?.base_unit || '',
+            daysToOut: null,
             flag,
           }
         })
