@@ -5,8 +5,12 @@ import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
 import BarcodeScanner from './BarcodeScanner'
 import QRScanner from './QRScanner'
 import { lookupLoyaltyQR } from '../../../lib/supabase'
-import { useLanguage } from '../../../contexts/LanguageContext'
+import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
+
+// Local-only POS translation — see CartPanel for rationale.
+const posT = (key, lang) =>
+  translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
 
 const NUMPAD_KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫']
 
@@ -39,8 +43,8 @@ function Numpad({ value, onChange }) {
   )
 }
 
-export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty }) {
-  const { t } = useLanguage()
+export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'en' }) {
+  const t = (k) => posT(k, posLang)
   const [method, setMethod] = useState('cash') // cash | card | split | presto
   const [cashTendered, setCashTendered] = useState(total.toFixed(2))
   const [cardAmount, setCardAmount] = useState('0')

@@ -575,6 +575,7 @@ export default function POSTerminal() {
             onClear={clearCart}
             onCharge={handleCharge}
             managerOverrideEnabled={!!settings?.manager_override_enabled}
+            posLang={tileLang === 'ar' ? 'ar' : 'en'}
           />
         </div>
       </div>
@@ -590,6 +591,7 @@ export default function POSTerminal() {
           submitting={submitting}
           onComplete={handlePaymentComplete}
           onClose={() => !submitting && setShowPayment(null)}
+          posLang={tileLang === 'ar' ? 'ar' : 'en'}
         />
       )}
 
@@ -600,6 +602,7 @@ export default function POSTerminal() {
           branch={branch}
           onNewOrder={() => setShowReceipt(null)}
           onClose={() => setShowReceipt(null)}
+          posLang={tileLang === 'ar' ? 'ar' : 'en'}
         />
       )}
 

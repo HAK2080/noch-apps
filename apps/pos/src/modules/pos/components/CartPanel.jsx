@@ -3,8 +3,13 @@
 import { useState } from 'react'
 import { Minus, Plus, X, Trash2, Tag, Shield } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
-import { useLanguage } from '../../../contexts/LanguageContext'
+import { translations } from '../../../lib/i18n'
 import ManagerOverrideModal from './ManagerOverrideModal'
+
+// Local-only POS translation. Does NOT change document direction or
+// the global app language — only the in-cart button labels switch.
+const posT = (key, lang) =>
+  translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
 
 function CartItem({ item, onUpdateQty, onRemove }) {
   const [editQty, setEditQty] = useState(false)
@@ -91,10 +96,10 @@ function CartItem({ item, onUpdateQty, onRemove }) {
 
 export default function CartPanel({
   items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge,
-  managerOverrideEnabled = false,
+  managerOverrideEnabled = false, posLang = 'en',
 }) {
   const can = usePermission()
-  const { t } = useLanguage()
+  const t = (k) => posT(k, posLang)
   const canDiscountAny = can('pos', 'discount_any')
   const canVoidOrder = can('pos', 'void_order')
 

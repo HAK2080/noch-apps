@@ -3,11 +3,15 @@
 import { useState } from 'react'
 import { X, Printer, DollarSign, Plus } from 'lucide-react'
 import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
-import { useLanguage } from '../../../contexts/LanguageContext'
+import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 
-export default function ReceiptModal({ order, items, branch, onNewOrder, onClose }) {
-  const { t } = useLanguage()
+// Local-only POS translation — see CartPanel for rationale.
+const posT = (key, lang) =>
+  translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
+
+export default function ReceiptModal({ order, items, branch, onNewOrder, onClose, posLang = 'en' }) {
+  const t = (k) => posT(k, posLang)
   const [printing, setPrinting] = useState(false)
   const [openingDrawer, setOpeningDrawer] = useState(false)
 
