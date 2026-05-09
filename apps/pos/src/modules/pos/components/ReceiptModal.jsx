@@ -3,23 +3,25 @@
 import { useState } from 'react'
 import { X, Printer, DollarSign, Plus } from 'lucide-react'
 import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
+import { useLanguage } from '../../../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 
 export default function ReceiptModal({ order, items, branch, onNewOrder, onClose }) {
+  const { t } = useLanguage()
   const [printing, setPrinting] = useState(false)
   const [openingDrawer, setOpeningDrawer] = useState(false)
 
   const handlePrint = async () => {
     if (!isPrinterConnected()) {
-      toast.error('Printer not connected. Go to Settings to connect.')
+      toast.error(t('receiptPrinterNotConnected'))
       return
     }
     setPrinting(true)
     try {
       await printReceipt(order, branch, items)
-      toast.success('Receipt printed')
+      toast.success(t('receiptPrinted'))
     } catch (err) {
-      toast.error(err.message || 'Print failed')
+      toast.error(err.message || t('receiptPrintFailed'))
     } finally {
       setPrinting(false)
     }
@@ -27,15 +29,15 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
 
   const handleOpenDrawer = async () => {
     if (!isPrinterConnected()) {
-      toast.error('Printer not connected.')
+      toast.error(t('receiptPrinterNotConnected'))
       return
     }
     setOpeningDrawer(true)
     try {
       await openCashDrawer()
-      toast.success('Cash drawer opened')
+      toast.success(t('receiptDrawerOpened'))
     } catch (err) {
-      toast.error(err.message || 'Failed to open drawer')
+      toast.error(err.message || t('receiptDrawerFailed'))
     } finally {
       setOpeningDrawer(false)
     }
@@ -55,7 +57,7 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
               <div className="w-6 h-6 bg-noch-green rounded-full flex items-center justify-center">
                 <span className="text-noch-dark text-xs font-bold">✓</span>
               </div>
-              <h2 className="text-white font-bold text-lg">Sale Complete</h2>
+              <h2 className="text-white font-bold text-lg">{t('receiptSaleComplete')}</h2>
             </div>
             <p className="text-noch-muted text-sm mt-0.5">{order.order_number}</p>
           </div>
@@ -86,28 +88,28 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
 
             <div className="border-t border-dashed border-noch-border my-2" />
             <div className="flex justify-between text-noch-muted">
-              <span>Subtotal</span>
+              <span>{t('posSubtotal')}</span>
               <span>{parseFloat(order.subtotal).toFixed(2)}</span>
             </div>
             {parseFloat(order.discount_amount) > 0 && (
               <div className="flex justify-between text-yellow-400">
-                <span>Discount</span>
+                <span>{t('posDiscount')}</span>
                 <span>-{parseFloat(order.discount_amount).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-white font-bold text-sm mt-1">
-              <span>TOTAL</span>
+              <span>{t('receiptTotal')}</span>
               <span>{parseFloat(order.total).toFixed(2)} LYD</span>
             </div>
 
             {order.payment_method === 'cash' && order.cash_tendered && (
               <>
                 <div className="flex justify-between text-noch-muted mt-1">
-                  <span>Cash</span>
+                  <span>{t('receiptCash')}</span>
                   <span>{parseFloat(order.cash_tendered).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-noch-green">
-                  <span>Change</span>
+                  <span>{t('receiptChange')}</span>
                   <span>{parseFloat(order.change_due || 0).toFixed(2)}</span>
                 </div>
               </>
@@ -115,7 +117,9 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
 
             {order.loyalty_stamps_awarded > 0 && (
               <div className="text-center text-noch-green text-xs mt-1">
-                ⭐ {order.loyalty_stamps_awarded} loyalty stamp{order.loyalty_stamps_awarded > 1 ? 's' : ''} awarded
+                ⭐ {order.loyalty_stamps_awarded}{' '}
+                {order.loyalty_stamps_awarded > 1 ? t('receiptStampsAwarded') : t('receiptStampAwarded')}
+                {t('receiptStampsAwardedSuffix') && ' ' + t('receiptStampsAwardedSuffix')}
               </div>
             )}
             <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center text-noch-muted" dir="rtl">
@@ -131,7 +135,7 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
               className="btn-secondary flex items-center justify-center gap-2 py-3"
             >
               <Printer size={16} />
-              {printing ? 'Printing...' : 'Print'}
+              {printing ? t('receiptPrinting') : t('receiptPrint')}
             </button>
             <button
               onClick={handleOpenDrawer}
@@ -139,7 +143,7 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
               className="btn-secondary flex items-center justify-center gap-2 py-3"
             >
               <DollarSign size={16} />
-              {openingDrawer ? 'Opening...' : 'Open Drawer'}
+              {openingDrawer ? t('receiptOpening') : t('receiptOpenDrawer')}
             </button>
           </div>
 
@@ -148,7 +152,7 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
             className="btn-primary w-full py-3 flex items-center justify-center gap-2"
           >
             <Plus size={16} />
-            New Order
+            {t('receiptNewOrder')}
           </button>
         </div>
       </div>

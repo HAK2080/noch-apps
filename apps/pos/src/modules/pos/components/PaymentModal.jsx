@@ -5,6 +5,7 @@ import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
 import BarcodeScanner from './BarcodeScanner'
 import QRScanner from './QRScanner'
 import { lookupLoyaltyQR } from '../../../lib/supabase'
+import { useLanguage } from '../../../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 
 const NUMPAD_KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', '⌫']
@@ -39,6 +40,7 @@ function Numpad({ value, onChange }) {
 }
 
 export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty }) {
+  const { t } = useLanguage()
   const [method, setMethod] = useState('cash') // cash | card | split | presto
   const [cashTendered, setCashTendered] = useState(total.toFixed(2))
   const [cardAmount, setCardAmount] = useState('0')
@@ -124,7 +126,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
-              <h2 className="text-white font-bold text-xl">Payment</h2>
+              <h2 className="text-white font-bold text-xl">{t('posPayment')}</h2>
               <p className="text-noch-green text-2xl font-bold mt-1">{total.toFixed(2)} LYD</p>
             </div>
             <button onClick={onClose} className="text-noch-muted hover:text-white p-1">
@@ -136,10 +138,10 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             {/* Method tabs */}
             <div className="grid grid-cols-4 gap-2 mb-5">
               {[
-                { id: 'cash',   icon: DollarSign,  label: 'Cash' },
-                { id: 'card',   icon: CreditCard,  label: 'Card' },
-                { id: 'split',  icon: Shuffle,     label: 'Split' },
-                { id: 'presto', icon: Bike,        label: 'Presto' },
+                { id: 'cash',   icon: DollarSign,  label: t('posCash') },
+                { id: 'card',   icon: CreditCard,  label: t('posCard') },
+                { id: 'split',  icon: Shuffle,     label: t('posSplit') },
+                { id: 'presto', icon: Bike,        label: t('posPresto') },
               ].map(m => (
                 <button
                   key={m.id}
@@ -159,13 +161,13 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             {/* Cash */}
             {method === 'cash' && (
               <div>
-                <p className="text-noch-muted text-sm mb-2">Cash tendered</p>
+                <p className="text-noch-muted text-sm mb-2">{t('posCashTendered')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
                   <span className="text-white text-2xl font-bold">{parseFloat(cashTendered || 0).toFixed(2)} LYD</span>
                 </div>
                 {changeDue > 0 && (
                   <div className="flex justify-between items-center mt-3 bg-noch-green/10 border border-noch-green/20 rounded-xl px-4 py-3">
-                    <span className="text-noch-green font-medium">Change due</span>
+                    <span className="text-noch-green font-medium">{t('posChangeDue')}</span>
                     <span className="text-noch-green font-bold text-xl">{changeDue.toFixed(2)} LYD</span>
                   </div>
                 )}
@@ -189,8 +191,8 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             {method === 'card' && (
               <div className="text-center py-6">
                 <CreditCard size={48} className="text-noch-green mx-auto mb-3" />
-                <p className="text-white font-semibold mb-1">Process on Verifone X990 Plus</p>
-                <p className="text-noch-muted text-sm mb-4">Insert / tap card on terminal</p>
+                <p className="text-white font-semibold mb-1">{t('posVerifoneHint')}</p>
+                <p className="text-noch-muted text-sm mb-4">{t('posVerifoneSub')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
                   <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
                 </div>
@@ -200,13 +202,13 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             {/* Split */}
             {method === 'split' && (
               <div>
-                <p className="text-noch-muted text-sm mb-2">Card amount</p>
+                <p className="text-noch-muted text-sm mb-2">{t('posCardAmount')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
                   <span className="text-white text-2xl font-bold">{parseFloat(cardAmount || 0).toFixed(2)} LYD</span>
                 </div>
                 {splitValid && (
                   <div className="flex justify-between items-center mt-2 bg-noch-card border border-noch-border rounded-xl px-4 py-2">
-                    <span className="text-noch-muted text-sm">Cash remaining</span>
+                    <span className="text-noch-muted text-sm">{t('posCashRemaining')}</span>
                     <span className="text-white font-semibold">{splitCash.toFixed(2)} LYD</span>
                   </div>
                 )}
@@ -218,9 +220,9 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             {method === 'presto' && (
               <div className="text-center py-6">
                 <Bike size={48} className="text-noch-green mx-auto mb-3" />
-                <p className="text-white font-semibold mb-1">Presto Delivery</p>
-                <p className="text-noch-muted text-sm mb-1">Cash on delivery — Presto collects from customer</p>
-                <p className="text-yellow-400 text-xs mb-4">Counted in day total. Flagged as &quot;owed by Presto&quot; until reconciled.</p>
+                <p className="text-white font-semibold mb-1">{t('posPrestoHint')}</p>
+                <p className="text-noch-muted text-sm mb-1">{t('posPrestoSub')}</p>
+                <p className="text-yellow-400 text-xs mb-4">{t('posPrestoNote')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
                   <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
                 </div>
@@ -231,7 +233,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             <div className="mt-4 pt-4 border-t border-noch-border">
               {loyaltyCustomer ? (
                 <div className="flex items-center gap-2 bg-noch-green/10 border border-noch-green/20 rounded-xl px-3 py-2">
-                  <span className="text-noch-green text-sm">♥ {loyaltyCustomer.full_name || loyaltyCustomer.name || 'Loyalty Customer'}</span>
+                  <span className="text-noch-green text-sm">♥ {loyaltyCustomer.full_name || loyaltyCustomer.name || t('posLoyaltyCard')}</span>
                   <button onClick={() => setLoyaltyCustomer(null)} className="ml-auto text-noch-muted hover:text-white">
                     <X size={14} />
                   </button>
@@ -242,7 +244,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                   className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
                 >
                   <QrCode size={14} />
-                  Scan loyalty card
+                  {t('posScanLoyalty')}
                 </button>
               )}
             </div>
@@ -260,12 +262,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
               }`}
             >
               {submitting
-                ? 'Processing…'
+                ? t('posProcessing')
                 : method === 'card'
-                  ? 'Confirm Card Payment'
+                  ? t('posConfirmCard')
                   : method === 'presto'
-                    ? 'Confirm Presto Order'
-                    : 'Complete Sale'}
+                    ? t('posConfirmPresto')
+                    : t('posCompleteSale')}
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Minus, Plus, X, Trash2, Tag, Shield } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
+import { useLanguage } from '../../../contexts/LanguageContext'
 import ManagerOverrideModal from './ManagerOverrideModal'
 
 function CartItem({ item, onUpdateQty, onRemove }) {
@@ -93,6 +94,7 @@ export default function CartPanel({
   managerOverrideEnabled = false,
 }) {
   const can = usePermission()
+  const { t } = useLanguage()
   const canDiscountAny = can('pos', 'discount_any')
   const canVoidOrder = can('pos', 'void_order')
 
@@ -136,14 +138,14 @@ export default function CartPanel({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
-        <h2 className="text-white font-bold text-base">Cart</h2>
+        <h2 className="text-white font-bold text-base">{t('posCart')}</h2>
         {items.length > 0 && canVoidOrder && (
           <button
             onClick={onClear}
             className="text-noch-muted hover:text-red-400 flex items-center gap-1 text-xs transition-colors"
           >
             <Trash2 size={12} />
-            Void
+            {t('posVoid')}
           </button>
         )}
       </div>
@@ -152,7 +154,7 @@ export default function CartPanel({
       <div className="flex-1 overflow-y-auto min-h-0">
         {items.length === 0 ? (
           <div className="flex items-center justify-center h-full text-noch-muted text-sm">
-            Add items to start
+            {t('posAddItemsHint')}
           </div>
         ) : (
           items.map(item => (
@@ -171,21 +173,21 @@ export default function CartPanel({
         <div className="shrink-0 border-t border-noch-border pt-3 mt-3">
           {/* Subtotal */}
           <div className="flex justify-between text-sm mb-1">
-            <span className="text-noch-muted">Subtotal</span>
+            <span className="text-noch-muted">{t('posSubtotal')}</span>
             <span className="text-white">{subtotal.toFixed(2)} LYD</span>
           </div>
 
           {/* Discount */}
           {discountAmount > 0 && (
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-noch-muted">Discount</span>
+              <span className="text-noch-muted">{t('posDiscount')}</span>
               <span className="text-yellow-400">-{discountAmount.toFixed(2)} LYD</span>
             </div>
           )}
 
           {/* Total */}
           <div className="flex justify-between items-center mb-4">
-            <span className="text-white font-bold text-lg">Total</span>
+            <span className="text-white font-bold text-lg">{t('posTotal')}</span>
             <span className="text-noch-green font-bold text-2xl">{total.toFixed(2)} LYD</span>
           </div>
 
@@ -194,20 +196,20 @@ export default function CartPanel({
             <div className="flex flex-col gap-1.5 mb-3">
               {!canDiscountAny && !overrideBy && (
                 <p className="text-yellow-400 text-[10px] flex items-center justify-between">
-                  <span>Max discount: 10%</span>
+                  <span>{t('posMaxDiscount')}</span>
                   {managerOverrideEnabled && (
                     <button
                       onClick={() => setShowOverride(true)}
                       className="text-yellow-300 underline inline-flex items-center gap-1"
                     >
-                      <Shield size={10} /> Manager override
+                      <Shield size={10} /> {t('posManagerOverride')}
                     </button>
                   )}
                 </p>
               )}
               {overrideBy && (
                 <p className="text-noch-green text-[10px] flex items-center gap-1">
-                  <Shield size={10} /> Approved by {overrideBy.full_name || 'manager'}
+                  <Shield size={10} /> {t('posApprovedBy')} {overrideBy.full_name || 'manager'}
                 </p>
               )}
               <div className="flex gap-2">
@@ -229,7 +231,7 @@ export default function CartPanel({
                 max={discountType === 'pct' && !canDiscountAny ? 10 : undefined}
               />
               <button onClick={handleApplyDiscount} className="btn-primary px-3 py-1.5 text-sm">
-                Apply
+                {t('posApply')}
               </button>
               <button onClick={() => { setShowDiscount(false); setDiscountValue(''); onDiscount({ type: 'pct', value: 0, amount: 0 }) }}
                 className="btn-secondary px-2 py-1.5 text-sm">
@@ -243,7 +245,7 @@ export default function CartPanel({
               className="flex items-center gap-1.5 text-noch-muted hover:text-white text-sm mb-3 transition-colors"
             >
               <Tag size={12} />
-              Add discount
+              {t('posAddDiscount')}
             </button>
           )}
 
@@ -257,7 +259,7 @@ export default function CartPanel({
             className="btn-primary w-full py-4 text-lg font-bold rounded-xl"
             disabled={items.length === 0}
           >
-            Charge {total.toFixed(2)} LYD
+            {t('posCharge')} {total.toFixed(2)} LYD
           </button>
         </div>
       )}
