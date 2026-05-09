@@ -5,6 +5,7 @@
 -- Re-runnable.
 -- ============================================================
 
+drop function if exists update_passport_preferences(uuid, text, jsonb);
 create or replace function update_passport_preferences(
   p_token uuid,
   p_phone_last4 text,

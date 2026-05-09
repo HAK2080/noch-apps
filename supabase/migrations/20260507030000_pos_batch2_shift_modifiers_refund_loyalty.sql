@@ -31,6 +31,8 @@ create table if not exists pos_shift_attendees (
 );
 create index if not exists pos_shift_attendees_shift_idx on pos_shift_attendees (shift_id);
 alter table pos_shift_attendees enable row level security;
+drop policy if exists "pos_shift_attendees_all" on pos_shift_attendees;
+drop policy if exists "pos_shift_attendees_all" on pos_shift_attendees;
 create policy "pos_shift_attendees_all" on pos_shift_attendees
   for all to authenticated using (true) with check (true);
 
@@ -132,9 +134,13 @@ alter table pos_modifier_groups          enable row level security;
 alter table pos_modifiers                enable row level security;
 alter table pos_product_modifier_groups  enable row level security;
 alter table pos_order_item_modifiers     enable row level security;
+drop policy if exists "modifier_groups_all" on pos_modifier_groups;
 create policy "modifier_groups_all"          on pos_modifier_groups          for all to authenticated using (true) with check (true);
+drop policy if exists "modifiers_all" on pos_modifiers;
 create policy "modifiers_all"                on pos_modifiers                for all to authenticated using (true) with check (true);
+drop policy if exists "product_modifier_groups_all" on pos_product_modifier_groups;
 create policy "product_modifier_groups_all"  on pos_product_modifier_groups  for all to authenticated using (true) with check (true);
+drop policy if exists "order_item_modifiers_all" on pos_order_item_modifiers;
 create policy "order_item_modifiers_all"     on pos_order_item_modifiers     for all to authenticated using (true) with check (true);
 
 -- ──────────────────────────────────────────────────────────────────────

@@ -64,6 +64,7 @@ create index if not exists pos_audit_log_branch_idx on pos_audit_log (branch_id,
 create index if not exists pos_audit_log_entity_idx on pos_audit_log (entity_type, entity_id);
 
 alter table pos_audit_log enable row level security;
+drop policy if exists "pos_audit_log_all" on pos_audit_log;
 create policy "pos_audit_log_all" on pos_audit_log
   for all to authenticated using (true) with check (true);
 
@@ -80,6 +81,7 @@ create table if not exists staff_branches (
 );
 
 alter table staff_branches enable row level security;
+drop policy if exists "staff_branches_owner_all" on staff_branches;
 create policy "staff_branches_owner_all" on staff_branches
   for all to authenticated
   using (

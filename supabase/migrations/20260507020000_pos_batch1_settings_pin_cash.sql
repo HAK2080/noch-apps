@@ -27,6 +27,7 @@ create table if not exists pos_settings (
 );
 
 alter table pos_settings enable row level security;
+drop policy if exists "pos_settings_all" on pos_settings;
 create policy "pos_settings_all" on pos_settings
   for all to authenticated using (true) with check (true);
 
@@ -215,6 +216,7 @@ create index if not exists pos_cash_movements_shift_idx
   on pos_cash_movements (shift_id, created_at desc);
 
 alter table pos_cash_movements enable row level security;
+drop policy if exists "pos_cash_movements_all" on pos_cash_movements;
 create policy "pos_cash_movements_all" on pos_cash_movements
   for all to authenticated using (true) with check (true);
 

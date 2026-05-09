@@ -36,6 +36,7 @@ create unique index if not exists finance_budgets_unique_idx
   on finance_budgets (coalesce(branch_id::text, ''), period_month, category);
 
 alter table finance_budgets enable row level security;
+drop policy if exists "finance_budgets_owner" on finance_budgets;
 create policy "finance_budgets_owner" on finance_budgets
   for all to authenticated
   using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -58,6 +59,7 @@ create table if not exists finance_capex (
   created_by uuid references profiles(id)
 );
 alter table finance_capex enable row level security;
+drop policy if exists "finance_capex_owner" on finance_capex;
 create policy "finance_capex_owner" on finance_capex
   for all to authenticated
   using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -77,6 +79,7 @@ create table if not exists finance_scenarios (
   saved_by uuid references profiles(id)
 );
 alter table finance_scenarios enable row level security;
+drop policy if exists "finance_scenarios_owner" on finance_scenarios;
 create policy "finance_scenarios_owner" on finance_scenarios
   for all to authenticated
   using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -105,6 +108,7 @@ create table if not exists marketing_campaigns (
 create index if not exists marketing_campaigns_status_idx on marketing_campaigns (status, scheduled_for);
 
 alter table marketing_campaigns enable row level security;
+drop policy if exists "marketing_campaigns_owner" on marketing_campaigns;
 create policy "marketing_campaigns_owner" on marketing_campaigns
   for all to authenticated
   using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -124,6 +128,7 @@ create unique index if not exists marketing_campaign_recipients_unique_idx
   on marketing_campaign_recipients (campaign_id, coalesce(loyalty_customer_id::text, phone));
 create index if not exists marketing_campaign_recipients_campaign_idx on marketing_campaign_recipients (campaign_id);
 alter table marketing_campaign_recipients enable row level security;
+drop policy if exists "marketing_campaign_recipients_owner" on marketing_campaign_recipients;
 create policy "marketing_campaign_recipients_owner" on marketing_campaign_recipients
   for all to authenticated
   using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -150,6 +155,7 @@ create table if not exists marketing_reviews (
 );
 create index if not exists marketing_reviews_status_idx on marketing_reviews (status, posted_at desc);
 alter table marketing_reviews enable row level security;
+drop policy if exists "marketing_reviews_owner" on marketing_reviews;
 create policy "marketing_reviews_owner" on marketing_reviews
   for all to authenticated
   using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))

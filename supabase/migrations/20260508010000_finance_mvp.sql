@@ -42,6 +42,7 @@ insert into finance_settings (id) values ('default') on conflict do nothing;
 alter table finance_settings enable row level security;
 do $$ begin
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='finance_settings' and policyname='finance_settings_owner_only') then
+    drop policy if exists "finance_settings_owner_only" on finance_settings;
     create policy "finance_settings_owner_only" on finance_settings
       for all to authenticated
       using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -106,6 +107,7 @@ create index if not exists expense_entries_branch_idx  on expense_entries (branc
 alter table expense_entries enable row level security;
 do $$ begin
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='expense_entries' and policyname='expense_entries_owner_only') then
+    drop policy if exists "expense_entries_owner_only" on expense_entries;
     create policy "expense_entries_owner_only" on expense_entries
       for all to authenticated
       using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))
@@ -139,6 +141,7 @@ create unique index if not exists bank_transactions_dedupe_uidx on bank_transact
 alter table bank_transactions enable row level security;
 do $$ begin
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='bank_transactions' and policyname='bank_transactions_owner_only') then
+    drop policy if exists "bank_transactions_owner_only" on bank_transactions;
     create policy "bank_transactions_owner_only" on bank_transactions
       for all to authenticated
       using (exists (select 1 from profiles where id = auth.uid() and role = 'owner'))

@@ -43,6 +43,7 @@ create index if not exists marketing_channel_snapshots_chan_idx
   on marketing_channel_snapshots (channel, snapshot_date desc);
 
 alter table marketing_channel_snapshots enable row level security;
+drop policy if exists "marketing_channel_snapshots_owner_only" on marketing_channel_snapshots;
 create policy "marketing_channel_snapshots_owner_only"
   on marketing_channel_snapshots
   for all to authenticated
@@ -106,6 +107,7 @@ create table if not exists customer_segments (
 create index if not exists customer_segments_seg_idx on customer_segments (segment);
 
 alter table customer_segments enable row level security;
+drop policy if exists "customer_segments_authenticated_select" on customer_segments;
 create policy "customer_segments_authenticated_select"
   on customer_segments for select to authenticated using (true);
 -- writes only via the RPC below.
