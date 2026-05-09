@@ -33,9 +33,14 @@ export default function InventoryIntelligence() {
   useEffect(() => {
     async function load() {
       try {
+        // The `stock` table is keyed by ingredient_id; name + name_ar + unit
+        // live on the joined `ingredients` row. (Earlier this query selected
+        // `name` directly from stock and threw "column stock.name does not
+        // exist" — fixed by joining ingredients the same way InventoryHub
+        // and analytics IntelligenceTab do.)
         const { data, error } = await supabase
           .from('stock')
-          .select('id, name, name_ar, qty_available, min_threshold, unit, consumption_rate, manual_daily_rate')
+          .select('id, qty_available, min_threshold, consumption_rate, manual_daily_rate, ingredient:ingredients(id, name, name_ar, base_unit)')
           .gt('min_threshold', 0)
         if (error) throw error
 
@@ -47,7 +52,17 @@ export default function InventoryIntelligence() {
           else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold) flag = 'low'
           else if (dto !== null && dto < 7) flag = 'urgent'
           else if (dto !== null && dto <= 14) flag = 'watch'
-          return { ...it, daysToOut: dto, flag }
+          return {
+            ...it,
+            // Surface the joined columns at the top level so the rest of the
+            // component (which still references `it.name`, `it.unit`) keeps
+            // working without a deeper rewrite.
+            name:    it.ingredient?.name    || '—',
+            name_ar: it.ingredient?.name_ar || '',
+            unit:    it.ingredient?.base_unit || '',
+            daysToOut: dto,
+            flag,
+          }
         })
         setItems(enriched)
       } catch (e) {
