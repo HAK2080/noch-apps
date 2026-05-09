@@ -16,12 +16,11 @@ const PASSPORT_BASE = 'noch.cloud/#/passport'
 // from order_number so the same receipt always renders the same line
 // (matters when staff reprints).
 const NOCHI_FOOTERS_AR = [
-  '🐰 شكراً! نوتشي بستناك مرة ثانية',
-  '🐰 لا تطوّل علينا — نوتشي بيشتاقلك',
-  '🐰 شكراً، حبيبنا. إلى اللقاء قريب!',
-  '🐰 طيّب… متى الزيارة الجاية؟',
-  '🐰 إذا ما رجعت، نوتشي بيزعل',
-  '🐰 يومك أحلى مع نوتشي — نشوفك قريب',
+  '🐰 شكراً! نوتشي حيستناك المرة الجاية',
+  '🐰 ماتتطولش علينا — نوتشي بيشتاقلك',
+  '🐰 نوتشي يسأل… امتى الزيارة الجاية؟',
+  '🐰 إذا معاش رجعت، نوتشي بيزعل',
+  '🐰 يومك أحلى مع نوتشي — نشوفك قريب إن شاء الله',
 ]
 const NOCHI_FOOTERS_EN = [
   '🐰 Thanks! Nochi is already missing you',
