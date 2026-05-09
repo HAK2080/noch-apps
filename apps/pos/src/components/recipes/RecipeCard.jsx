@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { ChevronRight, EyeOff, Eye } from 'lucide-react'
 import { useLanguage } from '../../contexts/LanguageContext'
 
 const CATEGORY_INFO = {
@@ -9,21 +10,93 @@ const CATEGORY_INFO = {
   signature: { label_en: 'Signature', label_ar: 'مشروبات خاصة', color: '#3498DB', accent: 'text-blue-400' },
 }
 
-export default function RecipeCard({ recipe }) {
+const LONG_PRESS_MS = 700
+
+export default function RecipeCard({ recipe, canManage = false, onToggleDisabled }) {
   const navigate = useNavigate()
   const { lang } = useLanguage()
+  const longPressTimer = useRef(null)
+  const longPressFired = useRef(false)
+  const [pressing, setPressing] = useState(false)
 
   const name = lang === 'ar' && recipe.name_ar ? recipe.name_ar : recipe.name
   const categoryInfo = CATEGORY_INFO[recipe.category] || CATEGORY_INFO.specialty
   const categoryLabel = lang === 'ar' ? categoryInfo.label_ar : categoryInfo.label_en
+  const disabled = !!recipe.is_archived
+
+  const startPress = (e) => {
+    if (!canManage) return
+    longPressFired.current = false
+    setPressing(true)
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true
+      setPressing(false)
+      // haptic on devices that support it
+      try { if (navigator.vibrate) navigator.vibrate(40) } catch { /* noop */ }
+      onToggleDisabled?.(recipe)
+    }, LONG_PRESS_MS)
+  }
+
+  const cancelPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    longPressTimer.current = null
+    setPressing(false)
+  }
+
+  const handleClick = (e) => {
+    // If long-press fired, swallow the click so we don't navigate.
+    if (longPressFired.current) {
+      longPressFired.current = false
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    navigate(`/recipes/${recipe.id}`)
+  }
 
   return (
     <div
-      onClick={() => navigate(`/recipes/${recipe.id}`)}
-      className="group cursor-pointer transition-all duration-300 hover:shadow-lg"
+      onClick={handleClick}
+      onMouseDown={startPress}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchCancel={cancelPress}
+      onContextMenu={(e) => { if (canManage) e.preventDefault() }}
+      className={`group cursor-pointer transition-all duration-300 hover:shadow-lg select-none relative ${
+        disabled ? 'opacity-40 saturate-50' : ''
+      } ${pressing ? 'scale-[0.985]' : ''}`}
+      style={{ transition: 'opacity 200ms, transform 120ms, filter 200ms' }}
     >
+      {/* Disabled badge — bottom-right pill */}
+      {disabled && (
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-black/70 border border-noch-border text-noch-muted rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wider pointer-events-none">
+          <EyeOff size={10} />
+          <span>{lang === 'ar' ? 'معطّل' : 'Disabled'}</span>
+        </div>
+      )}
+
+      {/* Long-press progress hint — bar grows from 0 to full width over LONG_PRESS_MS */}
+      {pressing && canManage && (
+        <div className="absolute inset-x-0 bottom-0 z-10 h-0.5 bg-noch-green/20 overflow-hidden rounded-b-lg pointer-events-none">
+          <div
+            className="h-full bg-noch-green"
+            style={{
+              width: '100%',
+              transformOrigin: 'left',
+              animation: `recipeLongpress ${LONG_PRESS_MS}ms linear forwards`,
+            }}
+          />
+        </div>
+      )}
+      {/* Inline keyframes — scoped, no global CSS edit */}
+      <style>{`@keyframes recipeLongpress { from { transform: scaleX(0); } to { transform: scaleX(1); } }`}</style>
+
       {/* Card container */}
-      <div className="bg-noch-card border border-noch-border rounded-lg p-4 hover:border-noch-green/50 transition-colors">
+      <div className={`bg-noch-card border rounded-lg p-4 transition-colors ${
+        disabled ? 'border-noch-border/50' : 'border-noch-border hover:border-noch-green/50'
+      }`}>
 
         {/* Thumbnail — drink image if available, layer swatches as fallback */}
         {recipe.image_url ? (
@@ -112,11 +185,18 @@ export default function RecipeCard({ recipe }) {
           )}
         </div>
 
-        {/* View Recipe button */}
-        <button className="w-full bg-noch-green/10 border border-noch-green/30 text-noch-green rounded-lg py-2 text-xs font-semibold flex items-center justify-between px-3 group-hover:bg-noch-green/20 group-hover:border-noch-green/50 transition-colors">
-          <span>{lang === 'ar' ? 'عرض الوصفة' : 'View Recipe'}</span>
-          <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-        </button>
+        {/* Action button — re-enable when disabled, view when active */}
+        {disabled && canManage ? (
+          <div className="w-full bg-noch-green/10 border border-noch-green/30 text-noch-green rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-2 px-3">
+            <Eye size={14} />
+            <span>{lang === 'ar' ? 'اضغط مطوّلاً للتفعيل' : 'Long-press to re-enable'}</span>
+          </div>
+        ) : (
+          <button className="w-full bg-noch-green/10 border border-noch-green/30 text-noch-green rounded-lg py-2 text-xs font-semibold flex items-center justify-between px-3 group-hover:bg-noch-green/20 group-hover:border-noch-green/50 transition-colors">
+            <span>{lang === 'ar' ? 'عرض الوصفة' : 'View Recipe'}</span>
+            <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        )}
       </div>
     </div>
   )

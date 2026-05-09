@@ -530,6 +530,10 @@ export async function archiveRecipe(id) {
   return updateRecipe(id, { is_archived: true })
 }
 
+export async function unarchiveRecipe(id) {
+  return updateRecipe(id, { is_archived: false })
+}
+
 export async function deleteRecipe(id) {
   const { error } = await supabase
     .from('recipes')

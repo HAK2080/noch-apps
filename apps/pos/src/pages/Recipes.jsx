@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Search, RefreshCw, Archive, ChevronDown, ArrowUpDown } from 'lucide-react'
-import { getRecipes, createRecipe, updateRecipe, archiveRecipe } from '../lib/supabase'
+import { getRecipes, createRecipe, updateRecipe, archiveRecipe, unarchiveRecipe } from '../lib/supabase'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
@@ -122,7 +122,13 @@ export default function Recipes() {
   /* ── filter + sort ── */
   const filtered = recipes
     .filter(r => {
-      if (status === 'archived' ? !r.is_archived : r.is_archived) return false
+      // Owner stays on the "Active" tab and still sees disabled (archived)
+      // recipes shaded inline. Staff (non-owner) only see active recipes.
+      if (status === 'archived') {
+        if (!r.is_archived) return false
+      } else {
+        if (r.is_archived && !isOwner) return false
+      }
       if (category !== 'all' && r.category !== category) return false
       if (serve !== 'all' && r.serve_temp !== serve) return false
       if (search) {
@@ -182,6 +188,24 @@ export default function Recipes() {
     catch { toast.error(t('error')) }
   }
 
+  // Long-press handler on a recipe card — toggles is_archived. Owner only.
+  const handleToggleDisabled = async (recipe) => {
+    if (!isOwner) return
+    try {
+      if (recipe.is_archived) {
+        await unarchiveRecipe(recipe.id)
+        toast.success(lang === 'ar' ? `تم تفعيل ${recipe.name}` : `${recipe.name} re-enabled`)
+      } else {
+        await archiveRecipe(recipe.id)
+        toast.success(lang === 'ar' ? `تم تعطيل ${recipe.name}` : `${recipe.name} disabled`)
+      }
+      // Optimistic local update so the UI reacts instantly without a refetch
+      setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, is_archived: !r.is_archived } : r))
+    } catch (err) {
+      toast.error(err.message || t('error'))
+    }
+  }
+
   const openNew  = () => { setEditingRecipe(null); setShowForm(true) }
   const openEdit = (recipe) => { setEditingRecipe(recipe); setShowForm(true) }
 
@@ -196,7 +220,7 @@ export default function Recipes() {
       <div className="max-w-6xl mx-auto px-4 py-6">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-2">
           <h1 className="text-3xl font-bold text-white">{t('recipes')}</h1>
           {isOwner && (
             <button onClick={openNew} className="btn-primary flex items-center gap-2">
@@ -204,6 +228,13 @@ export default function Recipes() {
             </button>
           )}
         </div>
+        {isOwner && (
+          <p className="text-noch-muted text-xs mb-6">
+            {lang === 'ar'
+              ? 'اضغط مطوّلاً على أي وصفة لتعطيلها أو تفعيلها. الوصفات المعطّلة تظهر باهتة لك ومخفية عن الموظفين.'
+              : 'Long-press any recipe to disable / re-enable it. Disabled recipes show shaded for you and stay hidden from staff.'}
+          </p>
+        )}
 
         {/* ── Search ── */}
         <div className="relative mb-4">
@@ -320,7 +351,7 @@ export default function Recipes() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {items.map(recipe => (
-                        <RecipeCard key={recipe.id} recipe={recipe} />
+                        <RecipeCard key={recipe.id} recipe={recipe} canManage={isOwner} onToggleDisabled={handleToggleDisabled} />
                       ))}
                     </div>
                   </div>
@@ -331,7 +362,7 @@ export default function Recipes() {
             /* Flat view (filtered/searched) */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map(recipe => (
-                <RecipeCard key={recipe.id} recipe={recipe} />
+                <RecipeCard key={recipe.id} recipe={recipe} canManage={isOwner} onToggleDisabled={handleToggleDisabled} />
               ))}
             </div>
           )
