@@ -42,18 +42,18 @@ const SWEETNESS_OPTIONS = [
 
 const OTHER_DRINK = '__other__'
 
-// Heuristic for "is this menu item a drink" — categories with these
-// substrings (en or ar) get pulled into the drinks dropdown.
-const DRINK_KEYWORDS = ['drink', 'coffee', 'tea', 'latte', 'cappuccino', 'espresso', 'matcha', 'juice', 'beverage', 'smoothie', 'soda', 'مشروب', 'قهوة', 'شاي', 'لاتيه', 'عصير']
-
 function labelFor(options, value, ar) {
   const o = options.find(x => x.value === value)
   if (!o) return value
   return ar ? o.ar : o.en
 }
 
-export default function Passport({ lang = 'ar' }) {
-  const isAr = lang !== 'en'
+export default function Passport() {
+  // Per-tab language toggle. Default to AR (the receipt audience).
+  const [lang, setLang] = useState(() => localStorage.getItem('noch_pass_lang') || 'ar')
+  useEffect(() => { localStorage.setItem('noch_pass_lang', lang) }, [lang])
+  const isAr = lang === 'ar'
+
   const { token } = useParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -76,6 +76,17 @@ export default function Passport({ lang = 'ar' }) {
 
   useEffect(() => { load() }, [token])
 
+  const LangToggle = (
+    <button
+      onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
+      className="btn ghost"
+      style={{ padding: '4px 10px', fontSize: 13, fontWeight: 600, border: '1.5px solid currentColor' }}
+      aria-label="Switch language"
+    >
+      {lang === 'ar' ? 'EN' : 'عربي'}
+    </button>
+  )
+
   if (loading) {
     return (
       <div className="menu-page rtl" dir="rtl">
@@ -86,23 +97,19 @@ export default function Passport({ lang = 'ar' }) {
 
   if (error === 'not_found' || !data) {
     return (
-      <div className="menu-page rtl" dir="rtl">
+      <div className={`menu-page${isAr ? ' rtl' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
         <nav className="nav">
-          <Link to="/" className="back">→ الرئيسية</Link>
+          <Link to="/" className="back">{isAr ? '→ الرئيسية' : '← Home'}</Link>
+          <Link to="/" className="logo-sm"><img src="/assets/logo.svg" alt="Noch" style={{ height: 32 }} /></Link>
+          {LangToggle}
         </nav>
         <div className="card" style={{ maxWidth: 520, margin: '40px auto', textAlign: 'center' }}>
           <h1 style={{ marginBottom: 12 }}>{isAr ? 'بطاقة نوتشي' : 'Nochi Pass'}</h1>
           <p>{isAr ? 'هذه البطاقة غير موجودة.' : "This pass doesn't exist."}</p>
           <p style={{ marginTop: 12, fontSize: 14, opacity: 0.85 }}>
-            {isAr
-              ? 'فقدت الإيصال؟ افتح بطاقتك بإدخال رقم هاتفك:'
-              : 'Lost your receipt? Open your pass with your phone number:'}
+            {isAr ? 'فقدت الإيصال؟ افتح بطاقتك بإدخال رقم هاتفك:' : 'Lost your receipt? Open your pass with your phone number:'}
           </p>
-          <Link
-            to="/loyalty"
-            className="btn"
-            style={{ marginTop: 8, display: 'inline-block', padding: '8px 16px', textDecoration: 'none' }}
-          >
+          <Link to="/loyalty" className="btn" style={{ marginTop: 8, display: 'inline-block', padding: '8px 16px', textDecoration: 'none' }}>
             {isAr ? 'افتح بطاقتي عبر رقم الهاتف' : 'Open my pass by phone'}
           </Link>
         </div>
@@ -116,6 +123,12 @@ export default function Passport({ lang = 'ar' }) {
   const pendingRewards = Array.isArray(data.pending_rewards) ? data.pending_rewards : []
   const nochiSrc = NOCHI_IMG[data.nochi_state] || NOCHI_IMG.happy
 
+  // Display value: prefer the array, fall back to legacy single field.
+  const drinksList =
+    Array.isArray(data.favorite_drinks) && data.favorite_drinks.length > 0
+      ? data.favorite_drinks
+      : data.favorite_drink ? [data.favorite_drink] : []
+
   return (
     <div className={`menu-page${isAr ? ' rtl' : ''}`} dir={isAr ? 'rtl' : 'ltr'}>
       <nav className="nav">
@@ -123,7 +136,7 @@ export default function Passport({ lang = 'ar' }) {
         <Link to="/" className="logo-sm">
           <img src="/assets/logo.svg" alt="Noch" style={{ height: 32 }} />
         </Link>
-        <div />
+        {LangToggle}
       </nav>
 
       <div className="card" style={{ maxWidth: 520, margin: '24px auto', padding: 20 }}>
@@ -154,16 +167,7 @@ export default function Passport({ lang = 'ar' }) {
           <h2 style={{ fontSize: 16, marginBottom: 8 }}>{isAr ? 'الأختام' : 'Stamps'}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6 }}>
             {cycleStamps.map((filled, i) => (
-              <div
-                key={i}
-                style={{
-                  aspectRatio: '1 / 1',
-                  borderRadius: '50%',
-                  border: '2px solid currentColor',
-                  background: filled ? 'currentColor' : 'transparent',
-                  opacity: filled ? 1 : 0.25,
-                }}
-              />
+              <div key={i} style={{ aspectRatio: '1 / 1', borderRadius: '50%', border: '2px solid currentColor', background: filled ? 'currentColor' : 'transparent', opacity: filled ? 1 : 0.25 }} />
             ))}
           </div>
           <p style={{ fontSize: 13, marginTop: 8, opacity: 0.8 }}>
@@ -195,18 +199,20 @@ export default function Passport({ lang = 'ar' }) {
         )}
 
         {/* Your usual */}
-        {(data.favorite_drink || data.favorite_other || data.milk_preference || data.sweetness_preference) && (
+        {(drinksList.length > 0 || data.favorite_other || data.milk_preference || data.sweetness_preference) && (
           <section style={{ marginTop: 16 }}>
             <h2 style={{ fontSize: 16, marginBottom: 8 }}>{isAr ? 'المعتاد' : 'Your usual'}</h2>
-            <p style={{ fontSize: 15, margin: 0 }}>
-              {data.favorite_drink || '—'}
-              {data.milk_preference && (
-                <span style={{ opacity: 0.7, marginLeft: 8 }}> · {labelFor(MILK_OPTIONS, data.milk_preference, isAr)}</span>
-              )}
-              {data.sweetness_preference && (
-                <span style={{ opacity: 0.7, marginLeft: 8 }}> · {labelFor(SWEETNESS_OPTIONS, data.sweetness_preference, isAr)}</span>
-              )}
-            </p>
+            {drinksList.length > 0 && (
+              <p style={{ fontSize: 15, margin: 0 }}>
+                {drinksList.join(' · ')}
+                {data.milk_preference && (
+                  <span style={{ opacity: 0.7, marginLeft: 8 }}> · {labelFor(MILK_OPTIONS, data.milk_preference, isAr)}</span>
+                )}
+                {data.sweetness_preference && (
+                  <span style={{ opacity: 0.7, marginLeft: 8 }}> · {labelFor(SWEETNESS_OPTIONS, data.sweetness_preference, isAr)}</span>
+                )}
+              </p>
+            )}
             {data.favorite_other && (
               <p style={{ fontSize: 14, margin: '6px 0 0', opacity: 0.85 }}>
                 {isAr ? '🥐 وأيضاً: ' : '🥐 Also loves: '}{data.favorite_other}
@@ -219,9 +225,7 @@ export default function Passport({ lang = 'ar' }) {
         {pendingRewards.length > 0 && (
           <div style={{ marginTop: 16, padding: 10, border: '1px dashed currentColor', borderRadius: 8, textAlign: 'center', opacity: 0.9 }}>
             <p style={{ margin: 0, fontSize: 14 }}>
-              {isAr
-                ? '🎁 أظهر هذه الصفحة للموظف لاستلام الجائزة'
-                : '🎁 Show this page to staff to claim your reward'}
+              {isAr ? '🎁 أظهر هذه الصفحة للموظف لاستلام الجائزة' : '🎁 Show this page to staff to claim your reward'}
             </p>
           </div>
         )}
@@ -231,7 +235,7 @@ export default function Passport({ lang = 'ar' }) {
           {showEdit ? (
             <EditPanel
               token={token}
-              initial={data}
+              initial={{ ...data, favorite_drinks: drinksList }}
               isAr={isAr}
               onSaved={async () => { setShowEdit(false); await load() }}
               onCancel={() => setShowEdit(false)}
@@ -245,17 +249,17 @@ export default function Passport({ lang = 'ar' }) {
 
         <p style={{ marginTop: 16, fontSize: 12, opacity: 0.55 }}>
           {isAr
-            ? 'خصوصية: لا نعرض رقم هاتفك على هذه الصفحة. التعديلات تتطلب آخر 4 أرقام من رقمك.'
-            : "Privacy: your phone number isn't shown here. Edits require the last 4 digits of your phone."}
+            ? 'خصوصية: لا نعرض رقم هاتفك على هذه الصفحة. للتعديل نطلب منك تأكيد رقم واتساب.'
+            : "Privacy: your phone number isn't shown here. To edit, just confirm the WhatsApp number on file."}
         </p>
       </div>
     </div>
   )
 }
 
-function useDrinkOptions() {
-  // Pull active menu items from any "drinks-y" category. Public anon
-  // reads pos_products via the storefront menu policy.
+// All active menu items, no category filter — three dropdowns let
+// the customer pick anything we sell as their "top three".
+function useMenuItems() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -265,19 +269,13 @@ function useDrinkOptions() {
       try {
         const { data, error } = await supabase
           .from('pos_products')
-          .select('id, name, name_ar, pos_categories(name, name_ar)')
+          .select('id, name, name_ar')
           .eq('is_active', true)
           .order('name')
         if (error) throw error
-        const drinks = (data || []).filter(p => {
-          const cat = ((p.pos_categories?.name || '') + ' ' + (p.pos_categories?.name_ar || '')).toLowerCase()
-          if (!cat.trim()) return false
-          return DRINK_KEYWORDS.some(k => cat.includes(k))
-        })
-        // De-dup by name (multiple branches can have the same name)
         const seen = new Set()
         const out = []
-        for (const p of drinks) {
+        for (const p of data || []) {
           const key = (p.name || '').trim().toLowerCase()
           if (!key || seen.has(key)) continue
           seen.add(key)
@@ -285,7 +283,7 @@ function useDrinkOptions() {
         }
         if (!cancelled) setItems(out)
       } catch {
-        // Silent — drinks list is decorative; manual entry still works.
+        // dropdowns degrade to "Other / type below"
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -296,71 +294,109 @@ function useDrinkOptions() {
   return { items, loading }
 }
 
+function DrinkPicker({ index, value, onChange, items, isAr }) {
+  // Pre-resolve current selection: known menu item, "other" with custom
+  // text, or empty.
+  const knownName = useMemo(() => {
+    if (!value) return ''
+    const v = value.trim().toLowerCase()
+    return items.some(d => (d.name || '').trim().toLowerCase() === v) ? value : OTHER_DRINK
+  }, [value, items])
+
+  const [sel, setSel] = useState(knownName)
+  const [other, setOther] = useState(knownName === OTHER_DRINK ? value : '')
+
+  useEffect(() => { setSel(knownName); setOther(knownName === OTHER_DRINK ? value : '') }, [knownName])
+
+  const handleSel = (next) => {
+    setSel(next)
+    if (next === OTHER_DRINK) onChange(other || '')
+    else onChange(next || '')
+  }
+  const handleOther = (text) => {
+    setOther(text)
+    onChange(text)
+  }
+
+  const inputStyle = { padding: '8px 10px', borderRadius: 8, border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit' }
+  const labels = isAr
+    ? { label: `مشروب ${index}`, pick: '— اختياري —', other: 'أخرى (أدخلها أسفل)', placeholder: 'مشروبي…' }
+    : { label: `Drink ${index}`,    pick: '— optional —',     other: 'Other (type below)', placeholder: 'My drink…' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+      <span style={{ fontSize: 13 }}>{labels.label}</span>
+      <select style={inputStyle} value={sel} onChange={e => handleSel(e.target.value)}>
+        <option value="">{labels.pick}</option>
+        {items.map(d => (
+          <option key={d.name} value={d.name}>
+            {isAr && d.name_ar ? `${d.name_ar} (${d.name})` : d.name}
+          </option>
+        ))}
+        <option value={OTHER_DRINK}>{labels.other}</option>
+      </select>
+      {sel === OTHER_DRINK && (
+        <input
+          style={{ ...inputStyle, marginTop: 6 }}
+          value={other}
+          onChange={e => handleOther(e.target.value)}
+          placeholder={labels.placeholder}
+        />
+      )}
+    </div>
+  )
+}
+
 function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
-  const { items: drinkOptions } = useDrinkOptions()
-  const [last4, setLast4] = useState('')
+  const { items: menuItems } = useMenuItems()
 
-  // Drink picker: if the saved value matches a known menu item, preselect
-  // it; otherwise treat as "Other" with the manual text already filled.
-  const matchesKnown = useMemo(() => {
-    if (!initial.favorite_drink) return false
-    const v = initial.favorite_drink.trim().toLowerCase()
-    return drinkOptions.some(d => (d.name || '').trim().toLowerCase() === v)
-  }, [drinkOptions, initial.favorite_drink])
+  const initialDrinks = Array.isArray(initial.favorite_drinks) ? initial.favorite_drinks : []
+  const [d1, setD1] = useState(initialDrinks[0] || '')
+  const [d2, setD2] = useState(initialDrinks[1] || '')
+  const [d3, setD3] = useState(initialDrinks[2] || '')
 
-  const [drinkSel, setDrinkSel] = useState(initial.favorite_drink || '')
-  const [drinkOther, setDrinkOther] = useState(matchesKnown ? '' : (initial.favorite_drink || ''))
-
-  // When the menu list arrives, recompute the initial selection.
-  useEffect(() => {
-    if (!initial.favorite_drink) { setDrinkSel(''); return }
-    if (matchesKnown) {
-      setDrinkSel(initial.favorite_drink)
-      setDrinkOther('')
-    } else {
-      setDrinkSel(OTHER_DRINK)
-      setDrinkOther(initial.favorite_drink)
-    }
-  }, [matchesKnown, initial.favorite_drink])
-
+  const [phone, setPhone] = useState('')
   const [favoriteOther, setFavoriteOther] = useState(initial.favorite_other || '')
   const [milk, setMilk] = useState(initial.milk_preference || '')
   const [sweet, setSweet] = useState(initial.sweetness_preference || '')
   const [ig, setIg] = useState(initial.instagram_handle || '')
   const [tt, setTt] = useState(initial.tiktok_handle || '')
-  const [waOptIn, setWaOptIn] = useState(!!initial.whatsapp_opt_in)
+  const [fb, setFb] = useState(initial.facebook_handle || '')
+  const [waOptIn, setWaOptIn] = useState(initial.whatsapp_opt_in !== false)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
   const submit = async (e) => {
     e.preventDefault()
     setErr(null)
-    if (!/^\d{4}$/.test(last4)) {
-      setErr(isAr ? 'بنحتاج آخر 4 أرقام من هاتفك للتحقق.' : "Enter the last 4 digits of your phone to verify.")
+    const digits = (phone || '').replace(/[^0-9]/g, '')
+    if (digits.length < 6) {
+      setErr(isAr ? 'أدخل رقم واتساب الكامل للتأكيد.' : 'Enter your full WhatsApp number to confirm.')
       return
     }
-    const resolvedDrink =
-      drinkSel === OTHER_DRINK ? drinkOther.trim() :
-      drinkSel ? drinkSel : ''
+
+    const drinks = [d1, d2, d3].map(s => (s || '').trim()).filter(Boolean)
 
     setSaving(true)
     try {
       const { data, error } = await supabase.rpc('update_passport_preferences', {
         p_token: token,
-        p_phone_last4: last4,
+        p_phone: phone,
         p_updates: {
-          favorite_drink: resolvedDrink,
+          favorite_drinks: drinks,
           favorite_other: favoriteOther,
           milk_preference: milk,
           sweetness_preference: sweet,
           instagram_handle: ig.replace(/^@/, ''),
           tiktok_handle: tt.replace(/^@/, ''),
+          facebook_handle: fb.replace(/^@/, ''),
           whatsapp_opt_in: waOptIn,
         },
       })
       if (error) throw error
       if (!data?.ok) {
-        if (data?.error === 'verify_failed') setErr(isAr ? 'آخر 4 أرقام غير مطابقة. اطلب من الموظف.' : "Last 4 don't match — ask staff.")
+        if (data?.error === 'verify_failed') setErr(isAr ? 'الرقم لا يطابق المسجّل عندنا.' : "That number doesn't match what's on file.")
+        else if (data?.error === 'bad_phone') setErr(isAr ? 'الرقم غير صحيح.' : 'Phone number is too short.')
         else if (data?.error === 'not_found') setErr(isAr ? 'البطاقة غير موجودة.' : 'Pass not found.')
         else setErr(isAr ? 'تعذر الحفظ.' : "Couldn't save.")
         return
@@ -381,39 +417,30 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
       <h2 style={{ fontSize: 16, marginBottom: 8 }}>{isAr ? 'تحديث تفضيلاتي' : 'Update my preferences'}</h2>
 
       <label style={fieldStyle}>
-        <span style={{ fontSize: 13 }}>{isAr ? 'آخر 4 أرقام من هاتفي' : 'Last 4 digits of my phone'}</span>
+        <span style={{ fontSize: 13 }}>
+          {isAr ? '📱 أكد رقم واتساب' : '📱 Confirm your WhatsApp number'}
+        </span>
         <input
           style={inputStyle}
-          inputMode="numeric"
-          maxLength={4}
-          value={last4}
-          onChange={e => setLast4(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-          placeholder="••••"
+          inputMode="tel"
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          placeholder={isAr ? '‎+218 9X XXX XXXX' : '+218 9X XXX XXXX'}
+          dir="ltr"
           required
           autoFocus
         />
+        <span style={{ fontSize: 11, opacity: 0.6 }}>
+          {isAr ? 'نفس الرقم المسجّل عند الكاشير.' : 'Same number you gave us at the counter.'}
+        </span>
       </label>
 
-      <label style={fieldStyle}>
-        <span style={{ fontSize: 13 }}>{isAr ? 'مشروبي المفضل' : 'My favourite drink'}</span>
-        <select style={inputStyle} value={drinkSel} onChange={e => setDrinkSel(e.target.value)}>
-          <option value="">{isAr ? '— اختر مشروب —' : '— Pick a drink —'}</option>
-          {drinkOptions.map(d => (
-            <option key={d.name} value={d.name}>
-              {isAr && d.name_ar ? `${d.name_ar} (${d.name})` : d.name}
-            </option>
-          ))}
-          <option value={OTHER_DRINK}>{isAr ? 'أخرى (أدخلها أسفل)' : 'Other (type below)'}</option>
-        </select>
-        {drinkSel === OTHER_DRINK && (
-          <input
-            style={{ ...inputStyle, marginTop: 6 }}
-            value={drinkOther}
-            onChange={e => setDrinkOther(e.target.value)}
-            placeholder={isAr ? 'مشروبي…' : 'My drink…'}
-          />
-        )}
-      </label>
+      <h3 style={{ fontSize: 14, marginTop: 16, marginBottom: 6 }}>
+        {isAr ? 'مشروباتي المفضلة (حتى ٣)' : 'My favourite drinks (up to 3)'}
+      </h3>
+      <DrinkPicker index={1} value={d1} onChange={setD1} items={menuItems} isAr={isAr} />
+      <DrinkPicker index={2} value={d2} onChange={setD2} items={menuItems} isAr={isAr} />
+      <DrinkPicker index={3} value={d3} onChange={setD3} items={menuItems} isAr={isAr} />
 
       <label style={fieldStyle}>
         <span style={{ fontSize: 13 }}>{isAr ? '🥐 معجنات / حلويات / غير ذلك' : '🥐 Bakery / desserts / other items I love'}</span>
@@ -449,13 +476,13 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
         <input style={inputStyle} value={tt} onChange={e => setTt(e.target.value)} placeholder="@yourhandle" dir="ltr" />
       </label>
 
+      <label style={fieldStyle}>
+        <span style={{ fontSize: 13 }}>Facebook</span>
+        <input style={inputStyle} value={fb} onChange={e => setFb(e.target.value)} placeholder="yourhandle" dir="ltr" />
+      </label>
+
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, padding: '10px 12px', border: '1px dashed currentColor', borderRadius: 8 }}>
-        <input
-          type="checkbox"
-          checked={waOptIn}
-          onChange={e => setWaOptIn(e.target.checked)}
-          style={{ marginTop: 3 }}
-        />
+        <input type="checkbox" checked={waOptIn} onChange={e => setWaOptIn(e.target.checked)} style={{ marginTop: 3 }} />
         <span style={{ fontSize: 14 }}>
           {isAr
             ? '📱 أوافق على استلام عروض، هدايا، ومفاجآت على واتساب'
