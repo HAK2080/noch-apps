@@ -115,6 +115,9 @@ export default function POSTerminal() {
   // Loyalty customer attached to the current order (Passport Phase 1).
   const [loyaltyCustomer, setLoyaltyCustomer] = useState(null)
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
+  // Memory drawer: expanded read-only view of attached customer's
+  // preferences and consents (Phase 5).
+  const [showMemory, setShowMemory] = useState(false)
 
   // Tile-language preference: 'both' | 'en' | 'ar'. Persisted per device.
   const [tileLang, setTileLang] = useState(() => localStorage.getItem('pos-tile-lang') || 'both')
@@ -589,31 +592,43 @@ export default function POSTerminal() {
           {/* Passport customer chip (above cart) */}
           <div className="mb-2 shrink-0">
             {loyaltyCustomer ? (
-              <div className="flex items-center gap-2 bg-noch-green/10 border border-noch-green/30 rounded-xl px-3 py-2">
-                <div className="w-7 h-7 rounded-full bg-noch-green/20 text-noch-green flex items-center justify-center text-xs font-bold shrink-0">
-                  {(loyaltyCustomer.full_name || '?').slice(0, 1).toUpperCase()}
+              <>
+                <div className="flex items-center gap-2 bg-noch-green/10 border border-noch-green/30 rounded-xl px-3 py-2">
+                  <div className="w-7 h-7 rounded-full bg-noch-green/20 text-noch-green flex items-center justify-center text-xs font-bold shrink-0">
+                    {(loyaltyCustomer.full_name || '?').slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{loyaltyCustomer.full_name}</p>
+                    <p className="text-noch-muted text-xs">
+                      {loyaltyCustomer.tier ? `${loyaltyCustomer.tier} · ` : ''}{loyaltyCustomer.current_stamps ?? 0} stamps
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowMemory(v => !v)}
+                    className="text-noch-muted hover:text-white text-xs px-2"
+                    title={showMemory ? 'Hide details' : 'Show details'}
+                  >
+                    {showMemory ? '▾' : '▸'}
+                  </button>
+                  <button
+                    onClick={() => setShowCustomerSearch(true)}
+                    className="text-noch-muted hover:text-white text-xs px-2"
+                    title="Swap"
+                  >
+                    Swap
+                  </button>
+                  <button
+                    onClick={() => { setLoyaltyCustomer(null); setShowMemory(false) }}
+                    className="text-noch-muted hover:text-white p-1"
+                    title="Detach"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{loyaltyCustomer.full_name}</p>
-                  <p className="text-noch-muted text-xs">
-                    {loyaltyCustomer.tier ? `${loyaltyCustomer.tier} · ` : ''}{loyaltyCustomer.current_stamps ?? 0} stamps
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowCustomerSearch(true)}
-                  className="text-noch-muted hover:text-white text-xs px-2"
-                  title="Swap"
-                >
-                  Swap
-                </button>
-                <button
-                  onClick={() => setLoyaltyCustomer(null)}
-                  className="text-noch-muted hover:text-white p-1"
-                  title="Detach"
-                >
-                  <X size={14} />
-                </button>
-              </div>
+                {showMemory && (
+                  <CustomerMemoryDrawer customerId={loyaltyCustomer.id} fallback={loyaltyCustomer} />
+                )}
+              </>
             ) : (
               <button
                 onClick={() => setShowCustomerSearch(true)}
@@ -691,6 +706,116 @@ export default function POSTerminal() {
           onClose={() => setModifierProduct(null)}
         />
       )}
+    </div>
+  )
+}
+
+function CustomerMemoryDrawer({ customerId, fallback }) {
+  const [data, setData] = useState(fallback || null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!customerId) return
+    let cancelled = false
+    setLoading(true)
+    ;(async () => {
+      try {
+        const { data: row, error } = await supabase
+          .from('loyalty_customers')
+          .select(`
+            id, full_name, phone, tier, current_stamps, total_visits, nochi_state,
+            birthday_day, birthday_month,
+            favorite_drink, favorite_drinks, favorite_other,
+            milk_preference, sweetness_preference,
+            instagram_handle, tiktok_handle, facebook_handle,
+            whatsapp_opt_in, whatsapp_opt_in_at,
+            ugc_consent, ugc_consent_at,
+            consent_source
+          `)
+          .eq('id', customerId)
+          .maybeSingle()
+        if (cancelled) return
+        if (!error && row) setData(row)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [customerId])
+
+  if (!data) {
+    return (
+      <div className="mt-2 bg-noch-card border border-noch-border rounded-xl p-3 text-xs text-noch-muted">
+        {loading ? 'Loading…' : 'No memory yet.'}
+      </div>
+    )
+  }
+
+  const drinks = Array.isArray(data.favorite_drinks) && data.favorite_drinks.length > 0
+    ? data.favorite_drinks
+    : (data.favorite_drink ? [data.favorite_drink] : [])
+  const handleLine = ['instagram_handle', 'tiktok_handle', 'facebook_handle']
+    .map(k => data[k] ? { k, v: data[k] } : null)
+    .filter(Boolean)
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB') : null
+  const consentTip = (when, source) =>
+    [fmtDate(when), source].filter(Boolean).join(' · ')
+
+  return (
+    <div className="mt-2 bg-noch-card border border-noch-border rounded-xl p-3 text-xs space-y-1.5">
+      {drinks.length > 0 && (
+        <p className="text-noch-muted">
+          <span className="text-white font-medium">☕ </span>
+          {drinks.join(' · ')}
+          {data.milk_preference && <span> · milk: {data.milk_preference}</span>}
+          {data.sweetness_preference && <span> · sweet: {data.sweetness_preference}</span>}
+        </p>
+      )}
+
+      {data.favorite_other && (
+        <p className="text-noch-muted">
+          <span className="text-white font-medium">🥐 </span>
+          {data.favorite_other}
+        </p>
+      )}
+
+      {data.birthday_day && data.birthday_month && (
+        <p className="text-noch-muted">
+          <span className="text-white font-medium">🎂 </span>
+          {data.birthday_day}/{data.birthday_month}
+        </p>
+      )}
+
+      {handleLine.length > 0 && (
+        <p className="text-noch-muted flex flex-wrap gap-x-2 gap-y-0.5">
+          {data.instagram_handle && <span><span className="text-white font-medium">IG:</span> @{data.instagram_handle}</span>}
+          {data.tiktok_handle    && <span><span className="text-white font-medium">TT:</span> @{data.tiktok_handle}</span>}
+          {data.facebook_handle  && <span><span className="text-white font-medium">FB:</span> {data.facebook_handle}</span>}
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <span
+          className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            data.whatsapp_opt_in
+              ? 'bg-noch-green/15 text-noch-green border border-noch-green/30'
+              : 'bg-noch-border/30 text-noch-muted border border-noch-border'
+          }`}
+          title={consentTip(data.whatsapp_opt_in_at, data.consent_source)}
+        >
+          WhatsApp: {data.whatsapp_opt_in ? 'yes' : 'no'}
+        </span>
+        <span
+          className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+            data.ugc_consent
+              ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30'
+              : 'bg-noch-border/30 text-noch-muted border border-noch-border'
+          }`}
+          title={consentTip(data.ugc_consent_at, data.consent_source)}
+        >
+          UGC consent: {data.ugc_consent ? 'yes' : 'no'}
+        </span>
+      </div>
     </div>
   )
 }

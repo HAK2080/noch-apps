@@ -426,6 +426,7 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
   const [tt, setTt] = useState(initial.tiktok_handle || '')
   const [fb, setFb] = useState(initial.facebook_handle || '')
   const [waOptIn, setWaOptIn] = useState(initial.whatsapp_opt_in !== false)
+  const [ugcConsent, setUgcConsent] = useState(!!initial.ugc_consent)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -454,6 +455,8 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
           tiktok_handle: tt.replace(/^@/, ''),
           facebook_handle: fb.replace(/^@/, ''),
           whatsapp_opt_in: waOptIn,
+          ugc_consent: ugcConsent,
+          consent_source: 'passport_self_edit',
         },
       })
       if (error) throw error
@@ -550,6 +553,15 @@ function EditPanel({ token, initial, isAr, onSaved, onCancel }) {
           {isAr
             ? '📱 أوافق على استلام عروض، هدايا، ومفاجآت على واتساب'
             : "📱 Send me offers, freebies, and surprises on WhatsApp"}
+        </span>
+      </label>
+
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, padding: '10px 12px', border: '1px dashed currentColor', borderRadius: 8 }}>
+        <input type="checkbox" checked={ugcConsent} onChange={e => setUgcConsent(e.target.checked)} style={{ marginTop: 3 }} />
+        <span style={{ fontSize: 14 }}>
+          {isAr
+            ? '📸 إذا قمت بوسمنا في قصة أو منشور، أوافق أن نوتشي يعيد نشره (اختياري — تقدر تغيره وقت ما تشاء)'
+            : "📸 If I tag you in a story or post, Nochi may repost it (optional — change anytime)"}
         </span>
       </label>
 
