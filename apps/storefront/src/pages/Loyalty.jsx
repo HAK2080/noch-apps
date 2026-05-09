@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 export default function Loyalty({ lang = 'en' }) {
@@ -8,18 +8,27 @@ export default function Loyalty({ lang = 'en' }) {
   const [card, setCard] = useState(null)
   const [error, setError] = useState('')
   const isAr = lang === 'ar'
+  const navigate = useNavigate()
 
   const lookup = async () => {
     if (!phone.trim()) return
     setLoading(true); setError(''); setCard(null)
     try {
+      // Pull passport_token too so we can offer a one-tap "Open my Nochi
+      // Pass" jump — the QR on the receipt isn't the only way in.
       const { data, error: err } = await supabase
         .from('loyalty_customers')
-        .select('id,full_name,phone,stamps_count,tier,nochi_state,created_at,loyalty_rewards(id,status,created_at)')
+        .select('id,full_name,phone,stamps_count,tier,nochi_state,passport_token,created_at,loyalty_rewards(id,status,created_at)')
         .eq('phone', phone.trim())
         .maybeSingle()
       if (err) throw err
       if (!data) { setError(isAr ? 'لم نجد رقمك. هل أنت مسجّل؟' : "We couldn't find that number. Are you registered?"); return }
+      // If we have a passport_token, jump straight to the Nochi Pass —
+      // it's the richer view and is where edits happen.
+      if (data.passport_token) {
+        navigate(`/passport/${data.passport_token}`)
+        return
+      }
       setCard(data)
     } catch {
       setError(isAr ? 'حدث خطأ، حاول مرة أخرى.' : 'Something went wrong. Try again.')

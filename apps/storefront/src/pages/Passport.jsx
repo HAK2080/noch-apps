@@ -91,8 +91,20 @@ export default function Passport({ lang = 'ar' }) {
           <Link to="/" className="back">→ الرئيسية</Link>
         </nav>
         <div className="card" style={{ maxWidth: 520, margin: '40px auto', textAlign: 'center' }}>
-          <h1 style={{ marginBottom: 12 }}>{isAr ? 'بطاقة نوخ' : 'Nochi Pass'}</h1>
-          <p>{isAr ? 'هذه البطاقة غير موجودة. اطلب من الموظف بطاقتك.' : "This pass doesn't exist. Ask staff at the counter."}</p>
+          <h1 style={{ marginBottom: 12 }}>{isAr ? 'بطاقة نوتشي' : 'Nochi Pass'}</h1>
+          <p>{isAr ? 'هذه البطاقة غير موجودة.' : "This pass doesn't exist."}</p>
+          <p style={{ marginTop: 12, fontSize: 14, opacity: 0.85 }}>
+            {isAr
+              ? 'فقدت الإيصال؟ افتح بطاقتك بإدخال رقم هاتفك:'
+              : 'Lost your receipt? Open your pass with your phone number:'}
+          </p>
+          <Link
+            to="/loyalty"
+            className="btn"
+            style={{ marginTop: 8, display: 'inline-block', padding: '8px 16px', textDecoration: 'none' }}
+          >
+            {isAr ? 'افتح بطاقتي عبر رقم الهاتف' : 'Open my pass by phone'}
+          </Link>
         </div>
       </div>
     )
@@ -128,7 +140,7 @@ export default function Passport({ lang = 'ar' }) {
           </p>
           <h1 style={{ margin: '6px 0 2px' }}>{data.full_name}</h1>
           <p style={{ opacity: 0.5, fontSize: 12, margin: '2px 0 0', letterSpacing: 0.5 }}>
-            {isAr ? '🐰 بطاقة نوخ' : '🐰 Nochi Pass'}
+            {isAr ? '🐰 بطاقة نوتشي' : '🐰 Nochi Pass'}
           </p>
           <p style={{ opacity: 0.7, fontSize: 14, margin: '8px 0 0' }}>
             {isAr
@@ -203,10 +215,16 @@ export default function Passport({ lang = 'ar' }) {
           </section>
         )}
 
-        {/* Show this to staff */}
-        <div style={{ marginTop: 16, padding: 10, border: '1px dashed currentColor', borderRadius: 8, textAlign: 'center', opacity: 0.85 }}>
-          <p style={{ margin: 0, fontSize: 14 }}>{isAr ? 'أظهر هذه الصفحة للموظف عند الطلب' : 'Show this page to staff at the counter'}</p>
-        </div>
+        {/* Show-this-to-staff — only when there's an actual reward to claim */}
+        {pendingRewards.length > 0 && (
+          <div style={{ marginTop: 16, padding: 10, border: '1px dashed currentColor', borderRadius: 8, textAlign: 'center', opacity: 0.9 }}>
+            <p style={{ margin: 0, fontSize: 14 }}>
+              {isAr
+                ? '🎁 أظهر هذه الصفحة للموظف لاستلام الجائزة'
+                : '🎁 Show this page to staff to claim your reward'}
+            </p>
+          </div>
+        )}
 
         {/* Edit */}
         <div style={{ marginTop: 16 }}>
