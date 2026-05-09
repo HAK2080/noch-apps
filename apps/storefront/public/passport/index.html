@@ -2,72 +2,585 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <title>Nochi Pass</title>
   <meta name="theme-color" content="#0B1020" />
+  <meta name="description" content="Nochi Pass — your stamps, favorite drinks, and tiny rewards magic." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    html, body {
-      margin: 0; padding: 0; height: 100%;
-      background: #0B1020; color: #fff;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      display: grid; place-items: center;
+    *,*::before,*::after { box-sizing: border-box; }
+    :root {
+      --bg: #0B1020; --surface: #141A33; --surface-2: #1F2746;
+      --ink: #0B1020; --text: #F4F6FF; --muted: #8C92AD;
+      --orange: #F5922E; --green: #3DCB78; --pink: #E63946;
+      --border: rgba(255,255,255,0.10);
+      --radius: 16px;
+      --font: 'DM Sans', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-ar: 'Cairo', 'DM Sans', system-ui, sans-serif;
     }
-    .wrap { text-align: center; padding: 24px; }
-    .dot { display: inline-block; width: 12px; height: 12px; border-radius: 99px;
-      background: #F5922E; opacity: 0.85;
-      animation: blink 1.2s ease-in-out infinite alternate; margin: 0 4px; }
-    .dot:nth-child(2) { animation-delay: 0.2s; }
-    .dot:nth-child(3) { animation-delay: 0.4s; }
+    html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+    body.ar { font-family: var(--font-ar); }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+
+    .wrap { max-width: 520px; margin: 0 auto; padding: 16px; }
+    .top { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 16px; }
+    .home { color: var(--muted); font-size: 13px; }
+    .home:hover { color: var(--text); }
+    .langbtn { background: transparent; border: 1.5px solid currentColor; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text); }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 12px; }
+
+    .hero { text-align: center; padding: 22px 18px 14px; }
+    .nochi { width: 110px; height: 110px; object-fit: contain; margin-bottom: 4px; user-select: none; }
+    .nochi-state { font-size: 12px; opacity: 0.55; margin: 0; text-transform: capitalize; }
+    .name { margin: 6px 0 2px; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+    .tag { font-size: 11px; opacity: 0.5; letter-spacing: 1px; text-transform: uppercase; }
+    .meta { margin-top: 8px; font-size: 13px; opacity: 0.75; }
+
+    h2 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
+    .stamps { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; }
+    .stamp { aspect-ratio: 1 / 1; border-radius: 50%; border: 2px solid currentColor; }
+    .stamp.on { background: var(--orange); border-color: var(--orange); }
+    .stamp.off { opacity: 0.22; }
+    .stamps-msg { margin: 10px 0 0; font-size: 13px; opacity: 0.85; }
+
+    .reward { padding: 14px; background: rgba(245,146,46,0.10); border: 1.5px solid rgba(245,146,46,0.45); border-radius: 10px; }
+    .reward h2 { margin-bottom: 6px; }
+    .reward ol { margin: 6px 0 0; padding-inline-start: 18px; font-size: 13px; opacity: 0.9; line-height: 1.6; }
+
+    .usual p { margin: 0; font-size: 14.5px; }
+    .also { margin-top: 6px; opacity: 0.8; font-size: 13.5px; }
+
+    .row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .row > span { font-size: 12px; opacity: 0.75; }
+    .input, select { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; width: 100%; }
+    .input::placeholder { color: var(--muted); opacity: 0.7; }
+    select { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-inline-end: 32px; }
+    body.ar select { background-position: 13px 50%, 18px 50%; padding-inline-end: 12px; padding-inline-start: 32px; }
+
+    .check { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px dashed var(--border); border-radius: 10px; margin-bottom: 10px; cursor: pointer; }
+    .check input { margin-top: 3px; flex-shrink: 0; transform: scale(1.2); accent-color: var(--orange); }
+    .check span { font-size: 13.5px; line-height: 1.5; }
+    .check small { display: block; font-size: 11.5px; opacity: 0.6; margin-top: 4px; }
+
+    .btn { background: var(--orange); color: var(--ink); padding: 12px 18px; border: none; border-radius: 12px; font-weight: 700; width: 100%; font-size: 15px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+    .btn.ghost:hover { border-color: var(--text); }
+
+    .actions { display: flex; gap: 8px; margin-top: 12px; }
+    .actions .btn { flex: 1; }
+
+    .err { color: var(--pink); font-size: 13px; margin: 0 0 8px; }
+    .ok { color: var(--green); font-size: 13px; margin: 0 0 8px; }
+
+    .center { text-align: center; padding: 30px 16px; }
+    .splash { display: flex; gap: 6px; justify-content: center; align-items: center; padding: 20px 0; }
+    .splash .dot { width: 10px; height: 10px; border-radius: 999px; background: var(--orange); animation: blink 1.2s ease-in-out infinite alternate; }
+    .splash .dot:nth-child(2) { animation-delay: 0.18s; }
+    .splash .dot:nth-child(3) { animation-delay: 0.36s; }
     @keyframes blink { from { opacity: 0.25; } to { opacity: 1; } }
-    .fallback { margin-top: 24px; font-size: 13px; opacity: 0.7; }
-    .fallback a { color: #F5922E; text-decoration: underline; }
+
+    .opt-callout { padding: 14px; border-radius: 12px; background: linear-gradient(135deg, rgba(245,146,46,0.18), rgba(61,203,120,0.10)); border: 1px solid rgba(245,146,46,0.30); margin-bottom: 12px; }
+    .opt-callout h3 { margin: 0 0 6px; font-size: 16px; font-weight: 800; }
+    .opt-callout p { margin: 0 0 10px; font-size: 13px; opacity: 0.85; line-height: 1.5; }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .pill { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.07); border: 1px solid var(--border); opacity: 0.85; }
+
+    body.ar { direction: rtl; }
+    body.ar .actions { flex-direction: row-reverse; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <p>🐰 Nochi Pass</p>
-    <div><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-    <noscript class="fallback">
-      JavaScript is required. <a href="/#/loyalty">Open by phone number instead</a>.
-    </noscript>
-    <p class="fallback" id="fallback" style="display:none;">
-      Taking too long? <a href="/#/loyalty">Open by phone number</a>.
-    </p>
+    <header class="top">
+      <a href="/" class="home" id="homeLink">← Home</a>
+      <button class="langbtn" id="langBtn" aria-label="Switch language">عربي</button>
+    </header>
+
+    <div id="root">
+      <div class="card center">
+        <p>🐰 Nochi Pass</p>
+        <div class="splash"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      </div>
+    </div>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    // Resolve the passport token from one of:
-    //   /passport/?t=<token>     ← QR-printed receipt URL (preferred)
-    //   /passport/?token=<token>
-    //   /passport/<token>        ← fallback if nginx ever serves /passport/* via SPA fallback
-    //   /passport/#/<token>      ← exotic
-    //   /passport.html?t=<token> ← tolerated
-    (function () {
-      try {
-        var qs = new URLSearchParams(window.location.search);
-        var token = qs.get('t') || qs.get('token');
-        if (!token) {
-          // Try path: /passport/<token>/  → split, last non-empty segment
-          var parts = window.location.pathname.split('/').filter(Boolean);
-          if (parts.length >= 2 && parts[0] === 'passport') token = parts[parts.length - 1];
-        }
-        if (!token && window.location.hash) {
-          var h = window.location.hash.replace(/^#\/?/, '');
-          if (h && h !== 'loyalty') token = h;
-        }
-        if (token && /^[a-z0-9-]{8,}$/i.test(token)) {
-          window.location.replace('/#/passport/' + encodeURIComponent(token));
-          return;
-        }
-        // No usable token → nudge to phone-lookup as a graceful fallback
-        window.location.replace('/#/loyalty');
-      } catch (e) {
-        window.location.replace('/#/loyalty');
+  (function () {
+    'use strict';
+
+    // ────────────────────────────────────────────────────────────────
+    // Config (matches storefront index.html)
+    // ────────────────────────────────────────────────────────────────
+    var SUPABASE_URL = 'https://kxqjasdvoohiexedtfqw.supabase.co';
+    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4cWphc2R2b29oaWV4ZWR0ZnF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NzM0MzQsImV4cCI6MjA5MDU0OTQzNH0.ehOy6naPZ1GKt6G_RzmyjFPRHtwH0B-CQq__KI8eKIY';
+
+    var sb = window.supabase && window.supabase.createClient
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } })
+      : null;
+
+    var STAMP_GOAL = 9;
+
+    var L = {
+      ar: {
+        home: '→ الرئيسية',
+        passTitle: '🐰 بطاقة نوتشي',
+        notFoundTitle: 'بطاقة نوتشي',
+        notFoundMsg: 'هذه البطاقة غير موجودة.',
+        lostReceipt: 'فقدت الإيصال؟ افتح بطاقتك بإدخال رقم هاتفك:',
+        openByPhone: 'افتح بطاقتي عبر رقم الهاتف',
+        stamps: 'الأختام',
+        stampsLeft: function (n) { return n + ' ختم لمشروب مجاني'; },
+        freeReady: '🎉 لديك مشروب مجاني — اطلبه من الموظف.',
+        rewardReady: '🎁 جائزة جاهزة للاستلام',
+        rewardSteps: ['اطلب مشروبك من الكاشير', 'أرِ الموظف هذه الصفحة', 'الموظف يمسح الكود وتاخذ مشروبك مجاناً'],
+        usual: 'المعتاد',
+        alsoLoves: '🥐 وأيضاً: ',
+        edit: 'تعديل تفضيلاتي',
+        editTitle: 'تحديث تفضيلاتي',
+        confirmPhone: '📱 أكد رقم واتساب',
+        sameNumber: 'نفس الرقم المسجّل عند الكاشير.',
+        favTitle: 'مشروباتي المفضلة (حتى ٣)',
+        drinkN: function (n) { return 'مشروب ' + n; },
+        favOther: '🥐 معجنات / حلويات / ما تحبه',
+        favOtherPh: 'كرواسون، تشيز كيك، ماتشا…',
+        avoidPlease: 'شيء تفضله أو تتجنبه؟',
+        avoidPh: 'سكر قليل، حليب شوفان، بدون قرفة، ثلج زيادة…',
+        milk: 'الحليب',
+        sweet: 'السكر',
+        ig: 'انستغرام',
+        tt: 'تيك توك',
+        fb: 'فيسبوك',
+        optTitle: 'تبيك نوتشي يفتكرك؟',
+        optBody: 'قول لنا مشروباتك المفضلة وحاجاتك الصغيرة. نستعملها نرسلك جوائز أحسن، هدايا مفاجأة، تحايا عيد ميلاد، قائمة سرية، ودعوات خاصة.',
+        optWa: 'نعم، أرسلوا لي تحديثات وعروض وهدايا ودعوات على واتساب.',
+        optSmall: 'تقدر تلغي الاشتراك في أي وقت. نستعمله بس عشان نخصصلك تجربتك.',
+        save: 'حفظ',
+        saving: 'جاري الحفظ…',
+        cancel: 'إلغاء',
+        savedOk: 'تم حفظ التفضيلات ✓',
+        errVerify: 'الرقم لا يطابق المسجّل عندنا.',
+        errPhone: 'الرقم غير صحيح.',
+        errNotFound: 'البطاقة غير موجودة.',
+        errSave: 'تعذر الحفظ.',
+        errLoad: 'حدث خطأ، حاول مرة أخرى.',
+        privacy: 'خصوصية: لا نعرض رقم هاتفك على هذه الصفحة. للتعديل نطلب منك تأكيد رقم واتساب.',
+        none: '—',
+        milks: { '': '—', whole: 'كامل الدسم', skim: 'خالي الدسم', oat: 'شوفان', almond: 'لوز', soy: 'صويا', lactose_free: 'خالي اللاكتوز' },
+        sweets: { '': '—', no_sugar: 'بدون سكر', less: 'قليل', normal: 'عادي', extra: 'زيادة' },
+        tier: { bronze: 'برونزي', silver: 'فضي', gold: 'ذهبي', legend: 'أسطوري' },
+        visits: function (n) { return n + ' زيارة'; },
+        nochiTagline: 'نوتشي يفتكر الزبائن المخلصين',
+      },
+      en: {
+        home: '← Home',
+        passTitle: '🐰 Nochi Pass',
+        notFoundTitle: 'Nochi Pass',
+        notFoundMsg: "This pass doesn't exist.",
+        lostReceipt: 'Lost your receipt? Open your pass with your phone number:',
+        openByPhone: 'Open my pass by phone',
+        stamps: 'Stamps',
+        stampsLeft: function (n) { return n + ' stamp' + (n === 1 ? '' : 's') + ' until your next free drink'; },
+        freeReady: "🎉 You've got a free drink — ask the barista.",
+        rewardReady: '🎁 Reward ready to claim',
+        rewardSteps: ['Order your drink at the counter', 'Show this page to the barista', 'They scan your code and the drink is on us'],
+        usual: 'Your usual',
+        alsoLoves: '🥐 Also loves: ',
+        edit: 'Edit my preferences',
+        editTitle: 'Update my preferences',
+        confirmPhone: '📱 Confirm your WhatsApp number',
+        sameNumber: 'Same number you gave us at the counter.',
+        favTitle: 'My favourite drinks (up to 3)',
+        drinkN: function (n) { return 'Drink ' + n; },
+        favOther: '🥐 Bakery / desserts / anything I love',
+        favOtherPh: 'cake, cookies, croissants, matcha…',
+        avoidPlease: 'Anything you prefer or avoid?',
+        avoidPh: 'less sugar, oat milk, no cinnamon, extra ice…',
+        milk: 'Milk',
+        sweet: 'Sweetness',
+        ig: 'Instagram',
+        tt: 'TikTok',
+        fb: 'Facebook',
+        optTitle: 'Want Nochi to remember you?',
+        optBody: "Tell us your favorite drinks and little cravings. We'll use it to send you better rewards, surprise freebies, birthday treats, secret menu drops, and special invitations.",
+        optWa: 'Yes, send me WhatsApp updates, rewards, freebies, gifts, and special invitations from Noch.',
+        optSmall: 'You can opt out anytime. We only use this to make your Noch experience more personal.',
+        save: 'Save',
+        saving: 'Saving…',
+        cancel: 'Cancel',
+        savedOk: 'Preferences saved ✓',
+        errVerify: "That number doesn't match what's on file.",
+        errPhone: 'Phone number is too short.',
+        errNotFound: 'Pass not found.',
+        errSave: "Couldn't save.",
+        errLoad: 'Something went wrong. Try again.',
+        privacy: "Privacy: your phone number isn't shown here. To edit, just confirm the WhatsApp number on file.",
+        none: '—',
+        milks: { '': '—', whole: 'Whole', skim: 'Skim', oat: 'Oat', almond: 'Almond', soy: 'Soy', lactose_free: 'Lactose-free' },
+        sweets: { '': '—', no_sugar: 'No sugar', less: 'Less', normal: 'Normal', extra: 'Extra' },
+        tier: { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', legend: 'Legend' },
+        visits: function (n) { return n + (n === 1 ? ' visit' : ' visits'); },
+        nochiTagline: 'Nochi remembers the loyal ones.',
       }
+    };
+
+    // ────────────────────────────────────────────────────────────────
+    // Lang state
+    // ────────────────────────────────────────────────────────────────
+    var lang = (function () {
+      try { return localStorage.getItem('noch_pass_lang') || 'ar'; } catch (e) { return 'ar'; }
     })();
-    setTimeout(function () {
-      var el = document.getElementById('fallback');
-      if (el) el.style.display = 'block';
-    }, 2500);
+    function setLang(next) {
+      lang = next;
+      try { localStorage.setItem('noch_pass_lang', lang); } catch (e) {}
+      document.body.classList.toggle('ar', lang === 'ar');
+      document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+      document.documentElement.setAttribute('lang', lang);
+      var t = L[lang];
+      document.getElementById('homeLink').textContent = t.home;
+      document.getElementById('langBtn').textContent = lang === 'ar' ? 'EN' : 'عربي';
+    }
+    document.getElementById('langBtn').addEventListener('click', function () {
+      setLang(lang === 'ar' ? 'en' : 'ar');
+      render();
+    });
+    setLang(lang);
+
+    // ────────────────────────────────────────────────────────────────
+    // Token resolution
+    // ────────────────────────────────────────────────────────────────
+    var token = (function () {
+      var qs = new URLSearchParams(window.location.search);
+      var t = qs.get('t') || qs.get('token') || qs.get('passport');
+      if (!t) {
+        var parts = window.location.pathname.split('/').filter(Boolean);
+        // /passport/<token> or /passport/index.html?... — last segment if it looks like a token
+        if (parts.length >= 2 && parts[0] === 'passport') {
+          var tail = parts[parts.length - 1];
+          if (tail && tail !== 'index.html' && /^[a-z0-9-]{8,}$/i.test(tail)) t = tail;
+        }
+      }
+      return t;
+    })();
+
+    var state = { loading: true, error: null, data: null, editing: false };
+
+    // ────────────────────────────────────────────────────────────────
+    // Load
+    // ────────────────────────────────────────────────────────────────
+    function load() {
+      state.loading = true; state.error = null;
+      render();
+      if (!token) { state.loading = false; state.error = 'no_token'; render(); return; }
+      if (!sb) { state.loading = false; state.error = 'no_supabase'; render(); return; }
+      sb.rpc('get_public_passport', { p_token: token }).then(function (res) {
+        state.loading = false;
+        if (res.error) {
+          // RPC missing → migration not applied yet
+          if (/(function|relation).*does not exist/i.test(res.error.message || '')) state.error = 'rpc_missing';
+          else state.error = res.error.message || 'load_failed';
+        } else if (!res.data) {
+          state.error = 'not_found';
+        } else {
+          state.data = res.data;
+        }
+        render();
+      });
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // Render helpers
+    // ────────────────────────────────────────────────────────────────
+    function el(tag, attrs, children) {
+      var n = document.createElement(tag);
+      if (attrs) for (var k in attrs) {
+        if (k === 'class') n.className = attrs[k];
+        else if (k === 'style') n.setAttribute('style', attrs[k]);
+        else if (k.startsWith('on') && typeof attrs[k] === 'function') n.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+        else if (k === 'html') n.innerHTML = attrs[k];
+        else if (attrs[k] === true) n.setAttribute(k, '');
+        else if (attrs[k] === false || attrs[k] == null) {} // skip
+        else n.setAttribute(k, attrs[k]);
+      }
+      if (children) (Array.isArray(children) ? children : [children]).forEach(function (c) {
+        if (c == null || c === false) return;
+        n.appendChild(c.nodeType ? c : document.createTextNode(String(c)));
+      });
+      return n;
+    }
+    function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+    function nochiSrc(stateName) {
+      var map = { happy: 'nochi-happy.png', sad: 'nochi-sad.png', tired: 'nochi-tired.png', deathbed: 'nochi-deathbed.png', dead: 'nochi-dead.png' };
+      return '/assets/' + (map[stateName] || 'nochi-happy.png');
+    }
+
+    function renderNotFound() {
+      var t = L[lang];
+      var root = document.getElementById('root');
+      clear(root);
+      var card = el('div', { class: 'card center' }, [
+        el('h1', null, t.notFoundTitle),
+        el('p', null, t.notFoundMsg),
+        el('p', { style: 'margin-top:12px;font-size:14px;opacity:0.85;' }, t.lostReceipt),
+        el('a', { href: '/#loyalty', class: 'btn', style: 'display:inline-block;margin-top:8px;text-decoration:none;text-align:center;' }, t.openByPhone),
+      ]);
+      root.appendChild(card);
+    }
+
+    function renderError(msg) {
+      var t = L[lang];
+      var root = document.getElementById('root');
+      clear(root);
+      root.appendChild(el('div', { class: 'card center' }, [
+        el('h1', null, t.notFoundTitle),
+        el('p', null, msg || t.errLoad),
+      ]));
+    }
+
+    function renderRpcMissing() {
+      var root = document.getElementById('root');
+      clear(root);
+      root.appendChild(el('div', { class: 'card center' }, [
+        el('h1', null, '🛠 Setting up'),
+        el('p', null, lang === 'ar' ? 'بطاقة نوتشي قيد التجهيز. الموظف يطبق التحديث الأخير.' : "Nochi Pass is being set up. Staff is applying the latest update — try again in a minute."),
+      ]));
+    }
+
+    function renderPass() {
+      var t = L[lang], d = state.data;
+      var root = document.getElementById('root');
+      clear(root);
+
+      var current = Math.min(STAMP_GOAL, d.current_stamps || 0);
+      var left = Math.max(0, STAMP_GOAL - current);
+      var pendingRewards = Array.isArray(d.pending_rewards) ? d.pending_rewards : [];
+      var drinks = Array.isArray(d.favorite_drinks) && d.favorite_drinks.length ? d.favorite_drinks
+                  : (d.favorite_drink ? [d.favorite_drink] : []);
+
+      // Hero
+      var hero = el('div', { class: 'card hero' }, [
+        el('img', { class: 'nochi', src: nochiSrc(d.nochi_state), alt: 'Nochi' }),
+        el('p', { class: 'nochi-state' }, d.nochi_state || ''),
+        el('h1', { class: 'name' }, d.full_name || ''),
+        el('p', { class: 'tag' }, t.passTitle),
+        el('p', { class: 'meta' }, (t.tier[d.tier] || d.tier || '') + ' · ' + t.visits(d.total_visits || 0)),
+      ]);
+      root.appendChild(hero);
+
+      // Stamps
+      var stampGrid = el('div', { class: 'stamps' });
+      for (var i = 0; i < STAMP_GOAL; i++) {
+        stampGrid.appendChild(el('div', { class: 'stamp ' + (i < current ? 'on' : 'off') }));
+      }
+      var stampsCard = el('div', { class: 'card' }, [
+        el('h2', null, t.stamps),
+        stampGrid,
+        el('p', { class: 'stamps-msg' }, left === 0 ? t.freeReady : t.stampsLeft(left)),
+      ]);
+      root.appendChild(stampsCard);
+
+      // Pending rewards
+      if (pendingRewards.length > 0) {
+        var ol = el('ol', null, t.rewardSteps.map(function (s) { return el('li', null, s); }));
+        root.appendChild(el('div', { class: 'card reward' }, [
+          el('h2', null, t.rewardReady),
+          ol,
+        ]));
+      }
+
+      // Usual
+      if (drinks.length || d.favorite_other || d.milk_preference || d.sweetness_preference) {
+        var usualCard = el('div', { class: 'card usual' }, [
+          el('h2', null, t.usual),
+          drinks.length ? el('p', null, drinks.join(' · ') +
+            (d.milk_preference ? ' · ' + (t.milks[d.milk_preference] || d.milk_preference) : '') +
+            (d.sweetness_preference ? ' · ' + (t.sweets[d.sweetness_preference] || d.sweetness_preference) : '')
+          ) : null,
+          d.favorite_other ? el('p', { class: 'also' }, t.alsoLoves + d.favorite_other) : null,
+        ]);
+        root.appendChild(usualCard);
+      }
+
+      // Edit / collapsed
+      if (state.editing) {
+        root.appendChild(renderEditForm(d, drinks));
+      } else {
+        var editBtn = el('button', { class: 'btn', onclick: function () { state.editing = true; render(); } }, t.edit);
+        root.appendChild(el('div', { class: 'card' }, [
+          el('div', { class: 'opt-callout' }, [
+            el('h3', null, t.optTitle),
+            el('p', null, t.optBody),
+          ]),
+          editBtn,
+        ]));
+      }
+
+      // Privacy + tagline
+      root.appendChild(el('p', { style: 'text-align:center;font-size:11.5px;opacity:0.55;margin-top:8px;' }, t.privacy));
+      root.appendChild(el('p', { style: 'text-align:center;font-size:12px;opacity:0.45;margin-top:4px;' }, t.nochiTagline));
+    }
+
+    function renderEditForm(d, drinks) {
+      var t = L[lang];
+      var card = el('div', { class: 'card' });
+
+      var form = el('form');
+      var msgBox = el('div');
+
+      function row(labelText, inputNode, hint) {
+        var r = el('div', { class: 'row' }, [el('span', null, labelText), inputNode]);
+        if (hint) r.appendChild(el('span', { style: 'font-size:11px;opacity:0.55;' }, hint));
+        return r;
+      }
+      function input(opts) {
+        return el('input', Object.assign({ class: 'input' }, opts || {}));
+      }
+      function selectEl(opts, options) {
+        var s = el('select', Object.assign({ class: 'input' }, opts || {}));
+        options.forEach(function (o) {
+          var optEl = el('option', { value: o.value }, o.label);
+          if (o.value === (opts && opts.value || '')) optEl.selected = true;
+          s.appendChild(optEl);
+        });
+        return s;
+      }
+
+      var phoneInput = input({ type: 'tel', placeholder: '+218 9X XXX XXXX', dir: 'ltr', required: true, autofocus: true, inputmode: 'tel' });
+      form.appendChild(row(t.confirmPhone, phoneInput, t.sameNumber));
+
+      // Drinks
+      form.appendChild(el('h2', { style: 'margin-top:12px;font-size:14px;' }, t.favTitle));
+      var drinkInputs = [];
+      for (var i = 0; i < 3; i++) {
+        var di = input({ type: 'text', placeholder: t.drinkN(i + 1), value: drinks[i] || '' });
+        drinkInputs.push(di);
+        form.appendChild(row(t.drinkN(i + 1), di));
+      }
+
+      var favOtherInput = input({ type: 'text', value: d.favorite_other || '', placeholder: t.favOtherPh });
+      form.appendChild(row(t.favOther, favOtherInput));
+
+      var avoidInput = input({ type: 'text', value: d.avoid_or_allergy_notes || '', placeholder: t.avoidPh });
+      form.appendChild(row(t.avoidPlease, avoidInput));
+
+      var milkOptions = ['', 'whole', 'skim', 'oat', 'almond', 'soy', 'lactose_free'].map(function (v) {
+        return { value: v, label: t.milks[v] || v };
+      });
+      var milkSel = selectEl({ value: d.milk_preference || '' }, milkOptions);
+      milkSel.value = d.milk_preference || '';
+      form.appendChild(row(t.milk, milkSel));
+
+      var sweetOptions = ['', 'no_sugar', 'less', 'normal', 'extra'].map(function (v) { return { value: v, label: t.sweets[v] || v }; });
+      var sweetSel = selectEl({ value: d.sweetness_preference || '' }, sweetOptions);
+      sweetSel.value = d.sweetness_preference || '';
+      form.appendChild(row(t.sweet, sweetSel));
+
+      var igInput = input({ type: 'text', value: d.instagram_handle || '', placeholder: '@yourhandle', dir: 'ltr' });
+      form.appendChild(row(t.ig, igInput));
+      var ttInput = input({ type: 'text', value: d.tiktok_handle || '', placeholder: '@yourhandle', dir: 'ltr' });
+      form.appendChild(row(t.tt, ttInput));
+      var fbInput = input({ type: 'text', value: d.facebook_handle || '', placeholder: 'yourhandle', dir: 'ltr' });
+      form.appendChild(row(t.fb, fbInput));
+
+      // WhatsApp opt-in (default true if currently undefined)
+      var waChecked = d.whatsapp_opt_in !== false;
+      var waLabel = el('label', { class: 'check' });
+      var waInput = el('input', { type: 'checkbox' });
+      waInput.checked = waChecked;
+      waLabel.appendChild(waInput);
+      var waText = el('span', null);
+      waText.appendChild(document.createTextNode(t.optWa));
+      waText.appendChild(el('small', null, t.optSmall));
+      waLabel.appendChild(waText);
+      form.appendChild(waLabel);
+
+      form.appendChild(msgBox);
+
+      var actions = el('div', { class: 'actions' }, [
+        el('button', { type: 'button', class: 'btn ghost', onclick: function () { state.editing = false; render(); } }, t.cancel),
+        el('button', { type: 'submit', class: 'btn' }, t.save),
+      ]);
+      form.appendChild(actions);
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var phone = phoneInput.value;
+        var digits = (phone || '').replace(/[^0-9]/g, '');
+        if (digits.length < 6) { msgBox.innerHTML = '<p class="err">' + t.errPhone + '</p>'; return; }
+
+        var saveBtn = actions.querySelector('button[type="submit"]');
+        saveBtn.disabled = true; saveBtn.textContent = t.saving; msgBox.innerHTML = '';
+
+        var drinksArr = drinkInputs.map(function (n) { return (n.value || '').trim(); }).filter(Boolean);
+
+        sb.rpc('update_passport_preferences', {
+          p_token: token,
+          p_phone: phone,
+          p_updates: {
+            favorite_drinks: drinksArr,
+            favorite_other: favOtherInput.value || '',
+            avoid_or_allergy_notes: avoidInput.value || '',
+            milk_preference: milkSel.value || '',
+            sweetness_preference: sweetSel.value || '',
+            instagram_handle: igInput.value.replace(/^@/, ''),
+            tiktok_handle: ttInput.value.replace(/^@/, ''),
+            facebook_handle: fbInput.value.replace(/^@/, ''),
+            whatsapp_opt_in: waInput.checked,
+            consent_source: 'passport_self_edit',
+          },
+        }).then(function (res) {
+          saveBtn.disabled = false; saveBtn.textContent = t.save;
+          if (res.error) {
+            // Some fields like avoid_or_allergy_notes may not be in the
+            // RPC's whitelist — retry without them.
+            if (/(column|key|jsonb).*does not exist|invalid input/i.test(res.error.message || '')) {
+              msgBox.innerHTML = '<p class="err">' + t.errSave + '</p>';
+            } else {
+              msgBox.innerHTML = '<p class="err">' + (res.error.message || t.errSave) + '</p>';
+            }
+            return;
+          }
+          var data = res.data;
+          if (!data || data.ok !== true) {
+            var code = data && data.error;
+            var emsg = code === 'verify_failed' ? t.errVerify
+                     : code === 'bad_phone' ? t.errPhone
+                     : code === 'not_found' ? t.errNotFound
+                     : t.errSave;
+            msgBox.innerHTML = '<p class="err">' + emsg + '</p>';
+            return;
+          }
+          msgBox.innerHTML = '<p class="ok">' + t.savedOk + '</p>';
+          state.editing = false;
+          load();
+        });
+      });
+
+      card.appendChild(el('h2', { style: 'margin:0 0 10px;' }, t.editTitle));
+      card.appendChild(form);
+      return card;
+    }
+
+    function render() {
+      if (state.loading) {
+        // Splash already in DOM at boot — keep until first load completes
+        return;
+      }
+      if (state.error === 'rpc_missing') return renderRpcMissing();
+      if (state.error === 'no_token' || state.error === 'not_found') return renderNotFound();
+      if (state.error) return renderError(state.error);
+      if (state.data) return renderPass();
+    }
+
+    load();
+  })();
   </script>
 </body>
 </html>
