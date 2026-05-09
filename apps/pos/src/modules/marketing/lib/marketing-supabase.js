@@ -238,6 +238,43 @@ export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArg
   return { sent, failed, total }
 }
 
+// ── Owner insights (Phase 8) ─────────────────────────────────────────
+export async function ownerInsightsTopReturning(days = 30, limit = 10) {
+  const { data, error } = await supabase.rpc('owner_insights_top_returning', { p_days: days, p_limit: limit })
+  if (error) throw error
+  return data || []
+}
+export async function ownerInsightsNearReward(threshold = 2, limit = 20) {
+  const { data, error } = await supabase.rpc('owner_insights_near_reward', { p_threshold: threshold, p_limit: limit })
+  if (error) throw error
+  return data || []
+}
+export async function ownerInsightsTopDrinks(limit = 10) {
+  const { data, error } = await supabase.rpc('owner_insights_top_drinks', { p_limit: limit })
+  if (error) throw error
+  return data || []
+}
+
+// ── Challenges (Phase 9) ─────────────────────────────────────────────
+export async function listChallenges(opts = { activeOnly: false }) {
+  let q = supabase.from('nochi_challenges').select('*').order('starts_at', { ascending: false })
+  if (opts.activeOnly) q = q.eq('active', true)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+export async function createChallenge(row) {
+  const { data: { user } = {} } = await supabase.auth.getUser()
+  const { data, error } = await supabase.from('nochi_challenges').insert({ ...row, created_by: user?.id }).select().single()
+  if (error) throw error
+  return data
+}
+export async function updateChallenge(id, updates) {
+  const { data, error } = await supabase.from('nochi_challenges').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}
+
 // ── UGC moderation (Phase 7) ─────────────────────────────────────────
 export async function listUgcSubmissions(status = null) {
   let q = supabase.from('ugc_submissions').select(`

@@ -293,6 +293,9 @@ export default function Passport() {
           />
         )}
 
+        {/* Challenges (Phase 9) */}
+        <ChallengesSection token={token} isAr={isAr} />
+
         {/* UGC — share photos with explicit consent (Phase 7) */}
         <UgcSection token={token} isAr={isAr} />
 
@@ -621,6 +624,52 @@ function ReferralSection({ code, customerName, isAr }) {
       <a href={waUrl} target="_blank" rel="noreferrer" className="btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', padding: '10px 16px' }}>
         {isAr ? '📱 شارك على واتساب' : '📱 Share on WhatsApp'}
       </a>
+    </section>
+  )
+}
+
+function ChallengesSection({ token, isAr }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_challenge_progress', { p_token: token })
+        if (cancelled) return
+        if (!error) setItems(data || [])
+      } finally { if (!cancelled) setLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [token])
+
+  if (loading || items.length === 0) return null
+
+  return (
+    <section style={{ marginTop: 16, padding: 12, background: 'rgba(255, 200, 60, 0.08)', border: '1px solid rgba(255, 200, 60, 0.30)', borderRadius: 10 }}>
+      <h2 style={{ fontSize: 16, marginBottom: 8 }}>
+        {isAr ? '🏆 تحديات نوتشي' : '🏆 Nochi challenges'}
+      </h2>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {items.map(c => {
+          const target = Math.max(1, c.target_count || 1)
+          const pct = Math.min(100, Math.round((c.progress / target) * 100))
+          const completed = !!c.completed_at
+          const name = isAr ? (c.name_ar || c.name_en) : (c.name_en || c.name_ar)
+          return (
+            <li key={c.challenge_id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{completed ? '✅ ' : ''}{name}</span>
+                <span style={{ fontSize: 12, opacity: 0.75 }} dir="ltr">{c.progress} / {target}</span>
+              </div>
+              <div style={{ width: '100%', height: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: completed ? '#3DCB78' : '#F5922E', transition: 'width 0.3s' }} />
+              </div>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

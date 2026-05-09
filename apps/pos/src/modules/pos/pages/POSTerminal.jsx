@@ -712,7 +712,9 @@ export default function POSTerminal() {
 
 function CustomerMemoryDrawer({ customerId, fallback }) {
   const [data, setData] = useState(fallback || null)
+  const [memory, setMemory] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!customerId) return
@@ -720,28 +722,43 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
     setLoading(true)
     ;(async () => {
       try {
-        const { data: row, error } = await supabase
-          .from('loyalty_customers')
-          .select(`
-            id, full_name, phone, tier, current_stamps, total_visits, nochi_state,
-            birthday_day, birthday_month,
-            favorite_drink, favorite_drinks, favorite_other,
-            milk_preference, sweetness_preference,
-            instagram_handle, tiktok_handle, facebook_handle,
-            whatsapp_opt_in, whatsapp_opt_in_at,
-            ugc_consent, ugc_consent_at,
-            consent_source
-          `)
-          .eq('id', customerId)
-          .maybeSingle()
+        const [rowRes, memRes] = await Promise.all([
+          supabase
+            .from('loyalty_customers')
+            .select(`
+              id, full_name, phone, tier, current_stamps, total_visits, nochi_state,
+              birthday_day, birthday_month,
+              favorite_drink, favorite_drinks, favorite_other,
+              milk_preference, sweetness_preference,
+              instagram_handle, tiktok_handle, facebook_handle,
+              whatsapp_opt_in, whatsapp_opt_in_at,
+              ugc_consent, ugc_consent_at,
+              consent_source
+            `)
+            .eq('id', customerId)
+            .maybeSingle(),
+          supabase.rpc('get_customer_memory', { p_customer_id: customerId }),
+        ])
         if (cancelled) return
-        if (!error && row) setData(row)
+        if (!rowRes.error && rowRes.data) setData(rowRes.data)
+        if (!memRes.error) {
+          // RPC returns the row shape directly
+          setMemory(Array.isArray(memRes.data) ? memRes.data[0] : memRes.data)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
     return () => { cancelled = true }
   }, [customerId])
+
+  const copyGreeting = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {}
+  }
 
   if (!data) {
     return (
@@ -763,6 +780,25 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
 
   return (
     <div className="mt-2 bg-noch-card border border-noch-border rounded-xl p-3 text-xs space-y-1.5">
+      {/* Phase 8 — memory summary + suggested greeting (AI-helper, never auto-sent) */}
+      {memory?.summary_en && (
+        <div className="bg-noch-dark/40 border border-noch-border/50 rounded-lg p-2.5 space-y-1.5">
+          <p className="text-white/90 leading-snug">{memory.summary_en}</p>
+          {memory.greeting_en && (
+            <button
+              type="button"
+              onClick={() => copyGreeting(memory.greeting_en)}
+              className="w-full text-left text-noch-green hover:text-noch-green/80 italic flex items-start gap-1.5 transition-colors"
+              title="Copy suggested greeting"
+            >
+              <span className="opacity-60 not-italic shrink-0">💬</span>
+              <span className="flex-1">"{memory.greeting_en}"</span>
+              <span className="opacity-60 not-italic text-[10px] shrink-0">{copied ? '✓' : '⧉'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {drinks.length > 0 && (
         <p className="text-noch-muted">
           <span className="text-white font-medium">☕ </span>

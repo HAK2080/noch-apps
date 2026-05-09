@@ -2,7 +2,7 @@
 // Owner-only. Tabs: Channels · Customers · Cohorts.
 
 import { useState } from 'react'
-import { Megaphone, Users, BarChart3, Activity, Send, Calendar, Star, Image } from 'lucide-react'
+import { Megaphone, Users, BarChart3, Activity, Send, Calendar, Star, Image, TrendingUp, Trophy } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import ChannelAnalyticsTab from './tabs/ChannelAnalyticsTab'
@@ -12,15 +12,19 @@ import CampaignsTab from './tabs/CampaignsTab'
 import ContentCalendarTab from './tabs/ContentCalendarTab'
 import ReputationTab from './tabs/ReputationTab'
 import UgcTab from './tabs/UgcTab'
+import InsightsTab from './tabs/InsightsTab'
+import ChallengesTab from './tabs/ChallengesTab'
 
 const TABS = [
-  { id: 'channels',  label: 'Channels',   icon: BarChart3 },
-  { id: 'customers', label: 'Customers',  icon: Users },
-  { id: 'cohorts',   label: 'Cohorts',    icon: Activity },
-  { id: 'campaigns', label: 'Campaigns',  icon: Send },
-  { id: 'fanwall',   label: 'Fan wall',   icon: Image },
-  { id: 'calendar',  label: 'Calendar',   icon: Calendar },
-  { id: 'reviews',   label: 'Reputation', icon: Star },
+  { id: 'channels',   label: 'Channels',   icon: BarChart3 },
+  { id: 'customers',  label: 'Customers',  icon: Users },
+  { id: 'cohorts',    label: 'Cohorts',    icon: Activity },
+  { id: 'insights',   label: 'Insights',   icon: TrendingUp },
+  { id: 'campaigns',  label: 'Campaigns',  icon: Send },
+  { id: 'challenges', label: 'Challenges', icon: Trophy },
+  { id: 'fanwall',    label: 'Fan wall',   icon: Image },
+  { id: 'calendar',   label: 'Calendar',   icon: Calendar },
+  { id: 'reviews',    label: 'Reputation', icon: Star },
 ]
 
 export default function MarketingDashboard() {
@@ -59,8 +63,10 @@ export default function MarketingDashboard() {
         {tab === 'channels'  && <ChannelAnalyticsTab />}
         {tab === 'customers' && <CustomersTab />}
         {tab === 'cohorts'   && <CohortsTab />}
-        {tab === 'campaigns' && <CampaignsTab />}
-        {tab === 'fanwall'   && <UgcTab />}
+        {tab === 'insights'   && <InsightsTab />}
+        {tab === 'campaigns'  && <CampaignsTab />}
+        {tab === 'challenges' && <ChallengesTab />}
+        {tab === 'fanwall'    && <UgcTab />}
         {tab === 'calendar'  && <ContentCalendarTab />}
         {tab === 'reviews'   && <ReputationTab />}
       </div>
