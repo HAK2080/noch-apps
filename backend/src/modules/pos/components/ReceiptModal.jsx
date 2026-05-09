@@ -5,7 +5,7 @@ import { X, Printer, DollarSign, Plus } from 'lucide-react'
 import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
 import toast from 'react-hot-toast'
 
-export default function ReceiptModal({ order, items, branch, onNewOrder, onClose }) {
+export default function ReceiptModal({ order, items, branch, loyaltyCustomer, onNewOrder, onClose }) {
   const [printing, setPrinting] = useState(false)
   const [openingDrawer, setOpeningDrawer] = useState(false)
 
@@ -111,6 +111,13 @@ export default function ReceiptModal({ order, items, branch, onNewOrder, onClose
                   <span>{parseFloat(order.change_due || 0).toFixed(2)}</span>
                 </div>
               </>
+            )}
+
+            {loyaltyCustomer?.passport_token && (
+              <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center">
+                <p className="text-noch-muted text-[10px]">Your Passport</p>
+                <p className="text-white text-[11px] break-all">noch.cloud/passport/{loyaltyCustomer.passport_token}</p>
+              </div>
             )}
 
             <div className="border-t border-dashed border-noch-border mt-2 pt-2 text-center text-noch-muted" dir="rtl">

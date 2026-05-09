@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp } from 'lucide-react'
-import { supabase, consumeLoyaltyCode } from '../../../lib/supabase'
+import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, UserPlus, X } from 'lucide-react'
+import { supabase, consumeLoyaltyCode, recordPosCustomerVisit } from '../../../lib/supabase'
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift
@@ -96,6 +96,10 @@ export default function POSTerminal() {
   // Cart state
   const [cart, setCart] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Loyalty customer attached to the current order
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState(null)
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false)
 
   // Online orders
   const [onlineOrders, setOnlineOrders] = useState([])
@@ -310,9 +314,21 @@ export default function POSTerminal() {
         toast('Loyalty redemption queued — will reconcile when online', { icon: '📴' })
       }
 
+      // Record passport visit (bumps last_visit_at, total_visits, backfills favorite_drink)
+      const visitCustomerId = paymentData.loyalty_customer_id || loyaltyCustomer?.id || null
+      if (visitCustomerId && !String(order.id || '').startsWith('offline-')) {
+        try {
+          const firstItemName = items[0]?.product_name || null
+          await recordPosCustomerVisit(visitCustomerId, firstItemName)
+        } catch {
+          // non-fatal — don't block sale completion on memory update
+        }
+      }
+
       setShowPayment(null)
-      setShowReceipt({ order, items })
+      setShowReceipt({ order, items, loyaltyCustomer: loyaltyCustomer || (visitCustomerId ? { id: visitCustomerId } : null) })
       setCart([])
+      setLoyaltyCustomer(null)
     } catch (err) {
       toast.error(err.message || 'Failed to complete sale')
     }
@@ -453,6 +469,45 @@ export default function POSTerminal() {
 
         {/* Cart panel — right 40% */}
         <div className="flex-[2] p-3 overflow-hidden flex flex-col min-w-[240px]">
+          {/* Customer chip */}
+          <div className="mb-2 shrink-0">
+            {loyaltyCustomer ? (
+              <div className="flex items-center gap-2 bg-noch-green/10 border border-noch-green/30 rounded-xl px-3 py-2">
+                <div className="w-7 h-7 rounded-full bg-noch-green/20 text-noch-green flex items-center justify-center text-xs font-bold shrink-0">
+                  {(loyaltyCustomer.full_name || '?').slice(0, 1).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{loyaltyCustomer.full_name}</p>
+                  <p className="text-noch-muted text-xs">
+                    {loyaltyCustomer.tier ? `${loyaltyCustomer.tier} · ` : ''}{loyaltyCustomer.current_stamps ?? 0} stamps
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCustomerSearch(true)}
+                  className="text-noch-muted hover:text-white text-xs px-2"
+                  title="Swap"
+                >
+                  Swap
+                </button>
+                <button
+                  onClick={() => setLoyaltyCustomer(null)}
+                  className="text-noch-muted hover:text-white p-1"
+                  title="Detach"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowCustomerSearch(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-noch-border text-noch-muted hover:text-white hover:border-noch-green/40 text-sm transition-colors"
+              >
+                <UserPlus size={14} />
+                Attach customer
+              </button>
+            )}
+          </div>
+
           <CartPanel
             items={cart}
             onUpdateQty={updateQty}
@@ -473,6 +528,7 @@ export default function POSTerminal() {
         <PaymentModal
           total={showPayment.total}
           cartItems={cart}
+          loyaltyCustomer={loyaltyCustomer}
           onComplete={handlePaymentComplete}
           onClose={() => setShowPayment(null)}
         />
@@ -483,10 +539,84 @@ export default function POSTerminal() {
           order={showReceipt.order}
           items={showReceipt.items}
           branch={branch}
+          loyaltyCustomer={showReceipt.loyaltyCustomer}
           onNewOrder={() => setShowReceipt(null)}
           onClose={() => setShowReceipt(null)}
         />
       )}
+
+      {showCustomerSearch && (
+        <CustomerSearchModal
+          onSelect={(c) => { setLoyaltyCustomer(c); setShowCustomerSearch(false) }}
+          onClose={() => setShowCustomerSearch(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function CustomerSearchModal({ onSelect, onClose }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [searching, setSearching] = useState(false)
+
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 2) { setResults([]); return }
+    let cancelled = false
+    setSearching(true)
+    const timer = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('loyalty_customers')
+          .select('id, full_name, phone, tier, current_stamps, total_visits, nochi_state, passport_token')
+          .or(`phone.ilike.%${q}%,full_name.ilike.%${q}%`)
+          .order('last_visit_at', { ascending: false, nullsFirst: false })
+          .limit(8)
+        if (!cancelled && !error) setResults(data || [])
+      } finally {
+        if (!cancelled) setSearching(false)
+      }
+    }, 200)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query])
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 pt-20" onClick={onClose}>
+      <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-noch-border">
+          <h3 className="text-white font-bold">Attach customer</h3>
+          <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="p-4">
+          <input
+            autoFocus
+            type="text"
+            placeholder="Phone or name..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="input w-full mb-3"
+          />
+          <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+            {searching && <p className="text-noch-muted text-xs px-2 py-1">Searching…</p>}
+            {!searching && query.trim().length >= 2 && results.length === 0 && (
+              <p className="text-noch-muted text-sm px-2 py-2">No matches.</p>
+            )}
+            {results.map(c => (
+              <button
+                key={c.id}
+                onClick={() => onSelect(c)}
+                className="text-left px-3 py-2 rounded-lg hover:bg-noch-green/10 border border-transparent hover:border-noch-green/30"
+              >
+                <p className="text-white text-sm font-medium">{c.full_name}</p>
+                <p className="text-noch-muted text-xs">
+                  {c.phone} · {c.tier} · {c.current_stamps ?? 0} stamps · {c.total_visits ?? 0} visits
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

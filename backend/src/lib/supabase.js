@@ -1733,6 +1733,22 @@ export async function awardLoyaltyStamp(customerId, awardedBy) {
   return data
 }
 
+export async function recordPosCustomerVisit(customerId, favoriteDrink = null) {
+  if (!customerId) return null
+  const { data, error } = await supabase.rpc('record_pos_customer_visit', {
+    p_customer_id: customerId,
+    p_favorite_drink: favoriteDrink,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function getPublicPassport(token) {
+  const { data, error } = await supabase.rpc('get_public_passport', { p_token: token })
+  if (error) throw error
+  return data
+}
+
 export async function getLoyaltyRewards(status = 'pending') {
   const { data, error } = await supabase
     .from('loyalty_rewards')
