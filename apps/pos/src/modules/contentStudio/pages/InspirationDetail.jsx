@@ -1,11 +1,35 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Sparkles, Loader2, Trash2 } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Sparkles, Loader2, Trash2, Copy, Brain, Layers } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getInspiration, updateInspiration, deleteInspiration } from '../services/inspirations'
 import { getConceptByInspirationId, createConcept, updateConcept } from '../services/concepts'
-import { extractConcept } from '../ai/extractConcept'
+import { extractConcept, extractConceptBoth, logExtraction } from '../ai/extractConcept'
 import ConceptFields from '../components/ConceptFields'
+
+// Project the AI's flat concept JSON onto the cs_extracted_concepts row
+// shape. Only fields the model populated overwrite — null/empty pass
+// through so a "mechanism" run never wipes a previous "copy" run, and
+// vice versa. (This is what makes the same row additive across modes.)
+function projectConcept(fields = {}) {
+  const out = {}
+  const passthrough = [
+    // existing
+    'hook_summary', 'content_pattern', 'emotional_driver', 'target_audience',
+    'why_it_works', 'reusable_mechanism', 'originality_risk',
+    'source_brand', 'voice_type', 'post_nature', 'joke_structure', 'notes',
+    // mechanism half (Phase 1 rebuild)
+    'mechanism_summary', 'visual_pattern', 'hook_pattern', 'emotional_trigger',
+    'why_it_worked', 'suggested_content_mission', 'suggested_nochi_format',
+    // adaptation half
+    'copy_angle', 'noch_adaptation', 'localization_angle',
+    'copy_risk_level', 'risk_reason',
+  ]
+  for (const k of passthrough) {
+    if (fields[k] != null && fields[k] !== '') out[k] = fields[k]
+  }
+  return out
+}
 
 export default function InspirationDetail() {
   const { id } = useParams()
@@ -14,7 +38,7 @@ export default function InspirationDetail() {
   const [inspiration, setInspiration] = useState(null)
   const [concept, setConcept] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [extracting, setExtracting] = useState(false)
+  const [extractingMode, setExtractingMode] = useState(null) // 'copy' | 'mechanism' | 'both' | null
   const [saving, setSaving] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -36,42 +60,86 @@ export default function InspirationDetail() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  async function handleExtract() {
-    if (!inspiration) return
-    setExtracting(true)
+  async function handleExtract(mode) {
+    if (!inspiration || extractingMode) return
+    setExtractingMode(mode)
     try {
-      const result = await extractConcept({ inspiration })
-      const fields = result?.concept || result || {}
+      const result = mode === 'both'
+        ? await extractConceptBoth({ inspiration })
+        : await extractConcept({ inspiration, mode })
+
+      const fields = result?.concept || {}
+      const projected = projectConcept(fields)
+      // Additive — preserve any fields the prior mode wrote that this
+      // mode didn't touch.
       const payload = {
         inspiration_id: inspiration.id,
-        hook_summary: fields.hook_summary || null,
-        content_pattern: fields.content_pattern || null,
-        emotional_driver: fields.emotional_driver || null,
-        target_audience: fields.target_audience || null,
-        why_it_works: fields.why_it_works || null,
-        reusable_mechanism: fields.reusable_mechanism || null,
-        originality_risk: fields.originality_risk || 'low',
-        source_brand: fields.source_brand || null,
-        voice_type: fields.voice_type || null,
-        post_nature: fields.post_nature || null,
-        notes: fields.notes || null,
-        ai_model: result?.ai_model || null,
+        ...projected,
+        adaptation_mode: mode,
+        ai_model: result?.ai_model || result?.mechanism_result?.ai_model || result?.copy_result?.ai_model || null,
         status: concept ? (concept.status || 'draft') : 'draft',
       }
+      // originality_risk default only on first creation
+      if (!concept && !payload.originality_risk) payload.originality_risk = 'low'
+
       const row = concept
         ? await updateConcept(concept.id, { ...payload, edited_by_user: false })
         : await createConcept(payload)
       setConcept(row)
+
+      // Audit log — best-effort, never blocks UI.
+      if (mode === 'both') {
+        if (result.mechanism_result) {
+          await logExtraction({
+            inspirationId: inspiration.id,
+            conceptId: row.id,
+            mode: 'mechanism',
+            output: result.mechanism_result.concept,
+            model: result.mechanism_result.ai_model,
+            durationMs: result.mechanism_result.duration_ms,
+          })
+        }
+        if (result.copy_result) {
+          await logExtraction({
+            inspirationId: inspiration.id,
+            conceptId: row.id,
+            mode: 'copy',
+            output: result.copy_result.concept,
+            model: result.copy_result.ai_model,
+            durationMs: result.copy_result.duration_ms,
+          })
+        }
+      } else {
+        await logExtraction({
+          inspirationId: inspiration.id,
+          conceptId: row.id,
+          mode,
+          output: fields,
+          model: result?.ai_model,
+          durationMs: result?.duration_ms,
+        })
+      }
+
       if (inspiration.status !== 'extracted') {
         const updated = await updateInspiration(inspiration.id, { status: 'extracted' })
         setInspiration(updated)
       }
-      toast.success('Concept extracted')
+
+      // Surface partial-failure if Both had one side fail.
+      if (mode === 'both' && (result.mechanism_error || result.copy_error)) {
+        const which = result.mechanism_error ? 'mechanism' : 'copy'
+        toast.error(`${which} extraction failed; the other side saved.`)
+      } else {
+        const label = mode === 'both' ? 'Adaptation + mechanism extracted'
+                    : mode === 'copy' ? 'Adaptation extracted'
+                    : 'Mechanism extracted'
+        toast.success(label)
+      }
     } catch (e) {
       console.error(e)
       toast.error(e.message || 'Extraction failed')
     } finally {
-      setExtracting(false)
+      setExtractingMode(null)
     }
   }
 
@@ -129,28 +197,85 @@ export default function InspirationDetail() {
 
         {/* Concept pane */}
         <section className="bg-noch-card border border-noch-border rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-3 gap-2">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <h2 className="text-white font-semibold">Extracted concept</h2>
-            <button
-              onClick={handleExtract}
-              disabled={extracting}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-noch-green text-noch-dark font-medium text-xs disabled:opacity-50"
-            >
-              {extracting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              {concept ? 'Re-extract' : 'Extract concept'}
-            </button>
+            {concept?.adaptation_mode && (
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-noch-green/15 text-noch-green border border-noch-green/30">
+                last: {concept.adaptation_mode}
+              </span>
+            )}
           </div>
-          {concept || !extracting ? (
-            <ConceptFields concept={concept} onSave={handleSaveConcept} saving={saving} />
+
+          {/* Three-mode launcher */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+            <ModeButton
+              mode="copy"
+              label="Copy / Adapt Fast"
+              hint="Rewrite for Noch — voice, dialect, product. Flag copy risk."
+              icon={Copy}
+              activeMode={extractingMode}
+              onClick={handleExtract}
+            />
+            <ModeButton
+              mode="mechanism"
+              label="Extract Mechanism"
+              hint="Why it worked. Reusable strategic intelligence."
+              icon={Brain}
+              activeMode={extractingMode}
+              onClick={handleExtract}
+            />
+            <ModeButton
+              mode="both"
+              label="Do Both"
+              hint="Run adaptation + mechanism in parallel."
+              icon={Layers}
+              activeMode={extractingMode}
+              onClick={handleExtract}
+              accent
+            />
+          </div>
+
+          {extractingMode && !concept ? (
+            <div className="text-noch-muted text-sm flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              {extractingMode === 'both' ? 'Running adaptation + mechanism…' : `Running ${extractingMode}…`}
+            </div>
           ) : (
-            <div className="text-noch-muted text-sm">Working…</div>
+            <ConceptFields concept={concept} onSave={handleSaveConcept} saving={saving} />
           )}
+
           {concept?.edited_by_user && (
             <p className="text-noch-muted text-[11px] mt-2">Edited by user</p>
           )}
         </section>
       </div>
     </div>
+  )
+}
+
+function ModeButton({ mode, label, hint, icon: Icon, activeMode, onClick, accent }) {
+  const busy = activeMode === mode
+  const disabled = activeMode != null && !busy
+  return (
+    <button
+      onClick={() => onClick(mode)}
+      disabled={busy || disabled}
+      className={`text-left p-3 rounded-xl border transition-colors disabled:opacity-50 ${
+        accent
+          ? 'border-noch-green/40 bg-noch-green/5 hover:bg-noch-green/10'
+          : 'border-noch-border bg-noch-dark/40 hover:bg-noch-card'
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        {busy ? (
+          <Loader2 size={14} className={accent ? 'animate-spin text-noch-green' : 'animate-spin text-white'} />
+        ) : (
+          <Icon size={14} className={accent ? 'text-noch-green' : 'text-white'} />
+        )}
+        <span className={`text-xs font-semibold ${accent ? 'text-noch-green' : 'text-white'}`}>{label}</span>
+      </div>
+      <p className="text-noch-muted text-[11px] leading-snug">{hint}</p>
+    </button>
   )
 }
 

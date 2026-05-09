@@ -1,6 +1,31 @@
 import { useEffect, useState } from 'react'
-import { RotateCcw, Sparkles, Loader2 } from 'lucide-react'
+import { RotateCcw, Sparkles, Loader2, Copy, Brain } from 'lucide-react'
 import { calculateConceptQuality, QUALITY_LABELS, QUALITY_COLORS, QUALITY_BG } from '../lib/conceptQuality'
+
+const RISK_BADGE = {
+  low:    { label: 'Low risk',    cls: 'bg-noch-green/15 text-noch-green border-noch-green/30' },
+  medium: { label: 'Medium risk', cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/40' },
+  high:   { label: 'High risk',   cls: 'bg-red-500/15 text-red-400 border-red-500/40' },
+}
+
+// Phase 1 rebuild — Adaptation half (Copy / Adapt Fast output).
+const ADAPTATION_FIELDS = [
+  { id: 'copy_angle',         label: 'Copy angle',          rows: 2 },
+  { id: 'noch_adaptation',    label: 'Nochi adaptation',    rows: 5, mono: true },
+  { id: 'localization_angle', label: 'Localization angle',  rows: 2 },
+  { id: 'risk_reason',        label: 'Risk reason',         rows: 2 },
+]
+
+// Phase 1 rebuild — Mechanism half (Extract Mechanism output).
+const MECHANISM_FIELDS = [
+  { id: 'mechanism_summary',          label: 'Mechanism summary',          rows: 2 },
+  { id: 'hook_pattern',               label: 'Hook pattern',               rows: 2 },
+  { id: 'visual_pattern',             label: 'Visual pattern',             rows: 2 },
+  { id: 'emotional_trigger',          label: 'Emotional trigger',          rows: 2 },
+  { id: 'why_it_worked',              label: 'Why it worked (1 line)',     rows: 2 },
+  { id: 'suggested_content_mission',  label: 'Suggested content mission',  rows: 2 },
+  { id: 'suggested_nochi_format',     label: 'Suggested Nochi format',     rows: 2 },
+]
 
 const FIELDS = [
   { id: 'hook_summary',       label: 'Hook summary',       type: 'textarea', rows: 2 },
@@ -120,6 +145,70 @@ export default function ConceptFields({ concept, onSave, saving, onScoreChange, 
         </Field>
       ))}
 
+      {/* Adaptation half — only render if ANY adaptation field is filled */}
+      {ADAPTATION_FIELDS.some(f => values[f.id]) || values.copy_risk_level ? (
+        <CollapsibleSection
+          title="Adaptation (Copy / Adapt Fast)"
+          icon={Copy}
+          accentClass="border-noch-green/30 bg-noch-green/5"
+          defaultOpen
+        >
+          {/* Copy risk level — three-state pill selector */}
+          <Field label="Copy risk level">
+            <div className="flex items-center gap-2 flex-wrap">
+              {['low', 'medium', 'high'].map(level => {
+                const active = values.copy_risk_level === level
+                const meta = RISK_BADGE[level]
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => update('copy_risk_level', active ? null : level)}
+                    className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                      active ? meta.cls : 'border-noch-border text-noch-muted hover:text-white'
+                    }`}
+                  >
+                    {meta.label}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+
+          {ADAPTATION_FIELDS.map(f => (
+            <Field key={f.id} label={f.label}>
+              <textarea
+                rows={f.rows}
+                value={values[f.id] || ''}
+                onChange={e => update(f.id, e.target.value)}
+                className={f.mono ? `${inputCls} font-mono text-[13px] leading-relaxed` : inputCls}
+              />
+            </Field>
+          ))}
+        </CollapsibleSection>
+      ) : null}
+
+      {/* Mechanism half — only render if any mechanism field is filled */}
+      {MECHANISM_FIELDS.some(f => values[f.id]) ? (
+        <CollapsibleSection
+          title="Mechanism (Extract Mechanism)"
+          icon={Brain}
+          accentClass="border-purple-500/30 bg-purple-500/5"
+          defaultOpen
+        >
+          {MECHANISM_FIELDS.map(f => (
+            <Field key={f.id} label={f.label}>
+              <textarea
+                rows={f.rows}
+                value={values[f.id] || ''}
+                onChange={e => update(f.id, e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+          ))}
+        </CollapsibleSection>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Field label="Source brand">
           <input
@@ -183,6 +272,20 @@ function initFrom(c) {
     source_brand: c?.source_brand || '',
     voice_type: c?.voice_type || '',
     post_nature: c?.post_nature || '',
+    // Phase 1 rebuild — adaptation half
+    copy_angle: c?.copy_angle || '',
+    noch_adaptation: c?.noch_adaptation || '',
+    localization_angle: c?.localization_angle || '',
+    copy_risk_level: c?.copy_risk_level || '',
+    risk_reason: c?.risk_reason || '',
+    // Phase 1 rebuild — mechanism half
+    mechanism_summary: c?.mechanism_summary || '',
+    hook_pattern: c?.hook_pattern || '',
+    visual_pattern: c?.visual_pattern || '',
+    emotional_trigger: c?.emotional_trigger || '',
+    why_it_worked: c?.why_it_worked || '',
+    suggested_content_mission: c?.suggested_content_mission || '',
+    suggested_nochi_format: c?.suggested_nochi_format || '',
   }
 }
 
@@ -194,5 +297,27 @@ function Field({ label, children }) {
       <span className="block text-noch-muted text-xs mb-1">{label}</span>
       {children}
     </label>
+  )
+}
+
+function CollapsibleSection({ title, icon: Icon, accentClass, defaultOpen, children }) {
+  const [open, setOpen] = useState(!!defaultOpen)
+  return (
+    <div className={`border rounded-xl ${accentClass}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2"
+      >
+        <Icon size={14} className="text-white shrink-0" />
+        <span className="text-white text-xs font-semibold flex-1 text-left">{title}</span>
+        <span className="text-noch-muted text-xs">{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-1 space-y-2 border-t border-current/10">
+          {children}
+        </div>
+      )}
+    </div>
   )
 }
