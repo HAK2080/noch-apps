@@ -77,6 +77,7 @@ const LoyaltyLeaderboard = lazy(() => import('./modules/loyalty/pages/LoyaltyLea
 const LoyaltyStamp     = lazy(() => import('./modules/loyalty/pages/LoyaltyStamp'))
 const LoyaltyGestures  = lazy(() => import('./modules/loyalty/pages/LoyaltyGestures'))
 const LoyaltySpinWheel = lazy(() => import('./modules/loyalty/pages/LoyaltySpinWheel'))
+const LoyaltyFeedback  = lazy(() => import('./modules/loyalty/pages/LoyaltyFeedback'))
 
 const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 
@@ -253,6 +254,7 @@ export default function App() {
         <Route path="/loyalty/stamp" element={<ProtectedRoute><LoyaltyStamp /></ProtectedRoute>} />
         <Route path="/loyalty/gestures" element={<ProtectedRoute><LoyaltyGestures /></ProtectedRoute>} />
         <Route path="/loyalty/spin" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
+        <Route path="/loyalty/feedback" element={<ProtectedRoute><LoyaltyFeedback /></ProtectedRoute>} />
         <Route path="/loyalty/intelligence" element={<ProtectedRoute><OwnerRoute><LoyaltyIntelligence /></OwnerRoute></ProtectedRoute>} />
 
         {/* Experience OS — Experiments + Messages */}

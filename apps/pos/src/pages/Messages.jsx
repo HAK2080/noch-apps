@@ -86,7 +86,7 @@ export default function Messages() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-noch-green/10 text-noch-green flex items-center justify-center">

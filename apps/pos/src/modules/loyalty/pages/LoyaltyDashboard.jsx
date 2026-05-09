@@ -239,6 +239,7 @@ export default function LoyaltyDashboard() {
               { label: ar ? '📱 QR الكاونتر' : '📱 Counter QR', path: '/loyalty/qr' },
               { label: ar ? '⚙️ الإعدادات' : '⚙️ Settings', path: '/loyalty/settings' },
               { label: ar ? '🏆 المتصدرين' : '🏆 Leaderboard', path: '/loyalty/leaderboard' },
+              { label: ar ? '💬 الملاحظات' : '💬 Feedback', path: '/loyalty/feedback' },
             ].map(item => (
               <button
                 key={item.path}
