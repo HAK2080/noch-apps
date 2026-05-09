@@ -28,12 +28,18 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
 
+    let lastLoadedUserId = null
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const newUserId = session?.user?.id ?? null
       setUser(session?.user ?? null)
       if (session?.user) {
+        // Skip refetch on TOKEN_REFRESHED / USER_UPDATED for the same user.
+        if (newUserId === lastLoadedUserId) return
+        lastLoadedUserId = newUserId
         setLoading(true)
         loadProfile(session.user.id).finally(() => setLoading(false))
       } else {
+        lastLoadedUserId = null
         setProfile(null)
         setLoading(false)
       }
