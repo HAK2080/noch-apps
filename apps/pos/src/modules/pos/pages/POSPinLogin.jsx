@@ -60,7 +60,8 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
     }
   }
 
-  // Auto-verify when 6 digits entered. Routes through the same RPC.
+  // Auto-verify only when 6 digits are entered (max PIN length).
+  // For 4-5 digit PINs the user presses Enter manually.
   const handleDigit = async (d) => {
     const newPin = pin + d
     if (newPin.length > 6) return
@@ -106,9 +107,9 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           <p className="text-noch-muted text-sm mt-1">Enter your PIN to continue</p>
         </div>
 
-        {/* PIN display */}
+        {/* PIN display — shows 4 slots minimum, expands up to 6 as digits are typed */}
         <div className="flex justify-center gap-3 mb-6">
-          {[0,1,2,3,4,5].map(i => (
+          {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
             <div key={i} className={`w-4 h-4 rounded-full border-2 transition-colors ${
               i < pin.length
                 ? 'bg-noch-green border-noch-green'
