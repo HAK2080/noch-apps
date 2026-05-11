@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Send, CheckSquare, Trash2, X, RefreshCw, UserCheck, Share2, Pencil, Save, Bell, Eye, EyeOff, Shield, Link as LinkIcon } from 'lucide-react'
-import { getAllTeamMembers, createStaffProfile, deleteProfile, getTasks, updateProfile, supabase } from '../lib/supabase'
+import { getAllTeamMembers, createStaffProfile, deleteProfile, getTasks, updateProfile, setPIN, supabase } from '../lib/supabase'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePermission } from '../lib/usePermission'
 import { useNavigate } from 'react-router-dom'
@@ -133,6 +133,11 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
       if (isEdit) {
         if (email.trim()) payload.email = email.trim()
         await updateProfile(staff.id, payload)
+        // PIN must go through the RPC (hashing + salt) — updateProfile strips it
+        const pinValue = form.pin_code.trim()
+        if (pinValue && /^\d{4,6}$/.test(pinValue)) {
+          await setPIN(staff.id, pinValue)
+        }
       } else if (isApproval) {
         const { data, error } = await supabase.functions.invoke('approve-staff-request', {
           body: { request_id: fromRequest.id, profile: payload, redirectTo: `${window.location.origin}/login` },
