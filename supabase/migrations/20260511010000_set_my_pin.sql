@@ -3,6 +3,8 @@
 -- Owners can still use set_pos_pin to update other staff's PINs.
 -- This unblocks the "My Profile" page for non-owner staff.
 
+create extension if not exists pgcrypto;
+
 create or replace function public.set_my_pin(
   p_new_pin text
 )
