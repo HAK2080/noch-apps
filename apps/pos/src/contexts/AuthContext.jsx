@@ -74,6 +74,29 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  const signInWithPIN = async (pin) => {
+    if (!pin || pin.length < 4 || pin.length > 6) throw new Error('PIN must be 4-6 digits')
+    // Call edge function which uses verify_pos_pin RPC
+    const { data, error } = await supabase.functions.invoke('sign-in-with-pin', {
+      body: { pin }
+    })
+    if (error) {
+      // Check for rate limiting error
+      if (error.message?.includes('429') || data?.locked) {
+        const retryIn = data?.retry_in_seconds || 900
+        throw new Error(`Too many failed attempts. Try again in ${Math.ceil(retryIn / 60)} minutes.`)
+      }
+      throw error
+    }
+    if (data?.error) throw new Error(data.error)
+    // On success, set user and profile from the returned session
+    if (data?.user) {
+      setUser(data.user)
+      await loadProfile(data.user.id)
+    }
+    return data
+  }
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
@@ -82,7 +105,7 @@ export function AuthProvider({ children }) {
   const isOwner = profile?.role === 'owner'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isOwner, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, isOwner, signIn, signInWithPIN, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   )

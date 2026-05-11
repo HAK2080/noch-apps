@@ -107,13 +107,25 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
 }
 
 export async function updateProfile(id, updates) {
+  // Filter out pin_code from direct updates; it must be set via RPC
+  const { pin_code, ...safeUpdates } = updates
+
   const { data, error } = await supabase
     .from('profiles')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...safeUpdates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select('id')
   if (error) throw error
   if (!data || data.length === 0) throw new Error('Save blocked — check permissions (RLS). Contact admin.')
+}
+
+export async function setPIN(userId, newPIN) {
+  const { data, error } = await supabase.rpc('set_pos_pin', {
+    p_user_id: userId,
+    p_new_pin: newPIN,
+  })
+  if (error) throw error
+  return data
 }
 
 export async function deleteProfile(id) {

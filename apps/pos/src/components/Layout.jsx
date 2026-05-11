@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, Users, BarChart2, LogOut, Coffee, Calculator, Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor, ShoppingBag, Receipt } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Users, BarChart2, LogOut, Coffee, Calculator, Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor, ShoppingBag, Receipt, Settings } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from './shared/LanguageToggle'
@@ -47,6 +47,7 @@ export default function Layout({ children }) {
 
   const ownerNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
+    { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
     { type: 'group', label: ar ? 'العمليات' : 'OPERATIONS' },
     { to: '/tasks', icon: CheckSquare, label: t('tasks') },
     { to: '/expenses', icon: Receipt, label: ar ? 'المصاريف' : 'Expenses' },
@@ -70,6 +71,7 @@ export default function Layout({ children }) {
 
   const staffNav = [
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
+    { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
     { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
     { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
     // /expenses removed from staff sidebar 2026-05-08 — route is now
