@@ -20,7 +20,7 @@ export default function MyProfile() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [avatar, setAvatar] = useState(null)
-  const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url)
+  const [avatarPreview, setAvatarPreview] = useState(profile?.photo_url)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState({})
 
@@ -54,7 +54,7 @@ export default function MyProfile() {
       if (error) throw error
 
       const { data } = supabase.storage.from('staff-photos').getPublicUrl(fileName)
-      await updateProfile(profile.id, { avatar_url: data.publicUrl })
+      await updateProfile(profile.id, { photo_url: data.publicUrl })
       setAvatar(null)
       toast.success(ar ? 'تم تحديث الصورة' : 'Avatar updated')
     } catch (err) {
