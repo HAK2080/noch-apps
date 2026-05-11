@@ -49,11 +49,11 @@ export default function MyProfile() {
     try {
       const fileName = `${profile.id}-${Date.now()}.jpg`
       const { error } = await supabase.storage
-        .from('avatars')
+        .from('staff-photos')
         .upload(fileName, avatar, { upsert: true })
       if (error) throw error
 
-      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName)
+      const { data } = supabase.storage.from('staff-photos').getPublicUrl(fileName)
       await updateProfile(profile.id, { avatar_url: data.publicUrl })
       setAvatar(null)
       toast.success(ar ? 'تم تحديث الصورة' : 'Avatar updated')
