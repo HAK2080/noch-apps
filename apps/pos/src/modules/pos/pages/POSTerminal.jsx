@@ -33,6 +33,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
+import { isPrinterConnected, printReceipt } from '../lib/escpos'
 import toast from 'react-hot-toast'
 
 let itemIdCounter = 0
@@ -416,6 +417,14 @@ export default function POSTerminal() {
       setShowReceipt({ order, items, loyaltyCustomer })
       setCart([])
       setLoyaltyCustomer(null)
+
+      // Auto-print: fire-and-forget if enabled + printer is connected.
+      // Failure toasts but never blocks the receipt modal from appearing.
+      if (localStorage.getItem('noch_auto_print') === 'true' && isPrinterConnected()) {
+        printReceipt(order, branch, items).catch(err =>
+          toast.error(`Auto-print failed: ${err.message}`)
+        )
+      }
     } catch (err) {
       toast.error(err.message || 'Failed to complete sale')
     } finally {

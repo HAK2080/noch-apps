@@ -59,6 +59,7 @@ export default function POSSettings() {
   const [openingCash, setOpeningCash] = useState('')
   const [openingShift, setOpeningShift] = useState(false)
   const [posSettings, setPosSettings] = useState(null)
+  const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
 
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
@@ -83,6 +84,12 @@ export default function POSSettings() {
       .catch(err => toast.error(err.message || 'Failed to load'))
       .finally(() => setLoading(false))
   }, [branchId])
+
+  const handleAutoPrintToggle = (value) => {
+    setAutoPrint(value)
+    localStorage.setItem('noch_auto_print', value ? 'true' : 'false')
+    toast(value ? 'Auto-print enabled' : 'Auto-print disabled', { icon: '🖨️' })
+  }
 
   const handleToggleFlag = async (flag, value) => {
     setPosSettings(s => ({ ...s, [flag]: value }))
@@ -490,6 +497,12 @@ export default function POSSettings() {
                 hint="When on, multiple staff clock in/out on the same shift with per-barista totals. Wired but not yet active."
                 value={!!posSettings.per_barista_shift}
                 onChange={v => handleToggleFlag('per_barista_shift', v)}
+              />
+              <FlagRow
+                label="Auto-print receipt on order completion"
+                hint="When on, the receipt is sent to the printer automatically after each sale — no need to tap 'Print Receipt' manually. Requires printer to be connected."
+                value={autoPrint}
+                onChange={handleAutoPrintToggle}
               />
             </div>
           </div>
