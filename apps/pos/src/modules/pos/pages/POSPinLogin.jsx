@@ -130,7 +130,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   // ── GRID STEP ──────────────────────────────────────────────────────────────
   if (step === 'grid') {
     return (
-      <div className="min-h-screen bg-noch-dark flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 bg-noch-dark flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-8">
@@ -192,7 +192,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
 
   // ── PIN STEP ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-noch-dark flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-noch-dark flex items-center justify-center p-4">
       <div className="w-full max-w-xs">
         {/* Back + selected staff */}
         <div className="text-center mb-8">
