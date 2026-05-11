@@ -542,10 +542,18 @@ export default function Staff() {
 
   const handleDelete = async () => {
     try {
-      await deleteProfile(deleteId)
-      setStaff(prev => prev.filter(s => s.id !== deleteId))
+      // Soft-delete: mark inactive instead of hard-deleting.
+      // Hard delete is impossible — 46+ tables reference profiles via FK.
+      // Setting is_active = false removes them from POS grid, prevents login,
+      // and preserves all historical orders/shifts/loyalty data.
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: false })
+        .eq('id', deleteId)
+      if (error) throw error
+      setStaff(prev => prev.map(s => s.id === deleteId ? { ...s, is_active: false } : s))
       setDeleteId(null)
-      toast.success('Staff removed')
+      toast.success('Staff member deactivated')
     } catch (err) {
       toast.error(err?.message || t('error'))
     }
@@ -834,7 +842,8 @@ export default function Staff() {
 
       {deleteId && (
         <ConfirmModal
-          message="Are you sure you want to remove this staff member?"
+          message="This will deactivate the staff member. They will no longer appear on POS or be able to log in. All their order history is preserved."
+          confirmLabel="Deactivate"
           onConfirm={handleDelete}
           onCancel={() => setDeleteId(null)}
         />
