@@ -7,13 +7,11 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const { signIn, signInWithPIN, user } = useAuth()
+  const { signIn, user } = useAuth()
   const { t, lang } = useLanguage()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('email') // 'email' | 'pin'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [resetting, setResetting] = useState(false)
 
@@ -38,9 +36,6 @@ export default function Login() {
   }
 
   const location = useLocation()
-  // Navigate once React has committed the updated user state.
-  // This avoids the race where navigate('/') fires before the state batch lands.
-  // Honour ?next=/some/path so kiosk-mode bookmarks land back on /kiosk.
   useEffect(() => {
     if (!user) return
     const next = new URLSearchParams(location.search).get('next')
@@ -51,22 +46,12 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     try {
-      if (mode === 'pin') {
-        await signInWithPIN(pin)
-      } else {
-        await signIn(email, password)
-      }
-      // Navigation is handled by the useEffect above
+      await signIn(email, password)
     } catch (err) {
       toast.error(err.message || t('loginError'))
     } finally {
       setLoading(false)
     }
-  }
-
-  const handlePINChange = (e) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6)
-    setPin(value)
   }
 
   return (
@@ -78,81 +63,38 @@ export default function Login() {
           <p className="text-noch-muted text-sm">{t('appTagline')}</p>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => { setMode('email'); setPin(''); }}
-            className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
-              mode === 'email'
-                ? 'bg-noch-green text-white'
-                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-            }`}
-          >
-            {lang === 'ar' ? 'بريد إلكتروني' : 'Email'}
-          </button>
-          <button
-            onClick={() => { setMode('pin'); setEmail(''); setPassword(''); }}
-            className={`flex-1 py-2 rounded-lg font-medium transition-colors ${
-              mode === 'pin'
-                ? 'bg-noch-green text-white'
-                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-            }`}
-          >
-            {lang === 'ar' ? 'رقم PIN' : 'PIN'}
-          </button>
-        </div>
-
         {/* Card */}
         <div className="card">
           <h2 className="text-white font-semibold text-center mb-5">{t('login')}</h2>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {mode === 'pin' ? (
-              <div>
-                <label className="label">{lang === 'ar' ? 'أدخل رقم PIN (4-6 أرقام)' : 'Enter PIN (4-6 digits)'}</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="input text-center text-3xl tracking-widest"
-                  value={pin}
-                  onChange={handlePINChange}
-                  maxLength={6}
-                  autoFocus
-                  autoComplete="off"
-                  required
-                />
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="label">{t('email')}</label>
-                  <input
-                    type="email"
-                    className="input"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    autoComplete="email"
-                    autoFocus
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('password')}</label>
-                  <input
-                    type="password"
-                    className="input"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    required
-                    minLength={6}
-                  />
-                </div>
-              </>
-            )}
+            <div>
+              <label className="label">{t('email')}</label>
+              <input
+                type="email"
+                className="input"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                autoFocus
+                required
+              />
+            </div>
+            <div>
+              <label className="label">{t('password')}</label>
+              <input
+                type="password"
+                className="input"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                minLength={6}
+              />
+            </div>
             <button
               type="submit"
-              disabled={loading || (mode === 'pin' && (pin.length < 4 || pin.length > 6))}
+              disabled={loading}
               className="btn-primary w-full mt-2"
             >
               {loading ? t('loading') : t('loginBtn')}
