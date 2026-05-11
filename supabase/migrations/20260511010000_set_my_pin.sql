@@ -23,8 +23,9 @@ begin
   end if;
 
   -- Generate a fresh per-user salt and hash
-  v_salt := encode(gen_random_bytes(16), 'hex');
-  v_hash := encode(digest(p_new_pin || v_salt, 'sha256'), 'hex');
+  -- Use schema-qualified names: Supabase installs pgcrypto in the extensions schema
+  v_salt := encode(extensions.gen_random_bytes(16), 'hex');
+  v_hash := encode(extensions.digest(p_new_pin || v_salt, 'sha256'), 'hex');
 
   -- Only allow updating your own PIN
   update profiles
