@@ -34,6 +34,7 @@ import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
 import { isPrinterConnected, printReceipt } from '../lib/escpos'
+import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 
 let itemIdCounter = 0
@@ -434,9 +435,11 @@ export default function POSTerminal() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-noch-dark flex items-center justify-center">
-      <p className="text-noch-muted">Loading terminal...</p>
-    </div>
+    <Layout>
+      <div className="flex items-center justify-center py-24">
+        <p className="text-noch-muted">Loading terminal...</p>
+      </div>
+    </Layout>
   )
 
   // PIN gate. The branch's pos_settings.require_pin defaults to true; the
@@ -446,11 +449,13 @@ export default function POSTerminal() {
   // AuthContext, so non-owners never see it.
   if (settings?.require_pin !== false && !pinVerified) {
     return (
-      <POSPinLogin
-        branchId={branchId}
-        onSuccess={() => setPinVerified(true)}
-        onSkip={() => setPinVerified(true)}
-      />
+      <Layout>
+        <POSPinLogin
+          branchId={branchId}
+          onSuccess={() => setPinVerified(true)}
+          onSkip={() => setPinVerified(true)}
+        />
+      </Layout>
     )
   }
 

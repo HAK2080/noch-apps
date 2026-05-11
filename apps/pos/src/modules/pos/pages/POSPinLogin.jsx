@@ -130,15 +130,15 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   // ── GRID STEP ──────────────────────────────────────────────────────────────
   if (step === 'grid') {
     return (
-      <div className="fixed inset-0 z-50 bg-noch-dark flex items-center justify-center p-4">
+      <div className="flex items-start justify-center py-8">
         <div className="w-full max-w-md">
-          {/* Logo */}
+          {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-noch-green/10 border border-noch-green/20 flex items-center justify-center mx-auto mb-4">
               <Coffee size={28} className="text-noch-green" />
             </div>
-            <h1 className="text-white font-bold text-2xl">noch.apps</h1>
-            <p className="text-noch-muted text-sm mt-1">Who's serving?</p>
+            <h1 className="text-white font-bold text-2xl">Who's serving?</h1>
+            <p className="text-noch-muted text-sm mt-1">Select your name then enter your PIN</p>
           </div>
 
           {loadingStaff ? (
@@ -192,7 +192,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
 
   // ── PIN STEP ───────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 bg-noch-dark flex items-center justify-center p-4">
+    <div className="flex items-start justify-center py-8">
       <div className="w-full max-w-xs">
         {/* Back + selected staff */}
         <div className="text-center mb-8">
