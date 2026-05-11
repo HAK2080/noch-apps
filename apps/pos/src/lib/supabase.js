@@ -119,9 +119,19 @@ export async function updateProfile(id, updates) {
   if (!data || data.length === 0) throw new Error('Save blocked — check permissions (RLS). Contact admin.')
 }
 
+// Owner-only: set another user's PIN
 export async function setPIN(userId, newPIN) {
   const { data, error } = await supabase.rpc('set_pos_pin', {
     p_user_id: userId,
+    p_new_pin: newPIN,
+  })
+  if (error) throw error
+  return data
+}
+
+// Self-service: any staff member can update their own PIN
+export async function setMyPIN(newPIN) {
+  const { data, error } = await supabase.rpc('set_my_pin', {
     p_new_pin: newPIN,
   })
   if (error) throw error

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { supabase, updateProfile, setPIN } from '../../lib/supabase'
+import { supabase, updateProfile, setMyPIN } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { Upload, Check, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -73,9 +73,9 @@ export default function MyProfile() {
         phone: formData.phone,
       })
 
-      // If PIN was changed, update it separately via RPC
-      if (formData.pin_code && formData.pin_code !== profile.pin_code) {
-        await setPIN(profile.id, formData.pin_code)
+      // If PIN was changed, update it via self-service RPC (no owner check)
+      if (formData.pin_code && formData.pin_code.length >= 4) {
+        await setMyPIN(formData.pin_code)
       }
 
       toast.success(ar ? 'تم حفظ البيانات' : 'Profile saved')
