@@ -106,10 +106,11 @@ export default function POSTerminal() {
   const [loading, setLoading] = useState(true)
   const [online, setOnline] = useState(isOnline())
   const [offlineQueue, setOfflineQueue] = useState(0)
-  // PIN gate: when require_pin is on (default), the terminal cannot
-  // load until a barista is verified. The PIN-verified profile is held
-  // in sessionStorage by pos-session.js and re-checked on mount.
-  const [pinVerified, setPinVerified] = useState(() => !!getServedBy())
+  // PIN gate: always require staff identification on each terminal session.
+  // On a shared tablet every new session must pick who is serving.
+  // (We do NOT seed from sessionStorage — stale data from a previous
+  //  session would silently skip the staff-picker grid.)
+  const [pinVerified, setPinVerified] = useState(false)
 
   // Cart state
   const [cart, setCart] = useState([])
