@@ -1,11 +1,15 @@
 // POSPinLogin.jsx — Staff picker + PIN confirmation screen before POS loads.
 //
 // Flow:
-//   1. Load all active staff who have a PIN set for this branch.
+//   1. Load active staff who have a PIN set (from local cache instantly,
+//      then refresh from Supabase in the background).
 //   2. Staff taps their name/photo.
 //   3. PIN keypad appears with their name shown.
-//   4. PIN verified against ONLY that staff member via verify_staff_pin RPC.
-//      → Duplicate PINs across staff are never a problem.
+//   4. PIN verified via verify_staff_pin RPC (online) OR local offline token.
+//      → Offline verification uses a token stored after the last successful
+//        online verification: sha256('offline_' + profileId + '_' + pin).
+//        This means the first-ever login on a device requires internet; all
+//        subsequent logins on the same device work offline.
 //   5. On success: setServedBy(profile) and call onSuccess(profile).
 
 import { useState, useEffect } from 'react'
@@ -13,14 +17,65 @@ import { Delete, Coffee, Loader2, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { setServedBy } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
+import { isOnline } from '../lib/pos-offline'
 import toast from 'react-hot-toast'
+
+// ── Local SHA-256 (Web Crypto API) ─────────────────────────────────────────
+async function sha256(str) {
+  const data = new TextEncoder().encode(str)
+  const buf = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(buf))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+// ── Offline token helpers ──────────────────────────────────────────────────
+// Key: noch_offline_pin_<profileId>
+// Value: sha256('offline_' + profileId + '_' + pin)  (stored as hex)
+function offlineKey(profileId) { return `noch_offline_pin_${profileId}` }
+
+async function storeOfflineToken(profileId, pin) {
+  try {
+    const token = await sha256(`offline_${profileId}_${pin}`)
+    localStorage.setItem(offlineKey(profileId), token)
+  } catch { /* non-fatal */ }
+}
+
+async function verifyOfflineToken(profileId, pin) {
+  try {
+    const stored = localStorage.getItem(offlineKey(profileId))
+    if (!stored) return false
+    const test = await sha256(`offline_${profileId}_${pin}`)
+    return test === stored
+  } catch {
+    return false
+  }
+}
+
+// ── Staff list cache ───────────────────────────────────────────────────────
+function staffCacheKey(branchId) { return `noch_staff_cache_${branchId || 'all'}` }
+
+function loadCachedStaff(branchId) {
+  try {
+    const raw = localStorage.getItem(staffCacheKey(branchId))
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveCachedStaff(branchId, staffList) {
+  try {
+    localStorage.setItem(staffCacheKey(branchId), JSON.stringify(staffList))
+  } catch { /* quota */ }
+}
 
 export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   const { isOwner } = useAuth()
 
   // Step: 'grid' | 'pin'
   const [step, setStep] = useState('grid')
-  const [staffList, setStaffList] = useState([])
+  const [staffList, setStaffList] = useState(() => loadCachedStaff(branchId))
   const [loadingStaff, setLoadingStaff] = useState(true)
   const [selectedStaff, setSelectedStaff] = useState(null)
 
@@ -28,10 +83,20 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState('')
 
-  // Load active staff who have a PIN configured
+  // Load staff: show cache immediately, then refresh from DB in background
   useEffect(() => {
+    const cached = loadCachedStaff(branchId)
+    if (cached.length > 0) {
+      setStaffList(cached)
+      setLoadingStaff(false)
+    }
+
+    if (!isOnline()) {
+      setLoadingStaff(false)
+      return
+    }
+
     const load = async () => {
-      setLoadingStaff(true)
       try {
         let query = supabase
           .from('profiles')
@@ -40,17 +105,18 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           .not('pin_code', 'is', null)
           .order('full_name')
 
-        // Filter by branch if provided
         if (branchId) {
           query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
         }
 
         const { data, error } = await query
         if (error) throw error
-        setStaffList(data || [])
+        const list = data || []
+        setStaffList(list)
+        saveCachedStaff(branchId, list)
       } catch (err) {
         console.error('Failed to load staff:', err)
-        setStaffList([])
+        // Keep cached list if fetch fails
       } finally {
         setLoadingStaff(false)
       }
@@ -81,27 +147,54 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
     setVerifying(true)
     setError('')
     try {
-      const { data, error: rpcErr } = await supabase.rpc('verify_staff_pin', {
-        p_profile_id: selectedStaff.id,
-        p_pin: pinToVerify,
-        p_branch_id: branchId || null,
-      })
-      if (rpcErr) throw rpcErr
+      let profile = null
 
-      if (data?.locked) {
-        setError(`Too many failed attempts. Try again in ${Math.ceil((data.retry_in_seconds || 900) / 60)} min.`)
-        setPin('')
-        return
-      }
-      if (!data?.matched) {
-        setError('Incorrect PIN — try again')
-        setPin('')
-        return
+      if (isOnline()) {
+        // ── Online: verify via RPC ──────────────────────────────────────
+        const { data, error: rpcErr } = await supabase.rpc('verify_staff_pin', {
+          p_profile_id: selectedStaff.id,
+          p_pin: pinToVerify,
+          p_branch_id: branchId || null,
+        })
+        if (rpcErr) throw rpcErr
+
+        if (data?.locked) {
+          setError(`Too many failed attempts. Try again in ${Math.ceil((data.retry_in_seconds || 900) / 60)} min.`)
+          setPin('')
+          return
+        }
+        if (!data?.matched) {
+          setError('Incorrect PIN — try again')
+          setPin('')
+          return
+        }
+
+        profile = data.profile
+        // Cache an offline token so this staff can verify next time without internet
+        await storeOfflineToken(selectedStaff.id, pinToVerify)
+
+      } else {
+        // ── Offline: verify via local token ────────────────────────────
+        const ok = await verifyOfflineToken(selectedStaff.id, pinToVerify)
+        if (!ok) {
+          setError('Incorrect PIN — or connect to internet for first-time login')
+          setPin('')
+          return
+        }
+        // Build profile from cached staff list
+        profile = {
+          id:         selectedStaff.id,
+          full_name:  selectedStaff.full_name,
+          role:       selectedStaff.role,
+          photo_url:  selectedStaff.photo_url,
+          department: selectedStaff.department,
+        }
+        toast('Signed in offline', { icon: '📴' })
       }
 
-      toast.success(`Welcome, ${data.profile.full_name || 'Staff'} 👋`)
-      setServedBy(data.profile)
-      onSuccess(data.profile)
+      toast.success(`Welcome, ${profile.full_name || 'Staff'} 👋`)
+      setServedBy(profile)
+      onSuccess(profile)
     } catch (err) {
       setError(err.message || 'Verification failed')
       setPin('')
@@ -115,7 +208,6 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
     const newPin = pin + d
     setPin(newPin)
     setError('')
-    // Auto-verify at 6 digits (max length)
     if (newPin.length === 6) {
       await verifyPin(newPin)
     }
@@ -138,10 +230,12 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
               <Coffee size={28} className="text-noch-green" />
             </div>
             <h1 className="text-white font-bold text-2xl">Who's serving?</h1>
-            <p className="text-noch-muted text-sm mt-1">Select your name then enter your PIN</p>
+            <p className="text-noch-muted text-sm mt-1">
+              {!isOnline() ? '📴 Offline — using cached staff' : 'Select your name then enter your PIN'}
+            </p>
           </div>
 
-          {loadingStaff ? (
+          {loadingStaff && staffList.length === 0 ? (
             <div className="flex justify-center py-12">
               <Loader2 size={32} className="animate-spin text-noch-green" />
             </div>

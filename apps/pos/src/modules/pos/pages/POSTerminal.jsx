@@ -107,11 +107,9 @@ export default function POSTerminal() {
   const [loading, setLoading] = useState(true)
   const [online, setOnline] = useState(isOnline())
   const [offlineQueue, setOfflineQueue] = useState(0)
-  // PIN gate: always require staff identification on each terminal session.
-  // On a shared tablet every new session must pick who is serving.
-  // (We do NOT seed from sessionStorage — stale data from a previous
-  //  session would silently skip the staff-picker grid.)
-  const [pinVerified, setPinVerified] = useState(false)
+  // PIN gate: seed from sessionStorage so a page refresh within the same
+  // tab keeps the same operator. Staff can switch via the header button.
+  const [pinVerified, setPinVerified] = useState(() => !!getServedBy())
 
   // Cart state
   const [cart, setCart] = useState([])
@@ -158,6 +156,15 @@ export default function POSTerminal() {
         setShift(s)
         setSettings(st)
 
+        // Stale-while-revalidate: show cached products immediately (fast),
+        // then refresh from DB in the background (always fresh).
+        const [cachedProds, cachedCats] = await Promise.all([
+          getCachedProducts(branchId),
+          getCachedCategories(branchId),
+        ])
+        if (cachedProds.length > 0) setProducts(cachedProds)
+        if (cachedCats.length > 0) setCategories(cachedCats)
+
         if (isOnline()) {
           const [prods, cats] = await Promise.all([
             getPOSProducts(branchId),
@@ -165,16 +172,8 @@ export default function POSTerminal() {
           ])
           setProducts(prods)
           setCategories(cats)
-          // Cache for offline
           cacheProducts(branchId, prods).catch(() => {})
           cacheCategories(branchId, cats).catch(() => {})
-        } else {
-          const [prods, cats] = await Promise.all([
-            getCachedProducts(branchId),
-            getCachedCategories(branchId),
-          ])
-          setProducts(prods)
-          setCategories(cats)
         }
       } catch (err) {
         toast.error(err.message || 'Failed to load terminal')
@@ -475,6 +474,21 @@ export default function POSTerminal() {
             <p className="text-yellow-400 text-xs">No shift — go to Settings to open one</p>
           )}
         </div>
+
+        {/* Serving staff chip — tap to switch */}
+        {getServedBy() && (
+          <button
+            onClick={() => { setPinVerified(false) }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-noch-border bg-noch-dark text-xs text-noch-muted hover:border-noch-green/50 hover:text-white transition-colors shrink-0"
+            title="Switch staff"
+          >
+            <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-300 shrink-0">
+              {getServedBy()?.full_name?.charAt(0)?.toUpperCase() || '?'}
+            </span>
+            <span className="max-w-[80px] truncate">{getServedBy()?.full_name}</span>
+            <Users size={10} />
+          </button>
+        )}
 
         {/* Search */}
         <div className="relative hidden sm:block">
