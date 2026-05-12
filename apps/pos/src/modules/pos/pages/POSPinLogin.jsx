@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react'
 import { Delete, Coffee, Loader2, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
-import { setServedBy } from '../lib/pos-session'
+import { setServedBy, setPinGrace, checkPinGrace } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
 import { isOnline } from '../lib/pos-offline'
 import toast from 'react-hot-toast'
@@ -125,6 +125,13 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   }, [branchId])
 
   const handleSelectStaff = (staff) => {
+    // Grace-period fast path: same staff within 30 min → skip PIN entry.
+    if (checkPinGrace(staff.id)) {
+      toast.success(`Welcome back, ${staff.full_name || 'Staff'} 👋`)
+      setServedBy(staff)
+      onSuccess(staff)
+      return
+    }
     setSelectedStaff(staff)
     setPin('')
     setError('')
@@ -172,6 +179,8 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         profile = data.profile
         // Cache an offline token so this staff can verify next time without internet
         await storeOfflineToken(selectedStaff.id, pinToVerify)
+        // Start the 30-min grace period so a quick return skips PIN re-entry
+        setPinGrace(selectedStaff.id)
 
       } else {
         // ── Offline: verify via local token ────────────────────────────
@@ -189,6 +198,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           photo_url:  selectedStaff.photo_url,
           department: selectedStaff.department,
         }
+        setPinGrace(selectedStaff.id)
         toast('Signed in offline', { icon: '📴' })
       }
 

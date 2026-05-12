@@ -49,23 +49,30 @@ export async function syncOfflineOrders() {
   }
 }
 
-export function startSyncListener() {
-  const handleOnline = async () => {
-    const queue = await getOfflineQueue()
-    if (!queue.length) return
+async function drainQueue() {
+  const queue = await getOfflineQueue()
+  if (!queue.length) return
 
-    toast.loading(`Syncing ${queue.length} offline order(s)...`, { id: 'pos-sync' })
-    try {
-      const { synced, failed } = await syncOfflineOrders()
-      if (failed === 0) {
-        toast.success(`Synced ${synced} offline order(s)`, { id: 'pos-sync' })
-      } else {
-        toast.error(`Synced ${synced}, failed ${failed}`, { id: 'pos-sync' })
-      }
-    } catch (err) {
-      toast.error('Sync failed: ' + err.message, { id: 'pos-sync' })
+  toast.loading(`Syncing ${queue.length} offline order(s)…`, { id: 'pos-sync' })
+  try {
+    const { synced, failed } = await syncOfflineOrders()
+    if (failed === 0) {
+      toast.success(`Synced ${synced} offline order(s)`, { id: 'pos-sync' })
+    } else {
+      toast.error(`Synced ${synced}, failed ${failed}`, { id: 'pos-sync' })
     }
+  } catch (err) {
+    toast.error('Sync failed: ' + err.message, { id: 'pos-sync' })
   }
+}
+
+export function startSyncListener() {
+  // Drain any orders that were queued during a previous offline session.
+  // (The 'online' event only fires on a transition, so it's never triggered
+  // if the device was already online when the page loaded.)
+  if (isOnline()) drainQueue().catch(() => {})
+
+  const handleOnline = () => drainQueue().catch(() => {})
 
   window.addEventListener('online', handleOnline)
 
