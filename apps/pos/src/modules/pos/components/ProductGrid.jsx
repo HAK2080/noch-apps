@@ -134,7 +134,6 @@ export default function ProductGrid({
               onTouchEnd={cancelPress}
               onTouchCancel={cancelPress}
               onContextMenu={(e) => e.preventDefault()}
-              disabled={unavailable}
               className={`relative rounded-2xl text-left h-[180px] sm:h-[200px] flex flex-col overflow-hidden
                 bg-noch-card border border-noch-border/40
                 transition-transform duration-75
@@ -144,7 +143,7 @@ export default function ProductGrid({
             >
               {/* Status pill — top-right, sits over the photo */}
               {product.is_sold_out ? (
-                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-red-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg">
+                <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-red-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg select-none">
                   <Ban size={10} /> Sold out
                 </div>
               ) : isOutOfStock(product) ? (
