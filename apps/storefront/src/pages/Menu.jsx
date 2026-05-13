@@ -23,7 +23,8 @@ function getEmoji(name) {
   return '✨'
 }
 
-export default function Menu({ lang = 'en' }) {
+export default function Menu() {
+  const [lang, setLang] = useState('ar')
   const [active, setActive] = useState('all')
   const [query, setQuery] = useState('')
   const [items, setItems] = useState([])
@@ -37,9 +38,8 @@ export default function Menu({ lang = 'en' }) {
         const [catRes, prodRes] = await Promise.all([
           supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).order('sort_order'),
           supabase.from('pos_products')
-            .select('id,name,name_ar,price,description,visible_on_website,category_id,pos_categories(id,name,name_ar)')
+            .select('id,name,name_ar,price,description,visible_on_website,category_id')
             .eq('is_active', true)
-            .eq('visible_on_website', true)
             .order('name'),
         ])
 
@@ -50,16 +50,16 @@ export default function Menu({ lang = 'en' }) {
           ])
         }
 
-        if (prodRes.data?.length) {
-          setItems(prodRes.data.map(p => ({
-            id: p.id,
-            cat_id: p.category_id,
-            name: p.name,
-            name_ar: p.name_ar || '',
-            price: parseFloat(p.price),
-            desc: p.description || '',
-          })))
-        }
+        // Use all active products — visible_on_website flag optional
+        const prods = prodRes.data || []
+        setItems(prods.map(p => ({
+          id: p.id,
+          cat_id: p.category_id,
+          name: p.name,
+          name_ar: p.name_ar || '',
+          price: parseFloat(p.price),
+          desc: p.description || '',
+        })))
       } catch (e) {
         console.error('Menu load error:', e)
       } finally {
@@ -87,7 +87,7 @@ export default function Menu({ lang = 'en' }) {
           <img src="/assets/logo.svg" alt="Noch" style={{height:32}} />
         </Link>
         <div className="nav-right">
-          <button className="icon-btn" title={isAr ? 'English' : 'عربي'}>ع</button>
+          <button className="icon-btn" onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}>{isAr ? 'EN' : 'ع'}</button>
         </div>
       </nav>
 
@@ -151,7 +151,7 @@ export default function Menu({ lang = 'en' }) {
                     {item.name}
                     {item.name_ar && <span className="ar">{item.name_ar}</span>}
                   </div>
-                  <div className="price">{item.price.toFixed(3)}<span>LYD</span></div>
+                  <div className="price">{item.price.toFixed(2)}<span>{isAr ? ' دينار ليبي' : ' LYD'}</span></div>
                 </div>
                 {item.desc && <p className="card-desc">{item.desc}</p>}
               </article>
@@ -181,7 +181,7 @@ export default function Menu({ lang = 'en' }) {
       </section>
 
       <footer className="m-footer">
-        {isAr ? 'الأسعار بالدينار الليبي · محدّثة من نظام المبيعات · ' : 'Prices in LYD · Live from our POS · '}
+        {isAr ? 'الأسعار بالدينار الليبي · محدّثة من نظام المبيعات · ' : 'Prices in LYD (Libyan Dinar) · Live from our POS · '}
         <Link to="/">noch.cloud</Link>
       </footer>
     </div>

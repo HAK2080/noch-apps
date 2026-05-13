@@ -192,6 +192,17 @@ function separator(char = '-', width = RECEIPT_WIDTH) {
   return line(char.repeat(width))
 }
 
+// Strip accented Latin characters (> 0x7F but not Arabic) from the branch
+// name so "Noch Café" prints as "Noch Cafe" instead of "NOCH CAF?".
+// Arabic characters are left alone — they go through encodeForPrinter().
+function sanitiseHeader(str) {
+  return String(str || '')
+    .normalize('NFD')                       // decompose é → e + combining accent
+    .replace(/[̀-ͯ]/g, '')        // drop combining diacritics (accents)
+    .replace(/[^\x00-\x7F؀-ۿ]/g, '') // keep ASCII + Arabic block
+    .trim()
+}
+
 export async function printReceipt(order, branch, items) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
 
@@ -204,13 +215,18 @@ export async function printReceipt(order, branch, items) {
   const dateStr = now.toLocaleDateString('en-GB')
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-  // Init + select Arabic-compatible code page so the Arabic footer and
-  // any product_name_ar values render as glyphs, not boxes.
+  // Use CP864 (ESC t 0x16) — the most widely supported Arabic code page on
+  // budget XPrinter units. The CP1256_MAP byte values are identical for the
+  // basic Arabic block (U+0621–U+0652), so no separate encoding table needed.
+  // Arabic default: product_name_ar, Arabic footer.
+  const headerText = sanitiseHeader(branch.receipt_header || branch.name) || 'Noch Cafe'
+  const footerText = branch.receipt_footer || 'شكراً لزيارتكم' // شكراً لزيارتكم
+
   pushCmd(CMD.INIT)
-  pushCmd(CMD.CODEPAGE_CP1256)
+  pushCmd(CMD.CODEPAGE_CP864)   // switch to CP864 Arabic before any text
   pushCmd(CMD.ALIGN_CENTER)
   pushCmd(CMD.BOLD_ON)
-  pushLine(branch.receipt_header || branch.name)
+  pushLine(headerText)
   pushCmd(CMD.BOLD_OFF)
   pushLine()
   pushCmd(CMD.ALIGN_LEFT)
@@ -220,9 +236,9 @@ export async function printReceipt(order, branch, items) {
   pushLine(padRight(dateStr, timeStr, RECEIPT_WIDTH))
   bytes.push(...separator('-'))
 
-  // Items (with modifier sub-lines)
+  // Items — prefer Arabic name when available
   for (const item of items) {
-    const name = item.product_name || item.name || 'Item'
+    const name = item.product_name_ar || item.product_name || item.name_ar || item.name || 'Item'
     const qty = item.quantity || 1
     const price = parseFloat(item.unit_price).toFixed(2)
     const total = (parseFloat(item.unit_price) * qty).toFixed(2)
@@ -238,36 +254,37 @@ export async function printReceipt(order, branch, items) {
 
   bytes.push(...separator('-'))
 
-  // Totals
+  // Totals — Arabic labels
   const subtotal = parseFloat(order.subtotal).toFixed(2)
   const total = parseFloat(order.total).toFixed(2)
-  pushLine(padRight('Subtotal:', subtotal, RECEIPT_WIDTH))
+  pushLine(padRight('المجموع الفرعي:', subtotal, RECEIPT_WIDTH))
 
   if (parseFloat(order.discount_amount) > 0) {
-    pushLine(padRight('Discount:', `-${parseFloat(order.discount_amount).toFixed(2)}`, RECEIPT_WIDTH))
+    pushLine(padRight('خصم:', `-${parseFloat(order.discount_amount).toFixed(2)}`, RECEIPT_WIDTH))
   }
 
   pushCmd(CMD.BOLD_ON)
   pushCmd(CMD.DOUBLE_SIZE)
-  pushLine(padRight('TOTAL:', total + ' LYD', RECEIPT_WIDTH - 4))
+  pushLine(padRight('الإجمالي:', total + ' LYD', RECEIPT_WIDTH - 4))
   pushCmd(CMD.NORMAL_SIZE)
   pushCmd(CMD.BOLD_OFF)
 
   bytes.push(...separator('='))
 
-  // Payment info
-  const method = order.payment_method?.toUpperCase() || 'CASH'
-  pushLine(`Payment: ${method}`)
+  // Payment info — Arabic labels
+  const methodAr = { cash: 'نقداً', card: 'بطاقة', split: 'مختلط', presto: 'بريستو' }
+  const methodLabel = methodAr[order.payment_method] || (order.payment_method?.toUpperCase() || 'CASH')
+  pushLine(`طريقة الدفع: ${methodLabel}`)
   if (order.payment_method === 'cash' && order.cash_tendered) {
-    pushLine(padRight('Tendered:', parseFloat(order.cash_tendered).toFixed(2), RECEIPT_WIDTH))
-    pushLine(padRight('Change:', parseFloat(order.change_due || 0).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('المبلغ المدفوع:', parseFloat(order.cash_tendered).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('الباقي:', parseFloat(order.change_due || 0).toFixed(2), RECEIPT_WIDTH))
   } else if (order.payment_method === 'split') {
     const cardAmt = parseFloat(order.card_amount || 0).toFixed(2)
     const cashAmt = (parseFloat(order.total) - parseFloat(order.card_amount || 0)).toFixed(2)
-    pushLine(padRight('Card:', cardAmt, RECEIPT_WIDTH))
-    pushLine(padRight('Cash:', cashAmt, RECEIPT_WIDTH))
+    pushLine(padRight('بطاقة:', cardAmt, RECEIPT_WIDTH))
+    pushLine(padRight('نقداً:', cashAmt, RECEIPT_WIDTH))
   } else if (order.payment_method === 'presto') {
-    pushLine(padRight('Presto Delivery:', parseFloat(order.total).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('توصيل بريستو:', parseFloat(order.total).toFixed(2), RECEIPT_WIDTH))
   }
 
   bytes.push(...separator('='))
@@ -275,13 +292,13 @@ export async function printReceipt(order, branch, items) {
   // Loyalty awarded
   if (order.loyalty_stamps_awarded > 0) {
     pushCmd(CMD.ALIGN_CENTER)
-    pushLine(`* ${order.loyalty_stamps_awarded} loyalty stamp(s) awarded *`)
+    pushLine(`* تم منح ${order.loyalty_stamps_awarded} طابع ولاء *`)
     pushCmd(CMD.ALIGN_LEFT)
   }
 
-  // Footer (Arabic greeting — may not render on all printers)
+  // Footer
   pushCmd(CMD.ALIGN_CENTER)
-  pushLine(branch.receipt_footer || 'Thank you for visiting!')
+  pushLine(footerText)
   pushLine()
   pushLine()
   pushLine()
