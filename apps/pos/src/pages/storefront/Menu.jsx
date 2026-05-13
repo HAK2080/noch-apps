@@ -116,10 +116,11 @@ export default function Menu() {
       setError(null)
       const [{ data: b, error: be }, { data: cats }, { data: prods }] = await Promise.all([
         supabase.from('pos_branches').select('*').eq('id', branchId).eq('is_active', true).single(),
-        // Categories: visible at this branch (new array model) OR legacy single branch_id
+        // Categories: visible at this branch + shown on website (show_on_website = true)
         supabase.from('pos_categories')
           .select('*')
           .eq('is_active', true)
+          .eq('show_on_website', true)
           .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
           .order('sort_order').order('name'),
         // Products: visible at this branch + visible on customer menu

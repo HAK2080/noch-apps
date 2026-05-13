@@ -300,6 +300,8 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
   const [name, setName] = useState(category?.name || '')
   const [nameAr, setNameAr] = useState(category?.name_ar || '')
   const [color, setColor] = useState(category?.color || '#10b981')
+  const [showInPos, setShowInPos] = useState(category?.show_in_pos ?? true)
+  const [showOnWebsite, setShowOnWebsite] = useState(category?.show_on_website ?? true)
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
@@ -307,10 +309,10 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
     setSaving(true)
     try {
       if (isEdit) {
-        await updatePOSCategory(category.id, { name, name_ar: nameAr, color })
+        await updatePOSCategory(category.id, { name, name_ar: nameAr, color, show_in_pos: showInPos, show_on_website: showOnWebsite })
         toast.success('Category updated')
       } else {
-        await createPOSCategory({ branch_id: branchId, name, name_ar: nameAr, color })
+        await createPOSCategory({ branch_id: branchId, name, name_ar: nameAr, color, show_in_pos: showInPos, show_on_website: showOnWebsite })
         toast.success('Category created')
       }
       onSave()
@@ -331,6 +333,17 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
         <input value={nameAr} onChange={e => setNameAr(e.target.value)} className="input w-full mb-3 text-right" dir="rtl" placeholder="المشروبات الساخنة" />
         <label className="label block mb-1">Color</label>
         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-full h-10 rounded cursor-pointer mb-4" />
+        <div className="border border-noch-border rounded-xl p-3 mb-4 flex flex-col gap-2">
+          <p className="text-noch-muted text-xs mb-1">Visible in</p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={showInPos} onChange={e => setShowInPos(e.target.checked)} className="accent-noch-green" />
+            <span className="text-white text-sm">POS food menu</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={showOnWebsite} onChange={e => setShowOnWebsite(e.target.checked)} className="accent-noch-green" />
+            <span className="text-white text-sm">Online ordering menu</span>
+          </label>
+        </div>
         <div className="flex gap-3">
           <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
