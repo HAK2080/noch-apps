@@ -217,7 +217,7 @@ export default function Menu() {
   function name_(p) { return lang === 'ar' && p.name_ar ? p.name_ar : p.name }
   function desc_(p) { return lang === 'ar' && p.menu_description_ar ? p.menu_description_ar : p.menu_description }
   const t = (en, ar) => lang === 'ar' ? ar : en
-  const currency = lang === 'ar' ? 'دينار ليبي' : 'LYD'
+  const currency = lang === 'ar' ? 'دينار' : 'LYD'
 
   async function handlePlaceOrder() {
     if (!name.trim())  { setSubmitError(t('Please enter your name', 'الرجاء إدخال اسمك')); return }

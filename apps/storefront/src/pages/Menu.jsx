@@ -151,7 +151,7 @@ export default function Menu() {
                     {item.name}
                     {item.name_ar && <span className="ar">{item.name_ar}</span>}
                   </div>
-                  <div className="price">{item.price.toFixed(2)}<span>{isAr ? ' دينار ليبي' : ' LYD'}</span></div>
+                  <div className="price">{item.price.toFixed(2)}<span>{isAr ? ' دينار' : ' LYD'}</span></div>
                 </div>
                 {item.desc && <p className="card-desc">{item.desc}</p>}
               </article>
