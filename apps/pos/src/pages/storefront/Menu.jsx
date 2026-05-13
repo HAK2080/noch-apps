@@ -342,7 +342,7 @@ export default function Menu() {
             {featured.map(p => (
               <ProductCard key={p.id} p={p} qty={cart[p.id] || 0}
                 onAdd={() => addToCart(p.id)} onRemove={() => removeFromCart(p.id)}
-                name_={name_} desc_={desc_} featured
+                name_={name_} desc_={desc_} featured currency={currency}
                 catColor={catColorMap[p.category_id] || CARD_COLORS[0]} />
             ))}
           </div>
@@ -383,7 +383,7 @@ export default function Menu() {
                   {grpProds.map(p => (
                     <ProductCard key={p.id} p={p} qty={cart[p.id] || 0}
                       onAdd={() => addToCart(p.id)} onRemove={() => removeFromCart(p.id)}
-                      name_={name_} desc_={desc_}
+                      name_={name_} desc_={desc_} currency={currency}
                       catColor={catColorMap[p.category_id] || CARD_COLORS[0]} />
                   ))}
                 </div>
@@ -398,7 +398,7 @@ export default function Menu() {
               : filtered.map(p => (
                   <ProductCard key={p.id} p={p} qty={cart[p.id] || 0}
                     onAdd={() => addToCart(p.id)} onRemove={() => removeFromCart(p.id)}
-                    name_={name_} desc_={desc_}
+                    name_={name_} desc_={desc_} currency={currency}
                     catColor={catColorMap[p.category_id] || CARD_COLORS[0]} />
                 ))
             }
@@ -570,7 +570,7 @@ export default function Menu() {
   )
 }
 
-function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatured, catColor }) {
+function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatured, catColor, currency }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
