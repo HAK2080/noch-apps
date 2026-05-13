@@ -13,6 +13,7 @@ import {
 import BarcodeScanner from '../components/BarcodeScanner'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+import { supabase } from '../../../lib/supabase'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
@@ -300,19 +301,42 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
   const [name, setName] = useState(category?.name || '')
   const [nameAr, setNameAr] = useState(category?.name_ar || '')
   const [color, setColor] = useState(category?.color || '#10b981')
+  const [imageUrl, setImageUrl] = useState(category?.image_url || '')
   const [showInPos, setShowInPos] = useState(category?.show_in_pos ?? true)
   const [showOnWebsite, setShowOnWebsite] = useState(category?.show_on_website ?? true)
   const [saving, setSaving] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const imgRef = useRef(null)
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImg(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `cat_${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('staff-photos').upload(path, file, { upsert: true })
+      if (uploadErr) throw uploadErr
+      const { data } = supabase.storage.from('staff-photos').getPublicUrl(path)
+      setImageUrl(data.publicUrl)
+      toast.success('Image uploaded')
+    } catch (err) {
+      toast.error(err.message || 'Upload failed')
+    } finally {
+      setUploadingImg(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!name) return toast.error('Name required')
     setSaving(true)
     try {
+      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite }
       if (isEdit) {
-        await updatePOSCategory(category.id, { name, name_ar: nameAr, color, show_in_pos: showInPos, show_on_website: showOnWebsite })
+        await updatePOSCategory(category.id, payload)
         toast.success('Category updated')
       } else {
-        await createPOSCategory({ branch_id: branchId, name, name_ar: nameAr, color, show_in_pos: showInPos, show_on_website: showOnWebsite })
+        await createPOSCategory({ branch_id: branchId, ...payload })
         toast.success('Category created')
       }
       onSave()
@@ -325,8 +349,31 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-xs p-5">
+      <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-xs p-5 max-h-[90vh] overflow-y-auto">
         <h2 className="text-white font-bold mb-4">{isEdit ? 'Edit Category' : 'New Category'}</h2>
+
+        {/* Avatar / Icon */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-16 h-16 rounded-xl border-2 border-noch-border overflow-hidden bg-noch-bg flex items-center justify-center flex-shrink-0">
+            {imageUrl
+              ? <img src={imageUrl} alt="category" className="w-full h-full object-cover" />
+              : <span className="text-2xl">{catEmoji(name) || '🌿'}</span>
+            }
+          </div>
+          <div>
+            <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+            <button onClick={() => imgRef.current?.click()} disabled={uploadingImg}
+              className="text-xs bg-noch-border text-noch-muted px-3 py-1.5 rounded-lg hover:text-white transition-colors block mb-1">
+              {uploadingImg ? 'Uploading...' : 'Upload image'}
+            </button>
+            {imageUrl && (
+              <button onClick={() => setImageUrl('')} className="text-xs text-red-400 hover:text-red-300">
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
         <label className="label block mb-1">Name (EN) *</label>
         <input value={name} onChange={e => setName(e.target.value)} className="input w-full mb-3" placeholder="Hot Drinks" />
         <label className="label block mb-1">Name (AR)</label>
@@ -832,7 +879,10 @@ export default function POSProducts() {
                   <div className="cursor-grab active:cursor-grabbing text-noch-muted hover:text-white shrink-0 touch-none select-none">
                     <GripVertical size={16} />
                   </div>
-                  <div className="w-3 h-8 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
+                  {c.image_url
+                    ? <img src={c.image_url} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-noch-border" />
+                    : <div className="w-3 h-8 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
+                  }
                   <div className="flex-1">
                     <p className="text-white font-medium">{c.name}</p>
                     {c.name_ar && <p className="text-noch-muted text-xs" dir="rtl">{c.name_ar}</p>}

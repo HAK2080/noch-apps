@@ -27,7 +27,8 @@ function V60Icon({ size = 16 }) {
   )
 }
 
-function CatIcon({ name }) {
+function CatIcon({ name, imageUrl }) {
+  if (imageUrl) return <img src={imageUrl} alt={name} style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover', display: 'inline-block', verticalAlign: '-3px' }} />
   const n = (name || '').toLowerCase()
   if (/matcha|ماتشا/.test(n) && !/coffee/.test(n)) return <MatchaIcedIcon />
   if (/tools|tool|equipment|أدوات|معدات|v60/.test(n)) return <V60Icon />
@@ -360,7 +361,7 @@ export default function Menu() {
             const label = lang === 'ar' && c.name_ar ? c.name_ar : c.name
             return (
               <button key={c.id} className={`cat-pill${selectedCat === c.id ? ' active' : ''}`} onClick={() => setSelectedCat(c.id)}>
-                <CatIcon name={label} />&nbsp;{label}
+                <CatIcon name={label} imageUrl={c.image_url} />&nbsp;{label}
               </button>
             )
           })}
@@ -378,7 +379,7 @@ export default function Menu() {
             return (
               <section key={cat?.id || 'uncategorized'} className="cat-group">
                 <h2 className="cat-group-heading">
-                  {cat ? <CatIcon name={catLabel} /> : '🌿'}&nbsp;{catLabel}
+                  {cat ? <CatIcon name={catLabel} imageUrl={cat.image_url} /> : '🌿'}&nbsp;{catLabel}
                 </h2>
                 <div className="products-grid">
                   {grpProds.map(p => (
