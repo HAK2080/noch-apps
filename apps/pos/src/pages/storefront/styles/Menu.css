@@ -101,10 +101,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  min-height: 100dvh;
   gap: 16px;
-  color: var(--muted);
-  font-family: 'Inter', sans-serif;
+  /* Own colours — these are outside .menu-root so can't use CSS vars */
+  background: #FBF3E3;
+  color: #4a4560;
+  font-family: 'Inter', 'IBM Plex Sans Arabic', sans-serif;
+}
+.menu-loading .loading-spinner {
+  border-color: #e8e0d0;
+  border-top-color: #E86A1E;
 }
 .loading-spinner {
   width: 36px; height: 36px;
@@ -118,8 +124,10 @@
 .menu-error {
   text-align: center;
   padding: 60px 20px;
+  min-height: 100dvh;
+  background: #FBF3E3;
   color: #c0392b;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', 'IBM Plex Sans Arabic', sans-serif;
 }
 
 /* Featured */
