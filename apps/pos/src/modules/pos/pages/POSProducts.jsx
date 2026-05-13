@@ -295,18 +295,24 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
   )
 }
 
-function CategoryModal({ branchId, onSave, onClose }) {
-  const [name, setName] = useState('')
-  const [nameAr, setNameAr] = useState('')
-  const [color, setColor] = useState('#10b981')
+function CategoryModal({ branchId, category, onSave, onClose }) {
+  const isEdit = !!category
+  const [name, setName] = useState(category?.name || '')
+  const [nameAr, setNameAr] = useState(category?.name_ar || '')
+  const [color, setColor] = useState(category?.color || '#10b981')
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
     if (!name) return toast.error('Name required')
     setSaving(true)
     try {
-      await createPOSCategory({ branch_id: branchId, name, name_ar: nameAr, color })
-      toast.success('Category created')
+      if (isEdit) {
+        await updatePOSCategory(category.id, { name, name_ar: nameAr, color })
+        toast.success('Category updated')
+      } else {
+        await createPOSCategory({ branch_id: branchId, name, name_ar: nameAr, color })
+        toast.success('Category created')
+      }
       onSave()
     } catch (err) {
       toast.error(err.message || 'Save failed')
@@ -318,7 +324,7 @@ function CategoryModal({ branchId, onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-xs p-5">
-        <h2 className="text-white font-bold mb-4">New Category</h2>
+        <h2 className="text-white font-bold mb-4">{isEdit ? 'Edit Category' : 'New Category'}</h2>
         <label className="label block mb-1">Name (EN) *</label>
         <input value={name} onChange={e => setName(e.target.value)} className="input w-full mb-3" placeholder="Hot Drinks" />
         <label className="label block mb-1">Name (AR)</label>
@@ -328,7 +334,7 @@ function CategoryModal({ branchId, onSave, onClose }) {
         <div className="flex gap-3">
           <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-            {saving ? '...' : 'Create'}
+            {saving ? '...' : isEdit ? 'Save' : 'Create'}
           </button>
         </div>
       </div>
@@ -352,6 +358,7 @@ export default function POSProducts() {
   const [editProduct, setEditProduct] = useState(null)
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showAddCategory, setShowAddCategory] = useState(false)
+  const [editCategory, setEditCategory] = useState(null)
   const [showShare, setShowShare] = useState(false)
 
   const load = async () => {
@@ -817,6 +824,9 @@ export default function POSProducts() {
                     <p className="text-white font-medium">{c.name}</p>
                     {c.name_ar && <p className="text-noch-muted text-xs" dir="rtl">{c.name_ar}</p>}
                   </div>
+                  <button onClick={() => setEditCategory(c)} className="p-1.5 text-noch-muted hover:text-white">
+                    <Edit2 size={14} />
+                  </button>
                   <button onClick={() => handleDeleteCategory(c.id)} className="p-1.5 text-noch-muted hover:text-red-400">
                     <Trash2 size={14} />
                   </button>
@@ -838,11 +848,12 @@ export default function POSProducts() {
         />
       )}
 
-      {showAddCategory && (
+      {(showAddCategory || editCategory) && (
         <CategoryModal
           branchId={branchId}
-          onSave={() => { setShowAddCategory(false); load() }}
-          onClose={() => setShowAddCategory(false)}
+          category={editCategory || null}
+          onSave={() => { setShowAddCategory(false); setEditCategory(null); load() }}
+          onClose={() => { setShowAddCategory(false); setEditCategory(null) }}
         />
       )}
 
