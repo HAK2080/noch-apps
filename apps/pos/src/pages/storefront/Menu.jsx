@@ -124,11 +124,16 @@ export default function Menu() {
           .eq('show_on_website', true)
           .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
           .order('sort_order').order('name'),
-        // Products: visible at this branch + visible on customer menu
+        // Products: active + visible_on_customer_menu = true.
+        // Three independent visibility channels:
+        //   visible_on_menu          = POS staff terminal grid
+        //   visible_on_customer_menu = this page (customer ordering)
+        //   visible_on_website       = Online store (retail: tools, bags)
+        // Category-level show_on_website controls which category tabs appear.
         supabase.from('pos_products')
           .select('*')
           .eq('is_active', true)
-          .eq('visible_on_menu', true)
+          .eq('visible_on_customer_menu', true)
           .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
           .order('menu_sort')
           .order('name'),
@@ -136,15 +141,7 @@ export default function Menu() {
       if (be) throw new Error('Branch not found')
       setBranch(b)
       setCategories(cats || [])
-      if (!prods?.length) {
-        const { data: all } = await supabase.from('pos_products')
-          .select('*').eq('is_active', true)
-          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
-          .order('name')
-        setProducts(all || [])
-      } else {
-        setProducts(prods)
-      }
+      setProducts(prods || [])
     } catch (err) {
       setError(err.message || 'Failed to load menu')
     } finally {
@@ -200,7 +197,11 @@ export default function Menu() {
     return map
   }, [categories])
 
-  // Grouped layout for "All" view
+  // Set of visible category IDs (categories with show_on_website = true)
+  const visibleCatIds = useMemo(() => new Set(categories.map(c => c.id)), [categories])
+
+  // Grouped layout for "All" view.
+  // Only include products whose category is in the visible list — no "Other" bucket.
   const groupedView = useMemo(() => {
     if (selectedCat !== 'all' || categories.length === 0) return null
     const groups = []
@@ -208,13 +209,13 @@ export default function Menu() {
       const prods = products.filter(p => p.category_id === cat.id)
       if (prods.length > 0) groups.push({ cat, products: prods })
     })
-    const uncategorized = products.filter(p => !p.category_id || !categories.find(c => c.id === p.category_id))
-    if (uncategorized.length > 0) groups.push({ cat: null, products: uncategorized })
     return groups.length > 0 ? groups : null
   }, [selectedCat, products, categories])
 
-  const featured = products.filter(p => p.featured)
-  const filtered  = selectedCat === 'all' ? products : products.filter(p => p.category_id === selectedCat)
+  const featured = products.filter(p => p.featured && visibleCatIds.has(p.category_id))
+  const filtered  = selectedCat === 'all'
+    ? products.filter(p => visibleCatIds.has(p.category_id))
+    : products.filter(p => p.category_id === selectedCat)
 
   function name_(p) { return lang === 'ar' && p.name_ar ? p.name_ar : p.name }
   function desc_(p) { return lang === 'ar' && p.menu_description_ar ? p.menu_description_ar : p.menu_description }

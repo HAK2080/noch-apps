@@ -40,54 +40,199 @@ import toast from 'react-hot-toast'
 let itemIdCounter = 0
 function newItemId() { return ++itemIdCounter }
 
-function OnlineOrderRow({ order, branchId, onConfirmed }) {
-  const [confirming, setConfirming] = useState(false)
+// ── Sound alert (Web Audio API — no file needed) ─────────────────────────────
+function playOrderAlert() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const play = (freq, start, dur) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + start)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur)
+      osc.start(ctx.currentTime + start)
+      osc.stop(ctx.currentTime + start + dur)
+    }
+    play(880, 0, 0.15)
+    play(1100, 0.18, 0.15)
+    play(1320, 0.36, 0.25)
+  } catch {}
+}
 
-  const handleConfirm = async () => {
-    setConfirming(true)
+// ── New order popup modal ─────────────────────────────────────────────────────
+function NewOrderModal({ order, branchId, onAccept, onDecline }) {
+  const [busy, setBusy] = useState(false)
+
+  const handle = async (action) => {
+    setBusy(true)
     try {
-      const { data, error } = await supabase.rpc('confirm_pickup_order', {
-        p_pickup_code: order.pickup_code,
-        p_branch_id: branchId,
-      })
+      const fn = action === 'accept' ? 'approve_online_order' : 'cancel_online_order'
+      const { data, error } = await supabase.rpc(fn, { p_order_id: order.id, p_branch_id: branchId })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
-      toast.success(`Order ${order.order_number} confirmed`)
-      onConfirmed()
+      if (action === 'accept') { toast.success(`✅ Order ${order.order_number} accepted`); onAccept() }
+      else { toast(`❌ Order ${order.order_number} declined`, { icon: '🚫' }); onDecline() }
     } catch (err) {
-      toast.error(err.message || 'Confirm failed')
+      toast.error(err.message || 'Failed')
     } finally {
-      setConfirming(false)
+      setBusy(false)
     }
   }
 
   return (
-    <div className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm border ${
-      order.awaiting_staff_confirm
-        ? 'bg-yellow-500/10 border-yellow-500/30'
-        : 'bg-noch-dark border-transparent'
-    }`}>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-noch-green font-mono text-xs">{order.order_number}</span>
-        <span className="text-white">{order.customer_name || 'Guest'}</span>
-        {order.table_number && <span className="text-yellow-400 text-xs">📍 Table {order.table_number}</span>}
-        {order.awaiting_staff_confirm && order.pickup_code && (
-          <span className="text-yellow-300 text-xs font-mono tracking-widest">CODE: {order.pickup_code}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.85)' }}>
+      <div className="bg-noch-card border-2 border-yellow-500/60 rounded-2xl w-full max-w-sm shadow-2xl animate-pulse-once">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-noch-border">
+          <span className="text-3xl">🛎</span>
+          <div>
+            <p className="text-yellow-400 font-bold text-lg">New Online Order!</p>
+            <p className="text-noch-muted text-sm font-mono">{order.order_number}</p>
+          </div>
+        </div>
+        {/* Customer */}
+        <div className="px-5 py-3 border-b border-noch-border">
+          <p className="text-white font-semibold">{order.customer_name || 'Guest'}</p>
+          {order.customer_phone && <p className="text-noch-muted text-sm">{order.customer_phone}</p>}
+          {order.table_number && (
+            <p className="text-yellow-400 text-sm mt-1">📍 Table {order.table_number}</p>
+          )}
+        </div>
+        {/* Items */}
+        {order.pos_order_items?.length > 0 && (
+          <div className="px-5 py-3 border-b border-noch-border max-h-48 overflow-y-auto">
+            {order.pos_order_items.map((it, i) => (
+              <div key={i} className="flex justify-between text-sm py-1">
+                <span className="text-white">{it.quantity}× {it.product_name_ar || it.product_name}</span>
+                <span className="text-noch-muted">{Number(it.total).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
-      <div className="flex flex-col items-end gap-1">
-        <span className="text-white font-semibold">{Number(order.total).toFixed(2)} LYD</span>
-        <span className="text-noch-muted text-xs">
-          {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
-        {order.awaiting_staff_confirm && (
+        {/* Total */}
+        <div className="flex justify-between items-center px-5 py-3 border-b border-noch-border">
+          <span className="text-noch-muted">Total</span>
+          <span className="text-white font-bold text-lg">{Number(order.total).toFixed(2)} LYD</span>
+        </div>
+        {/* Pickup code */}
+        {order.pickup_code && (
+          <div className="px-5 py-3 border-b border-noch-border text-center">
+            <p className="text-noch-muted text-xs mb-1">Pickup code</p>
+            <p className="text-yellow-300 font-mono font-bold text-2xl tracking-widest">{order.pickup_code}</p>
+          </div>
+        )}
+        {/* Actions */}
+        <div className="flex gap-3 px-5 py-4">
           <button
-            onClick={handleConfirm}
-            disabled={confirming}
-            className="bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded-full transition-colors disabled:opacity-50"
+            onClick={() => handle('decline')}
+            disabled={busy}
+            className="flex-1 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 font-bold transition-colors disabled:opacity-50"
           >
-            {confirming ? '…' : 'Confirm'}
+            ✕ Decline
           </button>
+          <button
+            onClick={() => handle('accept')}
+            disabled={busy}
+            className="flex-1 py-3 rounded-xl bg-noch-green text-black font-bold hover:bg-noch-green/80 transition-colors disabled:opacity-50"
+          >
+            ✓ Accept
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Pending order row in the panel ───────────────────────────────────────────
+function OnlineOrderRow({ order, branchId, onConfirmed, onCancelled }) {
+  const [busy, setBusy] = useState(false)
+
+  const handleAction = async (action) => {
+    setBusy(true)
+    try {
+      if (action === 'confirm_pickup') {
+        const { data, error } = await supabase.rpc('confirm_pickup_order', {
+          p_pickup_code: order.pickup_code, p_branch_id: branchId,
+        })
+        if (error) throw error
+        if (data?.error) throw new Error(data.error)
+        toast.success(`Order ${order.order_number} collected`)
+        onConfirmed()
+      } else if (action === 'accept') {
+        const { data, error } = await supabase.rpc('approve_online_order', {
+          p_order_id: order.id, p_branch_id: branchId,
+        })
+        if (error) throw error
+        if (data?.error) throw new Error(data.error)
+        toast.success(`Order ${order.order_number} accepted`)
+        onConfirmed()
+      } else {
+        const { data, error } = await supabase.rpc('cancel_online_order', {
+          p_order_id: order.id, p_branch_id: branchId,
+        })
+        if (error) throw error
+        if (data?.error) throw new Error(data.error)
+        toast(`Order ${order.order_number} cancelled`, { icon: '🚫' })
+        onCancelled()
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const isPending = order.awaiting_staff_confirm
+  const isInProgress = order.status === 'in_progress'
+
+  return (
+    <div className={`rounded-lg px-3 py-2 text-sm border ${
+      isPending ? 'bg-yellow-500/10 border-yellow-500/40' : 'bg-noch-dark border-transparent'
+    }`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-noch-green font-mono text-xs">{order.order_number}</span>
+          <span className="text-white font-medium">{order.customer_name || 'Guest'}</span>
+          {order.table_number && <span className="text-yellow-400 text-xs">📍 Table {order.table_number}</span>}
+          {isInProgress && order.pickup_code && (
+            <span className="text-yellow-300 text-xs font-mono tracking-widest mt-1">
+              CODE: {order.pickup_code}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className="text-white font-semibold">{Number(order.total).toFixed(2)} LYD</span>
+          <span className="text-noch-muted text-xs">
+            {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-2">
+        {isPending && (
+          <>
+            <button onClick={() => handleAction('decline')} disabled={busy}
+              className="flex-1 py-1 text-xs rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium disabled:opacity-50">
+              ✕ Decline
+            </button>
+            <button onClick={() => handleAction('accept')} disabled={busy}
+              className="flex-1 py-1 text-xs rounded-lg bg-noch-green/20 text-noch-green hover:bg-noch-green/30 font-medium disabled:opacity-50">
+              ✓ Accept
+            </button>
+          </>
+        )}
+        {isInProgress && (
+          <>
+            <button onClick={() => handleAction('cancel')} disabled={busy}
+              className="flex-1 py-1 text-xs rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium disabled:opacity-50">
+              Cancel
+            </button>
+            <button onClick={() => handleAction('confirm_pickup')} disabled={busy}
+              className="flex-1 py-1 text-xs rounded-lg bg-noch-green text-black hover:bg-noch-green/80 font-bold disabled:opacity-50">
+              ✓ Collected
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -134,6 +279,7 @@ export default function POSTerminal() {
   const [onlineOrders, setOnlineOrders] = useState([])
   const [showOnlineOrders, setShowOnlineOrders] = useState(false)
   const onlineOrdersTimer = useRef(null)
+  const [newOrderAlert, setNewOrderAlert] = useState(null) // order to show in popup
 
   // Modals
   const [showPayment, setShowPayment] = useState(null) // charge data
@@ -168,7 +314,7 @@ export default function POSTerminal() {
         if (isOnline()) {
           const [prods, cats] = await Promise.all([
             getPOSProducts(branchId),
-            getPOSCategories(branchId),
+            getPOSCategories(branchId, { posOnly: true }),
           ])
           setProducts(prods)
           setCategories(cats)
@@ -204,35 +350,58 @@ export default function POSTerminal() {
     }
   }, [branchId])
 
-  // Poll for online orders every 30 seconds
+  // Fetch pending online orders (initial load + after actions)
+  const fetchOnlineOrders = useCallback(async () => {
+    if (!isOnline()) return
+    try {
+      const { data } = await supabase
+        .from('pos_orders')
+        .select('id,order_number,customer_name,customer_phone,total,table_number,created_at,awaiting_staff_confirm,pickup_code,status,pos_order_items(product_name,product_name_ar,quantity,unit_price,total)')
+        .eq('branch_id', branchId)
+        .eq('source', 'online')
+        .in('status', ['pending', 'in_progress'])
+        .order('created_at', { ascending: false })
+        .limit(20)
+      setOnlineOrders(data || [])
+    } catch { /* silently ignore */ }
+  }, [branchId])
+
+  // Realtime subscription — instant notification on new online order
   useEffect(() => {
-    async function fetchOnlineOrders() {
-      if (!isOnline()) return
-      try {
-        const { data, error: err } = await supabase
-          .from('pos_orders')
-          .select('id,order_number,customer_name,total,table_number,created_at,awaiting_staff_confirm,pickup_code')
-          .eq('branch_id', branchId)
-          .eq('source', 'online')
-          .in('status', ['pending', 'pending_confirm'])
-          .order('created_at', { ascending: false })
-          .limit(10)
-
-        if (!err) {
-          setOnlineOrders(data || [])
-        }
-      } catch {
-        // silently ignore poll errors
-      }
-    }
-
     fetchOnlineOrders()
-    onlineOrdersTimer.current = setInterval(fetchOnlineOrders, 30000)
+
+    const channel = supabase
+      .channel(`online-orders-${branchId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'pos_orders',
+        filter: `branch_id=eq.${branchId}`,
+      }, async (payload) => {
+        if (payload.new?.source !== 'online') return
+        // Fetch full order with items for the popup
+        const { data } = await supabase
+          .from('pos_orders')
+          .select('id,order_number,customer_name,customer_phone,total,table_number,created_at,awaiting_staff_confirm,pickup_code,status,pos_order_items(product_name,product_name_ar,quantity,unit_price,total)')
+          .eq('id', payload.new.id)
+          .single()
+        if (data) {
+          setNewOrderAlert(data)
+          setShowOnlineOrders(true)
+          playOrderAlert()
+          fetchOnlineOrders()
+        }
+      })
+      .subscribe()
+
+    // Fallback poll every 60s (covers cases where Realtime misses an event)
+    onlineOrdersTimer.current = setInterval(fetchOnlineOrders, 60000)
 
     return () => {
+      supabase.removeChannel(channel)
       if (onlineOrdersTimer.current) clearInterval(onlineOrdersTimer.current)
     }
-  }, [branchId])
+  }, [branchId, fetchOnlineOrders])
 
   // addCartLine: append a fully-formed cart line (used after the
   // modifier modal returns, and from the bare addToCart path below).
@@ -508,23 +677,30 @@ export default function POSTerminal() {
         </div>
 
         {/* Online Orders badge */}
-        <button
-          onClick={() => setShowOnlineOrders(v => !v)}
-          className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded text-sm font-medium transition-colors ${
-            onlineOrders.length > 0
-              ? 'bg-noch-green/20 text-noch-green hover:bg-noch-green/30'
-              : 'text-noch-muted hover:text-white'
-          }`}
-          title="Online Orders"
-        >
-          <ShoppingBag size={16} />
-          {onlineOrders.length > 0 && (
-            <span className="bg-noch-green text-black text-xs font-bold rounded-full px-1.5 py-0.5 leading-none">
-              {onlineOrders.length}
-            </span>
-          )}
-          {showOnlineOrders ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
+        {(() => {
+          const hasPending = onlineOrders.some(o => o.awaiting_staff_confirm)
+          return (
+            <button
+              onClick={() => setShowOnlineOrders(v => !v)}
+              className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded text-sm font-medium transition-colors ${
+                hasPending
+                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 animate-pulse'
+                  : onlineOrders.length > 0
+                  ? 'bg-noch-green/20 text-noch-green hover:bg-noch-green/30'
+                  : 'text-noch-muted hover:text-white'
+              }`}
+              title="Online Orders"
+            >
+              <ShoppingBag size={16} />
+              {onlineOrders.length > 0 && (
+                <span className={`text-xs font-bold rounded-full px-1.5 py-0.5 leading-none ${hasPending ? 'bg-yellow-400 text-black' : 'bg-noch-green text-black'}`}>
+                  {onlineOrders.length}
+                </span>
+              )}
+              {showOnlineOrders ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+          )
+        })()}
 
         {/* Actions */}
         <button
@@ -562,6 +738,16 @@ export default function POSTerminal() {
         </div>
       </header>
 
+      {/* New order popup — auto-shown on Realtime INSERT */}
+      {newOrderAlert && (
+        <NewOrderModal
+          order={newOrderAlert}
+          branchId={branchId}
+          onAccept={() => { setNewOrderAlert(null); fetchOnlineOrders() }}
+          onDecline={() => { setNewOrderAlert(null); fetchOnlineOrders() }}
+        />
+      )}
+
       {/* Online Orders Panel */}
       {showOnlineOrders && (
         <div className="bg-noch-card border-b border-noch-border shrink-0 px-4 py-3">
@@ -573,6 +759,9 @@ export default function POSTerminal() {
                 <span className="text-noch-muted font-normal">(none pending)</span>
               )}
             </h2>
+            <button onClick={() => setShowOnlineOrders(false)} className="text-noch-muted hover:text-white">
+              <X size={14} />
+            </button>
           </div>
           {onlineOrders.length > 0 ? (
             <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
@@ -581,7 +770,8 @@ export default function POSTerminal() {
                   key={order.id}
                   order={order}
                   branchId={branchId}
-                  onConfirmed={() => setOnlineOrders(prev => prev.filter(o => o.id !== order.id))}
+                  onConfirmed={fetchOnlineOrders}
+                  onCancelled={fetchOnlineOrders}
                 />
               ))}
             </div>

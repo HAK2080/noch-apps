@@ -42,11 +42,13 @@ export async function updatePOSBranch(id, updates) {
 // CATEGORIES
 // ============================================================
 
-export async function getPOSCategories(branchId) {
-  // Returns categories visible at the given branch (new array model)
-  // OR legacy categories scoped to that branch_id.
-  // Only shows categories flagged show_in_pos = true (POS terminal filter).
-  let q = supabase.from('pos_categories').select('*').eq('is_active', true).eq('show_in_pos', true).order('sort_order')
+// opts.posOnly  = true  → only categories shown in POS terminal (show_in_pos = true)
+// opts.webOnly  = true  → only categories shown on website (show_on_website = true)
+// default (no opts)    → all active categories (used by admin pages)
+export async function getPOSCategories(branchId, opts = {}) {
+  let q = supabase.from('pos_categories').select('*').eq('is_active', true).order('sort_order')
+  if (opts.posOnly)  q = q.eq('show_in_pos', true)
+  if (opts.webOnly)  q = q.eq('show_on_website', true)
   if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
   const { data, error } = await q
   if (error) throw error

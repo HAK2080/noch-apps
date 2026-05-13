@@ -19,7 +19,7 @@ const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
   description: '', category_id: '', track_inventory: false,
   stock_qty: '0', low_stock_alert: '5', is_active: true,
-  visible_on_menu: false, featured: false,
+  visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
 }
 
@@ -194,15 +194,29 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
                 <Globe size={12} /> Customer Menu
               </p>
 
-              <div className="flex items-center gap-4 mb-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={!!form.visible_on_menu} onChange={e => set('visible_on_menu', e.target.checked)} className="w-4 h-4 accent-noch-green" />
-                  <span className="text-white text-sm">Show on menu</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={!!form.featured} onChange={e => set('featured', e.target.checked)} className="w-4 h-4 accent-yellow-400" />
-                  <span className="text-white text-sm flex items-center gap-1"><Star size={12} className="text-yellow-400" />Featured</span>
-                </label>
+              <div className="border border-noch-border rounded-xl p-3 mb-3">
+                <p className="text-noch-muted text-xs mb-2">Visibility</p>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={!!form.visible_on_menu} onChange={e => set('visible_on_menu', e.target.checked)} className="w-4 h-4 accent-noch-green" />
+                    <span className="text-white text-sm">POS Menu</span>
+                    <span className="text-noch-muted text-xs ml-1">— staff terminal</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.visible_on_customer_menu !== false} onChange={e => set('visible_on_customer_menu', e.target.checked)} className="w-4 h-4 accent-green-400" />
+                    <span className="text-white text-sm">Customer Menu</span>
+                    <span className="text-noch-muted text-xs ml-1">— ordering page</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.visible_on_website !== false} onChange={e => set('visible_on_website', e.target.checked)} className="w-4 h-4 accent-blue-400" />
+                    <span className="text-white text-sm">Online Store</span>
+                    <span className="text-noch-muted text-xs ml-1">— retail channel</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={!!form.featured} onChange={e => set('featured', e.target.checked)} className="w-4 h-4 accent-yellow-400" />
+                    <span className="text-white text-sm flex items-center gap-1"><Star size={12} className="text-yellow-400" />Featured</span>
+                  </label>
+                </div>
               </div>
 
               {form.visible_on_menu && (
@@ -357,7 +371,7 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
           <div className="w-16 h-16 rounded-xl border-2 border-noch-border overflow-hidden bg-noch-bg flex items-center justify-center flex-shrink-0">
             {imageUrl
               ? <img src={imageUrl} alt="category" className="w-full h-full object-cover" />
-              : <span className="text-2xl">{catEmoji(name) || '🌿'}</span>
+              : <span className="text-2xl">🌿</span>
             }
           </div>
           <div>

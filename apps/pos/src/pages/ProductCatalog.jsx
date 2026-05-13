@@ -130,7 +130,7 @@ const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
-  visible_branch_ids: [], visible_on_menu: false, visible_on_website: true,
+  visible_branch_ids: [], visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true,
   is_available: true,
 }
 
@@ -198,8 +198,9 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
         low_stock_alert: parseFloat(form.low_stock_alert) || 5,
         category_id: form.category_id || null,
         visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
-        visible_on_menu:    !!form.visible_on_menu,
-        visible_on_website: form.visible_on_website !== false,
+        visible_on_menu:          !!form.visible_on_menu,
+        visible_on_customer_menu: form.visible_on_customer_menu !== false,
+        visible_on_website:       form.visible_on_website !== false,
         is_available:       form.is_available !== false,
       }
       // Drop legacy single-branch field — visibility lives in the array now
@@ -452,16 +453,28 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                     <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_menu ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-white text-sm">Show on customer Drinks menu</p>
+                    <p className="text-white text-sm">POS Menu</p>
+                    <p className="text-zinc-600 text-xs">Visible to staff on the POS terminal</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_customer_menu', !form.visible_on_customer_menu)}>
+                  <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
+                    style={{ background: form.visible_on_customer_menu !== false ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_customer_menu !== false ? 'translate-x-4' : ''}`} />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm">Customer Menu</p>
+                    <p className="text-zinc-600 text-xs">Visible to customers on the ordering page</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_website', !form.visible_on_website)}>
                   <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
-                    style={{ background: form.visible_on_website ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
-                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_website ? 'translate-x-4' : ''}`} />
+                    style={{ background: form.visible_on_website !== false ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.visible_on_website !== false ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-white text-sm">Show on online store</p>
+                    <p className="text-white text-sm">Online Store</p>
+                    <p className="text-zinc-600 text-xs">Retail products — tools, coffee bags, tea bags…</p>
                   </div>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('is_available', !form.is_available)}>
@@ -480,8 +493,8 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                     <div className={`w-3 h-3 rounded-full bg-white transition-transform ${form.is_active ? 'translate-x-4' : ''}`} />
                   </div>
                   <div>
-                    <p className="text-white text-sm">Show in POS terminal</p>
-                    <p className="text-zinc-600 text-xs">{form.is_active ? 'Shown to cashiers' : 'Hidden from POS — still in catalog'}</p>
+                    <p className="text-white text-sm">Active product</p>
+                    <p className="text-zinc-600 text-xs">{form.is_active ? 'Live in catalog' : 'Archived — hidden everywhere'}</p>
                   </div>
                 </label>
               </div>
