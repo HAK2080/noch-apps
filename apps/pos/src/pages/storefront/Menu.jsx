@@ -89,7 +89,7 @@ export default function Menu() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
   const [showCheckout, setShowCheckout] = useState(false)
-  const [lang, setLang]           = useState('en')
+  const [lang, setLang]           = useState('ar')
   const [copied, setCopied]       = useState(false)
 
   // Checkout form
@@ -217,6 +217,7 @@ export default function Menu() {
   function name_(p) { return lang === 'ar' && p.name_ar ? p.name_ar : p.name }
   function desc_(p) { return lang === 'ar' && p.menu_description_ar ? p.menu_description_ar : p.menu_description }
   const t = (en, ar) => lang === 'ar' ? ar : en
+  const currency = lang === 'ar' ? 'دينار ليبي' : 'LYD'
 
   async function handlePlaceOrder() {
     if (!name.trim())  { setSubmitError(t('Please enter your name', 'الرجاء إدخال اسمك')); return }
@@ -242,7 +243,7 @@ export default function Menu() {
       if (data?.error) throw new Error(data.error)
       setOrderResult(data)
       setCart({})
-      const msg = `🛎 NEW ORDER ${data.order_number}${tableNumber ? ` · Table ${tableNumber}` : ''}\n${name} · ${finalTotal.toFixed(2)} LYD${couponApplied ? ` (${couponApplied.message})` : ''}\nCode: ${data.pickup_code} ← confirm at POS`
+      const msg = `🛎 NEW ORDER ${data.order_number}${tableNumber ? ` · Table ${tableNumber}` : ''}\n${name} · ${finalTotal.toFixed(2)} ${currency}${couponApplied ? ` (${couponApplied.message})` : ''}\nCode: ${data.pickup_code} ← confirm at POS`
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace('/rest/v1', '') || ''
       fetch(`${supabaseUrl}/functions/v1/send-telegram`, {
         method: 'POST',
@@ -410,7 +411,7 @@ export default function Menu() {
         <div className="cart-bar" onClick={() => setShowCheckout(true)}>
           <span className="cart-badge">{cartCount}</span>
           <span className="cart-bar-label">{t('View Order', 'عرض الطلب')}</span>
-          <span className="cart-bar-total" translate="no">{cartTotal.toFixed(2)} LYD</span>
+          <span className="cart-bar-total">{cartTotal.toFixed(2)} {currency}</span>
         </div>
       )}
 
@@ -432,7 +433,7 @@ export default function Menu() {
                   </button>
                 </div>
                 <p className="order-number">{orderResult.order_number}</p>
-                <p className="order-total">{Number(orderResult.total).toFixed(2)} LYD</p>
+                <p className="order-total">{Number(orderResult.total).toFixed(2)} {currency}</p>
                 {tableNumber && <p className="order-table">{t('Table', 'طاولة')} {tableNumber}</p>}
                 <p className="staff-note">
                   {t('The cashier will confirm your order shortly.', 'سيقوم الكاشير بتأكيد طلبك في أقرب وقت.')}
@@ -464,24 +465,24 @@ export default function Menu() {
                       <div key={id} className="sheet-item">
                         <span className="sheet-item-qty">{qty}×</span>
                         <span className="sheet-item-name">{name_(p)}</span>
-                        <span className="sheet-item-price" translate="no">{(p.price * qty).toFixed(2)} LYD</span>
+                        <span className="sheet-item-price">{(p.price * qty).toFixed(2)} {currency}</span>
                       </div>
                     )
                   })}
                   <div className={`sheet-total${couponApplied ? ' crossed' : ''}`}>
                     <span>{t('Subtotal', 'المجموع الفرعي')}</span>
-                    <span translate="no">{cartTotal.toFixed(2)} LYD</span>
+                    <span>{cartTotal.toFixed(2)} {currency}</span>
                   </div>
                   {couponApplied && (
                     <div className="sheet-discount-row">
                       <span>🎉 {couponApplied.message}</span>
-                      <span translate="no">−{couponApplied.discount_amount.toFixed(2)} LYD</span>
+                      <span>−{couponApplied.discount_amount.toFixed(2)} {currency}</span>
                     </div>
                   )}
                   {couponApplied && (
                     <div className="sheet-final-total">
                       <span>{t('Total', 'الإجمالي')}</span>
-                      <span translate="no">{finalTotal.toFixed(2)} LYD</span>
+                      <span>{finalTotal.toFixed(2)} {currency}</span>
                     </div>
                   )}
                 </div>
@@ -513,7 +514,7 @@ export default function Menu() {
                   </div>
                   {couponApplied && (
                     <p className="coupon-success">
-                      🎉 {couponApplied.message} — {t('saving', 'وفّرت')} <span translate="no">{couponApplied.discount_amount.toFixed(2)} LYD</span>
+                      🎉 {couponApplied.message} — {t('saving', 'وفّرت')} <span>{couponApplied.discount_amount.toFixed(2)} {currency}</span>
                     </p>
                   )}
                   {couponError && <p className="coupon-error">{couponError}</p>}
@@ -552,11 +553,11 @@ export default function Menu() {
                   {submitError && <p className="submit-error">{submitError}</p>}
 
                   {gps.status === 'ready' && (
-                    <button type="button" className="btn-order" onClick={handlePlaceOrder} disabled={submitting} translate="no">
+                    <button type="button" className="btn-order" onClick={handlePlaceOrder} disabled={submitting}>
                       {submitting
                         ? t('Submitting…', 'جارٍ الإرسال…')
-                        : t(`Send to Cashier · ${finalTotal.toFixed(2)} LYD`,
-                            `إرسال للكاشير · ${finalTotal.toFixed(2)} LYD`)}
+                        : t(`Send to Cashier · ${finalTotal.toFixed(2)} ${currency}`,
+                            `إرسال للكاشير · ${finalTotal.toFixed(2)} ${currency}`)}
                     </button>
                   )}
                 </div>
@@ -591,7 +592,7 @@ function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatur
         <p className="product-name">{name_(p)}</p>
         {desc_(p) && <p className="product-desc">{desc_(p)}</p>}
         <div className="product-footer">
-          <span className="product-price" translate="no">{parseFloat(p.price).toFixed(2)} LYD</span>
+          <span className="product-price">{parseFloat(p.price).toFixed(2)} {currency}</span>
           {soldOut ? null : qty === 0 ? (
             <button className="btn-add" onClick={onAdd}>+</button>
           ) : (

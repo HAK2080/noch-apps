@@ -49,7 +49,7 @@ const T = {
 }
 
 export default function Hub() {
-  const [lang, setLang] = useState('en')
+  const [lang, setLang] = useState('ar')
   const t = T[lang]
   const isAr = lang === 'ar'
 
