@@ -45,6 +45,25 @@ export async function disconnect() {
   } catch { /* ignore */ }
 }
 
+// autoConnect — silently reconnect to a previously-granted serial port on
+// page load without showing the port picker.  Uses getPorts() (Chrome 89+).
+export async function autoConnect({ baudRate = DEFAULT_BAUD } = {}) {
+  if (!isAvailable()) return false
+  if (isConnected()) return true
+  try {
+    const ports = await navigator.serial.getPorts()
+    if (!ports.length) return false
+    _port = ports[0]
+    await _port.open({ baudRate })
+    _writer = _port.writable.getWriter()
+    return true
+  } catch {
+    _port = null
+    _writer = null
+    return false
+  }
+}
+
 export async function write(bytes, timeoutMs = DEFAULT_TIMEOUT_MS) {
   if (!_writer) throw new Error('Printer not connected')
   await Promise.race([

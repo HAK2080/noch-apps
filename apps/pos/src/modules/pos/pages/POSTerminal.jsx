@@ -33,7 +33,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
-import { isPrinterConnected, printReceipt } from '../lib/escpos'
+import { isPrinterConnected, printReceipt, autoConnectPrinter } from '../lib/escpos'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 
@@ -191,6 +191,11 @@ export default function POSTerminal() {
 
     // Start sync listener
     const stopSync = startSyncListener()
+
+    // Silently restore the printer connection (no picker dialog).
+    // Works on Chrome/Edge via getDevices() / getPorts() for previously-
+    // granted Bluetooth / Serial devices.
+    autoConnectPrinter().catch(() => {})
 
     return () => {
       window.removeEventListener('online', handleOnline)

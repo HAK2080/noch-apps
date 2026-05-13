@@ -151,6 +151,22 @@ export function isPrinterConnected() {
   return TRANSPORTS[_kind]?.isConnected?.() === true
 }
 
+// autoConnectPrinter — called on page load to silently restore the printer
+// connection without user interaction.  Relies on getDevices() / getPorts()
+// which only return devices the browser has already been granted access to.
+// Returns true if reconnected, false if nothing to reconnect (printer off,
+// never connected before, or API not supported).
+export async function autoConnectPrinter(opts = {}) {
+  if (isPrinterConnected()) return true
+  const t = TRANSPORTS[_kind]
+  if (typeof t?.autoConnect !== 'function') return false
+  try {
+    return await t.autoConnect(opts)
+  } catch {
+    return false
+  }
+}
+
 async function writeBytes(bytes, timeoutMs = 8000) {
   const t = TRANSPORTS[_kind]
   if (!t || !t.isConnected()) throw new Error('Printer not connected')

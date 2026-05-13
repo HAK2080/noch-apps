@@ -138,6 +138,35 @@ export async function disconnect() {
   _device = null
 }
 
+// autoConnect — silently reconnect to a previously-granted device on page
+// load without showing the Bluetooth picker.  Uses getDevices() (Chrome 85+)
+// which returns devices the origin has already been granted access to.
+// Returns true if reconnected, false if nothing to reconnect to.
+export async function autoConnect() {
+  if (!isAvailable()) return false
+  if (isConnected()) return true
+  try {
+    const devices = await navigator.bluetooth.getDevices()
+    if (!devices.length) return false
+    const device = devices[0]
+    device.addEventListener('gattserverdisconnected', handleDisconnected)
+    _device = device
+    _server = await device.gatt.connect()
+    _characteristic = await findWritableCharacteristic(_server)
+    if (!_characteristic) {
+      _server = null
+      _device = null
+      return false
+    }
+    return true
+  } catch {
+    // Printer may be off or out of range — fail silently
+    _characteristic = null
+    _server = null
+    return false
+  }
+}
+
 async function writeChunk(chunk) {
   if (_useWithoutResponse && _characteristic.writeValueWithoutResponse) {
     await _characteristic.writeValueWithoutResponse(chunk)

@@ -410,7 +410,7 @@ export default function Menu() {
         <div className="cart-bar" onClick={() => setShowCheckout(true)}>
           <span className="cart-badge">{cartCount}</span>
           <span className="cart-bar-label">{t('View Order', 'عرض الطلب')}</span>
-          <span className="cart-bar-total">{cartTotal.toFixed(2)} LYD</span>
+          <span className="cart-bar-total" translate="no">{cartTotal.toFixed(2)} LYD</span>
         </div>
       )}
 
@@ -464,24 +464,24 @@ export default function Menu() {
                       <div key={id} className="sheet-item">
                         <span className="sheet-item-qty">{qty}×</span>
                         <span className="sheet-item-name">{name_(p)}</span>
-                        <span className="sheet-item-price">{(p.price * qty).toFixed(2)} LYD</span>
+                        <span className="sheet-item-price" translate="no">{(p.price * qty).toFixed(2)} LYD</span>
                       </div>
                     )
                   })}
                   <div className={`sheet-total${couponApplied ? ' crossed' : ''}`}>
-                    <span>{t('Subtotal', 'المجموع')}</span>
-                    <span>{cartTotal.toFixed(2)} LYD</span>
+                    <span>{t('Subtotal', 'المجموع الفرعي')}</span>
+                    <span translate="no">{cartTotal.toFixed(2)} LYD</span>
                   </div>
                   {couponApplied && (
                     <div className="sheet-discount-row">
                       <span>🎉 {couponApplied.message}</span>
-                      <span>−{couponApplied.discount_amount.toFixed(2)} LYD</span>
+                      <span translate="no">−{couponApplied.discount_amount.toFixed(2)} LYD</span>
                     </div>
                   )}
                   {couponApplied && (
                     <div className="sheet-final-total">
                       <span>{t('Total', 'الإجمالي')}</span>
-                      <span>{finalTotal.toFixed(2)} LYD</span>
+                      <span translate="no">{finalTotal.toFixed(2)} LYD</span>
                     </div>
                   )}
                 </div>
@@ -513,7 +513,7 @@ export default function Menu() {
                   </div>
                   {couponApplied && (
                     <p className="coupon-success">
-                      🎉 {couponApplied.message} — {t('saving', 'وفّرت')} {couponApplied.discount_amount.toFixed(2)} LYD
+                      🎉 {couponApplied.message} — {t('saving', 'وفّرت')} <span translate="no">{couponApplied.discount_amount.toFixed(2)} LYD</span>
                     </p>
                   )}
                   {couponError && <p className="coupon-error">{couponError}</p>}
@@ -552,7 +552,7 @@ export default function Menu() {
                   {submitError && <p className="submit-error">{submitError}</p>}
 
                   {gps.status === 'ready' && (
-                    <button type="button" className="btn-order" onClick={handlePlaceOrder} disabled={submitting}>
+                    <button type="button" className="btn-order" onClick={handlePlaceOrder} disabled={submitting} translate="no">
                       {submitting
                         ? t('Submitting…', 'جارٍ الإرسال…')
                         : t(`Send to Cashier · ${finalTotal.toFixed(2)} LYD`,
@@ -591,7 +591,7 @@ function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatur
         <p className="product-name">{name_(p)}</p>
         {desc_(p) && <p className="product-desc">{desc_(p)}</p>}
         <div className="product-footer">
-          <span className="product-price">{parseFloat(p.price).toFixed(2)} LYD</span>
+          <span className="product-price" translate="no">{parseFloat(p.price).toFixed(2)} LYD</span>
           {soldOut ? null : qty === 0 ? (
             <button className="btn-add" onClick={onAdd}>+</button>
           ) : (

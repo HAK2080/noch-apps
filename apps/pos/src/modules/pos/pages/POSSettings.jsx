@@ -7,7 +7,7 @@ import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
-  connectPrinter, disconnectPrinter, isPrinterConnected,
+  connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
   printTestPage, openCashDrawer,
   getTransport, setTransport, isTransportAvailable, getTransportLabel,
 } from '../lib/escpos'
@@ -64,6 +64,15 @@ export default function POSSettings() {
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
   const transportAvailable = isTransportAvailable(transport)
+
+  // On mount: silently reconnect to the last-used printer without showing
+  // the picker.  Updates the connected indicator if successful.
+  useEffect(() => {
+    autoConnectPrinter({ baudRate }).then(ok => {
+      if (ok) setPrinterConnected(true)
+    }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     Promise.all([
