@@ -70,7 +70,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
     }
     setPrinting(true)
     try {
-      await printReceipt(order, branch, items)
+      await printReceipt(order, branch, items, loyaltyCustomer)
       toast.success(t('receiptPrinted'))
     } catch (err) {
       toast.error(err.message || t('receiptPrintFailed'))

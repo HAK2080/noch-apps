@@ -115,7 +115,7 @@ export default function Menu() {
     try {
       setLoading(true)
       setError(null)
-      const [{ data: b, error: be }, { data: cats }, { data: prods }] = await Promise.all([
+      const [{ data: b, error: be }, { data: cats, error: ce }, { data: prods, error: pe }] = await Promise.all([
         supabase.from('pos_branches').select('*').eq('id', branchId).eq('is_active', true).single(),
         // Categories: visible at this branch + shown on website (show_on_website = true)
         supabase.from('pos_categories')
@@ -139,6 +139,8 @@ export default function Menu() {
           .order('name'),
       ])
       if (be) throw new Error('Branch not found')
+      if (pe) throw new Error('Failed to load products: ' + pe.message)
+      if (ce) throw new Error('Failed to load categories: ' + ce.message)
       setBranch(b)
       setCategories(cats || [])
       setProducts(prods || [])
@@ -578,17 +580,16 @@ function ProductCard({ p, qty, onAdd, onRemove, name_, desc_, featured: isFeatur
   const soldOut = p.is_available === false
   return (
     <div className={`product-card${isFeatured ? ' featured' : ''}${soldOut ? ' sold-out' : ''}`}>
+      {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
       {p.image_url ? (
         <div className="product-img-wrap">
           <img src={p.image_url} alt={name_(p)} className="product-img" loading="lazy" />
-          {soldOut && <span className="sold-out-badge">Sold out</span>}
         </div>
       ) : (
         <div className="product-img-wrap product-placeholder" style={{ background: col.bg }}>
           <span className="placeholder-letter" style={{ color: col.text }}>
             {name_(p).charAt(0).toUpperCase()}
           </span>
-          {soldOut && <span className="sold-out-badge">Sold out</span>}
         </div>
       )}
       <div className="product-body">

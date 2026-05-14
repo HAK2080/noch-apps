@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, Users, BarChart2, LogOut, Coffee, Calculator, Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor, ShoppingBag, Receipt, Settings } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Users, BarChart2, LogOut, Coffee, Calculator, Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor, ShoppingBag, Receipt, Settings, ListOrdered } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from './shared/LanguageToggle'
@@ -53,6 +53,7 @@ export default function Layout({ children }) {
     { to: '/expenses', icon: Receipt, label: ar ? 'المصاريف' : 'Expenses' },
     { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
     { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
+    { to: '/sales', icon: ListOrdered, label: ar ? 'المبيعات' : 'Sales' },
     { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
     { to: '/staff', icon: Users, label: ar ? 'الفريق' : 'Team' },
     { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
@@ -73,6 +74,7 @@ export default function Layout({ children }) {
     { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
     { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
     { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
+    { to: '/sales', icon: ListOrdered, label: ar ? 'المبيعات' : 'Sales' },
     { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
     // /expenses removed from staff sidebar 2026-05-08 — route is now
     // OwnerRoute-gated, so the link would only redirect anyway.

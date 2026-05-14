@@ -60,6 +60,7 @@ const POSSettings      = lazy(() => import('./modules/pos/pages/POSSettings'))
 const POSProducts      = lazy(() => import('./modules/pos/pages/POSProducts'))
 const POSStockCheck    = lazy(() => import('./modules/pos/pages/POSStockCheck'))
 const POSOrders        = lazy(() => import('./modules/pos/pages/POSOrders'))
+const Sales            = lazy(() => import('./pages/Sales'))
 const POSReports       = lazy(() => import('./modules/pos/pages/POSReports'))
 const POSModifiers     = lazy(() => import('./modules/pos/pages/POSModifiers'))
 const TableQRGenerator = lazy(() => import('./pages/TableQRGenerator'))
@@ -279,6 +280,7 @@ export default function App() {
 
         {/* POS System */}
         <Route path="/kiosk" element={<ProtectedRoute><KioskEntry /></ProtectedRoute>} />
+        <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
         <Route path="/pos" element={<ProtectedRoute><POSHome /></ProtectedRoute>} />
         <Route path="/pos/:branchId" element={<ProtectedRoute><POSTerminal /></ProtectedRoute>} />
         <Route path="/pos/:branchId/end-of-day" element={<ProtectedRoute><POSEndOfDay /></ProtectedRoute>} />

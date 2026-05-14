@@ -144,6 +144,7 @@ export default function POSOrders() {
   const [search, setSearch] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [refundOrder, setRefundOrder] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
   // Date range — defaults to today, but operators can scroll back.
   const today = () => {
     const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10)
@@ -268,67 +269,86 @@ export default function POSOrders() {
               const isVoided = o.status === 'voided'
               const isPresto = o.payment_method === 'presto'
               const owedByPresto = isPresto && o.presto_collected !== true
+              const isExpanded = expandedId === o.id
               return (
-                <div key={o.id} className="py-3 flex flex-wrap items-center gap-3">
-                  <div className="flex-1 min-w-[180px]">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-noch-green text-sm">{o.order_number}</span>
-                      {isVoided && <span className="text-red-400 text-xs uppercase">voided</span>}
-                      {owedByPresto && (
-                        <span className="bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                          <Bike size={10} /> owed by Presto
-                        </span>
-                      )}
-                      {isPresto && o.presto_collected === true && (
-                        <span className="bg-noch-green/15 border border-noch-green/30 text-noch-green text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                          <CheckCircle2 size={10} /> Presto paid
-                        </span>
+                <div key={o.id} className="py-3">
+                  {/* Clickable summary row */}
+                  <div
+                    className="flex flex-wrap items-center gap-3 cursor-pointer"
+                    onClick={() => setExpandedId(isExpanded ? null : o.id)}
+                  >
+                    <div className="flex-1 min-w-[180px]">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-noch-green text-sm">{o.order_number}</span>
+                        {isVoided && <span className="text-red-400 text-xs uppercase">voided</span>}
+                        {owedByPresto && (
+                          <span className="bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                            <Bike size={10} /> owed by Presto
+                          </span>
+                        )}
+                        {isPresto && o.presto_collected === true && (
+                          <span className="bg-noch-green/15 border border-noch-green/30 text-noch-green text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Presto paid
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-noch-muted text-xs mt-0.5">
+                        {new Date(o.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                        {' · '}{o.payment_method?.toUpperCase()}
+                        {' · '}{(o.pos_order_items?.length || 0)} items
+                        {o.customer_name && <span className="text-zinc-400"> · {o.customer_name}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white font-bold">{Number(o.total).toFixed(2)} LYD</p>
+                      {Number(o.discount_amount) > 0 && (
+                        <p className="text-yellow-400 text-xs">-{Number(o.discount_amount).toFixed(2)} disc</p>
                       )}
                     </div>
-                    <div className="text-noch-muted text-xs mt-0.5">
-                      {new Date(o.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                      {' · '}{o.payment_method?.toUpperCase()}
-                      {' · '}{(o.pos_order_items?.length || 0)} items
+                    <span className="text-noch-muted text-xs">{isExpanded ? '▲' : '▼'}</span>
+                  </div>
+
+                  {/* Expanded items */}
+                  {isExpanded && (
+                    <div className="mt-2 mb-1 bg-noch-dark rounded-xl overflow-hidden">
+                      <div className="divide-y divide-noch-border/30">
+                        {(o.pos_order_items || []).map((it, i) => (
+                          <div key={i} className="flex items-center justify-between px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-white text-sm">{it.product_name_ar || it.product_name}</p>
+                              {it.product_name_ar && it.product_name !== it.product_name_ar && (
+                                <p className="text-noch-muted text-xs">{it.product_name}</p>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <p className="text-noch-muted text-xs">{it.quantity} × {Number(it.unit_price).toFixed(2)}</p>
+                              <p className="text-white text-sm font-medium">{Number(it.total || it.unit_price * it.quantity).toFixed(2)} LYD</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 px-3 py-2 border-t border-noch-border/40 flex-wrap">
+                        <button onClick={(e) => { e.stopPropagation(); handleReprint(o) }} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1">
+                          <Printer size={12} /> Reprint
+                        </button>
+                        {owedByPresto && (
+                          <button onClick={(e) => { e.stopPropagation(); handlePrestoCollected(o) }} disabled={busyId === o.id} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Mark Collected
+                          </button>
+                        )}
+                        {!isVoided && (
+                          <>
+                            <button onClick={(e) => { e.stopPropagation(); setRefundOrder(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-1">
+                              <RotateCcw size={12} /> Refund
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleVoid(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-red-400 hover:bg-red-500/10 flex items-center gap-1">
+                              <X size={12} /> Void
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white font-bold">{Number(o.total).toFixed(2)} LYD</p>
-                    {Number(o.discount_amount) > 0 && (
-                      <p className="text-yellow-400 text-xs">-{Number(o.discount_amount).toFixed(2)} disc</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={() => handleReprint(o)} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1">
-                      <Printer size={12} /> Reprint
-                    </button>
-                    {owedByPresto && (
-                      <button
-                        onClick={() => handlePrestoCollected(o)}
-                        disabled={busyId === o.id}
-                        className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1"
-                      >
-                        <CheckCircle2 size={12} /> Mark Collected
-                      </button>
-                    )}
-                    {!isVoided && (
-                      <>
-                        <button
-                          onClick={() => setRefundOrder(o)}
-                          disabled={busyId === o.id}
-                          className="btn-secondary text-xs px-3 py-1.5 text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-1"
-                        >
-                          <RotateCcw size={12} /> Refund
-                        </button>
-                        <button
-                          onClick={() => handleVoid(o)}
-                          disabled={busyId === o.id}
-                          className="btn-secondary text-xs px-3 py-1.5 text-red-400 hover:bg-red-500/10 flex items-center gap-1"
-                        >
-                          <X size={12} /> Void
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  )}
                 </div>
               )
             })}

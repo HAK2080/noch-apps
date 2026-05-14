@@ -203,7 +203,29 @@ function sanitiseHeader(str) {
     .trim()
 }
 
-export async function printReceipt(order, branch, items) {
+// Build the ESC/POS byte sequence to print a QR code (model 2).
+// data: string to encode. size: module pixel size 3–6 (3 = small, 5 = medium).
+function qrCodeBytes(data, size = 4) {
+  const GS28k = [GS, 0x28, 0x6B]
+  const dataBytes = data.split('').map(c => c.charCodeAt(0))
+  const storeLen = dataBytes.length + 3          // +3 for the fn/m/k prefix
+  const pL = storeLen & 0xFF
+  const pH = (storeLen >> 8) & 0xFF
+  return [
+    // Select model 2
+    ...GS28k, 4, 0, 49, 65, 50, 0,
+    // Module size
+    ...GS28k, 3, 0, 49, 67, size,
+    // Error correction level M (49 = level M)
+    ...GS28k, 3, 0, 49, 69, 49,
+    // Store data
+    ...GS28k, pL, pH, 49, 80, 48, ...dataBytes,
+    // Print
+    ...GS28k, 3, 0, 49, 81, 48,
+  ]
+}
+
+export async function printReceipt(order, branch, items, loyaltyCustomer = null) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
 
   const bytes = []
@@ -215,15 +237,13 @@ export async function printReceipt(order, branch, items) {
   const dateStr = now.toLocaleDateString('en-GB')
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-  // Use CP864 (ESC t 0x16) — the most widely supported Arabic code page on
-  // budget XPrinter units. The CP1256_MAP byte values are identical for the
-  // basic Arabic block (U+0621–U+0652), so no separate encoding table needed.
-  // Arabic default: product_name_ar, Arabic footer.
+  // English-only receipt — thermal printers have no RTL engine so Arabic
+  // characters print in logical (reversed) order and are unreadable.
   const headerText = sanitiseHeader(branch.receipt_header || branch.name) || 'Noch Cafe'
-  const footerText = branch.receipt_footer || 'شكراً لزيارتكم' // شكراً لزيارتكم
+  const footerText = sanitiseHeader(branch.receipt_footer) || 'Thank you! See you soon.'
 
   pushCmd(CMD.INIT)
-  pushCmd(CMD.CODEPAGE_CP864)   // switch to CP864 Arabic before any text
+  pushCmd(CMD.CODEPAGE_CP437)   // standard ASCII page — no Arabic needed
   pushCmd(CMD.ALIGN_CENTER)
   pushCmd(CMD.BOLD_ON)
   pushLine(headerText)
@@ -236,13 +256,13 @@ export async function printReceipt(order, branch, items) {
   pushLine(padRight(dateStr, timeStr, RECEIPT_WIDTH))
   bytes.push(...separator('-'))
 
-  // Items — prefer Arabic name when available
+  // Items — English name only
   for (const item of items) {
-    const name = item.product_name_ar || item.product_name || item.name_ar || item.name || 'Item'
+    const name = (item.product_name || item.name || 'Item').slice(0, RECEIPT_WIDTH)
     const qty = item.quantity || 1
     const price = parseFloat(item.unit_price).toFixed(2)
     const total = (parseFloat(item.unit_price) * qty).toFixed(2)
-    pushLine(name.slice(0, RECEIPT_WIDTH))
+    pushLine(name)
     pushLine(padRight(`  ${qty} x ${price}`, total, RECEIPT_WIDTH))
     if (Array.isArray(item.modifiers) && item.modifiers.length) {
       for (const m of item.modifiers) {
@@ -254,37 +274,37 @@ export async function printReceipt(order, branch, items) {
 
   bytes.push(...separator('-'))
 
-  // Totals — Arabic labels
+  // Totals
   const subtotal = parseFloat(order.subtotal).toFixed(2)
   const total = parseFloat(order.total).toFixed(2)
-  pushLine(padRight('المجموع الفرعي:', subtotal, RECEIPT_WIDTH))
+  pushLine(padRight('Subtotal:', subtotal, RECEIPT_WIDTH))
 
   if (parseFloat(order.discount_amount) > 0) {
-    pushLine(padRight('خصم:', `-${parseFloat(order.discount_amount).toFixed(2)}`, RECEIPT_WIDTH))
+    pushLine(padRight('Discount:', `-${parseFloat(order.discount_amount).toFixed(2)}`, RECEIPT_WIDTH))
   }
 
   pushCmd(CMD.BOLD_ON)
   pushCmd(CMD.DOUBLE_SIZE)
-  pushLine(padRight('الإجمالي:', total + ' LYD', RECEIPT_WIDTH - 4))
+  pushLine(padRight('TOTAL:', total + ' LYD', RECEIPT_WIDTH - 4))
   pushCmd(CMD.NORMAL_SIZE)
   pushCmd(CMD.BOLD_OFF)
 
   bytes.push(...separator('='))
 
-  // Payment info — Arabic labels
-  const methodAr = { cash: 'نقداً', card: 'بطاقة', split: 'مختلط', presto: 'بريستو' }
-  const methodLabel = methodAr[order.payment_method] || (order.payment_method?.toUpperCase() || 'CASH')
-  pushLine(`طريقة الدفع: ${methodLabel}`)
+  // Payment info
+  const methodEn = { cash: 'Cash', card: 'Card', split: 'Split', presto: 'Presto' }
+  const methodLabel = methodEn[order.payment_method] || (order.payment_method?.toUpperCase() || 'CASH')
+  pushLine(`Payment: ${methodLabel}`)
   if (order.payment_method === 'cash' && order.cash_tendered) {
-    pushLine(padRight('المبلغ المدفوع:', parseFloat(order.cash_tendered).toFixed(2), RECEIPT_WIDTH))
-    pushLine(padRight('الباقي:', parseFloat(order.change_due || 0).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('Tendered:', parseFloat(order.cash_tendered).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('Change:', parseFloat(order.change_due || 0).toFixed(2), RECEIPT_WIDTH))
   } else if (order.payment_method === 'split') {
     const cardAmt = parseFloat(order.card_amount || 0).toFixed(2)
     const cashAmt = (parseFloat(order.total) - parseFloat(order.card_amount || 0)).toFixed(2)
-    pushLine(padRight('بطاقة:', cardAmt, RECEIPT_WIDTH))
-    pushLine(padRight('نقداً:', cashAmt, RECEIPT_WIDTH))
+    pushLine(padRight('Card:', cardAmt, RECEIPT_WIDTH))
+    pushLine(padRight('Cash:', cashAmt, RECEIPT_WIDTH))
   } else if (order.payment_method === 'presto') {
-    pushLine(padRight('توصيل بريستو:', parseFloat(order.total).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('Presto delivery:', parseFloat(order.total).toFixed(2), RECEIPT_WIDTH))
   }
 
   bytes.push(...separator('='))
@@ -292,13 +312,26 @@ export async function printReceipt(order, branch, items) {
   // Loyalty awarded
   if (order.loyalty_stamps_awarded > 0) {
     pushCmd(CMD.ALIGN_CENTER)
-    pushLine(`* تم منح ${order.loyalty_stamps_awarded} طابع ولاء *`)
+    pushLine(`* ${order.loyalty_stamps_awarded} loyalty stamp${order.loyalty_stamps_awarded > 1 ? 's' : ''} awarded *`)
     pushCmd(CMD.ALIGN_LEFT)
   }
 
   // Footer
   pushCmd(CMD.ALIGN_CENTER)
   pushLine(footerText)
+
+  // Passport QR — print only when order has a linked loyalty customer with a token
+  const passportToken = loyaltyCustomer?.passport_token
+  if (passportToken) {
+    const passportUrl = `https://noch.cloud/passport/?t=${passportToken}`
+    pushLine()
+    bytes.push(...separator('-'))
+    pushLine('Scan for your Nochi Pass')
+    bytes.push(...qrCodeBytes(passportUrl, 4))
+    pushLine()
+    pushLine(`noch.cloud/passport`)
+  }
+
   pushLine()
   pushLine()
   pushLine()
