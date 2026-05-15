@@ -5,12 +5,12 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, RotateCcw, CheckCircle2, Bike, Search, X, Minus, Plus } from 'lucide-react'
+import { ArrowLeft, Printer, RotateCcw, CheckCircle2, Bike, Search, X, Minus, Plus, Coffee } from 'lucide-react'
 import {
   getPOSBranch, getPOSOrders, voidPOSOrder, markPrestoCollected,
   refundPOSOrderLines,
 } from '../lib/pos-supabase'
-import { printReceipt, isPrinterConnected } from '../lib/escpos'
+import { printReceipt, printDrinkTicket, isPrinterConnected } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
@@ -177,6 +177,16 @@ export default function POSOrders() {
     try {
       await printReceipt(order, branch, order.pos_order_items || [])
       toast.success(`Reprinted ${order.order_number}`)
+    } catch (err) {
+      toast.error(err.message || 'Print failed')
+    }
+  }
+
+  const handleDrinkTicket = async (order) => {
+    if (!isPrinterConnected()) { toast.error('Printer not connected'); return }
+    try {
+      await printDrinkTicket(order, order.pos_order_items || [], branch)
+      toast.success(`Drink ticket reprinted`)
     } catch (err) {
       toast.error(err.message || 'Print failed')
     }
@@ -386,6 +396,9 @@ export default function POSOrders() {
                       <div className="flex gap-2 px-3 py-2 border-t border-noch-border/40 flex-wrap">
                         <button onClick={(e) => { e.stopPropagation(); handleReprint(o) }} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1">
                           <Printer size={12} /> Reprint
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDrinkTicket(o) }} className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1 text-noch-green hover:bg-noch-green/10">
+                          <Coffee size={12} /> Drink ticket
                         </button>
                         {owedByPresto && (
                           <button onClick={(e) => { e.stopPropagation(); handlePrestoCollected(o) }} disabled={busyId === o.id} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">

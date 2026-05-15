@@ -33,7 +33,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
-import { isPrinterConnected, printReceipt, autoConnectPrinter } from '../lib/escpos'
+import { isPrinterConnected, printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 
@@ -61,7 +61,7 @@ function playOrderAlert() {
 }
 
 // ── New order popup modal ─────────────────────────────────────────────────────
-function NewOrderModal({ order, branchId, onAccept, onDecline }) {
+function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
   const [busy, setBusy] = useState(false)
 
   const handle = async (action) => {
@@ -71,7 +71,16 @@ function NewOrderModal({ order, branchId, onAccept, onDecline }) {
       const { data, error } = await supabase.rpc(fn, { p_order_id: order.id, p_branch_id: branchId })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
-      if (action === 'accept') { toast.success(`✅ Order ${order.order_number} accepted`); onAccept() }
+      if (action === 'accept') {
+        toast.success(`✅ Order ${order.order_number} accepted`)
+        // Print drink ticket for the bar — customer name comes from the
+        // online order itself. Fire-and-forget.
+        if (isPrinterConnected()) {
+          printDrinkTicket(order, order.pos_order_items || [], branch)
+            .catch(err => toast.error(`Drink ticket failed: ${err.message}`))
+        }
+        onAccept()
+      }
       else { toast(`❌ Order ${order.order_number} declined`, { icon: '🚫' }); onDecline() }
     } catch (err) {
       toast.error(err.message || 'Failed')
@@ -146,7 +155,7 @@ function NewOrderModal({ order, branchId, onAccept, onDecline }) {
 }
 
 // ── Pending order row in the panel ───────────────────────────────────────────
-function OnlineOrderRow({ order, branchId, onConfirmed, onCancelled }) {
+function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
   const [busy, setBusy] = useState(false)
 
   const handleAction = async (action) => {
@@ -167,6 +176,11 @@ function OnlineOrderRow({ order, branchId, onConfirmed, onCancelled }) {
         if (error) throw error
         if (data?.error) throw new Error(data.error)
         toast.success(`Order ${order.order_number} accepted`)
+        // Print drink ticket for the bar.
+        if (isPrinterConnected()) {
+          printDrinkTicket(order, order.pos_order_items || [], branch)
+            .catch(err => toast.error(`Drink ticket failed: ${err.message}`))
+        }
         onConfirmed()
       } else {
         const { data, error } = await supabase.rpc('cancel_online_order', {
@@ -528,6 +542,11 @@ export default function POSTerminal() {
 
     const clientCreatedAt = new Date().toISOString()
 
+    // Pick customer name: staff-typed in cart wins; fall back to loyalty
+    // card's full name (first word only, to keep the drink ticket short).
+    const loyaltyFirstName = (loyaltyCustomer?.full_name || '').trim().split(/\s+/)[0] || null
+    const customerName = showPayment.customer_name || loyaltyFirstName || null
+
     const orderData = {
       branch_id: branchId,
       shift_id: shift?.id || null,
@@ -539,6 +558,7 @@ export default function POSTerminal() {
       discount_pct: showPayment.discountType === 'pct' ? (showPayment.discountValue || 0) : 0,
       total,
       ...paymentData,
+      customer_name: customerName,
       synced: isOnline(),
     }
 
@@ -593,10 +613,20 @@ export default function POSTerminal() {
       setCart([])
       setLoyaltyCustomer(null)
 
-      // Auto-print: fire-and-forget if enabled + printer is connected.
+      // Auto-print drink ticket — always fires when printer connected.
+      // This is the bar-facing slip with big order # + customer name +
+      // modifiers indented under each drink, so the barista can read it
+      // at a glance. Fire-and-forget — never blocks the receipt modal.
+      if (isPrinterConnected()) {
+        printDrinkTicket(order, items, branch).catch(err =>
+          toast.error(`Drink ticket print failed: ${err.message}`)
+        )
+      }
+
+      // Auto-print receipt: fire-and-forget if enabled + printer is connected.
       // Failure toasts but never blocks the receipt modal from appearing.
       if (localStorage.getItem('noch_auto_print') === 'true' && isPrinterConnected()) {
-        printReceipt(order, branch, items).catch(err =>
+        printReceipt(order, branch, items, loyaltyCustomer).catch(err =>
           toast.error(`Auto-print failed: ${err.message}`)
         )
       }
@@ -743,6 +773,7 @@ export default function POSTerminal() {
         <NewOrderModal
           order={newOrderAlert}
           branchId={branchId}
+          branch={branch}
           onAccept={() => { setNewOrderAlert(null); fetchOnlineOrders() }}
           onDecline={() => { setNewOrderAlert(null); fetchOnlineOrders() }}
         />
@@ -770,6 +801,7 @@ export default function POSTerminal() {
                   key={order.id}
                   order={order}
                   branchId={branchId}
+                  branch={branch}
                   onConfirmed={fetchOnlineOrders}
                   onCancelled={fetchOnlineOrders}
                 />

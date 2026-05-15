@@ -1,6 +1,6 @@
 // CartPanel.jsx — Shopping cart for POS terminal
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Minus, Plus, X, Trash2, Tag, Shield } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
 import { translations } from '../../../lib/i18n'
@@ -109,6 +109,11 @@ export default function CartPanel({
   // Manager-override approved state for the current cart. Cleared on void.
   const [overrideBy, setOverrideBy] = useState(null)
   const [showOverride, setShowOverride] = useState(false)
+  // Customer first name — printed in big letters on the drink ticket
+  // so the barista knows who the order is for. Optional.
+  const [customerName, setCustomerName] = useState('')
+  // Reset name when the cart is emptied (after charge / void)
+  useEffect(() => { if (items.length === 0) setCustomerName('') }, [items.length])
 
   const baselineCap = canDiscountAny ? Infinity : 10
   // Cap is lifted once a manager has approved.
@@ -254,12 +259,27 @@ export default function CartPanel({
             </button>
           )}
 
+          {/* Customer first name — printed BIG on the drink ticket */}
+          <div className="mb-3">
+            <input
+              type="text"
+              value={customerName}
+              onChange={e => setCustomerName(e.target.value)}
+              placeholder="Customer first name (for the drink ticket)"
+              className="input w-full py-2 text-sm"
+              maxLength={20}
+              autoComplete="off"
+              autoCapitalize="words"
+            />
+          </div>
+
           {/* Charge button */}
           <button
             onClick={() => onCharge({
               subtotal, discountAmount, total, discountType,
               discountValue: parseFloat(discountValue) || 0,
               override_by: overrideBy?.id || null,
+              customer_name: customerName.trim() || null,
             })}
             className="btn-primary w-full py-4 text-lg font-bold rounded-xl"
             disabled={items.length === 0}
