@@ -380,6 +380,18 @@ export async function refundPOSOrderLines(orderId, lines, reason, servedBy = nul
   return data
 }
 
+// Swap cash↔card on a completed order. Only supports cash/card; split
+// and presto need their own handling. Adjusts shift totals automatically.
+export async function switchPOSOrderPayment(orderId, newMethod, servedBy = null) {
+  const { data, error } = await supabase.rpc('switch_pos_order_payment', {
+    p_order_id: orderId,
+    p_new_method: newMethod,
+    p_served_by: servedBy,
+  })
+  if (error) throw error
+  return data
+}
+
 // ── Reporting ─────────────────────────────────────────────────────
 export async function getSalesByProduct(branchId, fromIso, toIso) {
   const { data, error } = await supabase.rpc('pos_sales_by_product', {
