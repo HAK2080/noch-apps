@@ -203,126 +203,6 @@ function sanitiseHeader(str) {
     .trim()
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Bitmap (raster) rendering — for Arabic receipts.
-// ESC/POS thermal printers have no RTL/shaping engine, so Arabic text
-// mode prints letters in logical order (visually reversed) and without
-// contextual letter forms. The fix: render the receipt with HTML5
-// Canvas (which DOES handle Arabic correctly via the browser's native
-// text engine), then send the resulting monochrome image to the printer
-// using GS v 0 raster-bitmap command.
-//
-// Printer width: 58mm at 203 DPI ≈ 384 dots. We render the canvas at
-// that width, threshold to 1-bit black/white, and ship.
-// ──────────────────────────────────────────────────────────────────
-
-const PRINT_WIDTH_PX = 384  // 58mm @ 203 DPI effective area
-
-// Convert RGBA canvas image data to ESC/POS GS v 0 raster bitmap bytes.
-// Each output byte encodes 8 horizontal pixels, MSB first; 1 = black.
-function imageDataToRasterBytes(imgData, width, height) {
-  const bytesPerRow = Math.ceil(width / 8)
-  const out = []
-  // Header: GS v 0 m xL xH yL yH  (m=0 normal mode)
-  out.push(GS, 0x76, 0x30, 0,
-           bytesPerRow & 0xFF, (bytesPerRow >> 8) & 0xFF,
-           height & 0xFF, (height >> 8) & 0xFF)
-  const data = imgData.data
-  for (let y = 0; y < height; y++) {
-    for (let xByte = 0; xByte < bytesPerRow; xByte++) {
-      let byte = 0
-      for (let b = 0; b < 8; b++) {
-        const x = xByte * 8 + b
-        if (x >= width) continue
-        const i = (y * width + x) * 4
-        const lum = (data[i] + data[i + 1] + data[i + 2]) / 3
-        // Pixel dark enough → set bit (= black ink)
-        if (lum < 128) byte |= (1 << (7 - b))
-      }
-      out.push(byte)
-    }
-  }
-  return out
-}
-
-// Build a canvas, run a render callback that draws content and returns
-// the final Y position, then convert the trimmed image to ESC/POS bytes.
-function renderToRaster(renderFn) {
-  const canvas = document.createElement('canvas')
-  canvas.width = PRINT_WIDTH_PX
-  canvas.height = 2400  // tall enough for any receipt; we'll trim
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#000000'
-  ctx.textBaseline = 'top'
-  // Use Arabic-capable system fonts (Segoe UI / Noto Sans Arabic / etc.)
-  // — these handle BiDi + contextual shaping automatically when
-  // ctx.direction = 'rtl'.
-  ctx.imageSmoothingEnabled = false
-
-  const finalY = renderFn(ctx, PRINT_WIDTH_PX) || 0
-  // Round up to nearest 8 pixels — printer rasters in 8-pixel rows.
-  const height = Math.max(8, Math.ceil((finalY + 8) / 8) * 8)
-  const img = ctx.getImageData(0, 0, PRINT_WIDTH_PX, height)
-  return imageDataToRasterBytes(img, PRINT_WIDTH_PX, height)
-}
-
-// Drawing helpers used by both receipt and drink-ticket renderers.
-const FONT_AR = `'Segoe UI', 'Noto Sans Arabic', 'Tahoma', sans-serif`
-const FONT_EN = `'Segoe UI', 'Tahoma', sans-serif`
-
-// Draw a dashed/dotted horizontal separator across the page.
-function drawDashedLine(ctx, y, width, dash = 4, gap = 3) {
-  ctx.beginPath()
-  ctx.setLineDash([dash, gap])
-  ctx.lineWidth = 1.5
-  ctx.moveTo(8, y)
-  ctx.lineTo(width - 8, y)
-  ctx.strokeStyle = '#000'
-  ctx.stroke()
-  ctx.setLineDash([])
-}
-
-// Centered title line (English by default — keeps numerics readable).
-function drawCenter(ctx, text, y, fontSize = 18, bold = false, font = FONT_EN) {
-  ctx.font = `${bold ? 'bold ' : ''}${fontSize}px ${font}`
-  ctx.direction = 'ltr'
-  ctx.textAlign = 'center'
-  ctx.fillText(String(text), PRINT_WIDTH_PX / 2, y)
-}
-
-// One row with an Arabic label on the right and a value (number / Latin)
-// on the left. Returns the next y.
-function drawArabicRow(ctx, label, value, y, fontSize = 18, bold = false) {
-  ctx.font = `${bold ? 'bold ' : ''}${fontSize}px ${FONT_AR}`
-  ctx.direction = 'rtl'
-  ctx.textAlign = 'right'
-  ctx.fillText(String(label), PRINT_WIDTH_PX - 10, y)
-  ctx.direction = 'ltr'
-  ctx.textAlign = 'left'
-  ctx.fillText(String(value), 10, y)
-  return y + fontSize + 6
-}
-
-// A right-aligned Arabic line (no value column).
-function drawArabicLine(ctx, text, y, fontSize = 18, bold = false) {
-  ctx.font = `${bold ? 'bold ' : ''}${fontSize}px ${FONT_AR}`
-  ctx.direction = 'rtl'
-  ctx.textAlign = 'right'
-  ctx.fillText(String(text), PRINT_WIDTH_PX - 10, y)
-  return y + fontSize + 4
-}
-
-// A centered Arabic line (used for footers).
-function drawArabicCenter(ctx, text, y, fontSize = 18, bold = false) {
-  ctx.font = `${bold ? 'bold ' : ''}${fontSize}px ${FONT_AR}`
-  ctx.direction = 'rtl'
-  ctx.textAlign = 'center'
-  ctx.fillText(String(text), PRINT_WIDTH_PX / 2, y)
-  return y + fontSize + 4
-}
-
 // Build the ESC/POS byte sequence to print a QR code (model 2).
 // data: string to encode. size: module pixel size 3–6 (3 = small, 5 = medium).
 function qrCodeBytes(data, size = 4) {
@@ -345,235 +225,207 @@ function qrCodeBytes(data, size = 4) {
   ]
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Customer receipt — rendered as bitmap image so Arabic text shapes
-// and reads right-to-left correctly. Layout:
-//
-//   [Branch name — bold, centered]
-//   ============================================
-//   Order: NHA-…                    13/05 22:28
-//   --------------------------------------------
-//   اسم المنتج (Arabic, RTL)              28.00
-//      ×1 × 28.00
-//      + شوفان
-//   --------------------------------------------
-//   المجموع الفرعي:                       66.00
-//   الإجمالي:                       66.00 LYD
-//   ============================================
-//   طريقة الدفع: نقداً
-//   المبلغ المدفوع:                       66.00
-//   الباقي:                                0.00
-//   ============================================
-//   [Footer Arabic, centered]
-//   [Passport QR if loyalty customer]
-// ──────────────────────────────────────────────────────────────────
+// Customer receipt — English text mode. Thermal printers have no RTL
+// engine so Arabic prints reversed; bitmap rendering was tried and
+// didn't print reliably, so we stay in plain ASCII for both receipts.
 export async function printReceipt(order, branch, items, loyaltyCustomer = null) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
+
+  const bytes = []
+  const pushCmd = (...cmds) => cmds.forEach(c => bytes.push(...c))
+  const pushLine = (text = '') => bytes.push(...line(text))
 
   const now = new Date(order.created_at || Date.now())
   const dateStr = now.toLocaleDateString('en-GB')
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const headerText = branch?.receipt_header || branch?.name || 'Noch Cafe'
-  const footerArDefault = 'شكراً لزيارتكم — نوتشي يستناك المرة الجاية'
-  const footerText = branch?.receipt_footer || footerArDefault
 
-  const rasterBytes = renderToRaster((ctx, w) => {
-    let y = 10
+  const headerText = sanitiseHeader(branch?.receipt_header || branch?.name) || 'Noch Cafe'
+  const footerText = sanitiseHeader(branch?.receipt_footer) || 'Thank you! See you soon.'
 
-    // Branch name — English / Latin, bold, centered, double-line for emphasis
-    drawCenter(ctx, headerText, y, 22, true, FONT_EN)
-    y += 30
-    drawDashedLine(ctx, y, w)
-    y += 10
+  pushCmd(CMD.INIT)
+  pushCmd(CMD.CODEPAGE_CP437)
+  pushCmd(CMD.ALIGN_CENTER)
+  pushCmd(CMD.BOLD_ON)
+  pushLine(headerText)
+  pushCmd(CMD.BOLD_OFF)
+  pushLine()
+  pushCmd(CMD.ALIGN_LEFT)
+  bytes.push(...separator('='))
 
-    // Order # and date — Arabic label, value left
-    y = drawArabicRow(ctx, `الطلب:`, order.order_number, y, 16, false)
-    y = drawArabicRow(ctx, `التاريخ:`, `${dateStr}  ${timeStr}`, y, 16, false)
+  pushLine(`Order: ${order.order_number}`)
+  pushLine(padRight(dateStr, timeStr, RECEIPT_WIDTH))
+  if (order.customer_name) {
+    pushLine(`Name: ${sanitiseHeader(order.customer_name)}`)
+  }
+  bytes.push(...separator('-'))
 
-    drawDashedLine(ctx, y, w)
-    y += 10
-
-    // Items — Arabic name right, qty×price + line total left
-    for (const item of items) {
-      const nameAr = item.product_name_ar || item.product_name || 'منتج'
-      const qty = item.quantity || 1
-      const price = parseFloat(item.unit_price).toFixed(2)
-      const lineTotal = (parseFloat(item.unit_price) * qty).toFixed(2)
-
-      y = drawArabicRow(ctx, nameAr, lineTotal, y, 18, true)
-      y = drawArabicLine(ctx, `${qty} × ${price}`, y, 14, false)
-
-      if (Array.isArray(item.modifiers) && item.modifiers.length) {
-        for (const m of item.modifiers) {
-          const arMod = m.modifier_name_ar || m.modifier_name || ''
-          y = drawArabicLine(ctx, `+ ${arMod}`, y, 14, false)
-        }
+  // Items — English name + modifiers
+  for (const item of items) {
+    const name = (item.product_name || item.name || 'Item').slice(0, RECEIPT_WIDTH)
+    const qty = item.quantity || 1
+    const price = parseFloat(item.unit_price).toFixed(2)
+    const total = (parseFloat(item.unit_price) * qty).toFixed(2)
+    pushLine(name)
+    pushLine(padRight(`  ${qty} x ${price}`, total, RECEIPT_WIDTH))
+    if (Array.isArray(item.modifiers) && item.modifiers.length) {
+      for (const m of item.modifiers) {
+        const label = `   + ${m.modifier_name || ''}`.slice(0, RECEIPT_WIDTH)
+        pushLine(label)
       }
-      if (item.notes) {
-        y = drawArabicLine(ctx, `* ${item.notes}`, y, 14, false)
-      }
-      y += 4
     }
+  }
 
-    drawDashedLine(ctx, y, w)
-    y += 10
+  bytes.push(...separator('-'))
 
-    // Totals
-    const subtotal = parseFloat(order.subtotal).toFixed(2)
-    const total = parseFloat(order.total).toFixed(2)
-    y = drawArabicRow(ctx, 'المجموع الفرعي:', subtotal, y, 16)
-    if (parseFloat(order.discount_amount) > 0) {
-      y = drawArabicRow(ctx, 'خصم:', `-${parseFloat(order.discount_amount).toFixed(2)}`, y, 16)
-    }
-    y += 4
-    y = drawArabicRow(ctx, 'الإجمالي:', `${total} LYD`, y, 26, true)
-    y += 4
-    drawDashedLine(ctx, y, w)
-    y += 10
+  // Totals
+  const subtotal = parseFloat(order.subtotal).toFixed(2)
+  const total = parseFloat(order.total).toFixed(2)
+  pushLine(padRight('Subtotal:', subtotal, RECEIPT_WIDTH))
 
-    // Payment info
-    const methodAr = { cash: 'نقداً', card: 'بطاقة', split: 'مختلط', presto: 'بريستو' }
-    const methodLabel = methodAr[order.payment_method] || (order.payment_method?.toUpperCase() || 'CASH')
-    y = drawArabicRow(ctx, 'طريقة الدفع:', methodLabel, y, 16)
-    if (order.payment_method === 'cash' && order.cash_tendered) {
-      y = drawArabicRow(ctx, 'المبلغ المدفوع:', parseFloat(order.cash_tendered).toFixed(2), y, 16)
-      y = drawArabicRow(ctx, 'الباقي:', parseFloat(order.change_due || 0).toFixed(2), y, 16)
-    } else if (order.payment_method === 'split') {
-      const cardAmt = parseFloat(order.card_amount || 0).toFixed(2)
-      const cashAmt = (parseFloat(order.total) - parseFloat(order.card_amount || 0)).toFixed(2)
-      y = drawArabicRow(ctx, 'بطاقة:', cardAmt, y, 16)
-      y = drawArabicRow(ctx, 'نقداً:', cashAmt, y, 16)
-    } else if (order.payment_method === 'presto') {
-      y = drawArabicRow(ctx, 'توصيل بريستو:', parseFloat(order.total).toFixed(2), y, 16)
-    }
-    y += 4
-    drawDashedLine(ctx, y, w)
-    y += 10
+  if (parseFloat(order.discount_amount) > 0) {
+    pushLine(padRight('Discount:', `-${parseFloat(order.discount_amount).toFixed(2)}`, RECEIPT_WIDTH))
+  }
 
-    // Loyalty stamps
-    if (order.loyalty_stamps_awarded > 0) {
-      const stamps = order.loyalty_stamps_awarded
-      y = drawArabicCenter(ctx, `★ تم منح ${stamps} طابع ولاء ★`, y, 16, true)
-      y += 4
-    }
+  pushCmd(CMD.BOLD_ON)
+  pushCmd(CMD.DOUBLE_SIZE)
+  pushLine(padRight('TOTAL:', total + ' LYD', RECEIPT_WIDTH - 4))
+  pushCmd(CMD.NORMAL_SIZE)
+  pushCmd(CMD.BOLD_OFF)
 
-    // Footer
-    y = drawArabicCenter(ctx, footerText, y, 16, false)
-    y += 8
+  bytes.push(...separator('='))
 
-    return y
-  })
+  // Payment info
+  const methodEn = { cash: 'Cash', card: 'Card', split: 'Split', presto: 'Presto' }
+  const methodLabel = methodEn[order.payment_method] || (order.payment_method?.toUpperCase() || 'CASH')
+  pushLine(`Payment: ${methodLabel}`)
+  if (order.payment_method === 'cash' && order.cash_tendered) {
+    pushLine(padRight('Tendered:', parseFloat(order.cash_tendered).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('Change:', parseFloat(order.change_due || 0).toFixed(2), RECEIPT_WIDTH))
+  } else if (order.payment_method === 'split') {
+    const cardAmt = parseFloat(order.card_amount || 0).toFixed(2)
+    const cashAmt = (parseFloat(order.total) - parseFloat(order.card_amount || 0)).toFixed(2)
+    pushLine(padRight('Card:', cardAmt, RECEIPT_WIDTH))
+    pushLine(padRight('Cash:', cashAmt, RECEIPT_WIDTH))
+  } else if (order.payment_method === 'presto') {
+    pushLine(padRight('Presto delivery:', parseFloat(order.total).toFixed(2), RECEIPT_WIDTH))
+  }
 
-  const bytes = [
-    ...CMD.INIT,
-    ...CMD.ALIGN_CENTER,
-    ...rasterBytes,
-  ]
+  bytes.push(...separator('='))
 
-  // Passport QR — printed in standard ESC/POS QR mode (it's not Arabic
-  // and works in text mode fine).
+  // Loyalty awarded
+  if (order.loyalty_stamps_awarded > 0) {
+    pushCmd(CMD.ALIGN_CENTER)
+    pushLine(`* ${order.loyalty_stamps_awarded} loyalty stamp${order.loyalty_stamps_awarded > 1 ? 's' : ''} awarded *`)
+    pushCmd(CMD.ALIGN_LEFT)
+  }
+
+  // Footer
+  pushCmd(CMD.ALIGN_CENTER)
+  pushLine(footerText)
+
+  // Passport QR — only when there's a loyalty customer with a token
   const passportToken = loyaltyCustomer?.passport_token
   if (passportToken) {
     const passportUrl = `https://noch.cloud/passport/?t=${passportToken}`
-    bytes.push(LF)
-    bytes.push(...textToBytes('Scan for your Nochi Pass'))
-    bytes.push(LF)
+    pushLine()
+    bytes.push(...separator('-'))
+    pushLine('Scan for your Nochi Pass')
     bytes.push(...qrCodeBytes(passportUrl, 4))
-    bytes.push(LF)
-    bytes.push(...textToBytes('noch.cloud/passport'))
-    bytes.push(LF)
+    pushLine()
+    pushLine('noch.cloud/passport')
   }
 
-  bytes.push(LF, LF, LF)
-  bytes.push(...CMD.CUT)
+  pushLine()
+  pushLine()
+  pushLine()
+  pushCmd(CMD.CUT)
 
   await writeBytes(bytes)
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Drink ticket — bar-facing slip rendered as bitmap so Arabic product
-// names + modifiers shape and read RTL correctly. Designed for fast
-// bar reading: huge order #, huge customer name, drinks stacked with
-// modifiers indented underneath.
-// ──────────────────────────────────────────────────────────────────
+// Drink ticket — bar-facing slip in English text mode. Big order # and
+// big customer name so the barista can read the slip from across the
+// bar at a glance. Modifiers indent under each drink so it's clear
+// which "less sugar" belongs to which cup.
 export async function printDrinkTicket(order, items, branch, opts = {}) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
 
+  const bytes = []
+  const pushCmd = (...cmds) => cmds.forEach(c => bytes.push(...c))
+  const pushLine = (text = '') => bytes.push(...line(text))
+
   const now = new Date(order.created_at || Date.now())
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const headerText = branch?.receipt_header || branch?.name || 'Noch Cafe'
+  const headerText = sanitiseHeader(branch?.receipt_header || branch?.name) || 'Noch Cafe'
 
-  // Extract trailing digits so "#0042" reads clearly even if order # is
-  // "NHA-20260515-0042". Falls back to full order_number.
+  // Extract trailing digits so "#0042" reads clearly even if the full
+  // order number is "NHA-20260515-0042".
   const orderNumStr = String(order.order_number || '')
   const shortNum = (orderNumStr.match(/(\d+)\s*$/) || [, orderNumStr])[1] || orderNumStr
 
-  const customerName = (order.customer_name || '').trim() || 'بدون اسم'
+  const customerName = sanitiseHeader(order.customer_name) || 'Walk-in'
   const paymentMethod = (order.payment_method || '').toUpperCase()
 
-  const rasterBytes = renderToRaster((ctx, w) => {
-    let y = 10
+  pushCmd(CMD.INIT)
+  pushCmd(CMD.CODEPAGE_CP437)
 
-    // Branch (English, small, centered)
-    drawCenter(ctx, headerText, y, 16, false, FONT_EN)
-    y += 24
+  // Branch header (small)
+  pushCmd(CMD.ALIGN_CENTER)
+  pushLine(headerText)
+  pushLine()
 
-    // ORDER NUMBER — huge, bold, centered, English so digits are crisp
-    ctx.font = `bold 72px ${FONT_EN}`
-    ctx.direction = 'ltr'
-    ctx.textAlign = 'center'
-    ctx.fillText(`#${shortNum}`, w / 2, y)
-    y += 80
+  // ORDER # — double size, bold, centered
+  pushCmd(CMD.BOLD_ON)
+  pushCmd(CMD.DOUBLE_SIZE)
+  pushLine(`#${shortNum}`)
+  pushCmd(CMD.NORMAL_SIZE)
+  pushCmd(CMD.BOLD_OFF)
+  pushLine()
 
-    // Customer name — huge, bold, centered (auto Arabic-shaped if Arabic
-    // characters, otherwise just rendered as Latin)
-    const hasArabic = /[؀-ۿ]/.test(customerName)
-    ctx.font = `bold 44px ${hasArabic ? FONT_AR : FONT_EN}`
-    ctx.direction = hasArabic ? 'rtl' : 'ltr'
-    ctx.textAlign = 'center'
-    ctx.fillText(hasArabic ? customerName : customerName.toUpperCase(), w / 2, y)
-    y += 60
+  // Customer name — double size, bold, centered
+  pushCmd(CMD.BOLD_ON)
+  pushCmd(CMD.DOUBLE_SIZE)
+  pushLine(customerName.toUpperCase())
+  pushCmd(CMD.NORMAL_SIZE)
+  pushCmd(CMD.BOLD_OFF)
+  pushLine()
 
-    // Meta — time + payment + table
-    const meta = [timeStr, paymentMethod, order.table_number ? `T${order.table_number}` : null]
-      .filter(Boolean).join(' · ')
-    drawCenter(ctx, meta, y, 14, false, FONT_EN)
-    y += 22
+  // Meta: time + payment + table
+  const meta = [timeStr, paymentMethod, order.table_number ? `T${order.table_number}` : null]
+    .filter(Boolean).join(' · ')
+  pushLine(meta)
 
-    drawDashedLine(ctx, y, w)
-    y += 10
+  pushCmd(CMD.ALIGN_LEFT)
+  bytes.push(...separator('-'))
 
-    // Items — Arabic name (right-aligned, bold), modifiers indented
-    for (const item of items) {
-      const nameAr = item.product_name_ar || item.product_name || 'منتج'
-      const qty = item.quantity || 1
-      y = drawArabicLine(ctx, `${qty}× ${nameAr}`, y, 24, true)
+  // Items — bold name, indented modifiers below
+  for (const item of items) {
+    const name = (item.product_name || item.name || 'Item').slice(0, RECEIPT_WIDTH)
+    const qty = item.quantity || 1
+    pushCmd(CMD.BOLD_ON)
+    pushLine(`${qty}x ${name}`)
+    pushCmd(CMD.BOLD_OFF)
 
-      if (Array.isArray(item.modifiers) && item.modifiers.length) {
-        for (const m of item.modifiers) {
-          const arMod = m.modifier_name_ar || m.modifier_name || ''
-          y = drawArabicLine(ctx, `+ ${arMod}`, y, 18, false)
-        }
+    if (Array.isArray(item.modifiers) && item.modifiers.length) {
+      for (const m of item.modifiers) {
+        const label = `   + ${m.modifier_name || ''}`.slice(0, RECEIPT_WIDTH)
+        pushLine(label)
       }
-      if (item.notes) {
-        y = drawArabicLine(ctx, `* ${item.notes}`, y, 16, false)
-      }
-      y += 10
     }
+    if (item.notes) {
+      pushLine(`   * ${String(item.notes).slice(0, RECEIPT_WIDTH - 5)}`)
+    }
+    pushLine()
+  }
 
-    drawDashedLine(ctx, y, w)
-    y += 8
-    y = drawArabicCenter(ctx, '— تذكرة المشروب —', y, 14, false)
-    return y
-  })
+  bytes.push(...separator('='))
+  pushCmd(CMD.ALIGN_CENTER)
+  pushLine('-- DRINK TICKET --')
 
-  const bytes = [
-    ...CMD.INIT,
-    ...CMD.ALIGN_CENTER,
-    ...rasterBytes,
-    LF, LF, LF,
-    ...CMD.CUT,
-  ]
+  pushLine()
+  pushLine()
+  pushLine()
+  pushCmd(CMD.CUT)
 
   await writeBytes(bytes)
 }
