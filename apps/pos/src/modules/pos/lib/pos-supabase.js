@@ -269,6 +269,19 @@ export async function getOpenShift(branchId) {
   return data?.[0] || null
 }
 
+// List recent shifts for a branch, newest first.
+// Default: 30 most recent (about a month). Used by the Sessions page.
+export async function listShifts(branchId, { limit = 30 } = {}) {
+  const { data, error } = await supabase
+    .from('pos_shifts')
+    .select('*')
+    .eq('branch_id', branchId)
+    .order('opened_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
 export async function openShift(branchId, openingCash, userId) {
   const { data, error } = await supabase
     .from('pos_shifts')

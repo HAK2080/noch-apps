@@ -223,6 +223,26 @@ export default function POSOrders() {
     )
   })
 
+  // Executive summary — computed from non-voided orders in the current range.
+  // We base on `filtered` so the summary respects the date filter and search.
+  const summary = filtered.reduce((acc, o) => {
+    if (o.status === 'voided') return acc
+    const total = Number(o.total) || 0
+    acc.revenue += total
+    acc.orders += 1
+    const m = (o.payment_method || '').toLowerCase()
+    if (m === 'cash')   acc.cash   += total
+    else if (m === 'card')   acc.card   += total
+    else if (m === 'presto') acc.presto += total
+    else if (m === 'split') {
+      const cardAmt = Number(o.card_amount) || 0
+      acc.card += cardAmt
+      acc.cash += (total - cardAmt)
+    }
+    else acc.other += total
+    return acc
+  }, { revenue: 0, orders: 0, cash: 0, card: 0, presto: 0, other: 0 })
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto">
@@ -258,6 +278,42 @@ export default function POSOrders() {
             className="input w-full pl-9 py-2 text-sm"
           />
         </div>
+
+        {/* Executive summary — totals for the visible (filtered) range */}
+        {!loading && (
+          <div className="card p-4 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div>
+                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Revenue</p>
+                <p className="text-noch-green font-bold text-lg leading-tight">{summary.revenue.toFixed(2)}</p>
+                <p className="text-noch-muted text-[10px]">LYD</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Orders</p>
+                <p className="text-white font-bold text-lg leading-tight">{summary.orders}</p>
+                <p className="text-noch-muted text-[10px]">tickets</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Cash</p>
+                <p className="text-white font-bold text-lg leading-tight">{summary.cash.toFixed(2)}</p>
+                <p className="text-noch-muted text-[10px]">LYD</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Card</p>
+                <p className="text-white font-bold text-lg leading-tight">{summary.card.toFixed(2)}</p>
+                <p className="text-noch-muted text-[10px]">LYD</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Presto</p>
+                <p className="text-white font-bold text-lg leading-tight">{summary.presto.toFixed(2)}</p>
+                <p className="text-noch-muted text-[10px]">LYD</p>
+              </div>
+            </div>
+            {summary.other > 0 && (
+              <p className="text-noch-muted text-xs mt-2">+ {summary.other.toFixed(2)} LYD other payment methods</p>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <p className="text-noch-muted text-center py-12">Loading…</p>

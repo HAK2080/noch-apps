@@ -16,6 +16,7 @@ export default function TableQRGenerator() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [qrDataUrls, setQrDataUrls] = useState({})
+  const [generalQr, setGeneralQr] = useState(null)
 
   useEffect(() => {
     loadBranch()
@@ -59,6 +60,23 @@ export default function TableQRGenerator() {
       }
     }
     setQrDataUrls(urls)
+
+    // Also generate a larger "general" menu QR (no table number) — for
+    // posters, business cards, window stickers, social media bio links.
+    try {
+      const generalUrl = `${host}/menu/${branchId}`
+      setGeneralQr(await QRCode.toDataURL(generalUrl, { width: 400, margin: 2 }))
+    } catch (e) {
+      console.error('General QR gen error', e)
+    }
+  }
+
+  function downloadGeneralQr() {
+    if (!generalQr) return
+    const a = document.createElement('a')
+    a.href = generalQr
+    a.download = `noch-menu-${(branch?.name || 'branch').replace(/\s+/g, '-')}.png`
+    a.click()
   }
 
   function getMenuUrl(tableNum) {
@@ -126,6 +144,43 @@ export default function TableQRGenerator() {
           >
             Regenerate
           </button>
+        </div>
+      </div>
+
+      {/* Branch / Menu QR — single big QR for posters, stickers, business cards */}
+      <div className="p-6 print:hidden border-b border-noch-border">
+        <h2 className="text-white font-bold text-lg mb-2">Menu QR (no table)</h2>
+        <p className="text-noch-muted text-sm mb-4">
+          For window stickers, business cards, social bios. Link: {' '}
+          <code className="text-noch-green text-xs">/menu/{branchId}</code>
+        </p>
+        <div className="flex items-center gap-6 flex-wrap">
+          {generalQr && (
+            <div className="bg-white p-4 rounded-xl flex flex-col items-center gap-2">
+              <div className="text-gray-500 text-xs uppercase tracking-wide font-medium">
+                {branch?.name}
+              </div>
+              <img src={generalQr} alt="Menu QR" width={200} height={200} className="rounded" />
+              <div className="text-gray-700 text-sm font-semibold">Scan to order</div>
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <button onClick={downloadGeneralQr} className="btn btn-primary text-sm">
+              Download PNG
+            </button>
+            <a
+              href={`${window.location.origin}/menu/${branchId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary text-sm text-center"
+            >
+              Open menu link
+            </a>
+            <p className="text-noch-muted text-xs max-w-xs">
+              Print at any size — QR codes scale infinitely.
+              For window stickers, 10×10 cm or larger is comfortable from 2 m away.
+            </p>
+          </div>
         </div>
       </div>
 

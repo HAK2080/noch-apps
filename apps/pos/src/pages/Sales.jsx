@@ -1,11 +1,13 @@
-// Sales.jsx — Branch picker that drops straight into POSOrders.
+// Sales.jsx — Branch picker into Orders or Sessions views.
 // Route: /sales
-// If only one branch exists, redirects immediately. Otherwise shows
-// a simple branch selector so the user never has to go through the
-// POS terminal to find their orders.
+//
+// Two ways to slice sales data:
+//   Orders   — every individual transaction (search, refund, void, reprint)
+//   Sessions — group by trading shift (best for cafes that cross midnight)
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ListOrdered, Clock } from 'lucide-react'
 import { getPOSBranches } from '../modules/pos/lib/pos-supabase'
 import Layout from '../components/Layout'
 
@@ -17,15 +19,11 @@ export default function Sales() {
   useEffect(() => {
     getPOSBranches()
       .then(list => {
-        if (list?.length === 1) {
-          navigate(`/pos/${list[0].id}/orders`, { replace: true })
-        } else {
-          setBranches(list || [])
-          setLoading(false)
-        }
+        setBranches(list || [])
+        setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [navigate])
+  }, [])
 
   if (loading) {
     return (
@@ -37,19 +35,33 @@ export default function Sales() {
 
   return (
     <Layout>
-      <div className="max-w-md mx-auto py-10">
+      <div className="max-w-2xl mx-auto py-6">
         <h1 className="text-white font-bold text-2xl mb-2">Sales</h1>
-        <p className="text-noch-muted text-sm mb-6">Select a branch to view orders</p>
-        <div className="flex flex-col gap-3">
+        <p className="text-noch-muted text-sm mb-6">View orders or trading sessions for each branch</p>
+        <div className="flex flex-col gap-4">
           {branches.map(b => (
-            <button
-              key={b.id}
-              onClick={() => navigate(`/pos/${b.id}/orders`)}
-              className="card text-left px-5 py-4 hover:border-noch-green/40 transition-colors"
-            >
-              <p className="text-white font-semibold">{b.name}</p>
-              {b.address && <p className="text-noch-muted text-sm mt-0.5">{b.address}</p>}
-            </button>
+            <div key={b.id} className="card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-white font-semibold">{b.name}</p>
+                  {b.address && <p className="text-noch-muted text-sm mt-0.5">{b.address}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => navigate(`/pos/${b.id}/orders`)}
+                  className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
+                >
+                  <ListOrdered size={14} /> Orders
+                </button>
+                <button
+                  onClick={() => navigate(`/pos/${b.id}/sessions`)}
+                  className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
+                >
+                  <Clock size={14} /> Sessions
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       </div>

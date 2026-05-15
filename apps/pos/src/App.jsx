@@ -60,6 +60,7 @@ const POSSettings      = lazy(() => import('./modules/pos/pages/POSSettings'))
 const POSProducts      = lazy(() => import('./modules/pos/pages/POSProducts'))
 const POSStockCheck    = lazy(() => import('./modules/pos/pages/POSStockCheck'))
 const POSOrders        = lazy(() => import('./modules/pos/pages/POSOrders'))
+const POSSessions      = lazy(() => import('./modules/pos/pages/POSSessions'))
 const Sales            = lazy(() => import('./pages/Sales'))
 const POSReports       = lazy(() => import('./modules/pos/pages/POSReports'))
 const POSModifiers     = lazy(() => import('./modules/pos/pages/POSModifiers'))
@@ -289,6 +290,7 @@ export default function App() {
         <Route path="/pos/:branchId/products" element={<ProtectedRoute><POSProducts /></ProtectedRoute>} />
         <Route path="/pos/:branchId/stock-check" element={<ProtectedRoute><POSStockCheck /></ProtectedRoute>} />
         <Route path="/pos/:branchId/orders" element={<ProtectedRoute><POSOrders /></ProtectedRoute>} />
+        <Route path="/pos/:branchId/sessions" element={<ProtectedRoute><POSSessions /></ProtectedRoute>} />
         <Route path="/pos/:branchId/reports" element={<ProtectedRoute><POSReports /></ProtectedRoute>} />
         <Route path="/pos/:branchId/modifiers" element={<ProtectedRoute><POSModifiers /></ProtectedRoute>} />
         <Route path="/pos/:branchId/tables" element={<ProtectedRoute><OwnerRoute><TableQRGenerator /></OwnerRoute></ProtectedRoute>} />
