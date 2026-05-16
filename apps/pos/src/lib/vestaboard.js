@@ -126,6 +126,30 @@ function alternatingRow(c1, c2, width = VB_COLS) {
   return Array.from({ length: width }, (_, i) => (i % 2 === 0 ? c1 : c2))
 }
 
+// Centre text inside a 20-cell inner window, with a single coloured
+// "bookend" cell on col 0 and col 21 — looks like ❤ NAME ❤ on the board.
+// Long lines that don't fit in 20 cells fall back to full-width with no
+// bookends so they don't get truncated.
+function textRowWithBookends(text, palette) {
+  const codes = [...String(text || '')].map(charToVbCode)
+  if (codes.length > VB_COLS - 2) {
+    return textToCodeRow(text)   // too long — drop bookends, use full width
+  }
+  const innerWidth = VB_COLS - 2
+  const padLeft = 1 + Math.floor((innerWidth - codes.length) / 2)
+  const row = Array(VB_COLS).fill(0)
+  row[0] = palette.top
+  row[VB_COLS - 1] = palette.top
+  for (let i = 0; i < codes.length; i++) row[padLeft + i] = codes[i]
+  return row
+}
+
+// "Polka dot" row — single colour every other cell, gives a floating
+// row of hearts/stars/coffee-beans look depending on palette colour.
+function polkaRow(color, width = VB_COLS) {
+  return Array.from({ length: width }, (_, i) => (i % 2 === 0 ? color : 0))
+}
+
 // One palette per template — picked by the same seed so the same order
 // always lands on the same template + palette combo.
 const PALETTES = [
@@ -137,17 +161,23 @@ const PALETTES = [
   { top: COLOR.GREEN,  bot: COLOR.ORANGE },  // 5: TOTALLY DID — sly
 ]
 
-// Build a 6×22 character grid with the 3 text lines wrapped in a
-// coloured stripe top and bottom. Returns the grid for the characters API.
+// Build a 6×22 character grid:
+//   row 0: alternating stripe top (palette.top / palette.bot)
+//   rows 1-3: text lines with palette-coloured "bookends" on each end
+//     so the name looks like ❤  HAITHEM  ❤ on a love palette,
+//     ⭐  HAITHEM  ⭐ on a dance palette, etc.
+//   row 4: polka-dot row in palette.top — floating hearts/stars between
+//     the text and the bottom stripe
+//   row 5: alternating stripe bottom (mirrored)
 function buildColorfulFrame(lines, palette) {
   const [l1 = '', l2 = '', l3 = ''] = lines
   return [
     alternatingRow(palette.top, palette.bot),
-    textToCodeRow(l1),
-    textToCodeRow(l2),
-    textToCodeRow(l3),
-    Array(VB_COLS).fill(0),
-    alternatingRow(palette.bot, palette.top),  // mirror stripe
+    textRowWithBookends(l1, palette),
+    textRowWithBookends(l2, palette),
+    textRowWithBookends(l3, palette),
+    polkaRow(palette.top),
+    alternatingRow(palette.bot, palette.top),
   ]
 }
 
