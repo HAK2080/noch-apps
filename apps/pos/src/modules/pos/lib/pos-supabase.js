@@ -584,6 +584,7 @@ export async function createPOSOrder(orderData, items) {
     p_client_created_at: orderData.client_created_at || new Date().toISOString(),
     p_offline_order_number: orderData.offline_order_number || null,
     p_items: itemsPayload,
+    p_customer_name: orderData.customer_name || null,
   })
   if (error) throw error
 
