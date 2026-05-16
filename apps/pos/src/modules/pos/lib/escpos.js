@@ -167,10 +167,34 @@ export async function autoConnectPrinter(opts = {}) {
   }
 }
 
+// Serialize all print jobs through one chain. Bluetooth thermal
+// printers have no internal job queue — if two prints fire at once
+// (drink ticket + customer receipt, or rapid reprint clicks) the
+// byte chunks interleave on the BLE characteristic and one print
+// drops silently. Staff reported "second receipt not printing" —
+// this queue is the fix.
+//
+// Each caller gets their own promise that resolves/rejects with
+// their own write. Failures in one job don't poison subsequent
+// jobs (we swallow on the chain head only).
+let _printChain = Promise.resolve()
+const PRINT_GAP_MS = 200   // small gap so printer firmware settles between jobs
+
 async function writeBytes(bytes, timeoutMs = 8000) {
   const t = TRANSPORTS[_kind]
   if (!t || !t.isConnected()) throw new Error('Printer not connected')
-  await t.write(bytes, timeoutMs)
+
+  const doWrite = async () => {
+    await t.write(bytes, timeoutMs)
+    // Brief settle delay before the next print starts streaming.
+    await new Promise(r => setTimeout(r, PRINT_GAP_MS))
+  }
+
+  // Chain my write after whatever is in flight — run even if the
+  // previous job rejected (otherwise a single failure freezes the queue).
+  const myTurn = _printChain.then(doWrite, doWrite)
+  _printChain = myTurn.catch(() => {})
+  return myTurn
 }
 
 function textToBytes(text) {
