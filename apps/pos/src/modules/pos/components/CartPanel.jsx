@@ -112,8 +112,17 @@ function CartPanel({
   // Customer first name — printed in big letters on the drink ticket
   // so the barista knows who the order is for. Optional.
   const [customerName, setCustomerName] = useState('')
-  // Reset name when the cart is emptied (after charge / void)
-  useEffect(() => { if (items.length === 0) setCustomerName('') }, [items.length])
+  // WhatsApp / phone number — stored on the order for future loyalty
+  // linking (lookup or auto-create in loyalty_customers by phone).
+  // Optional; not required for the sale to complete.
+  const [customerPhone, setCustomerPhone] = useState('')
+  // Reset both when the cart is emptied (after charge / void)
+  useEffect(() => {
+    if (items.length === 0) {
+      setCustomerName('')
+      setCustomerPhone('')
+    }
+  }, [items.length])
 
   const baselineCap = canDiscountAny ? Infinity : 10
   // Cap is lifted once a manager has approved.
@@ -260,7 +269,7 @@ function CartPanel({
           )}
 
           {/* Customer first name — printed BIG on the drink ticket */}
-          <div className="mb-3">
+          <div className="mb-2">
             <input
               type="text"
               value={customerName}
@@ -272,6 +281,21 @@ function CartPanel({
               autoCapitalize="words"
             />
           </div>
+          {/* WhatsApp number — used later to link the order to loyalty.
+              Free-form; trimmed and saved as-is, no formatting forced. */}
+          <div className="mb-3">
+            <input
+              type="tel"
+              value={customerPhone}
+              onChange={e => setCustomerPhone(e.target.value)}
+              placeholder="WhatsApp number (optional — for loyalty)"
+              className="input w-full py-2 text-sm"
+              maxLength={20}
+              autoComplete="off"
+              inputMode="tel"
+              dir="ltr"
+            />
+          </div>
 
           {/* Charge button */}
           <button
@@ -280,6 +304,7 @@ function CartPanel({
               discountValue: parseFloat(discountValue) || 0,
               override_by: overrideBy?.id || null,
               customer_name: customerName.trim() || null,
+              customer_phone: customerPhone.trim() || null,
             })}
             className="btn-primary w-full py-4 text-lg font-bold rounded-xl"
             disabled={items.length === 0}

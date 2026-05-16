@@ -569,6 +569,10 @@ export default function POSTerminal() {
     // card's full name (first word only, to keep the drink ticket short).
     const loyaltyFirstName = (loyaltyCustomer?.full_name || '').trim().split(/\s+/)[0] || null
     const customerName = showPayment.customer_name || loyaltyFirstName || null
+    // WhatsApp / phone — staff-typed at cart wins; fall back to loyalty
+    // card's phone if a card was scanned. Trim whitespace; null when empty.
+    const rawPhone = showPayment.customer_phone || loyaltyCustomer?.phone || null
+    const customerPhone = rawPhone ? String(rawPhone).trim() || null : null
 
     const orderData = {
       branch_id: branchId,
@@ -582,6 +586,7 @@ export default function POSTerminal() {
       total,
       ...paymentData,
       customer_name: customerName,
+      customer_phone: customerPhone,
       synced: isOnline(),
     }
 

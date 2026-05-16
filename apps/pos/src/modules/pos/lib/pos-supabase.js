@@ -585,6 +585,7 @@ export async function createPOSOrder(orderData, items) {
     p_offline_order_number: orderData.offline_order_number || null,
     p_items: itemsPayload,
     p_customer_name: orderData.customer_name || null,
+    p_customer_phone: orderData.customer_phone || null,
   })
   if (error) throw error
 
