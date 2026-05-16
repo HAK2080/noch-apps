@@ -10,7 +10,7 @@ import {
   rejectVestaboardMessage,
   markVestaboardSent,
 } from '../lib/supabase'
-import { sendVestaboard, VB_ROWS, VB_COLS, VB_MAX_CHARS } from '../lib/vestaboard'
+import { sendVestaboard, sendCustomerGreeting, VB_ROWS, VB_COLS, VB_MAX_CHARS } from '../lib/vestaboard'
 import toast from 'react-hot-toast'
 
 // ─── Character code helpers ───────────────────────────────────────────────────
@@ -345,6 +345,19 @@ export default function Vestaboard() {
     } catch (err) { toast.error(err.message) }
   }
 
+  // Test greeting — used during initial setup to confirm credentials
+  // work and that a customer-name greeting actually lands on the board.
+  const [testName, setTestName] = useState('AHMED')
+  const handleTestGreeting = async () => {
+    try {
+      const r = await sendCustomerGreeting(testName)
+      if (r?.simulated) toast('Vestaboard not configured — set VITE_VESTABOARD_API_KEY in .env', { icon: '⚙️' })
+      else toast.success(`Test greeting sent for "${testName}"`)
+    } catch (err) {
+      toast.error(`Greeting failed: ${err.message}`)
+    }
+  }
+
   const totalChars = charCount(board)
   const hasContent = totalChars > 0
 
@@ -360,6 +373,30 @@ export default function Vestaboard() {
               {lang === 'ar' ? 'أرسل رسالة للشاشة في المقهى' : 'Send a message to the café board'}
             </p>
           </div>
+        </div>
+
+        {/* ── Cheeky customer greeting test ── */}
+        <div className="card mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-white font-semibold text-sm">Customer greeting test</h2>
+            <span className="text-noch-muted text-xs">Fires automatically on every order with a name</span>
+          </div>
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={testName}
+              onChange={e => setTestName(e.target.value)}
+              placeholder="Name (e.g. AHMED)"
+              className="input flex-1 text-sm"
+              maxLength={16}
+            />
+            <button onClick={handleTestGreeting} className="btn-primary text-sm whitespace-nowrap">
+              Send cheeky greeting
+            </button>
+          </div>
+          <p className="text-noch-muted text-xs mt-2">
+            One of six random Nochi greetings will land on the board. If it doesn't appear, check that <code className="text-noch-green">VITE_VESTABOARD_API_KEY</code> is set in <code className="text-noch-green">.env</code>.
+          </p>
         </div>
 
         {/* ── Composer ── */}
