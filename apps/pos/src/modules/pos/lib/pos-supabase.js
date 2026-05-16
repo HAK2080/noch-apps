@@ -442,6 +442,38 @@ export async function getModifierGroupsForProduct(productId) {
   }))
 }
 
+export async function getAllModifierData() {
+  const [{ data: links }, { data: groups, error }] = await Promise.all([
+    supabase.from('pos_product_modifier_groups').select('product_id, group_id'),
+    supabase.from('pos_modifier_groups').select('*, pos_modifiers(*)').eq('is_active', true).order('sort_order'),
+  ])
+  if (error) throw error
+
+  const groupMap = new Map()
+  for (const g of groups || []) {
+    groupMap.set(g.id, {
+      ...g,
+      modifiers: (g.pos_modifiers || []).filter(m => m.is_active).sort((a, b) => a.sort_order - b.sort_order),
+    })
+  }
+
+  const productGroups = new Map()
+  for (const link of links || []) {
+    if (!productGroups.has(link.product_id)) productGroups.set(link.product_id, [])
+    productGroups.get(link.product_id).push(link.group_id)
+  }
+
+  return {
+    groupsForProduct(productId) {
+      const groupIds = productGroups.get(productId) || []
+      return groupIds
+        .map(id => groupMap.get(id))
+        .filter(Boolean)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    },
+  }
+}
+
 export async function getCashMovements(shiftId) {
   if (!shiftId) return []
   const { data, error } = await supabase

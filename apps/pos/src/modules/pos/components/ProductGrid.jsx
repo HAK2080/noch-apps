@@ -5,7 +5,7 @@
 // accent line. Optimised for fast visual scanning by Arabic-first
 // café staff.
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { AlertTriangle, Ban } from 'lucide-react'
 
 const LONG_PRESS_MS = 500
@@ -21,7 +21,7 @@ function tintFor(hex) {
   }
 }
 
-export default function ProductGrid({
+function ProductGrid({
   products = [], categories = [], onSelect, onLongPress,
   blockOutOfStock = false, searchQuery = '',
   tileLang = 'both',  // 'both' | 'en' | 'ar'
@@ -225,3 +225,5 @@ export default function ProductGrid({
     </div>
   )
 }
+
+export default memo(ProductGrid)

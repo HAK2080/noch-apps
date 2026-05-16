@@ -12,13 +12,12 @@ const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
-  setProductSoldOut,
+  setProductSoldOut, getAllModifierData, getModifierGroupsForProduct,
 } from '../lib/pos-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
 import POSPinLogin from './POSPinLogin'
 import ShiftAttendees from '../components/ShiftAttendees'
 import ProductModifierModal from '../components/ProductModifierModal'
-import { getModifierGroupsForProduct } from '../lib/pos-supabase'
 import {
   cacheProducts, getCachedProducts,
   cacheCategories, getCachedCategories,
@@ -34,6 +33,7 @@ import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
 import { isPrinterConnected, printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
+import { sendCustomerGreeting } from '../../../lib/vestaboard'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 
@@ -78,6 +78,11 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
         if (isPrinterConnected()) {
           printDrinkTicket(order, order.pos_order_items || [], branch)
             .catch(err => toast.error(`Drink ticket failed: ${err.message}`))
+        }
+        // Vestaboard cheeky greeting for the customer.
+        if (order.customer_name) {
+          sendCustomerGreeting(order.customer_name, { seed: order.order_number })
+            .catch(err => console.warn('[Vestaboard] greeting failed:', err?.message))
         }
         onAccept()
       }
@@ -180,6 +185,11 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         if (isPrinterConnected()) {
           printDrinkTicket(order, order.pos_order_items || [], branch)
             .catch(err => toast.error(`Drink ticket failed: ${err.message}`))
+        }
+        // Vestaboard cheeky greeting.
+        if (order.customer_name) {
+          sendCustomerGreeting(order.customer_name, { seed: order.order_number })
+            .catch(err => console.warn('[Vestaboard] greeting failed:', err?.message))
         }
         onConfirmed()
       } else {
@@ -302,6 +312,7 @@ export default function POSTerminal() {
   const [submitting, setSubmitting] = useState(false)  // disables Charge while RPC is in flight
   const [showAttendees, setShowAttendees] = useState(false)
   const [modifierProduct, setModifierProduct] = useState(null)
+  const [modifierData, setModifierData] = useState({ groupsForProduct: () => [] })
 
   // Load branch, products, categories
   useEffect(() => {
@@ -326,12 +337,14 @@ export default function POSTerminal() {
         if (cachedCats.length > 0) setCategories(cachedCats)
 
         if (isOnline()) {
-          const [prods, cats] = await Promise.all([
+          const [prods, cats, modData] = await Promise.all([
             getPOSProducts(branchId),
             getPOSCategories(branchId, { posOnly: true }),
+            getAllModifierData(),
           ])
           setProducts(prods)
           setCategories(cats)
+          setModifierData(modData)
           cacheProducts(branchId, prods).catch(() => {})
           cacheCategories(branchId, cats).catch(() => {})
         }
@@ -497,9 +510,9 @@ export default function POSTerminal() {
 
   const clearCart = () => setCart([])
 
-  const handleDiscount = ({ type, value, amount }) => {
+  const handleDiscount = useCallback(({ type, value, amount }) => {
     // stored in charge data via CartPanel
-  }
+  }, [])
 
   // Handle barcode scan. Barcode flow skips the modifier picker — the
   // assumption is that scanned items are pre-packaged retail SKUs, not
@@ -516,10 +529,10 @@ export default function POSTerminal() {
   }
 
   // Charge (open payment modal)
-  const handleCharge = (chargeData) => {
+  const handleCharge = useCallback((chargeData) => {
     if (cart.length === 0) return
     setShowPayment(chargeData)
-  }
+  }, [cart])
 
   // Complete payment
   const handlePaymentComplete = async (paymentData) => {
@@ -621,6 +634,15 @@ export default function POSTerminal() {
         printDrinkTicket(order, items, branch).catch(err =>
           toast.error(`Drink ticket print failed: ${err.message}`)
         )
+      }
+
+      // Vestaboard greeting — fire a cheeky Nochi message with the
+      // customer's name. Non-blocking; skips if no name was captured
+      // or if no API key is configured (sendCustomerGreeting handles
+      // both gracefully).
+      if (customerName) {
+        sendCustomerGreeting(customerName, { seed: order.order_number })
+          .catch(err => console.warn('[Vestaboard] greeting failed:', err?.message))
       }
 
       // Auto-print receipt: fire-and-forget if enabled + printer is connected.
@@ -959,6 +981,7 @@ export default function POSTerminal() {
       {modifierProduct && (
         <ProductModifierModal
           product={modifierProduct.product}
+          groups={modifierData.groupsForProduct(modifierProduct.product.id)}
           onAdd={({ unit_price, modifiers }) => {
             addCartLine(modifierProduct.product, { unit_price, modifiers })
             setModifierProduct(null)

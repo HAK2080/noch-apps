@@ -1,6 +1,6 @@
 // CartPanel.jsx — Shopping cart for POS terminal
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Minus, Plus, X, Trash2, Tag, Shield } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
 import { translations } from '../../../lib/i18n'
@@ -94,7 +94,7 @@ function CartItem({ item, onUpdateQty, onRemove }) {
   )
 }
 
-export default function CartPanel({
+function CartPanel({
   items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge,
   managerOverrideEnabled = false, posLang = 'en',
 }) {
@@ -299,3 +299,5 @@ export default function CartPanel({
     </div>
   )
 }
+
+export default memo(CartPanel)

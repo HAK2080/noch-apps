@@ -9,13 +9,23 @@ import { getModifierGroupsForProduct } from '../lib/pos-supabase'
 import { round, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
 
-export default function ProductModifierModal({ product, onAdd, onClose }) {
+export default function ProductModifierModal({ product, onAdd, onClose, groups: groupsProp = null }) {
   const [groups, setGroups] = useState([])
   const [selections, setSelections] = useState({}) // groupId → array of modifier objects
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!product?.id) return
+    if (Array.isArray(groupsProp)) {
+      setGroups(groupsProp)
+      const init = {}
+      for (const grp of groupsProp) {
+        init[grp.id] = grp.modifiers.filter(m => m.is_default)
+      }
+      setSelections(init)
+      setLoading(false)
+      return
+    }
     getModifierGroupsForProduct(product.id)
       .then(g => {
         setGroups(g)
@@ -28,7 +38,7 @@ export default function ProductModifierModal({ product, onAdd, onClose }) {
       })
       .catch(err => toast.error(err.message || 'Failed to load options'))
       .finally(() => setLoading(false))
-  }, [product?.id])
+  }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleModifier = (group, mod) => {
     setSelections(prev => {
