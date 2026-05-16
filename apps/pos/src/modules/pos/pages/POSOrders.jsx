@@ -12,8 +12,75 @@ import {
 } from '../lib/pos-supabase'
 import { printReceipt, printDrinkTicket, isPrinterConnected } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
+import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+
+// Roles allowed to see top-line totals (Revenue / Cash / Card / Presto).
+// Staff and limited_staff are scoped to per-order detail only.
+const TOTALS_ROLES = ['owner', 'supervisor']
+
+// CancelModal — proper in-app dialog replacing the unreliable window.prompt.
+// window.prompt() returns null silently on Android tablets / kiosk WebViews,
+// which is the root cause of staff reporting "Cancel/Void is not working".
+function CancelModal({ order, onClose, onSaved }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    const trimmed = reason.trim()
+    if (!trimmed) {
+      toast.error('Please enter a reason')
+      return
+    }
+    setBusy(true)
+    try {
+      const servedBy = getServedBy()?.id || null
+      await voidPOSOrder(order.id, trimmed, servedBy)
+      toast.success(`Order ${order.order_number} cancelled`)
+      onSaved()
+      onClose()
+    } catch (err) {
+      toast.error(err.message || 'Cancel failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-4 border-b border-noch-border">
+          <div>
+            <h2 className="text-white font-bold">Cancel order</h2>
+            <p className="text-noch-muted text-xs">{order.order_number}</p>
+          </div>
+          <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="p-4">
+          <p className="text-noch-muted text-sm mb-3">
+            Why is this order being cancelled? Stock will be returned, the shift total will be reversed, and an audit-log entry will be written.
+          </p>
+          <label className="label block mb-1 text-xs">Reason</label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            autoFocus
+            placeholder="e.g. wrong item rung up, customer changed mind"
+            className="input w-full resize-none mb-4"
+          />
+          <div className="flex gap-2">
+            <button onClick={onClose} disabled={busy} className="btn-secondary flex-1">Back</button>
+            <button onClick={submit} disabled={busy || !reason.trim()} className="btn-primary flex-1 text-red-300 hover:text-red-200">
+              {busy ? 'Cancelling…' : 'Confirm cancel'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function RefundModal({ order, onClose, onSaved }) {
   // Initial state: 0 refund qty per line; the operator dials up the
@@ -137,6 +204,9 @@ function RefundModal({ order, onClose, onSaved }) {
 export default function POSOrders() {
   const { branchId } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const canViewTotals = TOTALS_ROLES.includes(profile?.role)
+  const canCancel = canViewTotals  // same gate — supervisors and owners only
 
   const [branch, setBranch] = useState(null)
   const [orders, setOrders] = useState([])
@@ -144,6 +214,7 @@ export default function POSOrders() {
   const [search, setSearch] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [refundOrder, setRefundOrder] = useState(null)
+  const [cancelOrder, setCancelOrder] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   // Date range — defaults to today, but operators can scroll back.
   const today = () => {
@@ -241,20 +312,15 @@ export default function POSOrders() {
     )
   }
 
-  const handleVoid = async (order) => {
-    const reason = window.prompt(`Void order ${order.order_number}?\nReason:`)
-    if (!reason) return
-    setBusyId(order.id)
-    try {
-      const servedBy = getServedBy()?.id || null
-      await voidPOSOrder(order.id, reason, servedBy)
-      toast.success('Order voided')
-      await load()
-    } catch (err) {
-      toast.error(err.message || 'Void failed')
-    } finally {
-      setBusyId(null)
+  // Opens the in-app CancelModal. The old window.prompt was unreliable
+  // on tablets and kiosk WebViews — when the prompt returned null
+  // silently, staff saw "nothing happens" and reported it as broken.
+  const handleCancel = (order) => {
+    if (!canCancel) {
+      toast.error('Only owner or manager can cancel orders')
+      return
     }
+    setCancelOrder(order)
   }
 
   const handlePrestoCollected = async (order) => {
@@ -347,7 +413,7 @@ export default function POSOrders() {
         </div>
 
         {/* Executive summary — totals for the visible (filtered) range */}
-        {!loading && (
+        {!loading && canViewTotals && (
           <div className="card p-4 mb-4">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div>
@@ -411,7 +477,7 @@ export default function POSOrders() {
                     <div className="flex-1 min-w-[180px]">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-noch-green text-sm">{o.order_number}</span>
-                        {isVoided && <span className="text-red-400 text-xs uppercase">voided</span>}
+                        {isVoided && <span className="text-red-400 text-xs uppercase">cancelled</span>}
                         {refundState === 'full' && (
                           <span className="bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
                             <RotateCcw size={10} /> Refunded
@@ -527,9 +593,11 @@ export default function POSOrders() {
                             <button onClick={(e) => { e.stopPropagation(); setRefundOrder(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-1">
                               <RotateCcw size={12} /> Refund
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); handleVoid(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-red-400 hover:bg-red-500/10 flex items-center gap-1">
-                              <X size={12} /> Void
-                            </button>
+                            {canCancel && (
+                              <button onClick={(e) => { e.stopPropagation(); handleCancel(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-red-400 hover:bg-red-500/10 flex items-center gap-1">
+                                <X size={12} /> Cancel
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -546,6 +614,14 @@ export default function POSOrders() {
         <RefundModal
           order={refundOrder}
           onClose={() => setRefundOrder(null)}
+          onSaved={load}
+        />
+      )}
+
+      {cancelOrder && (
+        <CancelModal
+          order={cancelOrder}
+          onClose={() => setCancelOrder(null)}
           onSaved={load}
         />
       )}

@@ -220,10 +220,14 @@ function separator(char = '-', width = RECEIPT_WIDTH) {
 // name so "Noch Café" prints as "Noch Cafe" instead of "NOCH CAF?".
 // Arabic characters are left alone — they go through encodeForPrinter().
 function sanitiseHeader(str) {
+  // CP437 mode — strip everything outside printable ASCII. Arabic
+  // letters were being CP1256-encoded then printed as CP437 box-
+  // drawing glyphs in the header. Drop them entirely.
   return String(str || '')
     .normalize('NFD')                       // decompose é → e + combining accent
     .replace(/[̀-ͯ]/g, '')        // drop combining diacritics (accents)
-    .replace(/[^\x00-\x7F؀-ۿ]/g, '') // keep ASCII + Arabic block
+    .replace(/[^\x20-\x7E]/g, '')           // ASCII printable only
+    .replace(/\s+/g, ' ')                   // collapse stray whitespace
     .trim()
 }
 
@@ -359,6 +363,12 @@ export async function printReceipt(order, branch, items, loyaltyCustomer = null)
     pushLine('noch.cloud/passport')
   }
 
+  // Generous feed before cut so the auto-cutter (when present) doesn't
+  // slice through useful content, and on cutter-less units the tear
+  // edge lands well below the printed area.
+  pushLine()
+  pushLine()
+  pushLine()
   pushLine()
   pushLine()
   pushLine()
@@ -415,8 +425,10 @@ export async function printDrinkTicket(order, items, branch, opts = {}) {
   pushLine()
 
   // Meta: time + payment + table
+  // Use a pipe separator — the middle-dot character (·) sits above ASCII
+  // and prints as '?' on the CP437 page we're using.
   const meta = [timeStr, paymentMethod, order.table_number ? `T${order.table_number}` : null]
-    .filter(Boolean).join(' · ')
+    .filter(Boolean).join(' | ')
   pushLine(meta)
 
   pushCmd(CMD.ALIGN_LEFT)
@@ -446,7 +458,15 @@ export async function printDrinkTicket(order, items, branch, opts = {}) {
   pushCmd(CMD.ALIGN_CENTER)
   pushLine('-- DRINK TICKET --')
 
+  // Tear-marker block — visible cue so staff can clearly see the
+  // boundary between the drink ticket and the customer receipt, since
+  // this printer model has no auto-cutter and prints both on the
+  // same continuous strip.
   pushLine()
+  pushLine()
+  pushLine('- - - - - - - - - - - - - - - -')
+  pushLine('       T E A R   H E R E       ')
+  pushLine('- - - - - - - - - - - - - - - -')
   pushLine()
   pushLine()
   pushCmd(CMD.CUT)

@@ -21,7 +21,7 @@ const FEATURE_GROUPS = [
       { key: 'recipes', label: 'Recipes' },
       { key: 'pos', label: 'POS Terminal' },
       { key: 'pos_eod', label: 'POS End of Day' },
-      { key: 'pos_void', label: 'POS Void Orders' },
+      { key: 'pos_void', label: 'POS Cancel Orders' },
       { key: 'pos_discounts', label: 'POS Discounts' },
       { key: 'loyalty', label: 'Loyalty Admin' },
       { key: 'loyalty_stamp', label: 'Loyalty Stamp' },

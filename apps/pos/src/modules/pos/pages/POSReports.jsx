@@ -174,7 +174,7 @@ export default function POSReports() {
               <StatCard label="Card" value={`${totals.card.toFixed(2)}`} icon={ShoppingCart} color="text-blue-400" />
               <StatCard label="Presto" value={`${totals.presto.toFixed(2)}`} icon={ShoppingCart} color="text-purple-400" />
               <StatCard label="Discounts" value={`${totals.discounts.toFixed(2)}`} color="text-yellow-400" />
-              <StatCard label="Voided" value={`${totals.voided.toFixed(2)}`} color="text-red-400" />
+              <StatCard label="Cancelled" value={`${totals.voided.toFixed(2)}`} color="text-red-400" />
               <StatCard label="Avg ticket" value={totals.orders ? `${(totals.gross / totals.orders).toFixed(2)}` : '—'} />
               <StatCard label="Days" value={daily.length} />
             </div>

@@ -342,7 +342,7 @@ export const translations = {
 
     // POS — Cart & Payment
     posCart: 'Cart',
-    posVoid: 'Void',
+    posVoid: 'Cancel',
     posAddItemsHint: 'Add items to start',
     posSubtotal: 'Subtotal',
     posDiscount: 'Discount',
