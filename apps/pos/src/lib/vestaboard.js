@@ -85,6 +85,119 @@ export const VB_COLS = 22
 export const VB_MAX_CHARS = VB_ROWS * VB_COLS
 
 // ────────────────────────────────────────────────────────────────────
+// Character-grid mode — required for colored squares.
+// The plain text API renders messages in white only and ignores color
+// codes. To paint colors we have to send a 6×22 grid of numeric codes
+// instead. Codes 1-26 = A-Z, 27-36 = 1-9 + 0, 37-55 = punctuation,
+// 63-70 = colored squares (red, orange, yellow, green, blue, violet,
+// white, black).
+// ────────────────────────────────────────────────────────────────────
+
+const COLOR = {
+  RED: 63, ORANGE: 64, YELLOW: 65, GREEN: 66,
+  BLUE: 67, VIOLET: 68, WHITE: 69, BLACK: 70,
+}
+
+function charToVbCode(ch) {
+  if (!ch || ch === ' ') return 0
+  const c = ch.toUpperCase()
+  const a = c.charCodeAt(0)
+  if (a >= 65 && a <= 90) return a - 64          // A-Z
+  if (c >= '1' && c <= '9') return 27 + (a - 49) // 1-9
+  if (c === '0') return 36
+  const punct = {
+    '!': 37, '@': 38, '#': 39, '$': 40, '(': 41, ')': 42, '-': 43, '+': 44,
+    '&': 45, '=': 46, ';': 47, ':': 48, "'": 49, '"': 50, '%': 51, ',': 52,
+    '.': 53, '/': 54, '?': 55,
+  }
+  return punct[c] ?? 0
+}
+
+function textToCodeRow(text, width = VB_COLS) {
+  const codes = [...String(text)].map(charToVbCode)
+  if (codes.length >= width) return codes.slice(0, width)
+  // Centre the text within the row
+  const padLeft = Math.floor((width - codes.length) / 2)
+  const padRight = width - codes.length - padLeft
+  return [...Array(padLeft).fill(0), ...codes, ...Array(padRight).fill(0)]
+}
+
+function alternatingRow(c1, c2, width = VB_COLS) {
+  return Array.from({ length: width }, (_, i) => (i % 2 === 0 ? c1 : c2))
+}
+
+// One palette per template — picked by the same seed so the same order
+// always lands on the same template + palette combo.
+const PALETTES = [
+  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 0: WELL WELL WELL — warm welcome
+  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 1: GUESS WHO'S BACK — friendly
+  { top: COLOR.RED,    bot: COLOR.YELLOW },  // 2: + COFFEE = TRUE LOVE — love
+  { top: COLOR.BLUE,   bot: COLOR.VIOLET },  // 3: DON'T BLINK — cool/action
+  { top: COLOR.VIOLET, bot: COLOR.YELLOW },  // 4: A LITTLE DANCE — party
+  { top: COLOR.GREEN,  bot: COLOR.ORANGE },  // 5: TOTALLY DID — sly
+]
+
+// Build a 6×22 character grid with the 3 text lines wrapped in a
+// coloured stripe top and bottom. Returns the grid for the characters API.
+function buildColorfulFrame(lines, palette) {
+  const [l1 = '', l2 = '', l3 = ''] = lines
+  return [
+    alternatingRow(palette.top, palette.bot),
+    textToCodeRow(l1),
+    textToCodeRow(l2),
+    textToCodeRow(l3),
+    Array(VB_COLS).fill(0),
+    alternatingRow(palette.bot, palette.top),  // mirror stripe
+  ]
+}
+
+// Direct character-grid send (replaces the text API for colored output).
+export async function sendVestaboardCharacters(grid) {
+  // Local LAN — same shape; local printers accept either text or
+  // characters payload. Cloud is the common path.
+  const url = VB_HOST ? `http://${VB_HOST}:7000/local-api/message` : 'https://rw.vestaboard.com/'
+
+  // No key OR no host configured → simulate
+  if (!VB_HOST && !VB_KEY) {
+    console.log('[Vestaboard] No host/key configured. Grid (simulated):', grid)
+    return { success: true, simulated: true }
+  }
+
+  console.log('[Vestaboard] sending characters →', url)
+  const headers = { 'Content-Type': 'application/json' }
+  if (VB_HOST && VB_KEY) headers['X-Vestaboard-Local-Api-Enable-Key'] = VB_KEY
+  else if (VB_KEY) headers['X-Vestaboard-Read-Write-Key'] = VB_KEY
+
+  let resp
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ characters: grid }),
+    })
+  } catch (netErr) {
+    console.error('[Vestaboard] network error:', netErr)
+    throw new Error(`Vestaboard network: ${netErr?.message || netErr}`)
+  }
+  console.log('[Vestaboard] response status:', resp.status, resp.statusText)
+  if (!resp.ok) {
+    let errMsg = `Vestaboard API ${resp.status}`
+    try {
+      const text = await resp.text()
+      console.error('[Vestaboard] error body:', text)
+      try {
+        const body = JSON.parse(text)
+        if (body?.message) errMsg = `${resp.status}: ${body.message}`
+      } catch {
+        if (text) errMsg = `${resp.status}: ${text.slice(0, 120)}`
+      }
+    } catch {}
+    throw new Error(errMsg)
+  }
+  return { success: true }
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Customer greeting — fires when an order is placed with a name.
 // Six cheeky Nochi templates rotate randomly so regulars don't see
 // the same line twice in a row. Format is plain text; Vestaboard's
@@ -140,22 +253,31 @@ const GREETING_TEMPLATES = [
 ]
 
 // Deterministic-ish pick from order_number so reprints / re-fires of
-// the SAME order land on the same greeting. Falls back to Math.random.
-function pickTemplate(seed) {
-  if (!seed) return GREETING_TEMPLATES[Math.floor(Math.random() * GREETING_TEMPLATES.length)]
+// the SAME order land on the same greeting + palette. Returns the
+// template's index so we can pair it with a matching colour palette.
+function pickTemplateIndex(seed) {
+  if (!seed) return Math.floor(Math.random() * GREETING_TEMPLATES.length)
   let h = 0
   const s = String(seed)
   for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
-  return GREETING_TEMPLATES[Math.abs(h) % GREETING_TEMPLATES.length]
+  return Math.abs(h) % GREETING_TEMPLATES.length
 }
 
 // Public — fire a cheeky greeting to the board for an order.
 // Non-blocking caller pattern: .catch the rejection at call site so
 // POS workflow never breaks on board outages.
+//
+// Builds a colourful 6×22 grid (text in the middle, an alternating
+// colour stripe top and bottom) and sends via the character-grid API
+// so the stripes actually render in colour. The plain-text API used
+// previously stripped all colour codes.
 export async function sendCustomerGreeting(customerName, opts = {}) {
   const name = sanitizeName(customerName)
   if (!name) return { skipped: true, reason: 'no_name' }
-  const tpl = pickTemplate(opts.seed)
+  const idx = pickTemplateIndex(opts.seed)
+  const tpl = GREETING_TEMPLATES[idx]
+  const palette = PALETTES[idx % PALETTES.length]
   const lines = tpl(name).map(l => l.slice(0, VB_COLS))
-  return sendVestaboard(frame(lines))
+  const grid = buildColorfulFrame(lines, palette)
+  return sendVestaboardCharacters(grid)
 }
