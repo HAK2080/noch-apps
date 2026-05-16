@@ -82,7 +82,12 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
         // Vestaboard cheeky greeting for the customer.
         if (order.customer_name) {
           sendCustomerGreeting(order.customer_name, { seed: order.order_number })
-            .catch(err => console.warn('[Vestaboard] greeting failed:', err?.message))
+            .then(r => {
+              if (r?.simulated) toast('Vestaboard: no API key — simulated', { icon: '⚙️' })
+              else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
+              else toast.success(`Vestaboard: ${order.customer_name}`, { duration: 2500 })
+            })
+            .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
         }
         onAccept()
       }
@@ -189,7 +194,12 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         // Vestaboard cheeky greeting.
         if (order.customer_name) {
           sendCustomerGreeting(order.customer_name, { seed: order.order_number })
-            .catch(err => console.warn('[Vestaboard] greeting failed:', err?.message))
+            .then(r => {
+              if (r?.simulated) toast('Vestaboard: no API key — simulated', { icon: '⚙️' })
+              else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
+              else toast.success(`Vestaboard: ${order.customer_name}`, { duration: 2500 })
+            })
+            .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
         }
         onConfirmed()
       } else {
@@ -639,10 +649,16 @@ export default function POSTerminal() {
       // Vestaboard greeting — fire a cheeky Nochi message with the
       // customer's name. Non-blocking; skips if no name was captured
       // or if no API key is configured (sendCustomerGreeting handles
-      // both gracefully).
+      // both gracefully). Toast surfaces success/failure so we know
+      // whether the call actually reached the board.
       if (customerName) {
         sendCustomerGreeting(customerName, { seed: order.order_number })
-          .catch(err => console.warn('[Vestaboard] greeting failed:', err?.message))
+          .then(r => {
+            if (r?.simulated) toast('Vestaboard: no API key — simulated', { icon: '⚙️' })
+            else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
+            else toast.success(`Vestaboard: ${customerName}`, { duration: 2500 })
+          })
+          .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
       }
 
       // Auto-print receipt: fire-and-forget if enabled + printer is connected.

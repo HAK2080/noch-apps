@@ -34,22 +34,43 @@ export async function sendVestaboard(message) {
 
   // ── Cloud Subscription API ─────────────────────────────────────
   if (VB_KEY) {
-    const resp = await fetch('https://rw.vestaboard.com/', {
-      method: 'POST',
-      headers: {
-        'X-Vestaboard-Read-Write-Key': VB_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text: message.substring(0, 132) }),
-    })
+    const url = 'https://rw.vestaboard.com/'
+    const payload = message.substring(0, 132)
+    console.log('[Vestaboard] sending →', url, '| chars:', payload.length, '| preview:', payload.replace(/\n/g, '⏎'))
+    let resp
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-Vestaboard-Read-Write-Key': VB_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: payload }),
+      })
+    } catch (netErr) {
+      // Network-level (DNS, CORS, offline) — fetch never got a response.
+      console.error('[Vestaboard] network error:', netErr)
+      throw new Error(`Vestaboard network: ${netErr?.message || netErr}`)
+    }
+    console.log('[Vestaboard] response status:', resp.status, resp.statusText)
     if (!resp.ok) {
-      let errMsg = `Vestaboard API error: ${resp.status}`
+      let errMsg = `Vestaboard API ${resp.status}`
       try {
-        const body = await resp.json()
-        if (body?.message) errMsg = body.message
+        const text = await resp.text()
+        console.error('[Vestaboard] error body:', text)
+        try {
+          const body = JSON.parse(text)
+          if (body?.message) errMsg = `${resp.status}: ${body.message}`
+        } catch {
+          if (text) errMsg = `${resp.status}: ${text.slice(0, 120)}`
+        }
       } catch {}
       throw new Error(errMsg)
     }
+    try {
+      const body = await resp.json()
+      console.log('[Vestaboard] success body:', body)
+    } catch {}
     return { success: true }
   }
 
