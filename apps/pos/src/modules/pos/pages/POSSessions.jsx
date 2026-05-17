@@ -12,10 +12,16 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, CheckCircle2, DollarSign, CreditCard, Bike, Package } from 'lucide-react'
+import { ArrowLeft, Clock, CheckCircle2, DollarSign, CreditCard, Bike, Package, Lock } from 'lucide-react'
 import { getPOSBranch, listShifts } from '../lib/pos-supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+
+// Roles allowed to view session/shift totals.
+// Aligned with POSOrders.jsx — staff and limited_staff are scoped to
+// per-order detail only; aggregate financial views are owner+supervisor.
+const SESSION_ROLES = ['owner', 'supervisor']
 
 function formatDuration(openedAt, closedAt) {
   if (!openedAt) return '—'
@@ -41,12 +47,15 @@ function formatWhen(iso) {
 export default function POSSessions() {
   const { branchId } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const allowed = SESSION_ROLES.includes(profile?.role)
 
   const [branch, setBranch] = useState(null)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
+    if (!allowed) { setLoading(false); return }   // guard: don't even fetch
     setLoading(true)
     try {
       const [b, list] = await Promise.all([
@@ -62,7 +71,25 @@ export default function POSSessions() {
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load() }, [branchId])
+  useEffect(() => { load() }, [branchId, allowed])
+
+  // Hard block: staff / limited_staff land here → "Access denied" card.
+  if (!allowed) {
+    return (
+      <Layout>
+        <div className="max-w-md mx-auto py-16 text-center">
+          <Lock size={36} className="text-noch-muted mx-auto mb-3" />
+          <h1 className="text-white font-bold text-lg mb-2">Access restricted</h1>
+          <p className="text-noch-muted text-sm mb-5">
+            Sessions and shift totals are visible to owners and managers only.
+          </p>
+          <button onClick={() => navigate(`/pos/${branchId}`)} className="btn-secondary text-sm">
+            Back to POS
+          </button>
+        </div>
+      </Layout>
+    )
+  }
 
   // Aggregate top-level metrics across all loaded sessions
   const totals = shifts.reduce((a, s) => {

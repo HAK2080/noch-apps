@@ -9,10 +9,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListOrdered, Clock } from 'lucide-react'
 import { getPOSBranches } from '../modules/pos/lib/pos-supabase'
+import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
+
+// Roles allowed to see aggregate session/shift totals. Mirrors the
+// gate inside POSSessions.jsx and the POSOrders summary card.
+const SESSION_ROLES = ['owner', 'supervisor']
 
 export default function Sales() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const canViewSessions = SESSION_ROLES.includes(profile?.role)
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -47,19 +54,21 @@ export default function Sales() {
                   {b.address && <p className="text-noch-muted text-sm mt-0.5">{b.address}</p>}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid ${canViewSessions ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
                 <button
                   onClick={() => navigate(`/pos/${b.id}/orders`)}
                   className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
                 >
                   <ListOrdered size={14} /> Orders
                 </button>
-                <button
-                  onClick={() => navigate(`/pos/${b.id}/sessions`)}
-                  className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
-                >
-                  <Clock size={14} /> Sessions
-                </button>
+                {canViewSessions && (
+                  <button
+                    onClick={() => navigate(`/pos/${b.id}/sessions`)}
+                    className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
+                  >
+                    <Clock size={14} /> Sessions
+                  </button>
+                )}
               </div>
             </div>
           ))}
