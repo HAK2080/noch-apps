@@ -205,7 +205,13 @@ export default function POSOrders() {
   const { branchId } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const canViewTotals = TOTALS_ROLES.includes(profile?.role)
+  // Honour the PIN-verified staff if one is active (POS terminal flow).
+  // Falls back to the Supabase login role when no PIN session exists
+  // (e.g. a fresh device opening Sales straight from the sidebar).
+  // This prevents the owner's elevated profile.role leaking through
+  // after they hand the device to a staff member who PIN-swaps.
+  const activeRole = getServedBy()?.role || profile?.role
+  const canViewTotals = TOTALS_ROLES.includes(activeRole)
   const canCancel = canViewTotals  // same gate — supervisors and owners only
 
   const [branch, setBranch] = useState(null)

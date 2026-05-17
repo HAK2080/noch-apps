@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Clock, CheckCircle2, DollarSign, CreditCard, Bike, Package, Lock } from 'lucide-react'
 import { getPOSBranch, listShifts } from '../lib/pos-supabase'
+import { getServedBy } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
@@ -48,7 +49,10 @@ export default function POSSessions() {
   const { branchId } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const allowed = SESSION_ROLES.includes(profile?.role)
+  // PIN-verified operator takes precedence over the device's Supabase
+  // login. See the same comment in POSOrders.jsx for context.
+  const activeRole = getServedBy()?.role || profile?.role
+  const allowed = SESSION_ROLES.includes(activeRole)
 
   const [branch, setBranch] = useState(null)
   const [shifts, setShifts] = useState([])

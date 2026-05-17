@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListOrdered, Clock } from 'lucide-react'
 import { getPOSBranches } from '../modules/pos/lib/pos-supabase'
+import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 
@@ -19,7 +20,9 @@ const SESSION_ROLES = ['owner', 'supervisor']
 export default function Sales() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  const canViewSessions = SESSION_ROLES.includes(profile?.role)
+  // PIN-verified operator takes precedence over Supabase login.
+  const activeRole = getServedBy()?.role || profile?.role
+  const canViewSessions = SESSION_ROLES.includes(activeRole)
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
 
