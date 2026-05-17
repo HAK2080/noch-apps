@@ -153,12 +153,20 @@ function polkaRow(color, width = VB_COLS) {
 // One palette per template — picked by the same seed so the same order
 // always lands on the same template + palette combo.
 const PALETTES = [
-  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 0: WELL WELL WELL — warm welcome
-  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 1: GUESS WHO'S BACK — friendly
-  { top: COLOR.RED,    bot: COLOR.YELLOW },  // 2: + COFFEE = TRUE LOVE — love
-  { top: COLOR.BLUE,   bot: COLOR.VIOLET },  // 3: DON'T BLINK — cool/action
-  { top: COLOR.VIOLET, bot: COLOR.YELLOW },  // 4: A LITTLE DANCE — party
-  { top: COLOR.GREEN,  bot: COLOR.ORANGE },  // 5: TOTALLY DID — sly
+  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 0: ATTENTION (alert)
+  { top: COLOR.BLUE,   bot: COLOR.VIOLET },  // 1: LOOK WHO DECIDED (cool)
+  { top: COLOR.RED,    bot: COLOR.YELLOW },  // 2: NOCHI SPOTTED (excited)
+  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 3: FEELS LIKE (zen)
+  { top: COLOR.ORANGE, bot: COLOR.GREEN  },  // 4: OWNS 20% OF NOCH (ownership)
+  { top: COLOR.YELLOW, bot: COLOR.RED    },  // 5: QUICK HIDE THE CAKES (urgent)
+  { top: COLOR.VIOLET, bot: COLOR.YELLOW },  // 6: NOCHI PRETENDS (pretend)
+  { top: COLOR.ORANGE, bot: COLOR.RED    },  // 7: CAKES ARE NOT SAFE (danger)
+  { top: COLOR.GREEN,  bot: COLOR.BLUE   },  // 8: BREAKING NEWS (news)
+  { top: COLOR.YELLOW, bot: COLOR.VIOLET },  // 9: WAS DESTINY (destiny)
+  { top: COLOR.VIOLET, bot: COLOR.GREEN  },  // 10: NOCHI WHISPERED (oh no)
+  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 11: WELL WELL WELL (sly knowing)
+  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 12: GUESS WHO'S BACK (friendly)
+  { top: COLOR.GREEN,  bot: COLOR.ORANGE },  // 13: OH HEY (sly)
 ]
 
 // Build a 6×22 character grid:
@@ -274,11 +282,33 @@ function frame(lines) {
 // Each template is a fn(name) → 3-line string array. Kept to ≤ 3 visible
 // lines so a long name doesn't push content off the board.
 const GREETING_TEMPLATES = [
-  (n) => ['WELL WELL WELL...', n, 'NOCHI APPROVES'],
-  (n) => ["GUESS WHO'S BACK", n, '<3 NOCHI'],
-  (n) => [`${n} + COFFEE`, '= TRUE LOVE', '- NOCHI'],
-  (n) => ["DON'T BLINK", 'COFFEE INCOMING', n],
-  (n) => [`${n}'S HERE -`, 'NOCHI DOES', 'A LITTLE DANCE'],
+  // 0 — ATTENTION
+  (n) => ['ATTENTION PLEASE', n, 'EVERYONE ACT BUSY'],
+  // 1 — LOOK WHO DECIDED
+  (n) => ['LOOK WHO DECIDED', 'TO SHOW UP', n],
+  // 2 — NOCHI SPOTTED
+  (n) => ['NOCHI SPOTTED', n, 'AND GOT EXCITED'],
+  // 3 — FEELS LIKE
+  (n) => ['FEELS LIKE', `AN ${n} DAY`, 'FOR SOME REASON'],
+  // 4 — OWNS 20% OF NOCH
+  (n) => [n, 'WALKED INTO NOCH', 'OWNS 20% OF IT'],
+  // 5 — QUICK HIDE THE CAKES
+  (n) => ['QUICK HIDE', 'THE CAKES!', `${n} IS HERE`],
+  // 6 — NOCHI PRETENDS
+  (n) => [`${n} ARRIVED`, 'NOCHI PRETENDS', 'TO BE NORMAL'],
+  // 7 — CAKES ARE NOT SAFE
+  (n) => [`${n} IS HERE`, 'THE CAKES', 'ARE NOT SAFE'],
+  // 8 — BREAKING NEWS
+  (n) => ['BREAKING NEWS', n, 'RETURNED AGAIN'],
+  // 9 — WAS DESTINY
+  (n) => [`${n} WALKED IN`, 'LIKE THIS', 'WAS DESTINY'],
+  // 10 — NOCHI WHISPERED
+  (n) => ['NOCHI WHISPERED', '"OH NO..."', `${n} IS HERE`],
+  // 11 — WELL WELL WELL
+  (n) => ['WELL WELL WELL', n, 'IS HERE'],
+  // 12 — GUESS WHOS BACK
+  (n) => ["GUESS WHO'S BACK", n, 'IS BACK'],
+  // 13 — OH HEY
   (n) => [`OH, ${n}`, "DIDN'T SEE YOU", '(TOTALLY DID)'],
 ]
 
@@ -292,6 +322,12 @@ function pickTemplateIndex(seed) {
   for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
   return Math.abs(h) % GREETING_TEMPLATES.length
 }
+
+// Refresh timer — re-sends the same greeting after 30s so the
+// Vestaboard subscription content can't overwrite within the
+// first 60 seconds after an order is placed. Cleared and replaced
+// every time a new greeting fires, so the latest customer wins.
+let _greetingRefreshTimerId = null
 
 // Public — fire a cheeky greeting to the board for an order.
 // Non-blocking caller pattern: .catch the rejection at call site so
@@ -309,5 +345,19 @@ export async function sendCustomerGreeting(customerName, opts = {}) {
   const palette = PALETTES[idx % PALETTES.length]
   const lines = tpl(name).map(l => l.slice(0, VB_COLS))
   const grid = buildColorfulFrame(lines, palette)
-  return sendVestaboardCharacters(grid)
+
+  const result = await sendVestaboardCharacters(grid)
+
+  // 60-second hold: cancel any previous refresh, schedule a single
+  // re-send at T+30s. Combined with the board's ~30s flap-flip
+  // animation this keeps the greeting visible for ~60s before the
+  // Vestaboard subscription content takes over again.
+  if (_greetingRefreshTimerId) clearTimeout(_greetingRefreshTimerId)
+  _greetingRefreshTimerId = setTimeout(() => {
+    sendVestaboardCharacters(grid).catch(err =>
+      console.warn('[Vestaboard] refresh failed:', err?.message))
+    _greetingRefreshTimerId = null
+  }, 30000)
+
+  return result
 }
