@@ -223,11 +223,25 @@ export default function POSOrders() {
   const [cancelOrder, setCancelOrder] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   // Date range — defaults to today, but operators can scroll back.
+  // Use LOCAL date components (not toISOString which is UTC) — otherwise
+  // at 1am Tripoli/Saudi, the picker defaults to yesterday-UTC and the
+  // date-picker constraints lock the operator out of picking the real
+  // "today".
   const today = () => {
-    const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10)
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
   }
   const [fromDate, setFromDate] = useState(today())
   const [toDate, setToDate] = useState(today())
+  // Late-night (00:00–06:00) exclusion toggle — café operates evenings
+  // that cross midnight, so the calendar boundary splits one trading
+  // session in two. When ON, the summary AND list exclude any orders
+  // made between 00:00 and 06:00 of the visible range.
+  const [excludeLateNight, setExcludeLateNight] = useState(false)
+  const LATE_NIGHT_CUTOFF_HOUR = 6
 
   const load = async () => {
     setLoading(true)
@@ -344,6 +358,13 @@ export default function POSOrders() {
   }
 
   const filtered = orders.filter(o => {
+    // Late-night exclusion — skip orders whose local hour is 00..05
+    // when the toggle is ON. Applies to both summary and visible list
+    // so the numbers always reconcile with what's on screen.
+    if (excludeLateNight) {
+      const h = new Date(o.created_at).getHours()
+      if (h < LATE_NIGHT_CUTOFF_HOUR) return false
+    }
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -396,15 +417,37 @@ export default function POSOrders() {
           <button onClick={load} className="btn-secondary text-sm px-3 py-1">Refresh</button>
         </div>
 
-        {/* Date range */}
+        {/* Date range — no min/max cross-constraints because they'd
+            block selecting "today" on the FROM field whenever TO is
+            stale or unsaved. If the user picks FROM > TO we just
+            auto-bump TO to match so the query still returns a valid
+            range. */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="label block mb-1 text-xs">From</label>
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="input w-full text-sm" max={toDate} />
+            <input
+              type="date"
+              value={fromDate}
+              onChange={e => {
+                const v = e.target.value
+                setFromDate(v)
+                if (v && toDate && v > toDate) setToDate(v)
+              }}
+              className="input w-full text-sm"
+            />
           </div>
           <div>
             <label className="label block mb-1 text-xs">To</label>
-            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="input w-full text-sm" min={fromDate} />
+            <input
+              type="date"
+              value={toDate}
+              onChange={e => {
+                const v = e.target.value
+                setToDate(v)
+                if (v && fromDate && v < fromDate) setFromDate(v)
+              }}
+              className="input w-full text-sm"
+            />
           </div>
         </div>
 
@@ -421,6 +464,19 @@ export default function POSOrders() {
         {/* Executive summary — totals for the visible (filtered) range */}
         {!loading && canViewTotals && (
           <div className="card p-4 mb-4">
+            {/* Late-night toggle — keeps the calendar boundary from
+                lumping yesterday's late shift into "today's" numbers. */}
+            <label className="flex items-center gap-2 cursor-pointer mb-3 text-xs select-none">
+              <input
+                type="checkbox"
+                checked={excludeLateNight}
+                onChange={e => setExcludeLateNight(e.target.checked)}
+                className="w-3.5 h-3.5 accent-noch-green"
+              />
+              <span className="text-noch-muted">
+                Exclude late-night sales (00:00–{String(LATE_NIGHT_CUTOFF_HOUR).padStart(2, '0')}:00)
+              </span>
+            </label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Revenue</p>
