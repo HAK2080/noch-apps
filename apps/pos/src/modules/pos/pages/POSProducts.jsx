@@ -405,7 +405,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={showOnWebsite} onChange={e => setShowOnWebsite(e.target.checked)} className="accent-noch-green" />
-            <span className="text-white text-sm">Online ordering menu</span>
+            <span className="text-white text-sm">Customer menu (noch.cloud/menu)</span>
           </label>
         </div>
         {branches.length > 0 && (
