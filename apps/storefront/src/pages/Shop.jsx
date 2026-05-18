@@ -23,10 +23,12 @@ export default function Shop({ lang = 'en' }) {
   const [query, setQuery] = useState('')
   const isAr = lang === 'ar'
 
-  const filtered = PRODUCTS.filter(p =>
-    (active === 'all' || p.category === active) &&
-    (query === '' || p.name.toLowerCase().includes(query.toLowerCase()))
-  )
+  const filtered = PRODUCTS.filter(p => {
+    if (active !== 'all' && p.category !== active) return false
+    if (query === '') return true
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    return words.some(w => p.name.toLowerCase().includes(w))
+  })
 
   const activeCat = CATS.find(c => c.id === active)
 

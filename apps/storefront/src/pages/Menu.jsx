@@ -70,12 +70,13 @@ export default function Menu() {
     load()
   }, [])
 
-  const filtered = items.filter(i =>
-    (active === 'all' || i.cat_id === active) &&
-    (query === '' ||
-      i.name.toLowerCase().includes(query.toLowerCase()) ||
-      (i.name_ar || '').includes(query))
-  )
+  const filtered = items.filter(i => {
+    if (active !== 'all' && i.cat_id !== active) return false
+    if (query === '') return true
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const haystack = `${i.name} ${i.name_ar || ''}`.toLowerCase()
+    return words.some(w => haystack.includes(w))
+  })
 
   const activeCat = categories.find(c => c.id === active)
   const sectionTitle = isAr ? (activeCat?.name_ar || 'الكل') : (activeCat?.name || 'All')
