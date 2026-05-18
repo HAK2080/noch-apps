@@ -901,6 +901,10 @@ export default function POSProducts() {
                     <p className="text-white font-medium">{c.name}</p>
                     {c.name_ar && <p className="text-noch-muted text-xs" dir="rtl">{c.name_ar}</p>}
                   </div>
+                  {c.show_on_website
+                    ? <span className="text-xs px-2 py-0.5 rounded-full bg-noch-green/10 text-noch-green border border-noch-green/20 shrink-0">web</span>
+                    : <span className="text-xs px-2 py-0.5 rounded-full bg-noch-border text-noch-muted shrink-0">pos only</span>
+                  }
                   <button onClick={() => setEditCategory(c)} className="p-1.5 text-noch-muted hover:text-white">
                     <Edit2 size={14} />
                   </button>
