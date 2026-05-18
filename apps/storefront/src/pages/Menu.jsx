@@ -36,10 +36,11 @@ export default function Menu() {
     async function load() {
       try {
         const [catRes, prodRes] = await Promise.all([
-          supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).order('sort_order'),
+          supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).eq('show_on_website', true).order('sort_order'),
           supabase.from('pos_products')
             .select('id,name,name_ar,price,description,visible_on_website,category_id')
             .eq('is_active', true)
+            .eq('visible_on_customer_menu', true)
             .order('name'),
         ])
 
@@ -50,7 +51,7 @@ export default function Menu() {
           ])
         }
 
-        // Use all active products — visible_on_website flag optional
+        // Filtered by visibility flags (show_on_website / visible_on_customer_menu)
         const prods = prodRes.data || []
         setItems(prods.map(p => ({
           id: p.id,

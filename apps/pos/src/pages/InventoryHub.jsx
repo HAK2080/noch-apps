@@ -14,6 +14,7 @@ import { usePermissions } from '../contexts/PermissionsContext'
 import { supabase } from '../lib/supabase'
 import { sendTelegram } from '../lib/telegram'
 import { getPOSBranches, getAllLatestStockEntries } from '../modules/pos/lib/pos-supabase'
+import ConsumptionCard from '../components/inventory/ConsumptionCard'
 import toast from 'react-hot-toast'
 
 // ── Review day detection ─────────────────────────────────────
@@ -480,6 +481,13 @@ export default function InventoryHub() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Coffee & Matcha Consumption */}
+        <div className="bg-noch-card border border-noch-border rounded-xl p-4">
+          <h3 className="text-white font-semibold text-sm mb-3">Coffee & Matcha Consumption</h3>
+          <ConsumptionCard ingredient="coffee" />
+          <ConsumptionCard ingredient="matcha" />
         </div>
 
         {/* Alert preferences */}
