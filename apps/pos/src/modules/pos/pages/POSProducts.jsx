@@ -310,7 +310,7 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
   )
 }
 
-function CategoryModal({ branchId, category, onSave, onClose }) {
+function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
   const isEdit = !!category
   const [name, setName] = useState(category?.name || '')
   const [nameAr, setNameAr] = useState(category?.name_ar || '')
@@ -318,6 +318,9 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
   const [imageUrl, setImageUrl] = useState(category?.image_url || '')
   const [showInPos, setShowInPos] = useState(category?.show_in_pos ?? true)
   const [showOnWebsite, setShowOnWebsite] = useState(category?.show_on_website ?? true)
+  const [visibleBranchIds, setVisibleBranchIds] = useState(
+    category?.visible_branch_ids?.length ? category.visible_branch_ids : branchId ? [branchId] : []
+  )
   const [saving, setSaving] = useState(false)
   const [uploadingImg, setUploadingImg] = useState(false)
   const imgRef = useRef(null)
@@ -345,7 +348,7 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
     if (!name) return toast.error('Name required')
     setSaving(true)
     try {
-      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite }
+      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, visible_branch_ids: visibleBranchIds }
       if (isEdit) {
         await updatePOSCategory(category.id, payload)
         toast.success('Category updated')
@@ -394,7 +397,7 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
         <input value={nameAr} onChange={e => setNameAr(e.target.value)} className="input w-full mb-3 text-right" dir="rtl" placeholder="المشروبات الساخنة" />
         <label className="label block mb-1">Color</label>
         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-full h-10 rounded cursor-pointer mb-4" />
-        <div className="border border-noch-border rounded-xl p-3 mb-4 flex flex-col gap-2">
+        <div className="border border-noch-border rounded-xl p-3 mb-3 flex flex-col gap-2">
           <p className="text-noch-muted text-xs mb-1">Visible in</p>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={showInPos} onChange={e => setShowInPos(e.target.checked)} className="accent-noch-green" />
@@ -405,6 +408,24 @@ function CategoryModal({ branchId, category, onSave, onClose }) {
             <span className="text-white text-sm">Online ordering menu</span>
           </label>
         </div>
+        {branches.length > 0 && (
+          <div className="border border-noch-border rounded-xl p-3 mb-4 flex flex-col gap-2">
+            <p className="text-noch-muted text-xs mb-1">Branches</p>
+            {branches.map(b => (
+              <label key={b.id} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={visibleBranchIds.includes(b.id)}
+                  onChange={e => setVisibleBranchIds(prev =>
+                    e.target.checked ? [...prev, b.id] : prev.filter(id => id !== b.id)
+                  )}
+                  className="accent-noch-green"
+                />
+                <span className="text-white text-sm">{b.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
         <div className="flex gap-3">
           <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
@@ -421,6 +442,7 @@ export default function POSProducts() {
   const navigate = useNavigate()
 
   const [branch, setBranch] = useState(null)
+  const [branches, setBranches] = useState([])
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -437,12 +459,13 @@ export default function POSProducts() {
 
   const load = async () => {
     try {
-      const [b, p, c] = await Promise.all([
+      const [b, p, c, allBranches] = await Promise.all([
         getPOSBranch(branchId),
         getPOSProducts(branchId),
         getPOSCategories(branchId),
+        getPOSBranches(),
       ])
-      setBranch(b); setProducts(p); setCategories(c)
+      setBranch(b); setProducts(p); setCategories(c); setBranches(allBranches)
     } catch (err) {
       toast.error(err.message || 'Failed to load')
     } finally {
@@ -901,9 +924,11 @@ export default function POSProducts() {
                     <p className="text-white font-medium">{c.name}</p>
                     {c.name_ar && <p className="text-noch-muted text-xs" dir="rtl">{c.name_ar}</p>}
                   </div>
-                  {c.show_on_website
-                    ? <span className="text-xs px-2 py-0.5 rounded-full bg-noch-green/10 text-noch-green border border-noch-green/20 shrink-0">web</span>
-                    : <span className="text-xs px-2 py-0.5 rounded-full bg-noch-border text-noch-muted shrink-0">pos only</span>
+                  {c.visible_branch_ids?.length > 1
+                    ? <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">{c.visible_branch_ids.length} branches</span>
+                    : c.show_on_website
+                      ? <span className="text-xs px-2 py-0.5 rounded-full bg-noch-green/10 text-noch-green border border-noch-green/20 shrink-0">web</span>
+                      : <span className="text-xs px-2 py-0.5 rounded-full bg-noch-border text-noch-muted shrink-0">pos only</span>
                   }
                   <button onClick={() => setEditCategory(c)} className="p-1.5 text-noch-muted hover:text-white">
                     <Edit2 size={14} />
@@ -933,6 +958,7 @@ export default function POSProducts() {
         <CategoryModal
           branchId={branchId}
           category={editCategory || null}
+          branches={branches}
           onSave={() => { setShowAddCategory(false); setEditCategory(null); load() }}
           onClose={() => { setShowAddCategory(false); setEditCategory(null) }}
         />

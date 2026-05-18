@@ -3,20 +3,20 @@ import { Link } from 'react-router-dom'
 import PRODUCTS_RAW from '../data/bloomly-products.json'
 
 const CATS = [
-  { id: 'all',      label: 'All',           label_ar: 'الكل',          emoji: '✨' },
-  { id: 'Hot',      label: 'Hot Drinks',     label_ar: 'مشروبات ساخنة', emoji: '☕' },
-  { id: 'Cold',     label: 'Cold Drinks',    label_ar: 'مشروبات باردة', emoji: '🧊' },
-  { id: 'Specialty',label: 'Specialty',      label_ar: 'مميزة',         emoji: '⭐' },
-  { id: 'Boba',     label: 'Boba',           label_ar: 'بوبا',          emoji: '🧋' },
-  { id: 'Ice Tea',  label: 'Ice Tea',        label_ar: 'آيس تي',        emoji: '🍹' },
-  { id: 'Tea',      label: 'Tea',            label_ar: 'شاي',           emoji: '🫖' },
-  { id: 'Foods',    label: 'Food',           label_ar: 'أكل',           emoji: '🥗' },
-  { id: 'Retail',   label: 'Beans & Gear',   label_ar: 'حبوب وأدوات',   emoji: '☕' },
-  { id: 'Tools',    label: 'Brewing Tools',  label_ar: 'أدوات تحضير',   emoji: '⚗️' },
+  { id: 'all',    label: 'All',           label_ar: 'الكل',        emoji: '✨' },
+  { id: 'Retail', label: 'Beans & Gear',  label_ar: 'حبوب وأدوات', emoji: '☕' },
+  { id: 'Tools',  label: 'Brewing Tools', label_ar: 'أدوات تحضير', emoji: '⚗️' },
 ]
 
-// Filter out water/other noise, only show products with price > 0
-const PRODUCTS = PRODUCTS_RAW.filter(p => p.price > 0 && p.category !== 'Water' && p.category !== 'Other')
+const DRINK_CATS = ['Hot', 'Cold', 'Specialty', 'Boba', 'Ice Tea', 'Tea', 'Foods']
+
+// Only retail products — exclude drinks, water, other noise
+const PRODUCTS = PRODUCTS_RAW.filter(p =>
+  p.price > 0 &&
+  p.category !== 'Water' &&
+  p.category !== 'Other' &&
+  !DRINK_CATS.includes(p.category)
+)
 
 export default function Shop({ lang = 'en' }) {
   const [active, setActive] = useState('all')
