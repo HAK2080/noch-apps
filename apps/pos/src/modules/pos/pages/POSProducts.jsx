@@ -318,6 +318,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
   const [imageUrl, setImageUrl] = useState(category?.image_url || '')
   const [showInPos, setShowInPos] = useState(category?.show_in_pos ?? true)
   const [showOnWebsite, setShowOnWebsite] = useState(category?.show_on_website ?? true)
+  const [showInOnlineStore, setShowInOnlineStore] = useState(category?.show_in_online_store ?? false)
   const [visibleBranchIds, setVisibleBranchIds] = useState(
     category?.visible_branch_ids?.length ? category.visible_branch_ids : branchId ? [branchId] : []
   )
@@ -348,7 +349,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
     if (!name) return toast.error('Name required')
     setSaving(true)
     try {
-      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, visible_branch_ids: visibleBranchIds }
+      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, show_in_online_store: showInOnlineStore, visible_branch_ids: visibleBranchIds }
       if (isEdit) {
         await updatePOSCategory(category.id, payload)
         toast.success('Category updated')
@@ -401,11 +402,15 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
           <p className="text-noch-muted text-xs mb-1">Visible in</p>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={showInPos} onChange={e => setShowInPos(e.target.checked)} className="accent-noch-green" />
-            <span className="text-white text-sm">POS food menu</span>
+            <span className="text-white text-sm">POS <span className="text-noch-muted text-xs">— in-store staff terminal</span></span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={showOnWebsite} onChange={e => setShowOnWebsite(e.target.checked)} className="accent-noch-green" />
-            <span className="text-white text-sm">Customer menu (noch.cloud/menu)</span>
+            <span className="text-white text-sm">Customer menu <span className="text-noch-muted text-xs">— cafe menu (noch.cloud/menu)</span></span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={showInOnlineStore} onChange={e => setShowInOnlineStore(e.target.checked)} className="accent-noch-green" />
+            <span className="text-white text-sm">Online store <span className="text-noch-muted text-xs">— retail shop (noch.cloud/#shop)</span></span>
           </label>
         </div>
         {branches.length > 0 && (
