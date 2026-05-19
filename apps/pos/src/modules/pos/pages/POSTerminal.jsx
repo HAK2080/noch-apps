@@ -28,6 +28,7 @@ import ProductGrid from '../components/ProductGrid'
 import CartPanel from '../components/CartPanel'
 import PaymentModal from '../components/PaymentModal'
 import ReceiptModal from '../components/ReceiptModal'
+import PrintHostBadge from '../components/PrintHostBadge'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
@@ -709,6 +710,7 @@ export default function POSTerminal() {
 
   return (
     <div className="flex flex-col h-screen bg-noch-dark overflow-hidden">
+      <PrintHostBadge branchId={branchId} />
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-noch-card border-b border-noch-border shrink-0">
         <button onClick={() => navigate(isKioskMode() ? '/kiosk' : '/pos')} className="text-noch-muted hover:text-white p-1">
