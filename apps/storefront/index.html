@@ -1397,7 +1397,8 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
     Promise.all([
       sb.from('pos_products').select('id,name,name_ar,price,description,menu_description,menu_description_ar,image_url,is_active,visible_on_website,track_inventory,stock_qty,featured,category_id,created_at')
         .eq('visible_on_website', true).eq('is_active', true).order('featured', {ascending:false}).order('name'),
-      sb.from('pos_categories').select('id,name,name_ar').order('name'),
+      sb.from('pos_categories').select('id,name,name_ar')
+        .eq('show_in_online_store', true).eq('is_active', true).order('name'),
     ]).then(([pr, cr]) => {
       setProducts(pr.data || []);
       setCats(cr.data || []);
@@ -1439,6 +1440,8 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
 
   // Filter/search/sort
   const filtered = products.filter(p => {
+    const catIds = new Set(categories.map(c => c.id));
+    if (p.category_id && !catIds.has(p.category_id)) return false;
     if (activeCat !== 'all' && p.category_id !== activeCat) return false;
     if (search.trim()) {
       const s = search.trim().toLowerCase();

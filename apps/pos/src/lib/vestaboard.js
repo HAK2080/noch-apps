@@ -153,20 +153,18 @@ function polkaRow(color, width = VB_COLS) {
 // One palette per template — picked by the same seed so the same order
 // always lands on the same template + palette combo.
 const PALETTES = [
-  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 0: ATTENTION (alert)
-  { top: COLOR.BLUE,   bot: COLOR.VIOLET },  // 1: LOOK WHO DECIDED (cool)
-  { top: COLOR.RED,    bot: COLOR.YELLOW },  // 2: NOCHI SPOTTED (excited)
-  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 3: FEELS LIKE (zen)
-  { top: COLOR.ORANGE, bot: COLOR.GREEN  },  // 4: OWNS 20% OF NOCH (ownership)
-  { top: COLOR.YELLOW, bot: COLOR.RED    },  // 5: QUICK HIDE THE CAKES (urgent)
-  { top: COLOR.VIOLET, bot: COLOR.YELLOW },  // 6: NOCHI PRETENDS (pretend)
-  { top: COLOR.ORANGE, bot: COLOR.RED    },  // 7: CAKES ARE NOT SAFE (danger)
-  { top: COLOR.GREEN,  bot: COLOR.BLUE   },  // 8: BREAKING NEWS (news)
-  { top: COLOR.YELLOW, bot: COLOR.VIOLET },  // 9: WAS DESTINY (destiny)
-  { top: COLOR.VIOLET, bot: COLOR.GREEN  },  // 10: NOCHI WHISPERED (oh no)
-  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 11: WELL WELL WELL (sly knowing)
-  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 12: GUESS WHO'S BACK (friendly)
-  { top: COLOR.GREEN,  bot: COLOR.ORANGE },  // 13: OH HEY (sly)
+  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 0: ATTENTION EVERYONE
+  { top: COLOR.BLUE,   bot: COLOR.VIOLET },  // 1: LOOK WHO DECIDED
+  { top: COLOR.RED,    bot: COLOR.YELLOW },  // 2: NOCHI SPOTTED
+  { top: COLOR.GREEN,  bot: COLOR.YELLOW },  // 3: FEELS LIKE
+  { top: COLOR.YELLOW, bot: COLOR.RED    },  // 4: QUICK HIDE THE CAKES
+  { top: COLOR.VIOLET, bot: COLOR.YELLOW },  // 5: JUST ARRIVED / NOCHI HIDING
+  { top: COLOR.ORANGE, bot: COLOR.RED    },  // 6: IS HERE / CAKES GONE
+  { top: COLOR.GREEN,  bot: COLOR.BLUE   },  // 7: BREAKING NEWS
+  { top: COLOR.YELLOW, bot: COLOR.VIOLET },  // 8: WALKED IN LIKE DESTINY
+  { top: COLOR.VIOLET, bot: COLOR.GREEN  },  // 9: NOCHI WHISPERED
+  { top: COLOR.ORANGE, bot: COLOR.YELLOW },  // 10: WELL WELL WELL
+  { top: COLOR.GREEN,  bot: COLOR.ORANGE },  // 11: OH, X — DIDN'T SEE YOU
 ]
 
 // Build a 6×22 character grid:
@@ -282,33 +280,29 @@ function frame(lines) {
 // Each template is a fn(name) → 3-line string array. Kept to ≤ 3 visible
 // lines so a long name doesn't push content off the board.
 const GREETING_TEMPLATES = [
-  // 0 — ATTENTION
-  (n) => ['ATTENTION PLEASE', n, 'EVERYONE ACT BUSY'],
+  // 0 — ATTENTION EVERYONE
+  (n) => ['ATTENTION EVERYONE', `${n} IS HERE`, 'ACT BUSY NOW!'],
   // 1 — LOOK WHO DECIDED
   (n) => ['LOOK WHO DECIDED', 'TO SHOW UP', n],
   // 2 — NOCHI SPOTTED
   (n) => ['NOCHI SPOTTED', n, 'AND GOT EXCITED'],
   // 3 — FEELS LIKE
-  (n) => ['FEELS LIKE', `AN ${n} DAY`, 'FOR SOME REASON'],
-  // 4 — OWNS 20% OF NOCH
-  (n) => [n, 'WALKED INTO NOCH', 'OWNS 20% OF IT'],
-  // 5 — QUICK HIDE THE CAKES
-  (n) => ['QUICK HIDE', 'THE CAKES!', `${n} IS HERE`],
-  // 6 — NOCHI PRETENDS
-  (n) => [`${n} ARRIVED`, 'NOCHI PRETENDS', 'TO BE NORMAL'],
-  // 7 — CAKES ARE NOT SAFE
-  (n) => [`${n} IS HERE`, 'THE CAKES', 'ARE NOT SAFE'],
-  // 8 — BREAKING NEWS
+  (n) => ['FEELS LIKE', `${n} DAY`, 'FOR SOME REASON'],
+  // 4 — QUICK HIDE THE CAKES
+  (n) => ['QUICK HIDE THE CAKES!', n, 'IS HERE'],
+  // 5 — JUST ARRIVED / NOCHI HIDING
+  (n) => [n, 'JUST ARRIVED', 'NOCHI IS HIDING'],
+  // 6 — IS HERE / CAKES GONE
+  (n) => [n, 'IS HERE', 'THE CAKES ARE GONE'],
+  // 7 — BREAKING NEWS
   (n) => ['BREAKING NEWS', n, 'RETURNED AGAIN'],
-  // 9 — WAS DESTINY
-  (n) => [`${n} WALKED IN`, 'LIKE THIS', 'WAS DESTINY'],
-  // 10 — NOCHI WHISPERED
-  (n) => ['NOCHI WHISPERED', '"OH NO..."', `${n} IS HERE`],
-  // 11 — WELL WELL WELL
+  // 8 — WALKED IN LIKE DESTINY
+  (n) => [n, 'WALKED IN LIKE', 'THIS WAS DESTINY'],
+  // 9 — NOCHI WHISPERED
+  (n) => ['NOCHI WHISPERED', '"OH NO..." IT\'S', n],
+  // 10 — WELL WELL WELL
   (n) => ['WELL WELL WELL', n, 'IS HERE'],
-  // 12 — GUESS WHOS BACK
-  (n) => ["GUESS WHO'S BACK", n, 'IS BACK'],
-  // 13 — OH HEY
+  // 11 — OH, X — DIDN'T SEE YOU
   (n) => [`OH, ${n}`, "DIDN'T SEE YOU", '(TOTALLY DID)'],
 ]
 
