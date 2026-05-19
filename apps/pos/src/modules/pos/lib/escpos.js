@@ -1,6 +1,8 @@
 // escpos.js — ESC/POS printer driver via Web Serial API
 // Target: XPrinter NP-N200L, 48 char width
 
+import { enqueuePrintJob } from './print-queue'
+
 const ESC = 0x1b
 const GS = 0x1d
 const LF = 0x0a
@@ -256,7 +258,7 @@ function qrCodeBytes(data, size = 4) {
 // Customer receipt — English text mode. Thermal printers have no RTL
 // engine so Arabic prints reversed; bitmap rendering was tried and
 // didn't print reliably, so we stay in plain ASCII for both receipts.
-export async function printReceipt(order, branch, items, loyaltyCustomer = null) {
+export async function printReceiptDirect(order, branch, items, loyaltyCustomer = null) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
 
   const bytes = []
@@ -381,7 +383,7 @@ export async function printReceipt(order, branch, items, loyaltyCustomer = null)
 // big customer name so the barista can read the slip from across the
 // bar at a glance. Modifiers indent under each drink so it's clear
 // which "less sugar" belongs to which cup.
-export async function printDrinkTicket(order, items, branch, opts = {}) {
+export async function printDrinkTicketDirect(order, items, branch, opts = {}) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
 
   const bytes = []
@@ -499,4 +501,24 @@ export async function printTestPage() {
     ...CMD.CUT,
   ]
   await writeBytes(bytes)
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Queue-based prints. Tablets call printReceipt / printDrinkTicket
+// as before, but now the job is enqueued in pos_print_queue and the
+// designated "host" tablet (with the Bluetooth printer paired)
+// picks it up via Realtime and runs the *Direct variant locally.
+// See print-queue.js for the host subscriber.
+// ──────────────────────────────────────────────────────────────────
+
+export async function printReceipt(order, branch, items, loyaltyCustomer = null) {
+  return enqueuePrintJob(branch?.id || order?.branch_id, 'receipt', {
+    order, branch, items, loyaltyCustomer,
+  })
+}
+
+export async function printDrinkTicket(order, items, branch, opts = {}) {
+  return enqueuePrintJob(branch?.id || order?.branch_id, 'drink_ticket', {
+    order, items, branch, opts,
+  })
 }

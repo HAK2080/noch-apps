@@ -173,10 +173,6 @@ export default function POSEndOfDay() {
   }
 
   const handlePrintZReport = async () => {
-    if (!isPrinterConnected()) {
-      toast.error('Printer not connected')
-      return
-    }
     if (!shift || !summary) return
     // Build a z-report order-like object for printing
     const zOrder = {

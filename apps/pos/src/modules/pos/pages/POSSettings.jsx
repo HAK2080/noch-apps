@@ -11,6 +11,11 @@ import {
   printTestPage, openCashDrawer,
   getTransport, setTransport, isTransportAvailable, getTransportLabel,
 } from '../lib/escpos'
+import {
+  isPrintHost, setPrintHost,
+  startHostSubscriber, stopHostSubscriber,
+  getDeviceId,
+} from '../lib/print-queue'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
@@ -60,16 +65,23 @@ export default function POSSettings() {
   const [openingShift, setOpeningShift] = useState(false)
   const [posSettings, setPosSettings] = useState(null)
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
+  const [printHost, setPrintHostState] = useState(() => isPrintHost())
 
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
   const transportAvailable = isTransportAvailable(transport)
 
   // On mount: silently reconnect to the last-used printer without showing
-  // the picker.  Updates the connected indicator if successful.
+  // the picker. If this tablet is flagged as the print host, also start
+  // the queue subscriber so it picks up jobs from other tablets.
   useEffect(() => {
     autoConnectPrinter({ baudRate }).then(ok => {
-      if (ok) setPrinterConnected(true)
+      if (ok) {
+        setPrinterConnected(true)
+        if (isPrintHost() && branchId) {
+          startHostSubscriber(branchId)
+        }
+      }
     }).catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -303,6 +315,34 @@ export default function POSSettings() {
                 Test Print
               </button>
             )}
+          </div>
+
+          {/* Print host toggle — multi-tablet queue */}
+          <div className="mt-4 pt-4 border-t border-noch-border">
+            <FlagRow
+              label="This tablet is the print host"
+              hint={printHost
+                ? `Active — receiving print jobs from other tablets. Device ID: ${getDeviceId().slice(0, 12)}…`
+                : 'Other tablets will route their prints to whichever tablet has this ON. Only enable on the tablet paired with the printer.'}
+              value={printHost}
+              onChange={(on) => {
+                setPrintHost(on)
+                setPrintHostState(on)
+                if (on) {
+                  if (!isPrinterConnected()) {
+                    toast.error('Connect the printer first, then enable host mode.')
+                    setPrintHost(false)
+                    setPrintHostState(false)
+                    return
+                  }
+                  startHostSubscriber(branchId)
+                  toast.success('Print host active')
+                } else {
+                  stopHostSubscriber()
+                  toast.success('Print host disabled')
+                }
+              }}
+            />
           </div>
         </div>
 
