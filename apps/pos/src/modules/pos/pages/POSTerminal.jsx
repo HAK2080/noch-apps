@@ -33,7 +33,6 @@ import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { round, sum, lineTotal } from '../lib/money'
 import { isPrinterConnected, printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
-import { isPrintHost, startHostSubscriber, stopHostSubscriber } from '../lib/print-queue'
 import { sendCustomerGreeting } from '../../../lib/vestaboard'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
@@ -76,9 +75,10 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
         toast.success(`✅ Order ${order.order_number} accepted`)
         // Print drink ticket for the bar — customer name comes from the
         // online order itself. Fire-and-forget.
-        // Always enqueue — the print host tablet picks it up. Silent on no-host.
-        printDrinkTicket(order, order.pos_order_items || [], branch)
-          .catch(err => console.warn(`Drink ticket enqueue failed: ${err.message}`))
+        if (isPrinterConnected()) {
+          printDrinkTicket(order, order.pos_order_items || [], branch)
+            .catch(err => toast.error(`Drink ticket failed: ${err.message}`))
+        }
         // Vestaboard cheeky greeting for the customer.
         if (order.customer_name) {
           sendCustomerGreeting(order.customer_name, { seed: order.order_number })
@@ -187,9 +187,10 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         if (data?.error) throw new Error(data.error)
         toast.success(`Order ${order.order_number} accepted`)
         // Print drink ticket for the bar.
-        // Always enqueue — the print host tablet picks it up. Silent on no-host.
-        printDrinkTicket(order, order.pos_order_items || [], branch)
-          .catch(err => console.warn(`Drink ticket enqueue failed: ${err.message}`))
+        if (isPrinterConnected()) {
+          printDrinkTicket(order, order.pos_order_items || [], branch)
+            .catch(err => toast.error(`Drink ticket failed: ${err.message}`))
+        }
         // Vestaboard cheeky greeting.
         if (order.customer_name) {
           sendCustomerGreeting(order.customer_name, { seed: order.order_number })
@@ -376,17 +377,13 @@ export default function POSTerminal() {
 
     // Silently restore the printer connection (no picker dialog).
     // Works on Chrome/Edge via getDevices() / getPorts() for previously-
-    // granted Bluetooth / Serial devices. If this tablet is the print host,
-    // also start subscribing to the queue.
-    autoConnectPrinter().then(ok => {
-      if (ok && isPrintHost() && branchId) startHostSubscriber(branchId)
-    }).catch(() => {})
+    // granted Bluetooth / Serial devices.
+    autoConnectPrinter().catch(() => {})
 
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
       stopSync()
-      stopHostSubscriber()
     }
   }, [branchId])
 
@@ -647,11 +644,12 @@ export default function POSTerminal() {
       // Auto-print drink ticket — always fires when printer connected.
       // This is the bar-facing slip with big order # + customer name +
       // modifiers indented under each drink, so the barista can read it
-      // at a glance. Fire-and-forget — enqueues to print queue regardless
-      // of local printer connection; host tablet handles it.
-      printDrinkTicket(order, items, branch).catch(err =>
-        console.warn(`Drink ticket enqueue failed: ${err.message}`)
-      )
+      // at a glance. Fire-and-forget — never blocks the receipt modal.
+      if (isPrinterConnected()) {
+        printDrinkTicket(order, items, branch).catch(err =>
+          toast.error(`Drink ticket print failed: ${err.message}`)
+        )
+      }
 
       // Vestaboard greeting — fire a cheeky Nochi message with the
       // customer's name. Non-blocking; skips if no name was captured
@@ -668,11 +666,11 @@ export default function POSTerminal() {
           .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
       }
 
-      // Auto-print receipt: fire-and-forget if enabled. Enqueues regardless
-      // of local printer connection; host tablet handles it.
-      if (localStorage.getItem('noch_auto_print') === 'true') {
+      // Auto-print receipt: fire-and-forget if enabled + printer is connected.
+      // Failure toasts but never blocks the receipt modal from appearing.
+      if (localStorage.getItem('noch_auto_print') === 'true' && isPrinterConnected()) {
         printReceipt(order, branch, items, loyaltyCustomer).catch(err =>
-          console.warn(`Auto-print enqueue failed: ${err.message}`)
+          toast.error(`Auto-print failed: ${err.message}`)
         )
       }
     } catch (err) {

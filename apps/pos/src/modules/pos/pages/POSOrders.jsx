@@ -264,20 +264,22 @@ export default function POSOrders() {
   useEffect(() => { load() }, [branchId, fromDate, toDate])
 
   const handleReprint = async (order) => {
+    if (!isPrinterConnected()) { toast.error('Printer not connected'); return }
     try {
       await printReceipt(order, branch, order.pos_order_items || [])
-      toast.success(`Sent ${order.order_number} to print queue`)
+      toast.success(`Reprinted ${order.order_number}`)
     } catch (err) {
-      toast.error(err.message || 'Enqueue failed')
+      toast.error(err.message || 'Print failed')
     }
   }
 
   const handleDrinkTicket = async (order) => {
+    if (!isPrinterConnected()) { toast.error('Printer not connected'); return }
     try {
       await printDrinkTicket(order, order.pos_order_items || [], branch)
-      toast.success(`Drink ticket queued`)
+      toast.success(`Drink ticket reprinted`)
     } catch (err) {
-      toast.error(err.message || 'Enqueue failed')
+      toast.error(err.message || 'Print failed')
     }
   }
 

@@ -64,10 +64,14 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
   }, [passportUrl])
 
   const handlePrint = async () => {
+    if (!isPrinterConnected()) {
+      toast.error(t('receiptPrinterNotConnected'))
+      return
+    }
     setPrinting(true)
     try {
       await printReceipt(order, branch, items, loyaltyCustomer)
-      toast.success('Sent to print queue')
+      toast.success(t('receiptPrinted'))
     } catch (err) {
       toast.error(err.message || t('receiptPrintFailed'))
     } finally {
