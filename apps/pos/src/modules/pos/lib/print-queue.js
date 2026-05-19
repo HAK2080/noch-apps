@@ -57,7 +57,6 @@ export async function enqueuePrintJob(branchId, jobType, payload) {
 
 // ── Host subscriber ─────────────────────────────────────────────────
 let _channel = null
-let _presenceChannel = null
 let _processing = false
 let _activeBranchId = null
 
@@ -84,23 +83,6 @@ export function startHostSubscriber(branchId) {
       () => { processQueue(branchId) }
     )
     .subscribe()
-
-  // Presence: announce this tablet is the active host for the branch.
-  // Other tablets observing the same channel will see us in their
-  // presence state and can display a green/red indicator.
-  _presenceChannel = supabase.channel(`print-host-${branchId}`, {
-    config: { presence: { key: getDeviceId() } },
-  })
-  _presenceChannel
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await _presenceChannel.track({
-          deviceId: getDeviceId(),
-          role: 'host',
-          since: new Date().toISOString(),
-        })
-      }
-    })
 }
 
 export function stopHostSubscriber() {
@@ -108,52 +90,7 @@ export function stopHostSubscriber() {
     try { supabase.removeChannel(_channel) } catch {}
     _channel = null
   }
-  if (_presenceChannel) {
-    try {
-      _presenceChannel.untrack()
-      supabase.removeChannel(_presenceChannel)
-    } catch {}
-    _presenceChannel = null
-  }
   _activeBranchId = null
-}
-
-// ── Presence observer (used by non-host tablets to see host status) ─
-export function observeHostPresence(branchId, onChange) {
-  if (!branchId) return () => {}
-  const channel = supabase.channel(`print-host-${branchId}`, {
-    config: { presence: { key: `observer-${getDeviceId()}` } },
-  })
-  const emit = () => {
-    const state = channel.presenceState()
-    // Find any entry that declares role === 'host'
-    let host = null
-    for (const key of Object.keys(state)) {
-      const arr = state[key] || []
-      for (const p of arr) {
-        if (p?.role === 'host') { host = p; break }
-      }
-      if (host) break
-    }
-    onChange(host)
-  }
-  channel
-    .on('presence', { event: 'sync' }, emit)
-    .on('presence', { event: 'join' }, emit)
-    .on('presence', { event: 'leave' }, emit)
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        // We track ourselves as an observer (no role) so we appear
-        // in our own presence state and trigger the initial sync.
-        await channel.track({ deviceId: getDeviceId(), role: 'observer' })
-      }
-    })
-  return () => {
-    try {
-      channel.untrack()
-      supabase.removeChannel(channel)
-    } catch {}
-  }
 }
 
 async function processQueue(branchId) {
