@@ -178,7 +178,7 @@ export async function autoConnectPrinter(opts = {}) {
 // their own write. Failures in one job don't poison subsequent
 // jobs (we swallow on the chain head only).
 let _printChain = Promise.resolve()
-const PRINT_GAP_MS = 200   // small gap so printer firmware settles between jobs
+const PRINT_GAP_MS = 80   // small gap so printer firmware settles between jobs
 
 async function writeBytes(bytes, timeoutMs = 8000) {
   const t = TRANSPORTS[_kind]

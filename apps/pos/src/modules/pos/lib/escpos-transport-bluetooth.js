@@ -21,8 +21,13 @@
 //     small RX buffers and will drop bytes if hammered.
 
 const DEFAULT_TIMEOUT_MS = 8000
-const CHUNK_SIZE = 20            // safe BLE payload at default 23-byte MTU
-const INTER_CHUNK_DELAY_MS = 5
+// Start with a larger chunk size — modern Chrome/Android BT negotiates
+// MTU up to 247 bytes. If a write fails (printer firmware can't accept
+// the bigger payload), we drop back to the conservative 20-byte default
+// and remember it for subsequent writes in this session.
+let _chunkSize = 180
+const CHUNK_SIZE_FALLBACK = 20
+const INTER_CHUNK_DELAY_MS = 1
 
 // Common GATT services exposed by ESC/POS BT printers. Probed in order.
 const KNOWN_SERVICES = [
@@ -179,11 +184,33 @@ export async function write(bytes, timeoutMs = DEFAULT_TIMEOUT_MS) {
   if (!isConnected()) throw new Error('Printer not connected')
 
   const buf = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+
+  // Send the whole buffer in chunks of _chunkSize bytes. If a write
+  // fails with a payload-too-large signal (common phrases: "exceeds
+  // ATT", "GATT operation not permitted", "value is too long"), drop
+  // _chunkSize to the conservative fallback and retry from the same
+  // offset. This adapts once per session — subsequent writes use the
+  // smaller size automatically.
   const sendAll = (async () => {
-    for (let offset = 0; offset < buf.length; offset += CHUNK_SIZE) {
-      const chunk = buf.slice(offset, offset + CHUNK_SIZE)
-      await writeChunk(chunk)
-      if (offset + CHUNK_SIZE < buf.length) await sleep(INTER_CHUNK_DELAY_MS)
+    let offset = 0
+    while (offset < buf.length) {
+      const chunk = buf.slice(offset, offset + _chunkSize)
+      try {
+        await writeChunk(chunk)
+      } catch (err) {
+        const msg = String(err?.message || err)
+        const tooLarge = /exceeds|too long|ATT|GATT operation not permitted/i.test(msg)
+        if (tooLarge && _chunkSize > CHUNK_SIZE_FALLBACK) {
+          console.warn(`[escpos-bt] chunk ${_chunkSize} rejected, falling back to ${CHUNK_SIZE_FALLBACK}`)
+          _chunkSize = CHUNK_SIZE_FALLBACK
+          continue // retry from same offset with smaller chunks
+        }
+        throw err
+      }
+      offset += chunk.byteLength
+      if (offset < buf.length && INTER_CHUNK_DELAY_MS > 0) {
+        await sleep(INTER_CHUNK_DELAY_MS)
+      }
     }
   })()
 
