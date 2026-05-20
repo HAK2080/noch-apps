@@ -173,10 +173,20 @@ export async function autoConnect() {
 }
 
 async function writeChunk(chunk) {
-  if (_useWithoutResponse && _characteristic.writeValueWithoutResponse) {
-    await _characteristic.writeValueWithoutResponse(chunk)
-  } else {
+  // Prefer writeValue (with response) over writeValueWithoutResponse.
+  // The latter can be silently buffered by Chrome's BLE stack until
+  // the page receives a fresh user gesture, which causes the receipt
+  // modal to sit there until staff tap anywhere in the app. writeValue
+  // completes synchronously per chunk and bypasses that gating.
+  const props = _characteristic.properties || {}
+  if (props.write && _characteristic.writeValue) {
     await _characteristic.writeValue(chunk)
+  } else if (props.writeWithoutResponse && _characteristic.writeValueWithoutResponse) {
+    await _characteristic.writeValueWithoutResponse(chunk)
+  } else if (_characteristic.writeValue) {
+    await _characteristic.writeValue(chunk)
+  } else {
+    throw new Error('Characteristic supports neither write nor writeWithoutResponse')
   }
 }
 
