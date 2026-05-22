@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight, UserCheck, X, Zap } from 'lucide-react'
 import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment, getStaffProfiles, supabase } from '../lib/supabase'
+import { getPnL } from '../modules/finance/lib/finance-supabase'
 import { listSuggestedActions, runAllEventProducers } from '../lib/businessEvents'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [busyRequestId, setBusyRequestId] = useState(null)
   const [foundersClub, setFoundersClub] = useState(null)
   const [suggestedActions, setSuggestedActions] = useState([])
+  const [pnl, setPnl] = useState(null)
 
   const isOwner = profile?.role === 'owner'
 
@@ -111,6 +113,14 @@ export default function Dashboard() {
     loadAccessRequests()
     loadFoundersClub()
     loadSuggestedActions()
+    // P&L for today — silently fails if RPC doesn't exist or no data
+    if (isOwner) {
+      const today = new Date()
+      const y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0')
+      const from = `${y}-${m}-${d}T00:00:00`
+      const to = `${y}-${m}-${d}T23:59:59`
+      getPnL({ from, to, netOfRefunds: true }).then(setPnl).catch(() => {})
+    }
   }, [loadAccessRequests, loadFoundersClub, loadSuggestedActions])
 
   useEffect(() => { load() }, [load])
@@ -300,6 +310,50 @@ export default function Dashboard() {
 
       {/* Stats */}
       <StatsBar stats={stats} />
+
+      {/* Today's P&L — owner only, compact KPI strip */}
+      {isOwner && pnl && (pnl.revenue > 0 || pnl.cogs > 0) && (() => {
+        const revenue = Number(pnl.revenue) || 0
+        const cogs = Number(pnl.cogs) || 0
+        const labor = Number(pnl.labor) || 0
+        const opex = Number(pnl.opex) || 0
+        const profit = revenue - cogs - labor - opex
+        const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(0) : 0
+        return (
+          <div className="card mb-4 cursor-pointer hover:border-noch-green/30 transition-colors" onClick={() => navigate('/finance')}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-noch-muted text-[10px] font-bold uppercase tracking-widest">
+                {lang === 'ar' ? 'أداء اليوم' : "Today's P&L"}
+              </h2>
+              <ChevronRight size={14} className="text-noch-muted" />
+            </div>
+            <div className="grid grid-cols-5 gap-3">
+              <div>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'الإيرادات' : 'Revenue'}</p>
+                <p className="text-white font-bold text-sm">{revenue.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'التكلفة' : 'COGS'}</p>
+                <p className="text-red-400 font-bold text-sm">{cogs.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'العمالة' : 'Labor'}</p>
+                <p className="text-orange-400 font-bold text-sm">{labor.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'المصاريف' : 'OpEx'}</p>
+                <p className="text-yellow-400 font-bold text-sm">{opex.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'الربح' : 'Profit'}</p>
+                <p className={`font-bold text-sm ${profit >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                  {profit.toLocaleString('en', { maximumFractionDigits: 0 })} <span className="text-[10px] font-normal text-noch-muted">{margin}%</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Command Center — Suggested Actions (Phase 2) */}
       {isOwner && (

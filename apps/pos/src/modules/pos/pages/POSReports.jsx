@@ -223,14 +223,26 @@ export default function POSReports() {
                 <p className="text-noch-muted text-xs text-center py-3">No items sold.</p>
               ) : (
                 <div className="flex flex-col gap-1">
-                  {byProduct.slice(0, 20).map(p => (
-                    <div key={p.product_id || p.product_name} className="flex justify-between text-sm border-b border-noch-border/40 last:border-0 py-1.5">
-                      <span className="text-white truncate">{p.product_name}</span>
-                      <span className="text-noch-muted text-xs ml-2 shrink-0">
-                        {Number(p.qty).toFixed(0)} sold · <span className="text-noch-green">{Number(p.revenue).toFixed(2)}</span>
-                      </span>
-                    </div>
-                  ))}
+                  {byProduct.slice(0, 20).map(p => {
+                    const rev = Number(p.revenue) || 0
+                    const cost = Number(p.cogs) || 0
+                    const profit = Number(p.profit) ?? (rev - cost)
+                    const hasCost = cost > 0
+                    return (
+                      <div key={p.product_id || p.product_name} className="flex justify-between text-sm border-b border-noch-border/40 last:border-0 py-1.5">
+                        <span className="text-white truncate">{p.product_name}</span>
+                        <span className="text-noch-muted text-xs ml-2 shrink-0 flex items-center gap-2">
+                          {Number(p.qty).toFixed(0)} sold
+                          <span className="text-noch-green">{rev.toFixed(2)}</span>
+                          {hasCost && (
+                            <span className={`${profit >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                              {profit >= 0 ? '+' : ''}{profit.toFixed(0)} profit
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
