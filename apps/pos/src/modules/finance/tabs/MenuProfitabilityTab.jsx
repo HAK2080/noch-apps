@@ -174,6 +174,44 @@ export default function MenuProfitabilityTab() {
         })}
       </div>
 
+      {/* Top sellers — ranked list by units sold */}
+      {!loading && items.length > 0 && (
+        <div className="card">
+          <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+            <Package size={14} /> Top sellers — {items.length} products
+          </h3>
+          <div className="flex flex-col gap-0.5">
+            {[...items]
+              .filter(i => Number(i.units_sold) > 0)
+              .sort((a, b) => Number(b.units_sold) - Number(a.units_sold))
+              .slice(0, 20)
+              .map((p, idx) => {
+                const units = Number(p.units_sold) || 0
+                const rev = Number(p.revenue) || 0
+                const profit = Number(p.total_contribution) || (Number(p.contribution_margin) * units)
+                const hasCost = p.has_cost
+                return (
+                  <div key={p.product_id} className="flex items-center justify-between text-sm border-b border-noch-border/40 last:border-0 py-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-noch-muted text-xs w-5 text-right shrink-0">{idx + 1}</span>
+                      <span className="text-white truncate">{p.product_name}</span>
+                    </div>
+                    <span className="text-noch-muted text-xs ml-2 shrink-0 flex items-center gap-3">
+                      <span>{units.toFixed(0)} sold</span>
+                      <span className="text-noch-green">{lyd(rev)}</span>
+                      {hasCost && (
+                        <span className={profit >= 0 ? 'text-noch-green' : 'text-red-400'}>
+                          {profit >= 0 ? '+' : ''}{lyd(profit)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
       {selected && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
           <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>

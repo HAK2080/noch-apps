@@ -9,11 +9,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Calendar, TrendingUp, ShoppingCart, Users, Package,
+  ArrowLeft, Calendar, TrendingUp, ShoppingCart, Users,
 } from 'lucide-react'
 import {
   getPOSBranch,
-  getDailySalesRange, getSalesByProduct, getSalesByBarista,
+  getDailySalesRange, getSalesByBarista,
 } from '../lib/pos-supabase'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
@@ -68,7 +68,6 @@ export default function POSReports() {
 
   const [loading, setLoading] = useState(true)
   const [daily, setDaily] = useState([])
-  const [byProduct, setByProduct] = useState([])
   const [byBarista, setByBarista] = useState([])
 
   useEffect(() => {
@@ -85,12 +84,11 @@ export default function POSReports() {
     const toIso   = new Date(`${toDate}T23:59:59.999`).toISOString()
     Promise.all([
       getDailySalesRange(branchId, fromIso, toIso),
-      getSalesByProduct(branchId, fromIso, toIso),
       getSalesByBarista(branchId, fromIso, toIso),
     ])
-      .then(([d, p, b]) => {
+      .then(([d, b]) => {
         if (cancelled) return
-        setDaily(d); setByProduct(p); setByBarista(b)
+        setDaily(d); setByBarista(b)
       })
       .catch(err => { if (!cancelled) toast.error(err.message || 'Failed to load reports') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -210,39 +208,6 @@ export default function POSReports() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              )}
-            </div>
-
-            {/* By product */}
-            <div className="card mb-4">
-              <h3 className="text-white font-semibold text-sm mb-2 flex items-center gap-2">
-                <Package size={14} /> Top products
-              </h3>
-              {byProduct.length === 0 ? (
-                <p className="text-noch-muted text-xs text-center py-3">No items sold.</p>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  {byProduct.slice(0, 20).map(p => {
-                    const rev = Number(p.revenue) || 0
-                    const cost = Number(p.cogs) || 0
-                    const profit = Number(p.profit) ?? (rev - cost)
-                    const hasCost = cost > 0
-                    return (
-                      <div key={p.product_id || p.product_name} className="flex justify-between text-sm border-b border-noch-border/40 last:border-0 py-1.5">
-                        <span className="text-white truncate">{p.product_name}</span>
-                        <span className="text-noch-muted text-xs ml-2 shrink-0 flex items-center gap-2">
-                          {Number(p.qty).toFixed(0)} sold
-                          <span className="text-noch-green">{rev.toFixed(2)}</span>
-                          {hasCost && (
-                            <span className={`${profit >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
-                              {profit >= 0 ? '+' : ''}{profit.toFixed(0)} profit
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    )
-                  })}
                 </div>
               )}
             </div>
