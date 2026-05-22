@@ -899,6 +899,7 @@ export default function POSTerminal() {
             blockOutOfStock={!!settings?.block_out_of_stock}
             searchQuery={searchQuery}
             tileLang={tileLang}
+            defaultCategoryId={settings?.default_category_id}
           />
         </div>
 

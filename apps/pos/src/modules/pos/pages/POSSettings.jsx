@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3 } from 'lucide-react'
-import { getPOSBranch, updatePOSBranch, getOpenShift, openShift } from '../lib/pos-supabase'
+import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
@@ -59,6 +59,7 @@ export default function POSSettings() {
   const [openingCash, setOpeningCash] = useState('')
   const [openingShift, setOpeningShift] = useState(false)
   const [posSettings, setPosSettings] = useState(null)
+  const [categories, setCategories] = useState([])
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
 
   const serialAvailable = isTransportAvailable('serial')
@@ -79,11 +80,13 @@ export default function POSSettings() {
       getPOSBranch(branchId),
       getOpenShift(branchId),
       getPOSSettings(branchId),
+      getPOSCategories(branchId, { posOnly: true }),
     ])
-      .then(([b, s, ps]) => {
+      .then(([b, s, ps, cats]) => {
         setBranch(b)
         setShift(s)
         setPosSettings(ps)
+        setCategories(cats)
         setBranchForm({
           receipt_header: b.receipt_header || '',
           receipt_footer: b.receipt_footer || '',
@@ -483,6 +486,25 @@ export default function POSSettings() {
               <h2 className="text-white font-semibold">POS Behaviour</h2>
             </div>
             <div className="flex flex-col gap-3">
+              {/* Default category on POS open */}
+              <div className="p-2">
+                <label className="block text-white text-sm font-medium mb-1">Default category tab</label>
+                <p className="text-noch-muted text-xs mb-2">Which category opens first when staff enter the POS terminal.</p>
+                <select
+                  value={posSettings.default_category_id || ''}
+                  onChange={e => {
+                    const val = e.target.value || null
+                    handleToggleFlag('default_category_id', val)
+                  }}
+                  className="input w-full text-sm"
+                >
+                  <option value="">First category</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <FlagRow
                 label="Block sale of out-of-stock items"
                 hint="When on, products with stock ≤ 0 cannot be added to the cart. Off = current behaviour."

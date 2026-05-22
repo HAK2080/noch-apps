@@ -4,7 +4,7 @@
 // satisfied before "Add to cart".
 
 import { useEffect, useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { getModifierGroupsForProduct } from '../lib/pos-supabase'
 import { round, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
@@ -13,28 +13,32 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
   const [groups, setGroups] = useState([])
   const [selections, setSelections] = useState({}) // groupId → array of modifier objects
   const [loading, setLoading] = useState(true)
+  const [collapsed, setCollapsed] = useState({}) // groupId → bool
 
   useEffect(() => {
     if (!product?.id) return
+    const initFromGroups = (g) => {
+      const sel = {}
+      const col = {}
+      for (let i = 0; i < g.length; i++) {
+        const grp = g[i]
+        sel[grp.id] = grp.modifiers.filter(m => m.is_default)
+        // Expand first group + required groups; collapse the rest
+        col[grp.id] = i > 0 && !grp.is_required
+      }
+      setSelections(sel)
+      setCollapsed(col)
+    }
     if (Array.isArray(groupsProp)) {
       setGroups(groupsProp)
-      const init = {}
-      for (const grp of groupsProp) {
-        init[grp.id] = grp.modifiers.filter(m => m.is_default)
-      }
-      setSelections(init)
+      initFromGroups(groupsProp)
       setLoading(false)
       return
     }
     getModifierGroupsForProduct(product.id)
       .then(g => {
         setGroups(g)
-        // Pre-select defaults
-        const init = {}
-        for (const grp of g) {
-          init[grp.id] = grp.modifiers.filter(m => m.is_default)
-        }
-        setSelections(init)
+        initFromGroups(g)
       })
       .catch(err => toast.error(err.message || 'Failed to load options'))
       .finally(() => setLoading(false))
@@ -111,45 +115,63 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
           ) : groups.length === 0 ? (
             <p className="text-noch-muted text-sm text-center py-6">No options for this product.</p>
           ) : (
-            <div className="flex flex-col gap-4">
-              {groups.map(g => (
-                <div key={g.id}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h3 className="text-white text-sm font-semibold">
-                      {g.name}
-                      {g.is_required && <span className="text-red-400 ml-1">*</span>}
-                    </h3>
-                    <span className="text-noch-muted text-xs">
-                      {g.max_select === 1 ? 'pick one' : `up to ${g.max_select}`}
-                    </span>
+            <div className="flex flex-col gap-2">
+              {groups.map(g => {
+                const isOpen = !collapsed[g.id]
+                const picked = selections[g.id] || []
+                const summary = picked.length > 0
+                  ? picked.map(m => m.name).join(', ')
+                  : null
+                return (
+                  <div key={g.id} className="border border-noch-border/40 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setCollapsed(c => ({ ...c, [g.id]: !c[g.id] }))}
+                      className="flex items-center justify-between w-full px-3 py-2.5 text-left hover:bg-noch-border/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isOpen ? <ChevronDown size={14} className="text-noch-muted shrink-0" /> : <ChevronRight size={14} className="text-noch-muted shrink-0" />}
+                        <h3 className="text-white text-sm font-semibold truncate">
+                          {g.name}
+                          {g.is_required && <span className="text-red-400 ml-1">*</span>}
+                        </h3>
+                        {!isOpen && summary && (
+                          <span className="text-noch-green text-xs truncate ml-1">{summary}</span>
+                        )}
+                      </div>
+                      <span className="text-noch-muted text-xs shrink-0 ml-2">
+                        {g.max_select === 1 ? 'pick one' : `up to ${g.max_select}`}
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="flex flex-col gap-1.5 px-3 pb-3">
+                        {g.modifiers.map(m => {
+                          const checked = picked.some(s => s.id === m.id)
+                          return (
+                            <button
+                              key={m.id}
+                              onClick={() => toggleModifier(g, m)}
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm text-left ${
+                                checked
+                                  ? 'bg-noch-green/10 border-noch-green/50 text-white'
+                                  : 'border-noch-border text-noch-muted hover:border-noch-green/20'
+                              }`}
+                            >
+                              <span>
+                                {m.name}
+                                {m.name_ar && <span className="text-noch-muted text-xs ml-1" dir="rtl">{m.name_ar}</span>}
+                              </span>
+                              <span className={`text-xs font-mono ${checked ? 'text-noch-green' : ''}`}>
+                                {Number(m.price_delta) > 0 ? `+${Number(m.price_delta).toFixed(2)}` :
+                                 Number(m.price_delta) < 0 ? `${Number(m.price_delta).toFixed(2)}` : ''}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    {g.modifiers.map(m => {
-                      const checked = (selections[g.id] || []).some(s => s.id === m.id)
-                      return (
-                        <button
-                          key={m.id}
-                          onClick={() => toggleModifier(g, m)}
-                          className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm text-left ${
-                            checked
-                              ? 'bg-noch-green/10 border-noch-green/50 text-white'
-                              : 'border-noch-border text-noch-muted hover:border-noch-green/20'
-                          }`}
-                        >
-                          <span>
-                            {m.name}
-                            {m.name_ar && <span className="text-noch-muted text-xs ml-1" dir="rtl">{m.name_ar}</span>}
-                          </span>
-                          <span className={`text-xs font-mono ${checked ? 'text-noch-green' : ''}`}>
-                            {Number(m.price_delta) > 0 ? `+${Number(m.price_delta).toFixed(2)}` :
-                             Number(m.price_delta) < 0 ? `${Number(m.price_delta).toFixed(2)}` : ''}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

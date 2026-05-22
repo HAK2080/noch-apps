@@ -25,14 +25,19 @@ function ProductGrid({
   products = [], categories = [], onSelect, onLongPress,
   blockOutOfStock = false, searchQuery = '',
   tileLang = 'both',  // 'both' | 'en' | 'ar'
+  defaultCategoryId = null,
 }) {
   const [activeCategory, setActiveCategory] = useState('all')
   useEffect(() => {
     if (activeCategory !== 'all') return
-    const matcha = categories.find(c => /matcha/i.test(c.name || '') || /ماتشا/.test(c.name_ar || ''))
-    if (matcha) setActiveCategory(matcha.id)
+    // Use configured default, fall back to first category
+    if (defaultCategoryId && categories.some(c => c.id === defaultCategoryId)) {
+      setActiveCategory(defaultCategoryId)
+    } else if (categories.length > 0) {
+      setActiveCategory(categories[0].id)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories])
+  }, [categories, defaultCategoryId])
 
   // Build a quick id→category map so we can colour-key any product
   // even when the category strip isn't visible.

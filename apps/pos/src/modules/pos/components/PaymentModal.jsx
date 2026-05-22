@@ -183,7 +183,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 )}
                 {/* Quick amounts — big tappable buttons, shown first */}
                 <div className="grid grid-cols-3 gap-2 mt-3">
-                  {[total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10, Math.ceil(total / 20) * 20, Math.ceil(total / 50) * 50].filter((v, i, a) => v > 0 && a.indexOf(v) === i).slice(0, 6).map(amt => (
+                  {[total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10, Math.ceil(total / 20) * 20].filter((v, i, a) => v > 0 && a.indexOf(v) === i).slice(0, 6).map(amt => (
                     <button
                       key={amt}
                       onClick={() => setCashTendered(amt.toFixed(2))}
