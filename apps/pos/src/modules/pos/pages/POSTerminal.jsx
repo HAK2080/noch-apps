@@ -1021,6 +1021,7 @@ export default function POSTerminal() {
         <ProductModifierModal
           product={modifierProduct.product}
           groups={modifierData.groupsForProduct(modifierProduct.product.id)}
+          posLang={tileLang === 'ar' ? 'ar' : 'en'}
           onAdd={({ unit_price, modifiers }) => {
             addCartLine(modifierProduct.product, { unit_price, modifiers })
             setModifierProduct(null)

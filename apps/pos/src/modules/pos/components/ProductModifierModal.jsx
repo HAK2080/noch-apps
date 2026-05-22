@@ -9,7 +9,12 @@ import { getModifierGroupsForProduct } from '../lib/pos-supabase'
 import { round, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
 
-export default function ProductModifierModal({ product, onAdd, onClose, groups: groupsProp = null }) {
+export default function ProductModifierModal({ product, onAdd, onClose, groups: groupsProp = null, posLang = 'en' }) {
+  const isAr = posLang === 'ar'
+  // Display name helpers — prefer Arabic when in AR mode
+  const gName = (g) => (isAr && g.name_ar) ? g.name_ar : g.name
+  const mName = (m) => (isAr && m.name_ar) ? m.name_ar : m.name
+  const pName = (isAr && product.name_ar) ? product.name_ar : product.name
   const [groups, setGroups] = useState([])
   const [selections, setSelections] = useState({}) // groupId → array of modifier objects
   const [loading, setLoading] = useState(true)
@@ -99,47 +104,50 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center">
-      <div className="bg-noch-card border border-noch-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-noch-card border border-noch-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" dir={isAr ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between p-4 border-b border-noch-border sticky top-0 bg-noch-card">
           <div>
-            <h2 className="text-white font-bold">{product.name}</h2>
-            <p className="text-noch-muted text-xs">Customise this drink</p>
+            <h2 className="text-white font-bold">{pName}</h2>
+            <p className="text-noch-muted text-xs">{isAr ? 'تخصيص المشروب' : 'Customise this drink'}</p>
           </div>
           <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
         </div>
         <div className="p-4">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-noch-muted">
-              <Loader2 size={16} className="animate-spin mr-2" /> Loading options…
+              <Loader2 size={16} className="animate-spin mr-2" /> {isAr ? 'جاري التحميل…' : 'Loading options…'}
             </div>
           ) : groups.length === 0 ? (
-            <p className="text-noch-muted text-sm text-center py-6">No options for this product.</p>
+            <p className="text-noch-muted text-sm text-center py-6">{isAr ? 'لا توجد خيارات لهذا المنتج.' : 'No options for this product.'}</p>
           ) : (
             <div className="flex flex-col gap-2">
               {groups.map(g => {
                 const isOpen = !collapsed[g.id]
                 const picked = selections[g.id] || []
                 const summary = picked.length > 0
-                  ? picked.map(m => m.name).join(', ')
+                  ? picked.map(m => mName(m)).join(', ')
                   : null
                 return (
                   <div key={g.id} className="border border-noch-border/40 rounded-xl overflow-hidden">
                     <button
                       onClick={() => setCollapsed(c => ({ ...c, [g.id]: !c[g.id] }))}
                       className="flex items-center justify-between w-full px-3 py-2.5 text-left hover:bg-noch-border/20 transition-colors"
+                      dir={isAr ? 'rtl' : 'ltr'}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        {isOpen ? <ChevronDown size={14} className="text-noch-muted shrink-0" /> : <ChevronRight size={14} className="text-noch-muted shrink-0" />}
+                        {isOpen ? <ChevronDown size={14} className="text-noch-muted shrink-0" /> : <ChevronRight size={14} className={`text-noch-muted shrink-0 ${isAr ? 'rotate-180' : ''}`} />}
                         <h3 className="text-white text-sm font-semibold truncate">
-                          {g.name}
-                          {g.is_required && <span className="text-red-400 ml-1">*</span>}
+                          {gName(g)}
+                          {g.is_required && <span className="text-red-400 mx-1">*</span>}
                         </h3>
                         {!isOpen && summary && (
-                          <span className="text-noch-green text-xs truncate ml-1">{summary}</span>
+                          <span className="text-noch-green text-xs truncate mx-1">{summary}</span>
                         )}
                       </div>
-                      <span className="text-noch-muted text-xs shrink-0 ml-2">
-                        {g.max_select === 1 ? 'pick one' : `up to ${g.max_select}`}
+                      <span className="text-noch-muted text-xs shrink-0 mx-2">
+                        {g.max_select === 1
+                          ? (isAr ? 'اختر واحد' : 'pick one')
+                          : (isAr ? `حتى ${g.max_select}` : `up to ${g.max_select}`)}
                       </span>
                     </button>
                     {isOpen && (
@@ -155,11 +163,9 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
                                   ? 'bg-noch-green/10 border-noch-green/50 text-white'
                                   : 'border-noch-border text-noch-muted hover:border-noch-green/20'
                               }`}
+                              dir={isAr ? 'rtl' : 'ltr'}
                             >
-                              <span>
-                                {m.name}
-                                {m.name_ar && <span className="text-noch-muted text-xs ml-1" dir="rtl">{m.name_ar}</span>}
-                              </span>
+                              <span>{mName(m)}</span>
                               <span className={`text-xs font-mono ${checked ? 'text-noch-green' : ''}`}>
                                 {Number(m.price_delta) > 0 ? `+${Number(m.price_delta).toFixed(2)}` :
                                  Number(m.price_delta) < 0 ? `${Number(m.price_delta).toFixed(2)}` : ''}
@@ -176,7 +182,7 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
           )}
 
           <div className="flex items-center justify-between mt-5 mb-3 bg-noch-dark/50 rounded-lg px-3 py-2">
-            <span className="text-noch-muted text-sm">Total</span>
+            <span className="text-noch-muted text-sm">{isAr ? 'المجموع' : 'Total'}</span>
             <span className="text-noch-green font-bold">{lineTtl.toFixed(2)} LYD</span>
           </div>
           <button
@@ -184,7 +190,7 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
             disabled={loading || !validation.ok}
             className="btn-primary w-full py-3 text-base font-bold"
           >
-            Add to cart
+            {isAr ? 'أضف للسلة' : 'Add to cart'}
           </button>
         </div>
       </div>
