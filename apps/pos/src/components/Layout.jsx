@@ -76,8 +76,6 @@ export default function Layout({ children }) {
     { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
     { to: '/sales', icon: ListOrdered, label: ar ? 'المبيعات' : 'Sales' },
     { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
-    // /expenses removed from staff sidebar 2026-05-08 — route is now
-    // OwnerRoute-gated, so the link would only redirect anyway.
     { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
     { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
     { to: '/recipes', icon: Coffee, label: t('recipes') },
@@ -85,7 +83,23 @@ export default function Layout({ children }) {
     { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
   ]
 
-  const navItems = profile?.role === 'owner' ? ownerNav : staffNav
+  const dataEntryNav = [
+    { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
+    { type: 'group', label: ar ? 'الإدخال' : 'DATA ENTRY' },
+    { to: '/expenses', icon: Receipt, label: ar ? 'المصاريف' : 'Expenses' },
+    { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
+    { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
+    { to: '/recipes', icon: Coffee, label: t('recipes') },
+    { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
+    { type: 'group', label: ar ? 'المحتوى' : 'CONTENT' },
+    { to: '/marketing', icon: BarChart3, label: ar ? 'التسويق' : 'Marketing' },
+    { to: '/ideas', icon: Lightbulb, label: ar ? 'الأفكار' : 'Ideas' },
+    { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
+  ]
+
+  const navItems = profile?.role === 'owner' ? ownerNav
+    : profile?.role === 'data_entry' ? dataEntryNav
+    : staffNav
   const navLinkItems = navItems.filter(i => i.type !== 'group')
 
   const initials = profile?.full_name

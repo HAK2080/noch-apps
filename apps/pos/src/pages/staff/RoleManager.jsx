@@ -55,12 +55,13 @@ const FEATURE_GROUPS = [
 ]
 
 const ALL_FEATURES = FEATURE_GROUPS.flatMap(g => g.features.map(f => f.key))
-const ROLES = ['supervisor', 'accountant', 'staff', 'limited_staff']
+const ROLES = ['supervisor', 'accountant', 'staff', 'limited_staff', 'data_entry']
 const ROLE_COLORS = {
-  supervisor: 'text-blue-400',
-  accountant: 'text-green-400',
-  staff: 'text-noch-green',
-  limited_staff: 'text-noch-muted',
+  supervisor:   'text-blue-400',
+  accountant:   'text-green-400',
+  staff:        'text-noch-green',
+  limited_staff:'text-noch-muted',
+  data_entry:   'text-orange-400',
 }
 
 export default function RoleManager() {

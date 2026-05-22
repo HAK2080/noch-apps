@@ -46,6 +46,7 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
     { value: 'accountant',    label: 'Accountant' },
     { value: 'staff',         label: 'Staff' },
     { value: 'limited_staff', label: 'Limited Staff' },
+    { value: 'data_entry',    label: 'Data Entry' },
   ]
   const [saving, setSaving] = useState(false)
   const [showPin, setShowPin] = useState(false)

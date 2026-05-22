@@ -123,17 +123,24 @@ function OwnerRoute({ children }) {
   return children
 }
 
+// ElevatedRoute — owner or data_entry. Used for pages that data_entry
+// staff need but regular staff don't (expenses, marketing).
+function ElevatedRoute({ children }) {
+  const { profile, loading } = useAuth()
+  if (loading) return null
+  if (!profile) return null
+  if (profile.role !== 'owner' && profile.role !== 'data_entry') return <Navigate to="/my-tasks" replace />
+  return children
+}
+
 function RootRedirect() {
   const { profile, loading, user } = useAuth()
-  // Still loading initial auth state
   if (loading) return null
-  // No user → not authenticated → go to login
   if (!user) return <Navigate to="/login" replace />
-  // User is authenticated but profile hasn't loaded yet — wait (avoid redirect loop)
   if (!profile) return null
-  // Owner lands on the dashboard; everyone else (manager/supervisor/staff)
-  // lands on the POS branch picker — that's their daily entry point.
-  return <Navigate to={profile.role === 'owner' ? '/dashboard' : '/pos'} replace />
+  if (profile.role === 'owner') return <Navigate to="/dashboard" replace />
+  if (profile.role === 'data_entry') return <Navigate to="/expenses" replace />
+  return <Navigate to="/pos" replace />
 }
 
 export default function App() {
@@ -195,7 +202,7 @@ export default function App() {
         } />
 
         <Route path="/expenses/*" element={
-          <ProtectedRoute><OwnerRoute><ExpensesPage /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><ElevatedRoute><ExpensesPage /></ElevatedRoute></ProtectedRoute>
         } />
 
         {/* Content Studio 2.0 (Noch 4.0) */}
@@ -247,7 +254,7 @@ export default function App() {
         {/* Analytics (owner only) */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
         <Route path="/finance" element={<ProtectedRoute><OwnerRoute><FinanceDashboard /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/marketing" element={<ProtectedRoute><OwnerRoute><MarketingDashboard /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/marketing" element={<ProtectedRoute><ElevatedRoute><MarketingDashboard /></ElevatedRoute></ProtectedRoute>} />
         <Route path="/analytics-legacy" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}

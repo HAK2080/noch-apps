@@ -520,7 +520,8 @@ function getProductPerms(role) {
   if (role === 'owner')      return { canEdit: true,  allFields: true,  availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: true }
   if (role === 'supervisor') return { canEdit: true,  allFields: false, availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: false }
   if (role === 'staff')      return { canEdit: true,  allFields: false, availability: true,  image: false, branchVisibility: false, stock: false, cost: false }
-  if (role === 'accountant') return { canEdit: true,  allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: true }
+  if (role === 'accountant')   return { canEdit: true,  allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: true }
+  if (role === 'data_entry')   return { canEdit: true,  allFields: true,  availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: true }
   // limited_staff and unknown: view only
   return { canEdit: false, allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: false }
 }
