@@ -108,6 +108,7 @@ export async function getPOSProducts(branchId) {
     .from('pos_products')
     .select('*, pos_categories(name, name_ar, color)')
     .eq('is_active', true)
+    .order('menu_sort', { ascending: true, nullsFirst: false })
     .order('name')
   if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
   const { data, error } = await q
