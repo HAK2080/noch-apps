@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode } from 'lucide-react'
+import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical } from 'lucide-react'
 import { supabase, recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../../lib/supabase'
 // Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
@@ -321,6 +321,7 @@ export default function POSTerminal() {
   const [showScanner, setShowScanner] = useState(false)
   const [submitting, setSubmitting] = useState(false)  // disables Charge while RPC is in flight
   const [showAttendees, setShowAttendees] = useState(false)
+  const [showMore, setShowMore] = useState(false)
   const [modifierProduct, setModifierProduct] = useState(null)
   const [modifierData, setModifierData] = useState({ groupsForProduct: () => [] })
 
@@ -775,39 +776,55 @@ export default function POSTerminal() {
           )
         })()}
 
-        {/* Actions */}
-        <button
-          onClick={cycleTileLang}
-          className="px-2 py-1.5 text-noch-muted hover:text-white text-[11px] font-bold uppercase tracking-wider border border-noch-border rounded"
-          title="Toggle product label language"
-        >
-          {tileLang === 'both' ? 'EN+AR' : tileLang === 'en' ? 'EN' : 'AR'}
-        </button>
-        <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white">
-          <ScanLine size={18} />
-        </button>
-        {settings?.per_barista_shift && shift && (
-          <button onClick={() => setShowAttendees(true)} className="p-2 text-noch-muted hover:text-white" title="Shift attendees">
-            <Users size={18} />
-          </button>
-        )}
+        {/* Primary actions — visible */}
         <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title="Orders">
           <ListOrdered size={18} />
         </button>
-        <button onClick={() => navigate(`/pos/${branchId}/stock-check`)} className="p-2 text-noch-muted hover:text-white" title="Stock Check">
-          <ClipboardList size={18} />
-        </button>
-        <button onClick={() => navigate(`/pos/${branchId}/end-of-day`)} className="p-2 text-noch-muted hover:text-white" title="End of Day">
-          <ShoppingBag size={18} />
-        </button>
-        <button onClick={() => navigate(`/pos/${branchId}/settings`)} className="p-2 text-noch-muted hover:text-white" title="Settings">
-          <Settings size={18} />
+        <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white" title="Scan barcode">
+          <ScanLine size={18} />
         </button>
 
         {/* Online indicator */}
         <div className={`flex items-center gap-1 text-xs ${online ? 'text-noch-green' : 'text-red-400'}`}>
           {online ? <Wifi size={14} /> : <WifiOff size={14} />}
           {offlineQueue > 0 && <span className="bg-yellow-500 text-black rounded-full px-1 text-[10px]">{offlineQueue}</span>}
+        </div>
+
+        {/* ⋮ More menu — secondary actions */}
+        <div className="relative">
+          <button onClick={() => setShowMore(v => !v)} className="p-2 text-noch-muted hover:text-white">
+            <MoreVertical size={18} />
+          </button>
+          {showMore && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setShowMore(false)} />
+              <div className="absolute right-0 top-full mt-1 z-40 bg-noch-card border border-noch-border rounded-xl shadow-xl py-1 min-w-[180px]">
+                <button onClick={() => { cycleTileLang(); setShowMore(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
+                  <span className="text-[10px] font-bold uppercase w-10">{tileLang === 'both' ? 'EN+AR' : tileLang === 'en' ? 'EN' : 'AR'}</span>
+                  Language
+                </button>
+                {settings?.per_barista_shift && shift && (
+                  <button onClick={() => { setShowAttendees(true); setShowMore(false) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
+                    <Users size={16} /> Attendees
+                  </button>
+                )}
+                <button onClick={() => { navigate(`/pos/${branchId}/stock-check`); setShowMore(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
+                  <ClipboardList size={16} /> Stock Check
+                </button>
+                <button onClick={() => { navigate(`/pos/${branchId}/end-of-day`); setShowMore(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
+                  <ShoppingBag size={16} /> End of Day
+                </button>
+                <button onClick={() => { navigate(`/pos/${branchId}/settings`); setShowMore(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
+                  <Settings size={16} /> Settings
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 

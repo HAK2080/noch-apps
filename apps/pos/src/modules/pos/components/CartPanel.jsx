@@ -12,16 +12,6 @@ const posT = (key, lang) =>
   translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
 
 function CartItem({ item, onUpdateQty, onRemove }) {
-  const [editQty, setEditQty] = useState(false)
-  const [qtyInput, setQtyInput] = useState(String(item.quantity))
-
-  const handleQtyCommit = () => {
-    const n = parseInt(qtyInput, 10)
-    if (!isNaN(n) && n > 0) onUpdateQty(item.id, n)
-    else setQtyInput(String(item.quantity))
-    setEditQty(false)
-  }
-
   return (
     <div className="flex items-start gap-2 py-2.5 border-b border-noch-border/50 last:border-0">
       <div className="flex-1 min-w-0">
@@ -29,7 +19,6 @@ function CartItem({ item, onUpdateQty, onRemove }) {
         {item.name_ar && (
           <p className="text-noch-muted text-xs text-right" dir="rtl">{item.name_ar}</p>
         )}
-        {/* Modifier list (oat milk, extra shot, etc.) */}
         {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
           <p className="text-noch-muted text-[11px] mt-0.5 truncate">
             {item.modifiers.map(m => m.modifier_name).join(' · ')}
@@ -51,42 +40,24 @@ function CartItem({ item, onUpdateQty, onRemove }) {
         <div className="flex items-center gap-1">
           <button
             onClick={() => item.quantity > 1 ? onUpdateQty(item.id, item.quantity - 1) : onRemove(item.id)}
-            className="w-6 h-6 rounded-md bg-noch-border/50 flex items-center justify-center text-noch-muted hover:text-white active:scale-95"
+            className={`w-7 h-7 rounded-lg flex items-center justify-center active:scale-95 ${
+              item.quantity === 1
+                ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                : 'bg-noch-border/50 text-noch-muted hover:text-white'
+            }`}
           >
-            <Minus size={10} />
+            <Minus size={12} />
           </button>
 
-          {editQty ? (
-            <input
-              type="number"
-              value={qtyInput}
-              onChange={e => setQtyInput(e.target.value)}
-              onBlur={handleQtyCommit}
-              onKeyDown={e => e.key === 'Enter' && handleQtyCommit()}
-              className="w-8 text-center text-sm text-white bg-noch-card border border-noch-green/50 rounded px-1 py-0.5"
-              autoFocus
-            />
-          ) : (
-            <button
-              onClick={() => { setQtyInput(String(item.quantity)); setEditQty(true) }}
-              className="w-7 text-center text-sm text-white font-semibold"
-            >
-              {item.quantity}
-            </button>
-          )}
+          <span className="w-7 text-center text-sm text-white font-semibold select-none">
+            {item.quantity}
+          </span>
 
           <button
             onClick={() => onUpdateQty(item.id, item.quantity + 1)}
-            className="w-6 h-6 rounded-md bg-noch-green/20 flex items-center justify-center text-noch-green hover:bg-noch-green/40 active:scale-95"
+            className="w-7 h-7 rounded-lg bg-noch-green/20 flex items-center justify-center text-noch-green hover:bg-noch-green/40 active:scale-95"
           >
-            <Plus size={10} />
-          </button>
-
-          <button
-            onClick={() => onRemove(item.id)}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-noch-muted hover:text-red-400 active:scale-95 ml-0.5"
-          >
-            <X size={10} />
+            <Plus size={12} />
           </button>
         </div>
       </div>

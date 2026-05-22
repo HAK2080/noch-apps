@@ -181,19 +181,23 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                     <span className="text-noch-green font-bold text-xl">{changeDue.toFixed(2)} LYD</span>
                   </div>
                 )}
-                <Numpad value={cashTendered} onChange={setCashTendered} />
-                {/* Quick amounts */}
-                <div className="flex gap-2 mt-2">
-                  {[total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).map(amt => (
+                {/* Quick amounts — big tappable buttons, shown first */}
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  {[total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10, Math.ceil(total / 20) * 20, Math.ceil(total / 50) * 50].filter((v, i, a) => v > 0 && a.indexOf(v) === i).slice(0, 6).map(amt => (
                     <button
                       key={amt}
                       onClick={() => setCashTendered(amt.toFixed(2))}
-                      className="flex-1 py-2 rounded-xl border border-noch-border text-noch-muted hover:text-white hover:border-noch-green/30 text-sm transition-all"
+                      className={`py-3 rounded-xl font-semibold text-base transition-all active:scale-95 ${
+                        parseFloat(cashTendered) === amt
+                          ? 'bg-noch-green/20 border-2 border-noch-green text-noch-green'
+                          : 'border border-noch-border text-white hover:border-noch-green/30'
+                      }`}
                     >
-                      {amt.toFixed(2)}
+                      {amt % 1 === 0 ? amt : amt.toFixed(2)}
                     </button>
                   ))}
                 </div>
+                <Numpad value={cashTendered} onChange={setCashTendered} />
               </div>
             )}
 
