@@ -30,12 +30,10 @@ function ProductGrid({
   const [activeCategory, setActiveCategory] = useState('all')
   useEffect(() => {
     if (activeCategory !== 'all') return
-    // Use configured default, fall back to first category
     if (defaultCategoryId && categories.some(c => c.id === defaultCategoryId)) {
       setActiveCategory(defaultCategoryId)
-    } else if (categories.length > 0) {
-      setActiveCategory(categories[0].id)
     }
+    // When no default is configured, stay on "All"
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, defaultCategoryId])
 

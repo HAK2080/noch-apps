@@ -498,7 +498,7 @@ export default function POSSettings() {
                   }}
                   className="input w-full text-sm"
                 >
-                  <option value="">First category</option>
+                  <option value="">All products</option>
                   {categories.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
