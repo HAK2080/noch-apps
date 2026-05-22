@@ -302,7 +302,7 @@ export default function POSTerminal() {
   const [showMemory, setShowMemory] = useState(false)
 
   // Tile-language preference: 'both' | 'en' | 'ar'. Persisted per device.
-  const [tileLang, setTileLang] = useState(() => localStorage.getItem('pos-tile-lang') || 'both')
+  const [tileLang, setTileLang] = useState(() => localStorage.getItem('pos-tile-lang') || 'ar')
   const cycleTileLang = () => {
     const next = tileLang === 'both' ? 'en' : tileLang === 'en' ? 'ar' : 'both'
     setTileLang(next)

@@ -93,7 +93,7 @@ function ProductGrid({
               : 'bg-noch-card border border-noch-border text-noch-muted hover:text-white'
           }`}
         >
-          All ({products.length})
+          {tileLang === 'ar' ? `الكل (${products.length})` : `All (${products.length})`}
         </button>
         {categories.map(cat => {
           const active = activeCategory === cat.id
@@ -108,7 +108,7 @@ function ProductGrid({
               style={active ? { backgroundColor: c, borderColor: c } : {}}
             >
               {!active && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c }} />}
-              {cat.name}
+              {tileLang === 'ar' && cat.name_ar ? cat.name_ar : cat.name}
             </button>
           )
         })}
