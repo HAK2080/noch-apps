@@ -23,8 +23,8 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
       for (let i = 0; i < g.length; i++) {
         const grp = g[i]
         sel[grp.id] = grp.modifiers.filter(m => m.is_default)
-        // Expand first group + required groups; collapse the rest
-        col[grp.id] = i > 0 && !grp.is_required
+        // All collapsed by default — staff tap to expand when needed
+        col[grp.id] = true
       }
       setSelections(sel)
       setCollapsed(col)
