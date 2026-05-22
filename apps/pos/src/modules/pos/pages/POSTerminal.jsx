@@ -739,14 +739,15 @@ export default function POSTerminal() {
         )}
 
         {/* Search */}
-        <div className="relative hidden sm:block">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
+        <div className="relative flex-1 max-w-xs">
+          <Search size={14} className={`absolute top-1/2 -translate-y-1/2 text-noch-muted ${tileLang === 'ar' ? 'right-3' : 'left-3'}`} />
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder={tileLang === 'ar' ? 'بحث عن منتج…' : 'Search products…'}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="input pl-8 py-1.5 text-sm w-40"
+            dir={tileLang === 'ar' ? 'rtl' : 'ltr'}
+            className={`w-full py-2 text-sm rounded-xl bg-noch-dark border border-noch-border text-white placeholder:text-noch-muted focus:border-noch-green/50 focus:outline-none ${tileLang === 'ar' ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
           />
         </div>
 
