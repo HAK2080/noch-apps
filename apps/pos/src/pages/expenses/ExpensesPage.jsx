@@ -573,7 +573,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                 </div>
               </div>
 
-              {exp.status === 'pending' && (
+              {exp.status === 'pending' && isOwner && (
                 <div className="flex gap-2">
                   <button onClick={() => act(exp.id, 'approved')} disabled={acting === exp.id}
                     className="flex-1 bg-noch-green/10 text-noch-green border border-noch-green/20 rounded-lg py-2 text-xs font-medium hover:bg-noch-green/20 flex items-center justify-center gap-1 disabled:opacity-50">
@@ -585,7 +585,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                   </button>
                 </div>
               )}
-              {exp.status === 'approved' && (
+              {exp.status === 'approved' && isOwner && (
                 <button onClick={() => act(exp.id, 'paid')} disabled={acting === exp.id}
                   className="w-full bg-blue-400/10 text-blue-400 border border-blue-400/20 rounded-lg py-2 text-xs font-medium hover:bg-blue-400/20 flex items-center justify-center gap-1 disabled:opacity-50">
                   <Wallet size={13} /> Mark as Paid
