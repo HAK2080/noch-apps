@@ -95,7 +95,7 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
   const today = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     cost_center_id: '', category_id: '', amount: '', currency: 'LYD',
-    vendor: '', description: '', expense_date: today,
+    vendor: '', description: '', expense_date: today, paid_by: 'Business',
   })
   const [receiptFile, setReceiptFile] = useState(null)
   const [receiptPreview, setReceiptPreview] = useState(null)
@@ -141,6 +141,7 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
         amount_lyd: amountLyd,
         vendor: form.vendor || null,
         description: form.description || null,
+        paid_by: form.paid_by || 'Business',
         receipt_url,
         expense_date: form.expense_date,
         status: isAutoApproved ? 'approved' : 'pending',
@@ -155,7 +156,7 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
         })
       }
       toast.success(isAutoApproved ? 'Expense submitted & auto-approved' : 'Expense submitted for approval')
-      setForm({ cost_center_id: '', category_id: '', amount: '', currency: 'LYD', vendor: '', description: '', expense_date: today })
+      setForm({ cost_center_id: '', category_id: '', amount: '', currency: 'LYD', vendor: '', description: '', expense_date: today, paid_by: 'Business' })
       setReceiptFile(null)
       setReceiptPreview(null)
       onSubmitted()
@@ -246,6 +247,18 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
           ≈ {fmt(amountLyd)} at {selectedRate} LYD/{form.currency}
         </p>
       )}
+
+      {/* Source of payment */}
+      <div>
+        <label className="text-xs text-noch-muted mb-1 block">Source of Payment</label>
+        <select value={form.paid_by} onChange={e => set('paid_by', e.target.value)}
+          className="w-full bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50">
+          <option value="Business">Business</option>
+          <option value="Haithem">Haithem</option>
+          <option value="Ahmed">Ahmed</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
 
       {/* Vendor (optional) */}
       <div>
@@ -369,6 +382,7 @@ function MyExpensesTab({ userId, refreshKey }) {
                         <span className="text-noch-muted opacity-40">·</span>
                         <span className="text-xs text-noch-muted">{exp.expense_categories?.name}</span>
                       </div>
+                      {exp.paid_by && exp.paid_by !== 'Business' && <p className="text-xs text-yellow-400 mt-0.5">💳 Paid by {exp.paid_by}</p>}
                       {exp.vendor && <p className="text-xs text-noch-muted mt-0.5">📍 {exp.vendor}</p>}
                       {exp.description && <p className="text-xs text-noch-muted mt-1 italic">"{exp.description}"</p>}
                       {lastAppr?.notes && (
@@ -482,6 +496,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
       vendor: exp.vendor || '',
       description: exp.description || '',
       expense_date: exp.expense_date || '',
+      paid_by: exp.paid_by || 'Business',
     })
     setEditModal(exp)
   }
@@ -503,6 +518,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
         amount_lyd,
         vendor: editForm.vendor || null,
         description: editForm.description || null,
+        paid_by: editForm.paid_by || 'Business',
         expense_date: editForm.expense_date,
         updated_at: new Date().toISOString(),
       }).eq('id', editModal.id)
@@ -554,6 +570,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                   <p className="text-xs text-noch-muted mt-0.5">
                     {exp.cost_centers?.id} — {exp.cost_centers?.name} · {exp.expense_categories?.name}
                   </p>
+                  {exp.paid_by && exp.paid_by !== 'Business' && <p className="text-xs text-yellow-400">💳 Paid by {exp.paid_by}</p>}
                   {exp.vendor && <p className="text-xs text-noch-muted">📍 {exp.vendor}</p>}
                   {exp.description && <p className="text-xs text-noch-muted italic mt-1">"{exp.description}"</p>}
                 </div>
@@ -675,6 +692,16 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                   {rates.map(r => <option key={r.currency} value={r.currency}>{r.currency}</option>)}
                 </select>
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Source of Payment</label>
+              <select value={editForm.paid_by} onChange={e => setE('paid_by', e.target.value)}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50">
+                <option value="Business">Business</option>
+                <option value="Haithem">Haithem</option>
+                <option value="Ahmed">Ahmed</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
             <div>
               <label className="text-xs text-noch-muted mb-1 block">Vendor</label>
