@@ -18,7 +18,7 @@ import toast from 'react-hot-toast'
 async function listProductsForCostMapping() {
   const { data, error } = await supabase
     .from('pos_products')
-    .select('id, name, name_ar, price, cost_lyd, is_active, branch_id')
+    .select('id, name, name_ar, price, cost_lyd, is_active, branch_id, category_id, pos_categories(id, name, name_ar, color)')
     .eq('is_active', true)
     .order('name')
   if (error) throw error
@@ -37,8 +37,9 @@ export default function RecipeLinkerTab() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')  // all | unset | set
-  const [editing, setEditing] = useState({})   // { productId: cost-string }
+  const [filter, setFilter] = useState('all')          // all | unset | set
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [editing, setEditing] = useState({})           // { productId: cost-string }
 
   const reload = async () => {
     setLoading(true)
@@ -48,13 +49,26 @@ export default function RecipeLinkerTab() {
   }
   useEffect(() => { reload() }, [])
 
+  // Build unique category list from products (preserving category metadata)
+  const categories = useMemo(() => {
+    const seen = new Map()
+    for (const p of products) {
+      if (p.category_id && p.pos_categories && !seen.has(p.category_id)) {
+        seen.set(p.category_id, p.pos_categories)
+      }
+    }
+    return [...seen.entries()].map(([id, cat]) => ({ id, ...cat }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [products])
+
   const visible = useMemo(() => products.filter(p => {
     const isSet = Number(p.cost_lyd) > 0
     if (filter === 'unset' && isSet) return false
     if (filter === 'set'   && !isSet) return false
+    if (categoryFilter !== 'all' && p.category_id !== categoryFilter) return false
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
-  }), [products, search, filter])
+  }), [products, search, filter, categoryFilter])
 
   const totals = {
     total: products.length,
@@ -83,6 +97,39 @@ export default function RecipeLinkerTab() {
         Enter <strong>variable cost per unit (LYD)</strong> for each menu item — that's ingredients + cup + lid + sleeve + sweetener for one drink. The Menu Profitability Matrix and the COGS line on Daily P&L use these numbers directly.
         Tip: open the <a href="/cost-calculator" className="underline text-noch-green">Cost Calculator</a> in another tab to look up totals.
       </p>
+
+      {/* Category tabs */}
+      {categories.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-2 scrollbar-hide">
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+              categoryFilter === 'all'
+                ? 'bg-noch-green text-noch-dark'
+                : 'bg-noch-dark border border-noch-border text-noch-muted hover:text-white'
+            }`}
+          >
+            All
+          </button>
+          {categories.map(cat => {
+            const active = categoryFilter === cat.id
+            const c = cat.color || '#10b981'
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setCategoryFilter(cat.id)}
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                  active ? 'text-white' : 'bg-noch-dark border border-noch-border text-noch-muted hover:text-white'
+                }`}
+                style={active ? { backgroundColor: c, borderColor: c } : {}}
+              >
+                {!active && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c }} />}
+                {cat.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-2 mb-3">
         <div className="relative flex-1">
@@ -116,7 +163,14 @@ export default function RecipeLinkerTab() {
                 const cmR = Number(p.price) > 0 ? cm / Number(p.price) : 0
                 return (
                   <tr key={p.id} className="border-t border-noch-border/40">
-                    <td className="py-1.5 pr-2 text-white">{p.name}</td>
+                    <td className="py-1.5 pr-2">
+                      <div className="flex items-center gap-1.5">
+                        {p.pos_categories?.color && (
+                          <span className="w-2 h-2 rounded-full shrink-0 opacity-70" style={{ backgroundColor: p.pos_categories.color }} />
+                        )}
+                        <span className="text-white">{p.name}</span>
+                      </div>
+                    </td>
                     <td className="py-1.5 pr-2 text-right text-white font-mono">{lyd(p.price)}</td>
                     <td className="py-1.5 pr-2 text-right">
                       {isEditing ? (
