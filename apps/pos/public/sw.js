@@ -27,7 +27,15 @@ const SHELL = ['/', '/index.html', '/favicon.svg', '/manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => {})
+    caches.open(CACHE).then((cache) =>
+      // Fetch each shell entry fresh from the network (bypass HTTP cache) so
+      // we never precache a stale index.html pointing at old bundle hashes.
+      Promise.all(SHELL.map((url) =>
+        fetch(url, { cache: 'reload' })
+          .then((res) => (res && res.ok ? cache.put(url, res) : null))
+          .catch(() => null)
+      ))
+    ).catch(() => {})
   )
   self.skipWaiting()
 })
@@ -77,9 +85,12 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Page navigation: network-first, cached shell as fallback.
+  // Use cache: 'reload' so the HTML always comes from the network and
+  // bypasses the browser's HTTP disk cache — otherwise a fresh deploy can
+  // be masked by a stale cached index.html that still points at old bundles.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).then((res) => {
+      fetch(req, { cache: 'reload' }).then((res) => {
         if (res && res.ok) {
           const clone = res.clone()
           caches.open(CACHE).then((c) => c.put('/index.html', clone)).catch(() => {})
