@@ -376,7 +376,7 @@ export default function Menu() {
           .select('*')
           .eq('is_active', true)
           .eq('visible_on_menu', true)
-          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
+          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId},branch_id.is.null`)
           .order('menu_sort').order('name'),
       ])
       if (be) throw new Error('Branch not found')
