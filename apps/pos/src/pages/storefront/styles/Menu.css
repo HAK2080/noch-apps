@@ -671,15 +671,23 @@
   padding-right: 10px;
 }
 .view-all-btn {
-  font-size: 13px; font-weight: 600;
-  color: var(--brand);
-  background: none; border: none;
-  cursor: pointer; padding: 4px 0;
+  font-size: 12px; font-weight: 700;
+  color: #fff;
+  background: var(--brand);
+  border: 2px solid var(--text);
+  border-radius: 50px;
+  cursor: pointer;
+  padding: 5px 14px;
   white-space: nowrap;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  box-shadow: 2px 2px 0 var(--text);
+  transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
 }
-.view-all-btn:hover { color: var(--brand-dark); }
+.view-all-btn:hover {
+  background: var(--brand-dark);
+  transform: translate(-1px,-1px);
+  box-shadow: 3px 3px 0 var(--text);
+}
+.view-all-btn:active { transform: translate(0,0); box-shadow: 1px 1px 0 var(--text); }
 .cat-section-count {
   font-size: 13px;
   font-weight: 600;
@@ -1020,18 +1028,25 @@
 
 .text-section-toggle {
   display: block;
-  width: 100%;
-  padding: 10px 14px;
-  background: #f7f3eb;
-  border: none;
-  border-top: 1px solid var(--border);
+  margin: 12px auto 4px;
+  padding: 8px 20px;
+  background: var(--brand);
+  border: 2px solid var(--text);
+  border-radius: 50px;
   font-size: 13px; font-weight: 700;
-  color: var(--brand);
+  color: #fff;
   cursor: pointer;
   text-align: center;
-  transition: background 0.15s;
+  white-space: nowrap;
+  box-shadow: 2px 2px 0 var(--text);
+  transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
 }
-.text-section-toggle:hover { background: #f0e8d8; }
+.text-section-toggle:hover {
+  background: var(--brand-dark);
+  transform: translate(-1px,-1px);
+  box-shadow: 3px 3px 0 var(--text);
+}
+.text-section-toggle:active { transform: translate(0,0); box-shadow: 1px 1px 0 var(--text); }
 
 /* ── Compact btn-add & qty variants ─────────────────────── */
 .btn-add-sm {
