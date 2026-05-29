@@ -68,79 +68,85 @@ const CARD_COLORS = [
 
 // ── Section layout components ────────────────────────────────────────────────
 
-function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor }) {
+function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   return (
     <div className="scroll-row">
       {products.map(p => (
         <ScrollCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
-          name_={name_} desc_={desc_} currency={currency} catColor={catColor} />
+          name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor }) {
+function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
     <div className={`scroll-card${soldOut ? ' sold-out' : ''}`}>
       {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
-      {p.image_url ? (
-        <img src={p.image_url} alt={name_(p)} className="scroll-card-img" loading="lazy" />
-      ) : (
-        <div className="scroll-card-img scroll-card-placeholder" style={{ background: col.bg }}>
-          <span style={{ color: col.text, fontSize: 32, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+      <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
+        {p.image_url ? (
+          <img src={p.image_url} alt={name_(p)} className="scroll-card-img" loading="lazy" />
+        ) : (
+          <div className="scroll-card-img scroll-card-placeholder" style={{ background: col.bg }}>
+            <span style={{ color: col.text, fontSize: 32, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+          </div>
+        )}
+        <div className="scroll-card-body-text">
+          <p className="scroll-card-name">{name_(p)}</p>
+          {desc_(p) && <p className="scroll-card-desc">{desc_(p)}</p>}
         </div>
-      )}
-      <div className="scroll-card-body">
-        <p className="scroll-card-name">{name_(p)}</p>
-        {desc_(p) && <p className="scroll-card-desc">{desc_(p)}</p>}
-        <div className="scroll-card-footer">
-          <span className="scroll-card-price">{parseFloat(p.price).toFixed(2)}<small> {currency}</small></span>
-          {!soldOut && (qty === 0 ? (
-            <button className="btn-add" onClick={onAdd}>+</button>
-          ) : (
-            <div className="qty-ctrl">
-              <button className="qty-btn" onClick={onRemove}>−</button>
-              <span>{qty}</span>
-              <button className="qty-btn" onClick={onAdd}>+</button>
-            </div>
-          ))}
-        </div>
+      </button>
+      <div className="scroll-card-footer">
+        <span className="scroll-card-price">{parseFloat(p.price).toFixed(2)}<small> {currency}</small></span>
+        {!soldOut && (qty === 0 ? (
+          <button className="btn-add" onClick={onAdd}>+</button>
+        ) : (
+          <div className="qty-ctrl">
+            <button className="qty-btn" onClick={onRemove}>−</button>
+            <span>{qty}</span>
+            <button className="qty-btn" onClick={onAdd}>+</button>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-function ListSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor }) {
+function ListSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   return (
     <div className="list-section">
       {products.map(p => (
         <ListRow key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
-          name_={name_} desc_={desc_} currency={currency} catColor={catColor} />
+          name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor }) {
+function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
     <div className={`list-row${soldOut ? ' sold-out' : ''}`}>
-      {p.image_url ? (
-        <img src={p.image_url} alt={name_(p)} className="list-row-img" loading="lazy" />
-      ) : (
-        <div className="list-row-img list-row-placeholder" style={{ background: col.bg }}>
-          <span style={{ color: col.text, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+      <button className="list-row-tap" onClick={onOpenDetail} aria-label={name_(p)}>
+        {p.image_url ? (
+          <img src={p.image_url} alt={name_(p)} className="list-row-img" loading="lazy" />
+        ) : (
+          <div className="list-row-img list-row-placeholder" style={{ background: col.bg }}>
+            <span style={{ color: col.text, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+          </div>
+        )}
+        <div className="list-row-body">
+          <p className="list-row-name">{name_(p)}</p>
+          {desc_(p) && <p className="list-row-desc">{desc_(p)}</p>}
         </div>
-      )}
-      <div className="list-row-body">
-        <p className="list-row-name">{name_(p)}</p>
-        {desc_(p) && <p className="list-row-desc">{desc_(p)}</p>}
-      </div>
+      </button>
       <div className="list-row-right">
         <span className="list-row-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
         {!soldOut && (qty === 0 ? (
@@ -157,34 +163,39 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor }) 
   )
 }
 
-function GridSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor }) {
+function GridSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   return (
     <div className="grid-2col">
       {products.map(p => (
         <GridCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
-          name_={name_} desc_={desc_} currency={currency} catColor={catColor} />
+          name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor }) {
+function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
     <div className={`grid-card${soldOut ? ' sold-out' : ''}`}>
       {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
-      {p.image_url ? (
-        <img src={p.image_url} alt={name_(p)} className="grid-card-img" loading="lazy" />
-      ) : (
-        <div className="grid-card-img grid-card-placeholder" style={{ background: col.bg }}>
-          <span style={{ color: col.text, fontSize: 28, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+      <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
+        {p.image_url ? (
+          <img src={p.image_url} alt={name_(p)} className="grid-card-img" loading="lazy" />
+        ) : (
+          <div className="grid-card-img grid-card-placeholder" style={{ background: col.bg }}>
+            <span style={{ color: col.text, fontSize: 28, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+          </div>
+        )}
+        <div className="grid-card-body-text">
+          <p className="grid-card-name">{name_(p)}</p>
+          {desc_(p) && <p className="grid-card-desc">{desc_(p)}</p>}
         </div>
-      )}
+      </button>
       <div className="grid-card-body">
-        <p className="grid-card-name">{name_(p)}</p>
-        {desc_(p) && <p className="grid-card-desc">{desc_(p)}</p>}
         <div className="grid-card-footer">
           <span className="grid-card-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
           {!soldOut && (qty === 0 ? (
@@ -279,38 +290,46 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
 }
 
 // ── Category section wrapper ─────────────────────────────────────────────────
-function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, currency, catColorMap, lang, onViewAll }) {
+function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, currency, catColorMap, lang, onViewAll, onOpenDetail, expanded }) {
   const catLabel = lang === 'ar' && cat.name_ar ? cat.name_ar : cat.name
   const col = catColorMap[cat.id] || CARD_COLORS[0]
-  const style = cat.menu_display_style || 'scroll'
+  const baseStyle = cat.menu_display_style || 'scroll'
+  // When a single category is being viewed ("View all" / pill selected), always
+  // render a full vertical grid so every item is visible at once — no sideways scroll.
+  const style = expanded ? 'grid' : baseStyle
 
   if (products.length === 0) return null
 
   return (
-    <section className="cat-section" id={`cat-${cat.id}`}>
+    <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}`} id={`cat-${cat.id}`}>
       <div className="cat-section-header">
         <h2 className="cat-section-title">
           <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />
           <span>{catLabel}</span>
         </h2>
-        {style !== 'addons' && style !== 'text' && (
+        {!expanded && baseStyle !== 'addons' && baseStyle !== 'text' && (
           <button className="view-all-btn" onClick={() => onViewAll(cat.id)}>
             {lang === 'ar' ? 'عرض الكل ←' : 'View all →'}
           </button>
+        )}
+        {expanded && (
+          <span className="cat-section-count">
+            {products.length} {lang === 'ar' ? 'منتج' : 'items'}
+          </span>
         )}
       </div>
 
       {style === 'scroll' && (
         <ScrollSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} onOpenDetail={onOpenDetail} />
       )}
       {style === 'list' && (
         <ListSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} onOpenDetail={onOpenDetail} />
       )}
       {style === 'grid' && (
         <GridSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} onOpenDetail={onOpenDetail} />
       )}
       {style === 'addons' && (
         <AddonsStrip products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
@@ -321,6 +340,70 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
           name_={name_} currency={currency} lang={lang} />
       )}
     </section>
+  )
+}
+
+// ── Product detail popup ─────────────────────────────────────────────────────
+function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency, lang, catColor }) {
+  const col = catColor || CARD_COLORS[0]
+  const soldOut = p.is_available === false
+  const isAr = lang === 'ar'
+  const altName = isAr ? p.name : p.name_ar
+  // Full description (no truncation) in the active language, with fallback.
+  const fullDesc = isAr
+    ? (p.menu_description_ar || p.menu_description || p.description || '')
+    : (p.menu_description || p.menu_description_ar || p.description || '')
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const t = (en, ar) => isAr ? ar : en
+
+  return (
+    <div className="detail-overlay" onClick={onClose}>
+      <div className="detail-card" onClick={e => e.stopPropagation()} dir={isAr ? 'rtl' : 'ltr'}>
+        <button className="detail-close" onClick={onClose} aria-label={t('Close', 'إغلاق')}>✕</button>
+
+        <div className="detail-img-wrap">
+          {p.image_url ? (
+            <img src={p.image_url} alt={name_(p)} className="detail-img" />
+          ) : (
+            <div className="detail-img detail-img-placeholder" style={{ background: col.bg }}>
+              <span style={{ color: col.text, fontSize: 72, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+          {soldOut && <span className="detail-soldout">{t('SOLD OUT', 'نفد')}</span>}
+        </div>
+
+        <div className="detail-body">
+          <h2 className="detail-name">{name_(p)}</h2>
+          {altName && <p className="detail-name-alt">{altName}</p>}
+
+          {fullDesc && <p className="detail-desc">{fullDesc}</p>}
+
+          <div className="detail-footer">
+            <span className="detail-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+            {soldOut ? (
+              <span className="detail-unavailable">{t('Unavailable', 'غير متوفر')}</span>
+            ) : qty === 0 ? (
+              <button className="detail-add-btn" onClick={onAdd}>
+                {t('Add to order', 'أضف للطلب')}
+              </button>
+            ) : (
+              <div className="detail-qty">
+                <button className="qty-btn" onClick={onRemove}>−</button>
+                <span>{qty}</span>
+                <button className="qty-btn" onClick={onAdd}>+</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -342,6 +425,7 @@ export default function Menu() {
   const [showCheckout, setShowCheckout] = useState(false)
   const [lang, setLang]             = useState('ar')
   const [copied, setCopied]         = useState(false)
+  const [detailProduct, setDetailProduct] = useState(null)
 
   // Checkout form
   const [name, setName]             = useState('')
@@ -615,6 +699,8 @@ export default function Menu() {
               catColorMap={catColorMap}
               lang={lang}
               onViewAll={handleViewAll}
+              onOpenDetail={setDetailProduct}
+              expanded={activeCat !== 'all'}
             />
           ))
         )}
@@ -627,6 +713,21 @@ export default function Menu() {
           <span className="cart-bar-label">{t('View Order', 'عرض الطلب')}</span>
           <span className="cart-bar-total">{cartTotal.toFixed(2)} {currency}</span>
         </div>
+      )}
+
+      {/* ── Product detail popup ───────────────────────────────────────────── */}
+      {detailProduct && (
+        <ProductDetailModal
+          p={detailProduct}
+          qty={cart[detailProduct.id] || 0}
+          onAdd={() => addToCart(detailProduct.id)}
+          onRemove={() => removeFromCart(detailProduct.id)}
+          onClose={() => setDetailProduct(null)}
+          name_={name_}
+          currency={currency}
+          lang={lang}
+          catColor={catColorMap[detailProduct.category_id]}
+        />
       )}
 
       {/* ── Checkout sheet ─────────────────────────────────────────────────── */}
