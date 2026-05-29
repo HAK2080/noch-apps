@@ -216,7 +216,7 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, o
 // ── Style 5: TEXT — name + price only, collapsible ──────────────────────────
 const TEXT_PREVIEW = 4
 
-function TextSection({ products, cart, onAdd, onRemove, name_, currency, lang }) {
+function TextSection({ products, cart, onAdd, onRemove, name_, desc_, currency, lang }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? products : products.slice(0, TEXT_PREVIEW)
   const hasMore = products.length > TEXT_PREVIEW
@@ -227,11 +227,17 @@ function TextSection({ products, cart, onAdd, onRemove, name_, currency, lang })
       {visible.map(p => {
         const qty = cart[p.id] || 0
         const soldOut = p.is_available === false
+        const desc = desc_ ? desc_(p) : ''
         return (
           <div key={p.id} className={`text-row${soldOut ? ' sold-out' : ''}`}>
-            <span className="text-row-name">{name_(p)}</span>
-            <span className="text-row-dots" />
-            <span className="text-row-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+            <div className="text-row-main">
+              <div className="text-row-line">
+                <span className="text-row-name">{name_(p)}</span>
+                <span className="text-row-dots" />
+                <span className="text-row-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+              </div>
+              {desc && <p className="text-row-desc">{desc}</p>}
+            </div>
             {!soldOut && (qty === 0 ? (
               <button className="btn-add btn-add-sm" onClick={() => onAdd(p.id)}>+</button>
             ) : (
@@ -337,7 +343,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
       )}
       {style === 'text' && (
         <TextSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} currency={currency} lang={lang} />
+          name_={name_} desc_={desc_} currency={currency} lang={lang} />
       )}
     </section>
   )
