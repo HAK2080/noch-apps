@@ -205,10 +205,11 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor })
 // ── Style 5: TEXT — name + price only, collapsible ──────────────────────────
 const TEXT_PREVIEW = 4
 
-function TextSection({ products, cart, onAdd, onRemove, name_, currency }) {
+function TextSection({ products, cart, onAdd, onRemove, name_, currency, lang }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? products : products.slice(0, TEXT_PREVIEW)
   const hasMore = products.length > TEXT_PREVIEW
+  const isAr = lang === 'ar'
 
   return (
     <div className="text-section">
@@ -235,8 +236,8 @@ function TextSection({ products, cart, onAdd, onRemove, name_, currency }) {
       {hasMore && (
         <button className="text-section-toggle" onClick={() => setExpanded(e => !e)}>
           {expanded
-            ? '↑ Show less'
-            : `↓ Show all ${products.length} items`}
+            ? (isAr ? '↑ عرض أقل' : '↑ Show less')
+            : (isAr ? `↓ عرض جميع ${products.length} منتجات` : `↓ Show all ${products.length} items`)}
         </button>
       )}
     </div>
@@ -317,7 +318,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
       )}
       {style === 'text' && (
         <TextSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} currency={currency} />
+          name_={name_} currency={currency} lang={lang} />
       )}
     </section>
   )
