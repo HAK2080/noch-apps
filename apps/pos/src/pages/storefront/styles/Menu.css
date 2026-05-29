@@ -1062,6 +1062,19 @@
   padding: 24px;
   -webkit-line-clamp: 5;
 }
+
+/* Arabic font for menu tile text + section titles (were falling back to a
+   system font because they inherited 'Inter', which has no Arabic glyphs). */
+.cat-section-title,
+.scroll-card-name, .scroll-card-desc,
+.grid-card-name, .grid-card-desc,
+.list-row-name, .list-row-desc,
+.text-row-name,
+.addon-name,
+.placeholder-name,
+.detail-name, .detail-name-alt, .detail-desc {
+  font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
+}
 /* keep name/desc padding now that footer sits outside the tap area */
 .scroll-card-body-text { padding: 10px 10px 4px; }
 .grid-card-body-text   { padding: 10px 10px 4px; }
