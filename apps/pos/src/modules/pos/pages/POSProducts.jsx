@@ -319,6 +319,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
   const [showInPos, setShowInPos] = useState(category?.show_in_pos ?? true)
   const [showOnWebsite, setShowOnWebsite] = useState(category?.show_on_website ?? true)
   const [showInOnlineStore, setShowInOnlineStore] = useState(category?.show_in_online_store ?? false)
+  const [menuDisplayStyle, setMenuDisplayStyle] = useState(category?.menu_display_style || 'scroll')
   const [visibleBranchIds, setVisibleBranchIds] = useState(
     category?.visible_branch_ids?.length ? category.visible_branch_ids : branchId ? [branchId] : []
   )
@@ -349,7 +350,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
     if (!name) return toast.error('Name required')
     setSaving(true)
     try {
-      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, show_in_online_store: showInOnlineStore, visible_branch_ids: visibleBranchIds }
+      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, show_in_online_store: showInOnlineStore, visible_branch_ids: visibleBranchIds, menu_display_style: menuDisplayStyle }
       if (isEdit) {
         await updatePOSCategory(category.id, payload)
         toast.success('Category updated')
@@ -398,6 +399,18 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
         <input value={nameAr} onChange={e => setNameAr(e.target.value)} className="input w-full mb-3 text-right" dir="rtl" placeholder="المشروبات الساخنة" />
         <label className="label block mb-1">Color</label>
         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-full h-10 rounded cursor-pointer mb-4" />
+        {/* Customer menu layout style */}
+        <div className="mb-3">
+          <label className="label block mb-1">Customer menu layout</label>
+          <select value={menuDisplayStyle} onChange={e => setMenuDisplayStyle(e.target.value)} className="input w-full text-sm">
+            <option value="scroll">Horizontal scroll cards (default)</option>
+            <option value="list">Compact list rows</option>
+            <option value="grid">2-column image grid</option>
+            <option value="addons">Add-ons icon strip</option>
+          </select>
+          <p className="text-noch-muted text-[11px] mt-1">Controls how this category appears on the customer menu page</p>
+        </div>
+
         <div className="border border-noch-border rounded-xl p-3 mb-3 flex flex-col gap-2">
           <p className="text-noch-muted text-xs mb-1">Visible in</p>
           <label className="flex items-center gap-2 cursor-pointer">
