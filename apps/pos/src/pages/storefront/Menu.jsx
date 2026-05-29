@@ -202,6 +202,47 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor })
   )
 }
 
+// ── Style 5: TEXT — name + price only, collapsible ──────────────────────────
+const TEXT_PREVIEW = 4
+
+function TextSection({ products, cart, onAdd, onRemove, name_, currency }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? products : products.slice(0, TEXT_PREVIEW)
+  const hasMore = products.length > TEXT_PREVIEW
+
+  return (
+    <div className="text-section">
+      {visible.map(p => {
+        const qty = cart[p.id] || 0
+        const soldOut = p.is_available === false
+        return (
+          <div key={p.id} className={`text-row${soldOut ? ' sold-out' : ''}`}>
+            <span className="text-row-name">{name_(p)}</span>
+            <span className="text-row-dots" />
+            <span className="text-row-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+            {!soldOut && (qty === 0 ? (
+              <button className="btn-add btn-add-sm" onClick={() => onAdd(p.id)}>+</button>
+            ) : (
+              <div className="qty-ctrl qty-ctrl-sm">
+                <button className="qty-btn" onClick={() => onRemove(p.id)}>−</button>
+                <span>{qty}</span>
+                <button className="qty-btn" onClick={() => onAdd(p.id)}>+</button>
+              </div>
+            ))}
+          </div>
+        )
+      })}
+      {hasMore && (
+        <button className="text-section-toggle" onClick={() => setExpanded(e => !e)}>
+          {expanded
+            ? '↑ Show less'
+            : `↓ Show all ${products.length} items`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColor }) {
   return (
     <div className="addons-strip">
@@ -251,7 +292,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
           <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />
           <span>{catLabel}</span>
         </h2>
-        {style !== 'addons' && (
+        {style !== 'addons' && style !== 'text' && (
           <button className="view-all-btn" onClick={() => onViewAll(cat.id)}>
             {lang === 'ar' ? 'عرض الكل ←' : 'View all →'}
           </button>
@@ -273,6 +314,10 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
       {style === 'addons' && (
         <AddonsStrip products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
           name_={name_} currency={currency} catColor={col} />
+      )}
+      {style === 'text' && (
+        <TextSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
+          name_={name_} currency={currency} />
       )}
     </section>
   )

@@ -407,6 +407,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
             <option value="list">Compact list rows</option>
             <option value="grid">2-column image grid</option>
             <option value="addons">Add-ons icon strip</option>
+            <option value="text">Text only — name &amp; price, expandable</option>
           </select>
           <p className="text-noch-muted text-[11px] mt-1">Controls how this category appears on the customer menu page</p>
         </div>
