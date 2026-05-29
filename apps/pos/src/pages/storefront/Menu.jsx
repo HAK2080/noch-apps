@@ -455,16 +455,19 @@ export default function Menu() {
   const t = (en, ar) => lang === 'ar' ? ar : en
   const currency = lang === 'ar' ? 'دينار' : 'LYD'
 
-  // "View all" handler: activate category pill + smooth scroll
+  // "View all" handler: filter to this category only and scroll to section.
+  // If already on this category, just scroll (state won't change so no re-render).
   function handleViewAll(catId) {
-    setActiveCat(catId)
     setShowFeatured(false)
+    if (activeCat === catId) {
+      document.getElementById(`cat-${catId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    setActiveCat(catId)
     setTimeout(() => {
       document.getElementById(`cat-${catId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      // also scroll pill into view
-      const pill = document.getElementById(`pill-${catId}`)
-      pill?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-    }, 50)
+      document.getElementById(`pill-${catId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+    }, 60)
   }
 
   async function handlePlaceOrder() {
