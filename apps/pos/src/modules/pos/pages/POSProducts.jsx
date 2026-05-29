@@ -22,6 +22,7 @@ const BLANK_PRODUCT = {
   visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
   show_description_on_menu: true, show_description_on_website: true,
+  secondary_category_ids: [],
 }
 
 
@@ -141,13 +142,39 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
                 <input type="number" value={form.price} onChange={e => set('price', e.target.value)} className="input w-full" placeholder="8.500" step="0.001" min="0" />
               </div>
               <div>
-                <label className="label block mb-1">Category</label>
+                <label className="label block mb-1">Primary category</label>
                 <select value={form.category_id} onChange={e => set('category_id', e.target.value)} className="input w-full">
                   <option value="">No category</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
             </div>
+
+            {/* Secondary categories — product appears in multiple sections */}
+            {categories.filter(c => c.id !== form.category_id).length > 0 && (
+              <div>
+                <label className="label block mb-1">Also show in <span className="text-noch-muted text-xs">(optional — extra categories on customer menu)</span></label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {categories.filter(c => c.id !== form.category_id).map(c => {
+                    const checked = (form.secondary_category_ids || []).includes(c.id)
+                    return (
+                      <label key={c.id} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium cursor-pointer border transition-colors ${checked ? 'bg-noch-green/20 border-noch-green text-noch-green' : 'bg-noch-dark border-noch-border text-noch-muted hover:text-white'}`}>
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={checked}
+                          onChange={e => {
+                            const ids = form.secondary_category_ids || []
+                            set('secondary_category_ids', e.target.checked ? [...ids, c.id] : ids.filter(id => id !== c.id))
+                          }}
+                        />
+                        {c.name}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="label block mb-1">Barcode</label>

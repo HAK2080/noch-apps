@@ -375,7 +375,7 @@ export default function Menu() {
         supabase.from('pos_products')
           .select('*')
           .eq('is_active', true)
-          .eq('visible_on_customer_menu', true)
+          .eq('visible_on_menu', true)
           .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
           .order('menu_sort').order('name'),
       ])
@@ -437,10 +437,15 @@ export default function Menu() {
   const visibleCatIds = useMemo(() => new Set(categories.map(c => c.id)), [categories])
   const hasFeatured = useMemo(() => products.some(p => p.featured && visibleCatIds.has(p.category_id)), [products, visibleCatIds])
 
-  // Products for each category section, filtered by activeCat & showFeatured
+  // Products for each category section, filtered by activeCat & showFeatured.
+  // A product appears in a section if its primary category_id matches OR
+  // the category is in its secondary_category_ids array.
   const sectionsData = useMemo(() => {
     return categories.map(cat => {
-      let prods = products.filter(p => p.category_id === cat.id)
+      let prods = products.filter(p =>
+        p.category_id === cat.id ||
+        (Array.isArray(p.secondary_category_ids) && p.secondary_category_ids.includes(cat.id))
+      )
       if (showFeatured) prods = prods.filter(p => p.featured)
       if (activeCat !== 'all' && activeCat !== cat.id) prods = []
       return { cat, products: prods }
