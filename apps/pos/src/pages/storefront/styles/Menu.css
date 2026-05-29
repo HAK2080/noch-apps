@@ -1043,6 +1043,25 @@
   color: inherit;
 }
 .card-tap-area:active { opacity: 0.85; }
+
+/* Name shown in place of a missing image (instead of a single letter) */
+.placeholder-name {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  padding: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.placeholder-name-lg {
+  font-size: 26px;
+  padding: 24px;
+  -webkit-line-clamp: 5;
+}
 /* keep name/desc padding now that footer sits outside the tap area */
 .scroll-card-body-text { padding: 10px 10px 4px; }
 .grid-card-body-text   { padding: 10px 10px 4px; }

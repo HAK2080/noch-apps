@@ -92,7 +92,7 @@ function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor,
           <img src={p.image_url} alt={name_(p)} className="scroll-card-img" loading="lazy" />
         ) : (
           <div className="scroll-card-img scroll-card-placeholder" style={{ background: col.bg }}>
-            <span style={{ color: col.text, fontSize: 32, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+            <span className="placeholder-name" style={{ color: col.text }}>{name_(p)}</span>
           </div>
         )}
         <div className="scroll-card-body-text">
@@ -187,7 +187,7 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, o
           <img src={p.image_url} alt={name_(p)} className="grid-card-img" loading="lazy" />
         ) : (
           <div className="grid-card-img grid-card-placeholder" style={{ background: col.bg }}>
-            <span style={{ color: col.text, fontSize: 28, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+            <span className="placeholder-name" style={{ color: col.text }}>{name_(p)}</span>
           </div>
         )}
         <div className="grid-card-body-text">
@@ -373,7 +373,7 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
             <img src={p.image_url} alt={name_(p)} className="detail-img" />
           ) : (
             <div className="detail-img detail-img-placeholder" style={{ background: col.bg }}>
-              <span style={{ color: col.text, fontSize: 72, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
+              <span className="placeholder-name placeholder-name-lg" style={{ color: col.text }}>{name_(p)}</span>
             </div>
           )}
           {soldOut && <span className="detail-soldout">{t('SOLD OUT', 'نفد')}</span>}
