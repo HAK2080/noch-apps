@@ -985,6 +985,7 @@
 }
 .text-row-desc {
   font-size: 12px;
+  font-weight: 400;
   color: var(--muted);
   line-height: 1.35;
   margin: 0;
@@ -995,7 +996,7 @@
 }
 
 .text-row-name {
-  font-size: 14px; font-weight: 600;
+  font-size: 15px; font-weight: 800;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
