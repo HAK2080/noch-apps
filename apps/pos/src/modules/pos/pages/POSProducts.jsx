@@ -21,6 +21,7 @@ const BLANK_PRODUCT = {
   stock_qty: '0', low_stock_alert: '5', is_active: true,
   visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
+  show_description_on_menu: true, show_description_on_website: true,
 }
 
 
@@ -278,16 +279,29 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="label block mb-1">Menu description (EN)</label>
-                      <textarea value={form.menu_description || ''} onChange={e => set('menu_description', e.target.value)} className="input w-full resize-none" rows={2} placeholder="Rich espresso with velvety milk foam" />
-                    </div>
-                    <div>
-                      <label className="label block mb-1">Menu description (AR)</label>
-                      <textarea value={form.menu_description_ar || ''} onChange={e => set('menu_description_ar', e.target.value)} className="input w-full resize-none text-right" dir="rtl" rows={2} placeholder="إسبريسو غني مع رغوة الحليب" />
-                    </div>
+                  <div className="mb-1">
+                    <label className="label block mb-1">Menu description (EN)</label>
+                    <textarea value={form.menu_description || ''} onChange={e => set('menu_description', e.target.value)} className="input w-full resize-none" rows={2} placeholder="Rich espresso with velvety milk foam" />
                   </div>
+                  <div className="mb-3">
+                    <label className="label block mb-1">Menu description (AR)</label>
+                    <textarea value={form.menu_description_ar || ''} onChange={e => set('menu_description_ar', e.target.value)} className="input w-full resize-none text-right" dir="rtl" rows={2} placeholder="إسبريسو غني مع رغوة الحليب" />
+                  </div>
+                  {(form.menu_description || form.menu_description_ar) && (
+                    <div className="border border-noch-border rounded-xl p-3 mb-3">
+                      <p className="text-noch-muted text-xs mb-2">Show description on</p>
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={form.show_description_on_menu !== false} onChange={e => set('show_description_on_menu', e.target.checked)} className="w-4 h-4 accent-green-400" />
+                          <span className="text-white text-sm">Customer menu <span className="text-noch-muted text-xs">— ordering page</span></span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={form.show_description_on_website !== false} onChange={e => set('show_description_on_website', e.target.checked)} className="w-4 h-4 accent-blue-400" />
+                          <span className="text-white text-sm">Website menu <span className="text-noch-muted text-xs">— noch.cloud/menu</span></span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="label block mb-1">Sort order (lower = first)</label>

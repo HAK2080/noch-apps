@@ -447,7 +447,10 @@ export default function Menu() {
   }, [categories, products, activeCat, showFeatured])
 
   function name_(p) { return lang === 'ar' && p.name_ar ? p.name_ar : p.name }
-  function desc_(p) { return lang === 'ar' && p.menu_description_ar ? p.menu_description_ar : p.menu_description }
+  function desc_(p) {
+    if (p.show_description_on_menu === false) return ''
+    return lang === 'ar' && p.menu_description_ar ? p.menu_description_ar : p.menu_description
+  }
   const t = (en, ar) => lang === 'ar' ? ar : en
   const currency = lang === 'ar' ? 'دينار' : 'LYD'
 

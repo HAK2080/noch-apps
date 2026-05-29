@@ -38,7 +38,7 @@ export default function Menu() {
         const [catRes, prodRes] = await Promise.all([
           supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).eq('show_on_website', true).order('sort_order'),
           supabase.from('pos_products')
-            .select('id,name,name_ar,price,description,visible_on_website,category_id')
+            .select('id,name,name_ar,price,description,menu_description,menu_description_ar,show_description_on_website,visible_on_website,category_id')
             .eq('is_active', true)
             .eq('visible_on_customer_menu', true)
             .order('name'),
@@ -59,7 +59,14 @@ export default function Menu() {
           name: p.name,
           name_ar: p.name_ar || '',
           price: parseFloat(p.price),
-          desc: p.description || '',
+          // Use menu_description if available, fall back to legacy description field.
+          // Respect show_description_on_website flag (default true).
+          desc: p.show_description_on_website === false
+            ? ''
+            : (p.menu_description || p.description || ''),
+          desc_ar: p.show_description_on_website === false
+            ? ''
+            : (p.menu_description_ar || ''),
         })))
       } catch (e) {
         console.error('Menu load error:', e)
@@ -155,7 +162,9 @@ export default function Menu() {
                   </div>
                   <div className="price">{item.price.toFixed(2)}<span>{isAr ? ' دينار' : ' LYD'}</span></div>
                 </div>
-                {item.desc && <p className="card-desc">{item.desc}</p>}
+                {(isAr ? (item.desc_ar || item.desc) : item.desc) && (
+                  <p className="card-desc">{isAr ? (item.desc_ar || item.desc) : item.desc}</p>
+                )}
               </article>
             ))}
             {!loading && filtered.length === 0 && (
