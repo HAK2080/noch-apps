@@ -104,7 +104,7 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center">
-      <div className="bg-noch-card border border-noch-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="bg-noch-card border border-noch-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90dvh] pos-scroll" dir={isAr ? 'rtl' : 'ltr'}>
         <div className="flex items-center justify-between p-4 border-b border-noch-border sticky top-0 bg-noch-card">
           <div>
             <h2 className="text-white font-bold">{pName}</h2>

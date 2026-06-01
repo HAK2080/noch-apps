@@ -1,7 +1,7 @@
 // CartPanel.jsx — Shopping cart for POS terminal
 
 import { useState, useEffect, memo } from 'react'
-import { Minus, Plus, X, Trash2, Tag, Shield } from 'lucide-react'
+import { Minus, Plus, X, Trash2, Tag, Shield, PauseCircle } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
 import { translations } from '../../../lib/i18n'
 import ManagerOverrideModal from './ManagerOverrideModal'
@@ -66,27 +66,31 @@ function CartItem({ item, onUpdateQty, onRemove }) {
 }
 
 function CartPanel({
-  items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge,
+  items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge, onHold,
   managerOverrideEnabled = false, posLang = 'en',
+  // Seed values used when a held order is resumed (CartPanel is remounted
+  // with a fresh key, so these become the initial state).
+  initialCustomerName = '', initialCustomerPhone = '',
+  initialDiscountType = 'pct', initialDiscountValue = '',
 }) {
   const can = usePermission()
   const t = (k) => posT(k, posLang)
   const canDiscountAny = can('pos', 'discount_any')
   const canVoidOrder = can('pos', 'void_order')
 
-  const [discountType, setDiscountType] = useState('pct') // 'pct' | 'flat'
-  const [discountValue, setDiscountValue] = useState('')
-  const [showDiscount, setShowDiscount] = useState(false)
+  const [discountType, setDiscountType] = useState(initialDiscountType || 'pct') // 'pct' | 'flat'
+  const [discountValue, setDiscountValue] = useState(initialDiscountValue || '')
+  const [showDiscount, setShowDiscount] = useState(!!initialDiscountValue)
   // Manager-override approved state for the current cart. Cleared on void.
   const [overrideBy, setOverrideBy] = useState(null)
   const [showOverride, setShowOverride] = useState(false)
   // Customer first name — printed in big letters on the drink ticket
   // so the barista knows who the order is for. Optional.
-  const [customerName, setCustomerName] = useState('')
+  const [customerName, setCustomerName] = useState(initialCustomerName || '')
   // WhatsApp / phone number — stored on the order for future loyalty
   // linking (lookup or auto-create in loyalty_customers by phone).
   // Optional; not required for the sale to complete.
-  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerPhone, setCustomerPhone] = useState(initialCustomerPhone || '')
   // Reset both when the cart is emptied (after charge / void)
   useEffect(() => {
     if (items.length === 0) {
@@ -125,7 +129,7 @@ function CartPanel({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <h2 className="text-white font-bold text-base">{t('posCart')}</h2>
@@ -141,7 +145,7 @@ function CartPanel({
       </div>
 
       {/* Items list */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 min-h-0 pos-scroll">
         {items.length === 0 ? (
           <div className="flex items-center justify-center h-full text-noch-muted text-sm">
             {t('posAddItemsHint')}
@@ -268,20 +272,40 @@ function CartPanel({
             />
           </div>
 
-          {/* Charge button */}
-          <button
-            onClick={() => onCharge({
-              subtotal, discountAmount, total, discountType,
-              discountValue: parseFloat(discountValue) || 0,
-              override_by: overrideBy?.id || null,
-              customer_name: customerName.trim() || null,
-              customer_phone: customerPhone.trim() || null,
-            })}
-            className="btn-primary w-full py-4 text-lg font-bold rounded-xl"
-            disabled={items.length === 0}
-          >
-            {t('posCharge')} {total.toFixed(2)} LYD
-          </button>
+          {/* Charge + Hold buttons */}
+          <div className="flex gap-2">
+            {onHold && (
+              <button
+                onClick={() => onHold({
+                  customer_name: customerName.trim() || null,
+                  customer_phone: customerPhone.trim() || null,
+                  discount_type: discountType,
+                  discount_value: parseFloat(discountValue) || 0,
+                  override_by: overrideBy?.id || null,
+                  subtotal, total,
+                })}
+                className="btn-secondary shrink-0 px-4 py-4 rounded-xl flex items-center justify-center gap-1.5 font-bold"
+                disabled={items.length === 0}
+                title={t('posHold')}
+              >
+                <PauseCircle size={18} />
+                <span className="hidden sm:inline">{t('posHold')}</span>
+              </button>
+            )}
+            <button
+              onClick={() => onCharge({
+                subtotal, discountAmount, total, discountType,
+                discountValue: parseFloat(discountValue) || 0,
+                override_by: overrideBy?.id || null,
+                customer_name: customerName.trim() || null,
+                customer_phone: customerPhone.trim() || null,
+              })}
+              className="btn-primary flex-1 py-4 text-lg font-bold rounded-xl"
+              disabled={items.length === 0}
+            >
+              {t('posCharge')} {total.toFixed(2)} LYD
+            </button>
+          </div>
         </div>
       )}
 

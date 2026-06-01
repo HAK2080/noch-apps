@@ -4,7 +4,7 @@
 import { openDB } from 'idb'
 
 const DB_NAME = 'noch-pos'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 async function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -22,6 +22,12 @@ async function getDB() {
       }
       if (!db.objectStoreNames.contains('branch_config')) {
         db.createObjectStore('branch_config', { keyPath: 'branch_id' })
+      }
+      // v2: held (parked) orders — local-only, never touches the server or
+      // inventory until resumed and charged like a normal sale.
+      if (!db.objectStoreNames.contains('held_orders')) {
+        const heldStore = db.createObjectStore('held_orders', { keyPath: 'local_id', autoIncrement: true })
+        heldStore.createIndex('branch_id', 'branch_id')
       }
     },
   })
@@ -84,6 +90,42 @@ export async function getOfflineQueue() {
 export async function clearOfflineOrder(localId) {
   const db = await getDB()
   await db.delete('offline_orders', localId)
+}
+
+// ── Held (parked) Orders ──────────────────────────────────────
+// Local-only. A held order is a full snapshot of an unfinished cart so
+// staff can serve another customer and resume later. These NEVER hit the
+// server or inventory — they only become a real sale when resumed and
+// charged through the normal payment flow. Tagged with branch + staff so
+// the panel can show who parked each one.
+
+export async function holdOrder(record) {
+  const db = await getDB()
+  const now = new Date().toISOString()
+  const local_id = await db.add('held_orders', {
+    ...record,
+    held_at: record.held_at || now,
+    updated_at: now,
+  })
+  return local_id
+}
+
+export async function getHeldOrders(branchId) {
+  const db = await getDB()
+  const index = db.transaction('held_orders').store.index('branch_id')
+  const rows = await index.getAll(branchId)
+  // Newest first.
+  return rows.sort((a, b) => (b.held_at || '').localeCompare(a.held_at || ''))
+}
+
+export async function getHeldOrder(localId) {
+  const db = await getDB()
+  return db.get('held_orders', localId)
+}
+
+export async function deleteHeldOrder(localId) {
+  const db = await getDB()
+  await db.delete('held_orders', localId)
 }
 
 // ── Branch Config Cache ───────────────────────────────────────

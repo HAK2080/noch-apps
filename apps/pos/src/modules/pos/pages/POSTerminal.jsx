@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical } from 'lucide-react'
+import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle } from 'lucide-react'
 import { supabase, recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../../lib/supabase'
 // Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
@@ -21,8 +21,10 @@ import ProductModifierModal from '../components/ProductModifierModal'
 import {
   cacheProducts, getCachedProducts,
   cacheCategories, getCachedCategories,
-  queueOfflineOrder, isOnline
+  queueOfflineOrder, isOnline,
+  holdOrder, getHeldOrders, deleteHeldOrder,
 } from '../lib/pos-offline'
+import HeldOrdersPanel from '../components/HeldOrdersPanel'
 import { startSyncListener } from '../lib/pos-sync'
 import ProductGrid from '../components/ProductGrid'
 import CartPanel from '../components/CartPanel'
@@ -294,6 +296,13 @@ export default function POSTerminal() {
   const [cart, setCart] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Held (parked) orders — local-only, per branch/tablet. resumeKey remounts
+  // CartPanel so a resumed order can seed its discount/customer fields.
+  const [heldOrders, setHeldOrders] = useState([])
+  const [showHeld, setShowHeld] = useState(false)
+  const [resumeKey, setResumeKey] = useState(0)
+  const [cartSeed, setCartSeed] = useState(null)
+
   // Loyalty customer attached to the current order (Passport Phase 1).
   const [loyaltyCustomer, setLoyaltyCustomer] = useState(null)
   const [showCustomerSearch, setShowCustomerSearch] = useState(false)
@@ -521,6 +530,80 @@ export default function POSTerminal() {
 
   const clearCart = () => setCart([])
 
+  // ── Held orders ────────────────────────────────────────────────────────────
+  const refreshHeld = useCallback(async () => {
+    try { setHeldOrders(await getHeldOrders(branchId)) } catch { /* ignore */ }
+  }, [branchId])
+
+  // Load held orders on mount (survives refresh — they live in IndexedDB).
+  useEffect(() => { refreshHeld() }, [refreshHeld])
+
+  // Build a held-order snapshot from the current cart + CartPanel bundle and
+  // persist it locally. Does NOT touch the server or inventory.
+  const holdCurrentCart = useCallback(async (bundle, { silent = false } = {}) => {
+    if (cart.length === 0) return false
+    const servedBy = getServedBy()
+    const subtotal = sum(cart.map(i => lineTotal(i.price, i.quantity)))
+    const label =
+      (bundle?.customer_name && bundle.customer_name.trim()) ||
+      (loyaltyCustomer?.full_name || '').trim() ||
+      `Order ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    const record = {
+      branch_id: branchId,
+      served_by: servedBy ? { id: servedBy.id, full_name: servedBy.full_name } : null,
+      label,
+      cart,
+      loyalty_customer: loyaltyCustomer || null,
+      customer_name: bundle?.customer_name || null,
+      customer_phone: bundle?.customer_phone || null,
+      discount_type: bundle?.discount_type || 'pct',
+      discount_value: bundle?.discount_value || 0,
+      override_by: bundle?.override_by || null,
+      subtotal,
+      total: bundle?.total != null ? bundle.total : subtotal,
+    }
+    await holdOrder(record)
+    if (!silent) toast('⏸ ' + (tileLang === 'ar' ? 'تم تعليق الطلب' : 'Order held'))
+    return true
+  }, [cart, loyaltyCustomer, branchId, tileLang])
+
+  const handleHold = useCallback(async (bundle) => {
+    const ok = await holdCurrentCart(bundle)
+    if (!ok) return
+    setCart([])
+    setLoyaltyCustomer(null)
+    setCartSeed(null)
+    setResumeKey(k => k + 1)   // remount CartPanel → clears its internal fields
+    refreshHeld()
+  }, [holdCurrentCart, refreshHeld])
+
+  const handleResume = useCallback(async (record) => {
+    // Don't lose the cart in progress: auto-hold it first.
+    if (cart.length > 0) {
+      await holdCurrentCart(null, { silent: true })
+    }
+    setCart(Array.isArray(record.cart) ? record.cart : [])
+    setLoyaltyCustomer(record.loyalty_customer || null)
+    setCartSeed({
+      customer_name: record.customer_name || '',
+      customer_phone: record.customer_phone || '',
+      discount_type: record.discount_type || 'pct',
+      discount_value: record.discount_value ? String(record.discount_value) : '',
+    })
+    setResumeKey(k => k + 1)   // remount CartPanel with the seeds above
+    await deleteHeldOrder(record.local_id)
+    await refreshHeld()
+    setShowHeld(false)
+    toast('▶ ' + (tileLang === 'ar' ? 'تم استئناف الطلب' : 'Order resumed'))
+  }, [cart, holdCurrentCart, refreshHeld, tileLang])
+
+  const handleCancelHeld = useCallback(async (record) => {
+    const msg = tileLang === 'ar' ? 'إلغاء هذا الطلب المعلّق؟' : 'Cancel this held order?'
+    if (!window.confirm(msg)) return
+    await deleteHeldOrder(record.local_id)
+    await refreshHeld()
+  }, [refreshHeld, tileLang])
+
   const handleDiscount = useCallback(({ type, value, amount }) => {
     // stored in charge data via CartPanel
   }, [])
@@ -707,7 +790,7 @@ export default function POSTerminal() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-noch-dark overflow-hidden">
+    <div className="flex flex-col h-screen h-[100dvh] bg-noch-dark overflow-hidden">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-noch-card border-b border-noch-border shrink-0">
         <button onClick={() => navigate(isKioskMode() ? '/kiosk' : '/pos')} className="text-noch-muted hover:text-white p-1">
@@ -776,6 +859,24 @@ export default function POSTerminal() {
             </button>
           )
         })()}
+
+        {/* Held orders badge */}
+        <button
+          onClick={() => setShowHeld(v => !v)}
+          className={`relative flex items-center gap-1.5 px-2 py-1.5 rounded text-sm font-medium transition-colors ${
+            heldOrders.length > 0
+              ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+              : 'text-noch-muted hover:text-white'
+          }`}
+          title="Held Orders"
+        >
+          <PauseCircle size={16} />
+          {heldOrders.length > 0 && (
+            <span className="text-xs font-bold rounded-full px-1.5 py-0.5 leading-none bg-yellow-400 text-black">
+              {heldOrders.length}
+            </span>
+          )}
+        </button>
 
         {/* Primary actions — visible */}
         <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title="Orders">
@@ -874,6 +975,17 @@ export default function POSTerminal() {
         </div>
       )}
 
+      {/* Held Orders Panel */}
+      {showHeld && (
+        <HeldOrdersPanel
+          heldOrders={heldOrders}
+          onResume={handleResume}
+          onCancel={handleCancelHeld}
+          onClose={() => setShowHeld(false)}
+          posLang={tileLang === 'ar' ? 'ar' : 'en'}
+        />
+      )}
+
       {/* Mobile search */}
       <div className="sm:hidden px-3 py-2 border-b border-noch-border shrink-0">
         <div className="relative">
@@ -961,14 +1073,20 @@ export default function POSTerminal() {
           </div>
 
           <CartPanel
+            key={resumeKey}
             items={cart}
             onUpdateQty={updateQty}
             onRemove={removeItem}
             onDiscount={handleDiscount}
             onClear={clearCart}
             onCharge={handleCharge}
+            onHold={handleHold}
             managerOverrideEnabled={!!settings?.manager_override_enabled}
             posLang={tileLang === 'ar' ? 'ar' : 'en'}
+            initialCustomerName={cartSeed?.customer_name || ''}
+            initialCustomerPhone={cartSeed?.customer_phone || ''}
+            initialDiscountType={cartSeed?.discount_type || 'pct'}
+            initialDiscountValue={cartSeed?.discount_value || ''}
           />
         </div>
       </div>

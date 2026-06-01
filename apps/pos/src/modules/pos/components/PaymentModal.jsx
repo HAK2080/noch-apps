@@ -132,7 +132,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
       )}
 
       <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
-        <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
+        <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-sm max-h-[90dvh] pos-scroll">
           {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
