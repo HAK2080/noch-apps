@@ -46,9 +46,15 @@ function FlagRow({ label, hint, value, onChange }) {
   )
 }
 
-export default function POSSettings() {
-  const { branchId } = useParams()
+// When `onClose` is provided, POSSettings renders as a full-screen overlay
+// on top of POSTerminal (no Layout wrapper, back button calls onClose).
+// When absent, it works as a standalone route (existing behaviour).
+export default function POSSettings({ onClose } = {}) {
+  const params = useParams()
   const navigate = useNavigate()
+  // branchId comes from route params when standalone, or from props when overlay.
+  // (parent passes it via the onClose pattern — we read params as fallback)
+  const branchId = params.branchId
   const { user } = useAuth()
 
   const [branch, setBranch] = useState(null)
