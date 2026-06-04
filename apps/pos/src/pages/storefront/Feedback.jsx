@@ -60,12 +60,18 @@ function Confetti() {
   )
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default function Feedback() {
-  const { branchId } = useParams()
+  const { branchId: branchParam } = useParams()
   const [params] = useSearchParams()
   const table = params.get('table')          // captured silently for the owner, never shown
   const orderId = params.get('order')
   const source = params.get('source') || 'qr'
+
+  // The URL param can be a UUID (from QR codes) or a friendly slug (e.g.
+  // "andalous"). Resolve to the real branch id; UUID resolves instantly.
+  const [branchId, setBranchId] = useState(UUID_RE.test(branchParam) ? branchParam : null)
 
   const [lang, setLang] = useState('ar')
   const [branch, setBranch] = useState(null)
@@ -87,11 +93,13 @@ export default function Feedback() {
   }, [])
 
   useEffect(() => {
-    supabase.from('pos_branches')
-      .select('name, review_facebook_url, review_google_url, review_instagram_url')
-      .eq('id', branchId).single()
-      .then(({ data }) => setBranch(data))
-  }, [branchId])
+    const isUuid = UUID_RE.test(branchParam)
+    const q = supabase.from('pos_branches')
+      .select('id, name, review_facebook_url, review_google_url, review_instagram_url')
+    ;(isUuid ? q.eq('id', branchParam) : q.ilike('slug', branchParam))
+      .single()
+      .then(({ data }) => { if (data) { setBranch(data); setBranchId(data.id) } })
+  }, [branchParam])
 
   const toggleTag = (k) =>
     setTags(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k])
@@ -105,7 +113,7 @@ export default function Feedback() {
     t('Nochi is sooo happy with you!', 'نوتشي مبسوط منك هااااالبة!')
 
   async function submit() {
-    if (submitting || rating === 0) return
+    if (submitting || rating === 0 || !branchId) return
     setSubmitting(true)
     try {
       const { error } = await supabase.rpc('submit_feedback', {
