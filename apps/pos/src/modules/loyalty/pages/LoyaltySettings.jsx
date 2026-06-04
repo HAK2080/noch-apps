@@ -196,6 +196,30 @@ export default function LoyaltySettings() {
                 <input type="number" className="input" value={settings?.points_value || 1} onChange={e => set('points_value', parseFloat(e.target.value))} step="0.1" min={0} />
               </div>
             </div>
+
+            {/* Feedback reward — points for completing the survey, free drink at a goal */}
+            <div className="mt-4 pt-3 border-t border-noch-border">
+              <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-noch-green"
+                  checked={settings?.feedback_reward_enabled !== false}
+                  onChange={e => set('feedback_reward_enabled', e.target.checked)} />
+                <span className="text-white text-sm font-medium">{ar ? 'مكافأة التقييم (نقاط + مشروب مجاني)' : 'Feedback reward (points + free drink)'}</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">{ar ? 'نقاط لكل تقييم' : 'Points per feedback'}</label>
+                  <input type="number" className="input" value={settings?.points_for_feedback ?? 10} onChange={e => set('points_for_feedback', parseInt(e.target.value))} min={0} />
+                </div>
+                <div>
+                  <label className="label">{ar ? 'نقاط لمشروب مجاني' : 'Points for a free drink'}</label>
+                  <input type="number" className="input" value={settings?.free_drink_points_goal ?? 50} onChange={e => set('free_drink_points_goal', parseInt(e.target.value))} min={1} />
+                </div>
+              </div>
+              <p className="text-noch-muted text-xs mt-2">
+                {ar ? 'النقاط تُمنح مرة واحدة يومياً لكل عميل، لأي تقييم. المشروب المجاني يُمنح عند بلوغ الهدف.'
+                    : 'Points awarded once per customer per day, for any rating. Free-drink voucher issues at the goal.'}
+              </p>
+            </div>
           </div>
 
           {/* Spin wheel */}

@@ -80,6 +80,8 @@ export default function Feedback() {
   const [hover, setHover] = useState(0)
   const [tags, setTags] = useState([])
   const [comment, setComment] = useState('')
+  const [phone, setPhone] = useState('')
+  const [reward, setReward] = useState(null)   // { points_awarded, total_points, reward_code }
   const [submitting, setSubmitting] = useState(false)
 
   const isAr = lang === 'ar'
@@ -116,7 +118,7 @@ export default function Feedback() {
     if (submitting || rating === 0 || !branchId) return
     setSubmitting(true)
     try {
-      const { error } = await supabase.rpc('submit_feedback', {
+      const { data, error } = await supabase.rpc('submit_feedback', {
         p_branch_id: branchId,
         p_rating: rating,
         p_comment: comment.trim() || null,
@@ -125,8 +127,10 @@ export default function Feedback() {
         p_source: source,
         p_emoji: rating >= 4 ? '😍' : rating === 3 ? '😐' : '😖',
         p_reason_tags: tags,
+        p_phone: phone.trim() || null,
       })
       if (error) throw error
+      setReward(data && data.ok ? data : null)
       setStep('done')
     } catch {
       alert(t('Could not send — please try again.', 'تعذّر الإرسال — حاولي مرة ثانية.'))
@@ -229,6 +233,21 @@ export default function Feedback() {
               {t('Your feedback reaches us without your name.', 'رأيك يوصلنا بدون اسمك.')}
             </p>
 
+            {/* Optional phone → collect Nochi points (any rating; not tied to score) */}
+            <div className="fb-points-box">
+              <p className="fb-points-hint">🎁 {t('Drop your number to collect Nochi points', 'دخّلي رقمك تجمعي نقاط نوتشي')}</p>
+              <input
+                className="fb-phone"
+                type="tel"
+                inputMode="tel"
+                dir="ltr"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                maxLength={20}
+                placeholder={t('Phone (optional)', 'رقم الهاتف (اختياري)')}
+              />
+            </div>
+
             <button className="fb-btn-primary" disabled={submitting} onClick={submit}>
               {submitting ? t('Sending…', 'جارٍ الإرسال…') : t('Send to Nochi', 'أرسلي لنوتشي')}
             </button>
@@ -242,6 +261,23 @@ export default function Feedback() {
             <div className="fb-nochi-wrap"><NochiFace rating={5} /></div>
             <h1>{t('Your message reached Nochi!', 'وصلت رسالتك لنوتشي!')}</h1>
             <p>{t('We hear you, and we always try to be better 💪', 'سمعناك، ودايمًا نحاولوا نكونوا أحسن 💪')}</p>
+
+            {/* Free-drink voucher (threshold reached) */}
+            {reward?.reward_code && (
+              <div className="fb-voucher">
+                <p className="fb-voucher-title">🥤 {t('You earned a FREE drink!', 'ربحتي مشروب مجاني!')}</p>
+                <p className="fb-voucher-code">{reward.reward_code}</p>
+                <p className="fb-voucher-note">{t('Show this code at the counter', 'وريه للكاشير عند الكاونتر')}</p>
+              </div>
+            )}
+
+            {/* Nochi points earned */}
+            {reward?.points_awarded > 0 && (
+              <p className="fb-points-earned">
+                🎁 +{reward.points_awarded} {t('Nochi points', 'نقطة نوتشي')}
+                {typeof reward.total_points === 'number' && ` · ${t('total', 'المجموع')} ${reward.total_points}`}
+              </p>
+            )}
 
             {tier === 'happy' && (fb || google || ig) && (
               <div className="fb-share">

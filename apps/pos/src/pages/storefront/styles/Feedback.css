@@ -119,6 +119,48 @@
 
 .fb-private-note { font-size: 13px; color: var(--muted); margin: 12px 0 0; line-height: 1.6; }
 
+/* Points capture */
+.fb-points-box { margin-top: 14px; text-align: center; }
+.fb-points-hint { font-size: 13px; font-weight: 700; color: var(--brand); margin: 0 0 8px; }
+.fb-phone {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  font-family: inherit; font-size: 15px;
+  text-align: center; outline: none;
+  background: #fff; color: var(--text);
+}
+.fb-phone:focus { border-color: var(--brand); }
+
+/* Thank-you: points + free-drink voucher */
+.fb-points-earned {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 8px 16px;
+  background: #fff8e1;
+  border: 2px solid var(--brand);
+  border-radius: 50px;
+  font-weight: 800; font-size: 15px;
+  color: var(--brand-dark);
+}
+.fb-voucher {
+  margin: 4px 0 16px;
+  padding: 16px;
+  border: 3px dashed var(--brand);
+  border-radius: 18px;
+  background: #fff8e1;
+}
+.fb-voucher-title { font-size: 17px; font-weight: 800; color: var(--brand-dark); margin: 0 0 8px; }
+.fb-voucher-code {
+  font-family: 'Inter', monospace;
+  font-size: 30px; font-weight: 800;
+  letter-spacing: 6px;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+.fb-voucher-note { font-size: 12px; color: var(--muted); margin: 0; }
+
 /* Primary button — NOCH blue */
 .fb-btn-primary {
   width: 100%; margin-top: 18px;
