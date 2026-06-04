@@ -72,17 +72,13 @@ export default function POSSettings() {
   const bluetoothAvailable = isTransportAvailable('bluetooth')
   const transportAvailable = isTransportAvailable(transport)
 
-  // On mount: silently reconnect to the last-used printer without showing
-  // the picker. If this tablet is flagged as the print host, also start
-  // the queue subscriber so it picks up jobs from other tablets.
+  // On mount: silently reconnect to the last-used printer. The host
+  // subscriber is started unconditionally (if flagged) — do NOT gate it
+  // on printer connect success, as POSTerminal is the primary start point.
   useEffect(() => {
+    if (isPrintHost() && branchId) startHostSubscriber(branchId)
     autoConnectPrinter({ baudRate }).then(ok => {
-      if (ok) {
-        setPrinterConnected(true)
-        if (isPrintHost() && branchId) {
-          startHostSubscriber(branchId)
-        }
-      }
+      if (ok) setPrinterConnected(true)
     }).catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -385,13 +385,18 @@ export default function POSTerminal() {
     // Start sync listener
     const stopSync = startSyncListener()
 
+    // Start the print-queue host subscriber unconditionally if this tablet
+    // is flagged as the print host. The subscriber must be up regardless of
+    // whether the printer has auto-connected yet — jobs arriving while the
+    // printer is still connecting will be claimed and processed once the
+    // printer is ready. DO NOT gate this on autoConnectPrinter() success,
+    // otherwise staff must open Settings to kick the subscriber alive.
+    if (isPrintHost() && branchId) startHostSubscriber(branchId)
+
     // Silently restore the printer connection (no picker dialog).
     // Works on Chrome/Edge via getDevices() / getPorts() for previously-
-    // granted Bluetooth / Serial devices. If this tablet is the print host,
-    // also start subscribing to the queue.
-    autoConnectPrinter().then(ok => {
-      if (ok && isPrintHost() && branchId) startHostSubscriber(branchId)
-    }).catch(() => {})
+    // granted Bluetooth / Serial devices.
+    autoConnectPrinter().catch(() => {})
 
     return () => {
       window.removeEventListener('online', handleOnline)
