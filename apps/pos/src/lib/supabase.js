@@ -1765,13 +1765,63 @@ export async function deleteLoyaltyCustomer(id) {
   if (error) throw error
 }
 
-export async function awardLoyaltyStamp(customerId, awardedBy) {
-  const { data, error } = await supabase.functions.invoke('loyalty-stamp', {
-    body: { customer_id: customerId, awarded_by: awardedBy },
+// Admin (owner/staff) stamp grant — calls the RPC directly so we can tag the
+// activity (reason → loyalty_stamps.notes). The QR self-scan path still uses the
+// loyalty-stamp edge function elsewhere.
+export async function awardLoyaltyStamp(customerId, awardedBy, reason = null) {
+  const { data, error } = await supabase.rpc('award_loyalty_stamp', {
+    p_customer_id: customerId,
+    p_awarded_by: awardedBy || null,
+    p_reason: reason || null,
   })
   if (error) throw new Error(error.message ?? 'Failed to award stamp')
   if (data?.error) throw new Error(data.error)
   return data
+}
+
+// Activity labels for the stamp-grant WhatsApp message.
+const STAMP_ACTIVITY_LABELS = {
+  ugc:   { ar: 'المنشور', en: 'your post' },
+  review:{ ar: 'التقييم', en: 'your review' },
+  visit: { ar: 'زيارتك', en: 'your visit' },
+}
+
+// Optional WhatsApp thank-you when a stamp is granted for an activity.
+// Gated by settings + per-activity flag + the customer's whatsapp_opt_in.
+// Never throws — returns a result object the caller can toast.
+export async function notifyStampGranted(customer, activity) {
+  try {
+    if (!customer?.phone) return { skipped: true, reason: 'no_phone' }
+    if (customer.whatsapp_opt_in === false) return { skipped: true, reason: 'not_opted_in' }
+
+    const settings = await getLoyaltySettings()
+    if (!settings?.stamp_notify_enabled) return { skipped: true, reason: 'disabled' }
+    if (activity === 'ugc' && !settings.stamp_notify_ugc) return { skipped: true, reason: 'activity_off' }
+    if (activity === 'review' && !settings.stamp_notify_review) return { skipped: true, reason: 'activity_off' }
+
+    const lang = customer.preferred_language === 'en' ? 'en' : 'ar'
+    const tmpl = (lang === 'en' ? settings.stamp_notify_message_en : settings.stamp_notify_message_ar) || ''
+    const label = (STAMP_ACTIVITY_LABELS[activity] || STAMP_ACTIVITY_LABELS.visit)[lang]
+    const message = tmpl.replace(/\$\{activity\}/g, label)
+
+    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+      body: { to: customer.phone, message },
+    })
+    const ok = !error && !data?.error
+    // Audit log (best-effort).
+    supabase.rpc('record_whatsapp_send', {
+      p_customer_id: customer.id, p_phone: customer.phone,
+      p_template: 'stamp_grant', p_trigger: `stamp_${activity}`,
+      p_status: ok ? 'sent' : 'failed',
+      p_error: ok ? null : (error?.message || data?.error || 'unknown'),
+      p_payload_key: null,
+    }).catch(() => {})
+
+    if (!ok) return { skipped: false, sent: false, error: error?.message || data?.error }
+    return { sent: true }
+  } catch (e) {
+    return { skipped: false, sent: false, error: e.message }
+  }
 }
 
 // Passport Phase 1

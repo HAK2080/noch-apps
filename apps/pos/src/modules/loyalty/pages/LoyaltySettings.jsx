@@ -115,7 +115,24 @@ export default function LoyaltySettings() {
   const [branches, setBranches] = useState([])
   const [branchUrls, setBranchUrls] = useState({})
   const [savingBranch, setSavingBranch] = useState(null)
+  const [testPhone, setTestPhone] = useState('')
+  const [testSending, setTestSending] = useState(false)
   const ar = lang === 'ar'
+
+  const sendStampTest = async () => {
+    if (!testPhone.trim()) return
+    setTestSending(true)
+    try {
+      const msg = (settings?.stamp_notify_message_en || 'Thanks for ${activity}! Nochi gave you a stamp 🎁').replace(/\$\{activity\}/g, ar ? 'تجربة' : 'your post')
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', { body: { to: testPhone.trim(), message: msg } })
+      if (error || data?.error) throw new Error(error?.message || data?.error)
+      toast.success(ar ? 'تم الإرسال ✓' : 'Sent ✓')
+    } catch (e) {
+      toast.error((ar ? 'فشل: ' : 'Failed: ') + (e.message || ''))
+    } finally {
+      setTestSending(false)
+    }
+  }
 
   useEffect(() => {
     getLoyaltySettings()
@@ -220,6 +237,51 @@ export default function LoyaltySettings() {
                     : 'Points awarded once per customer per day, for any rating. Free-drink voucher issues at the goal.'}
               </p>
             </div>
+          </div>
+
+          {/* Stamp-grant WhatsApp notification */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-white font-semibold text-sm flex items-center gap-2"><MessageSquare size={14} className="text-noch-green" /> {ar ? 'إشعار واتساب عند منح طابع' : 'Stamp-grant WhatsApp'}</h2>
+              <button
+                onClick={() => set('stamp_notify_enabled', !settings?.stamp_notify_enabled)}
+                className={`px-3 py-1 text-xs rounded-lg border font-medium transition-colors ${settings?.stamp_notify_enabled ? 'bg-noch-green/10 text-noch-green border-noch-green/30' : 'border-noch-border text-noch-muted'}`}>
+                {settings?.stamp_notify_enabled ? (ar ? 'مفعّل' : 'Enabled') : (ar ? 'معطّل' : 'Disabled')}
+              </button>
+            </div>
+            {settings?.stamp_notify_enabled && (
+              <>
+                <div className="flex flex-wrap gap-4 mb-3">
+                  <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-noch-green" checked={settings?.stamp_notify_ugc !== false} onChange={e => set('stamp_notify_ugc', e.target.checked)} />
+                    {ar ? 'منشور / صورة / ستوري' : 'UGC / photo / story'}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-noch-green" checked={settings?.stamp_notify_review !== false} onChange={e => set('stamp_notify_review', e.target.checked)} />
+                    {ar ? 'تقييم جوجل / فيسبوك' : 'Google / Facebook review'}
+                  </label>
+                </div>
+                <div className="mb-2">
+                  <label className="label">{ar ? 'الرسالة (عربي)' : 'Message (AR)'}</label>
+                  <input className="input" value={settings?.stamp_notify_message_ar || ''} onChange={e => set('stamp_notify_message_ar', e.target.value)} placeholder="شكراً على ${activity}! نوتشي منحك طابع 🎁" />
+                </div>
+                <div className="mb-2">
+                  <label className="label">{ar ? 'الرسالة (إنجليزي)' : 'Message (EN)'}</label>
+                  <input className="input" value={settings?.stamp_notify_message_en || ''} onChange={e => set('stamp_notify_message_en', e.target.value)} placeholder="Thanks for ${activity}! Nochi gave you a stamp 🎁" />
+                </div>
+                <p className="text-noch-muted text-[11px] mb-3">
+                  {ar
+                    ? 'استخدم ${activity} لاسم النشاط. ⚠️ لإرسال واتساب استباقي يجب تسجيل هذه الرسالة كقالب معتمد في Twilio/Meta. تُرسل فقط للعملاء الموافقين على واتساب.'
+                    : 'Use ${activity} for the activity name. ⚠️ Proactive WhatsApp needs this registered as an approved Twilio/Meta template. Only sends to customers with WhatsApp opt-in.'}
+                </p>
+                <div className="flex gap-2">
+                  <input className="input flex-1" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder={ar ? 'رقم لاختبار الإرسال' : 'Phone to test send'} dir="ltr" />
+                  <button onClick={sendStampTest} disabled={testSending || !testPhone.trim()} className="btn-secondary px-4 text-sm">
+                    {testSending ? '…' : (ar ? 'إرسال تجريبي' : 'Send test')}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Spin wheel */}

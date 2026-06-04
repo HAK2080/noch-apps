@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Gift, Send, Trash2, Star, Copy, ExternalLink, QrCode } from 'lucide-react'
 import QRCode from 'qrcode'
-import { getLoyaltyCustomer, awardLoyaltyStamp, redeemLoyaltyReward, sendLoyaltyNotification, deleteLoyaltyCustomer, requestGoogleReview } from '../../../lib/supabase'
+import { getLoyaltyCustomer, awardLoyaltyStamp, redeemLoyaltyReward, sendLoyaltyNotification, deleteLoyaltyCustomer, requestGoogleReview, notifyStampGranted, getLoyaltySettings } from '../../../lib/supabase'
 import { getCustomerSegment } from '../../marketing/lib/marketing-supabase'
 import SegmentBadge from '../../marketing/components/SegmentBadge'
 import { getPOSBranches } from '../../pos/lib/pos-supabase'
@@ -33,7 +33,17 @@ export default function CustomerDetail() {
   const [stampLoading, setStampLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [segment, setSegment] = useState(null)
+  const [stampActivity, setStampActivity] = useState('visit')
+  const [notifyWa, setNotifyWa] = useState(false)
+  const [loySettings, setLoySettings] = useState(null)
   const ar = lang === 'ar'
+
+  // Which activities offer a WhatsApp notify (per settings).
+  const notifyEligible = stampActivity === 'ugc' || stampActivity === 'review'
+  const activityEnabled = stampActivity === 'ugc' ? loySettings?.stamp_notify_ugc !== false
+    : stampActivity === 'review' ? loySettings?.stamp_notify_review !== false : false
+  const canNotify = !!loySettings?.stamp_notify_enabled && notifyEligible && activityEnabled
+    && customer?.whatsapp_opt_in !== false && !!customer?.phone
 
   const load = async () => {
     try {
@@ -54,14 +64,29 @@ export default function CustomerDetail() {
     getCustomerSegment(id).then(setSegment).catch(() => {})
   }, [id])
 
+  // Loyalty settings (defaults the WhatsApp-notify toggle).
+  useEffect(() => {
+    getLoyaltySettings().then(s => {
+      setLoySettings(s)
+      setNotifyWa(!!s?.stamp_notify_enabled)
+    }).catch(() => {})
+  }, [])
+
   const handleAwardStamp = async () => {
     setStampLoading(true)
     try {
-      const result = await awardLoyaltyStamp(id, user?.id)
+      const result = await awardLoyaltyStamp(id, user?.id, stampActivity)
       if (result.reward_earned) {
         toast.success(ar ? '🎉 حصل على مشروب مجاني! مبروك!' : '🎉 Free drink earned! Congrats!')
       } else {
         toast.success(ar ? `☕ طابع ${result.current_stamps}/9 — أحسنت!` : `☕ Stamp ${result.current_stamps}/9 — Great!`)
+      }
+      // Optional WhatsApp thank-you for the activity.
+      if (notifyWa && canNotify) {
+        const r = await notifyStampGranted(customer, stampActivity)
+        if (r?.sent) toast.success(ar ? '📲 تم إرسال رسالة واتساب' : '📲 WhatsApp sent')
+        else if (r?.skipped) toast(ar ? `لم تُرسل: ${r.reason}` : `Not sent: ${r.reason}`, { icon: 'ℹ️' })
+        else if (r?.error) toast.error(ar ? `واتساب: ${r.error}` : `WhatsApp: ${r.error}`)
       }
       load()
     } catch (err) {
@@ -217,6 +242,42 @@ export default function CustomerDetail() {
       {/* Award Stamp */}
       <div className="card mb-4">
         <p className="text-noch-muted text-xs mb-3">{ar ? 'منح طابع' : 'Award Stamp'}</p>
+
+        {/* Activity (tags the stamp; UGC / review can notify on WhatsApp) */}
+        <label className="label block mb-1">{ar ? 'النشاط' : 'Activity'}</label>
+        <select
+          value={stampActivity}
+          onChange={e => setStampActivity(e.target.value)}
+          className="input w-full mb-3 text-sm"
+        >
+          <option value="visit">{ar ? 'زيارة / شراء' : 'Visit / purchase'}</option>
+          <option value="ugc">{ar ? 'منشور / صورة / ستوري' : 'UGC / photo / story'}</option>
+          <option value="review">{ar ? 'تقييم جوجل / فيسبوك' : 'Google / Facebook review'}</option>
+        </select>
+
+        {/* Notify on WhatsApp — only for eligible activities + opted-in customers */}
+        {notifyEligible && (
+          loySettings?.stamp_notify_enabled ? (
+            <label className={`flex items-center gap-2 mb-3 text-sm ${canNotify ? 'text-white cursor-pointer' : 'text-noch-muted'}`}>
+              <input
+                type="checkbox"
+                className="w-4 h-4 accent-noch-green"
+                checked={notifyWa && canNotify}
+                disabled={!canNotify}
+                onChange={e => setNotifyWa(e.target.checked)}
+              />
+              {ar ? 'إبلاغ العميل على واتساب' : 'Notify customer on WhatsApp'}
+              {!canNotify && customer?.whatsapp_opt_in === false && (
+                <span className="text-noch-muted text-xs">({ar ? 'لم يوافق على واتساب' : 'no WhatsApp opt-in'})</span>
+              )}
+            </label>
+          ) : (
+            <p className="text-noch-muted text-[11px] mb-3">
+              {ar ? 'تفعيل إشعار واتساب من إعدادات الولاء' : 'Enable WhatsApp notify in Loyalty Settings'}
+            </p>
+          )
+        )}
+
         <button
           onClick={handleAwardStamp}
           disabled={stampLoading}
