@@ -25,7 +25,7 @@ export default function TableQRGenerator() {
 
   useEffect(() => {
     generateQRCodes()
-  }, [branchId, tableCount])
+  }, [branchId, tableCount, branch])
 
   async function loadBranch() {
     try {
@@ -51,9 +51,11 @@ export default function TableQRGenerator() {
 
   async function generateQRCodes() {
     const host = window.location.origin
+    // Prefer the friendly slug in the printed URL; fall back to the UUID.
+    const key = branch?.slug || branchId
     const urls = {}
     for (let i = 1; i <= tableCount; i++) {
-      const url = `${host}/menu/${branchId}?table=${i}`
+      const url = `${host}/menu/${key}?table=${i}`
       try {
         urls[i] = await QRCode.toDataURL(url, { width: 150, margin: 1 })
       } catch (e) {
@@ -65,7 +67,7 @@ export default function TableQRGenerator() {
     // Also generate a larger "general" menu QR (no table number) — for
     // posters, business cards, window stickers, social media bio links.
     try {
-      const generalUrl = `${host}/menu/${branchId}`
+      const generalUrl = `${host}/menu/${key}`
       setGeneralQr(await QRCode.toDataURL(generalUrl, { width: 400, margin: 2 }))
     } catch (e) {
       console.error('General QR gen error', e)
@@ -73,7 +75,7 @@ export default function TableQRGenerator() {
 
     // Feedback poster QR — for the counter / table tents / "How did we do?" cards.
     try {
-      const feedbackUrl = `${host}/feedback/${branchId}?source=poster`
+      const feedbackUrl = `${host}/feedback/${key}?source=poster`
       setFeedbackQr(await QRCode.toDataURL(feedbackUrl, { width: 400, margin: 2 }))
     } catch (e) {
       console.error('Feedback QR gen error', e)
@@ -90,7 +92,7 @@ export default function TableQRGenerator() {
 
   function getMenuUrl(tableNum) {
     const host = window.location.origin
-    return `${host}/menu/${branchId}?table=${tableNum}`
+    return `${host}/menu/${branch?.slug || branchId}?table=${tableNum}`
   }
 
   if (loading) return (
@@ -145,7 +147,7 @@ export default function TableQRGenerator() {
             />
           </div>
           <p className="text-noch-muted text-sm">
-            Each QR links to: <code className="text-noch-green text-xs">/menu/{branchId}?table=N</code>
+            Each QR links to: <code className="text-noch-green text-xs">/menu/{branch?.slug || branchId}?table=N</code>
           </p>
           <button
             onClick={generateQRCodes}
@@ -161,7 +163,7 @@ export default function TableQRGenerator() {
         <h2 className="text-white font-bold text-lg mb-2">Menu QR (no table)</h2>
         <p className="text-noch-muted text-sm mb-4">
           For window stickers, business cards, social bios. Link: {' '}
-          <code className="text-noch-green text-xs">/menu/{branchId}</code>
+          <code className="text-noch-green text-xs">/menu/{branch?.slug || branchId}</code>
         </p>
         <div className="flex items-center gap-6 flex-wrap">
           {generalQr && (
@@ -178,7 +180,7 @@ export default function TableQRGenerator() {
               Download PNG
             </button>
             <a
-              href={`${window.location.origin}/menu/${branchId}`}
+              href={`${window.location.origin}/menu/${branch?.slug || branchId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-secondary text-sm text-center"
@@ -198,7 +200,7 @@ export default function TableQRGenerator() {
         <h2 className="text-white font-bold text-lg mb-2">Feedback QR</h2>
         <p className="text-noch-muted text-sm mb-4">
           For table tents, the counter, or "How did we do?" cards. Link:{' '}
-          <code className="text-noch-green text-xs">/feedback/{branchId}</code>
+          <code className="text-noch-green text-xs">/feedback/{branch?.slug || branchId}</code>
         </p>
         <div className="flex items-center gap-6 flex-wrap">
           {feedbackQr && (
@@ -224,7 +226,7 @@ export default function TableQRGenerator() {
               Download PNG
             </button>
             <a
-              href={`${window.location.origin}/feedback/${branchId}`}
+              href={`${window.location.origin}/feedback/${branch?.slug || branchId}`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-secondary text-sm text-center"

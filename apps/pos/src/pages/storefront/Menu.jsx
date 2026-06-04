@@ -414,11 +414,17 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
 }
 
 // ── Main page ────────────────────────────────────────────────────────────────
+const BRANCH_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default function Menu() {
-  const { branchId } = useParams()
+  const { branchId: branchParam } = useParams()
   const [searchParams] = useSearchParams()
   const tableNumber = searchParams.get('table')
   const catStripRef = useRef(null)
+
+  // The URL can carry a UUID (QR codes) or a friendly slug (e.g. "andalous").
+  // Resolved to the real branch id in loadMenu; everything downstream uses it.
+  const [branchId, setBranchId] = useState(BRANCH_UUID_RE.test(branchParam) ? branchParam : null)
 
   const [branch, setBranch]         = useState(null)
   const [categories, setCategories] = useState([])
@@ -449,27 +455,32 @@ export default function Menu() {
   // GPS
   const [gps, setGps] = useState({ status: 'idle', lat: null, lng: null, distance: null })
 
-  useEffect(() => { loadMenu() }, [branchId])
+  useEffect(() => { loadMenu() }, [branchParam])
 
   async function loadMenu() {
     try {
       setLoading(true); setError(null)
-      const [{ data: b, error: be }, { data: cats, error: ce }, { data: prods, error: pe }] = await Promise.all([
-        supabase.from('pos_branches').select('*').eq('id', branchId).eq('is_active', true).single(),
+      // Resolve branch by UUID or slug first, then load its menu by real id.
+      const isUuid = BRANCH_UUID_RE.test(branchParam)
+      const branchQ = supabase.from('pos_branches').select('*').eq('is_active', true)
+      const { data: b, error: be } = await (isUuid ? branchQ.eq('id', branchParam) : branchQ.ilike('slug', branchParam)).single()
+      if (be || !b) throw new Error('Branch not found')
+      const id = b.id
+      setBranchId(id)
+      const [{ data: cats, error: ce }, { data: prods, error: pe }] = await Promise.all([
         supabase.from('pos_categories')
           .select('id, name, name_ar, color, image_url, sort_order, menu_display_style, show_on_website')
           .eq('is_active', true)
           .eq('show_on_website', true)
-          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
+          .or(`visible_branch_ids.cs.{${id}},branch_id.eq.${id}`)
           .order('sort_order').order('name'),
         supabase.from('pos_products')
           .select('*')
           .eq('is_active', true)
           .eq('visible_on_customer_menu', true)
-          .or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId},branch_id.is.null`)
+          .or(`visible_branch_ids.cs.{${id}},branch_id.eq.${id},branch_id.is.null`)
           .order('menu_sort').order('name'),
       ])
-      if (be) throw new Error('Branch not found')
       if (pe) throw new Error('Failed to load products: ' + pe.message)
       if (ce) throw new Error('Failed to load categories: ' + ce.message)
       setBranch(b)
