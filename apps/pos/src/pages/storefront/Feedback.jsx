@@ -145,7 +145,7 @@ export default function Feedback() {
 
   const fb = branch?.review_facebook_url
   const google = branch?.review_google_url
-  const ig = branch?.review_instagram_url || 'https://www.instagram.com/noch.cafe'
+  const ig = branch?.review_instagram_url || 'https://www.instagram.com/noch.libya'
 
   return (
     <div className="fb-root notranslate" translate="no" dir={isAr ? 'rtl' : 'ltr'}>
