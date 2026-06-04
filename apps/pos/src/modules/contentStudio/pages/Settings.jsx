@@ -29,7 +29,7 @@ export default function Settings() {
           <h2 className="text-white font-semibold">Module</h2>
         </header>
         <dl className="grid grid-cols-2 gap-y-2 text-sm">
-          <dt className="text-noch-muted">App version</dt><dd className="text-white">Noch 4.1.0</dd>
+          <dt className="text-noch-muted">App version</dt><dd className="text-white">Noch 4.2.0</dd>
           <dt className="text-noch-muted">Module path</dt><dd className="text-white font-mono text-xs">src/modules/contentStudio</dd>
           <dt className="text-noch-muted">Storage bucket</dt><dd className="text-white font-mono text-xs">content-studio-inspirations</dd>
           <dt className="text-noch-muted">Evaluator version</dt><dd className="text-white font-mono text-xs">v1</dd>

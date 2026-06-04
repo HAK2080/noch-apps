@@ -756,6 +756,12 @@ export default function Menu() {
                 <p className="order-total">{Number(orderResult.total).toFixed(2)} {currency}</p>
                 {tableNumber && <p className="order-table">{t('Table', 'طاولة')} {tableNumber}</p>}
                 <p className="staff-note">{t('The cashier will confirm your order shortly.', 'سيقوم الكاشير بتأكيد طلبك في أقرب وقت.')}</p>
+                <a
+                  className="feedback-link"
+                  href={`/feedback/${branchId}?order=${orderResult.id}&source=online${tableNumber ? `&table=${tableNumber}` : ''}`}
+                >
+                  💛 {t('Tell us how we did →', 'احكيلنا كيف كانت تجربتك ←')}
+                </a>
                 <button className="btn-done" onClick={resetOrder}>{t('Done', 'تم')}</button>
               </div>
             )}

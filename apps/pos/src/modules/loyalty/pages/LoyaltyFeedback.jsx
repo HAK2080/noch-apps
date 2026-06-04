@@ -49,7 +49,7 @@ export default function LoyaltyFeedback() {
     try {
       const { data, error } = await supabase
         .from('loyalty_feedback')
-        .select('id, customer_id, rating, comment, visit_date, created_at, actioned, customer:loyalty_customers(id, full_name, phone)')
+        .select('id, customer_id, rating, comment, visit_date, created_at, actioned, source, table_number, reason_tags, branch:pos_branches(name), customer:loyalty_customers(id, full_name, phone)')
         .order('created_at', { ascending: false })
         .limit(200)
       if (error) throw error
@@ -160,10 +160,20 @@ export default function LoyaltyFeedback() {
                         </span>
                       )}
                     </div>
+                    {/* Reason tags (from the QR mini-site) — surface recurring themes */}
+                    {Array.isArray(f.reason_tags) && f.reason_tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {f.reason_tags.map(tag => (
+                          <span key={tag} className="text-[10px] uppercase tracking-wide bg-noch-border/40 text-noch-muted px-1.5 py-0.5 rounded-full">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {f.comment && (
                       <p className="text-white text-sm whitespace-pre-wrap break-words mb-2">"{f.comment}"</p>
                     )}
-                    {f.customer && (
+                    {f.customer ? (
                       <Link
                         to={`/loyalty/customers/${f.customer.id}`}
                         className="text-noch-green text-xs hover:underline"
@@ -171,6 +181,13 @@ export default function LoyaltyFeedback() {
                         {f.customer.full_name || (lang === 'ar' ? 'بدون اسم' : 'unnamed')}
                         {f.customer.phone && <span className="text-noch-muted"> · {f.customer.phone}</span>}
                       </Link>
+                    ) : (
+                      <span className="text-noch-muted text-xs">
+                        {lang === 'ar' ? 'زائر' : 'Guest'}
+                        {f.branch?.name && <span> · {f.branch.name}</span>}
+                        {f.table_number && <span> · {lang === 'ar' ? 'طاولة' : 'Table'} {f.table_number}</span>}
+                        {f.source && f.source !== 'qr' && <span> · {f.source}</span>}
+                      </span>
                     )}
                   </div>
 

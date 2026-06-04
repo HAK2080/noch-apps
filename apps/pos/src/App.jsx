@@ -22,6 +22,7 @@ import { enableKioskMode } from './modules/pos/lib/pos-kiosk'
 import Menu from './pages/storefront/Menu'
 import Checkout from './pages/storefront/Checkout'
 import OrderConfirmation from './pages/storefront/OrderConfirmation'
+import Feedback from './pages/storefront/Feedback'
 
 // ── Code-split route components ──────────────────────────────────────
 // Each import() becomes its own JS chunk Vite emits separately, fetched
@@ -304,6 +305,7 @@ export default function App() {
 
         {/* Storefront (Public — No Auth Required) */}
         <Route path="/menu/:branchId" element={<Menu />} />
+        <Route path="/feedback/:branchId" element={<Feedback />} />
         <Route path="/checkout/:branchId" element={<Checkout />} />
         <Route path="/order-confirmation" element={<OrderConfirmation />} />
 

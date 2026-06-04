@@ -363,6 +363,18 @@ export async function printReceipt(order, branch, items, loyaltyCustomer = null)
     pushLine('noch.cloud/passport')
   }
 
+  // Feedback QR — always printed so every customer can rate us, even guests.
+  const fbBranch = order.branch_id || branch?.id
+  if (fbBranch) {
+    const oid = String(order.id || '')
+    const orderParam = oid && !oid.startsWith('offline-') ? `?order=${oid}&source=receipt` : '?source=receipt'
+    const feedbackUrl = `https://apps.noch.cloud/feedback/${fbBranch}${orderParam}`
+    pushLine()
+    bytes.push(...separator('-'))
+    pushLine('How did we do? Scan to rate us')
+    bytes.push(...qrCodeBytes(feedbackUrl, 4))
+  }
+
   // Generous feed before cut so the auto-cutter (when present) doesn't
   // slice through useful content, and on cutter-less units the tear
   // edge lands well below the printed area.

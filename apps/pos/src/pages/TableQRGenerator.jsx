@@ -17,6 +17,7 @@ export default function TableQRGenerator() {
   const [error, setError] = useState(null)
   const [qrDataUrls, setQrDataUrls] = useState({})
   const [generalQr, setGeneralQr] = useState(null)
+  const [feedbackQr, setFeedbackQr] = useState(null)
 
   useEffect(() => {
     loadBranch()
@@ -68,6 +69,14 @@ export default function TableQRGenerator() {
       setGeneralQr(await QRCode.toDataURL(generalUrl, { width: 400, margin: 2 }))
     } catch (e) {
       console.error('General QR gen error', e)
+    }
+
+    // Feedback poster QR — for the counter / table tents / "How did we do?" cards.
+    try {
+      const feedbackUrl = `${host}/feedback/${branchId}?source=poster`
+      setFeedbackQr(await QRCode.toDataURL(feedbackUrl, { width: 400, margin: 2 }))
+    } catch (e) {
+      console.error('Feedback QR gen error', e)
     }
   }
 
@@ -180,6 +189,48 @@ export default function TableQRGenerator() {
               Print at any size — QR codes scale infinitely.
               For window stickers, 10×10 cm or larger is comfortable from 2 m away.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Feedback QR — single big QR for "How did we do?" cards / counter */}
+      <div className="p-6 print:hidden border-b border-noch-border">
+        <h2 className="text-white font-bold text-lg mb-2">Feedback QR</h2>
+        <p className="text-noch-muted text-sm mb-4">
+          For table tents, the counter, or "How did we do?" cards. Link:{' '}
+          <code className="text-noch-green text-xs">/feedback/{branchId}</code>
+        </p>
+        <div className="flex items-center gap-6 flex-wrap">
+          {feedbackQr && (
+            <div className="bg-white p-4 rounded-xl flex flex-col items-center gap-2">
+              <div className="text-gray-500 text-xs uppercase tracking-wide font-medium">
+                {branch?.name}
+              </div>
+              <img src={feedbackQr} alt="Feedback QR" width={200} height={200} className="rounded" />
+              <div className="text-gray-700 text-sm font-semibold">Scan to rate us 💛</div>
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                if (!feedbackQr) return
+                const a = document.createElement('a')
+                a.href = feedbackQr
+                a.download = `noch-feedback-${(branch?.name || 'branch').replace(/\s+/g, '-')}.png`
+                a.click()
+              }}
+              className="btn btn-primary text-sm"
+            >
+              Download PNG
+            </button>
+            <a
+              href={`${window.location.origin}/feedback/${branchId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary text-sm text-center"
+            >
+              Open feedback page
+            </a>
           </div>
         </div>
       </div>
