@@ -1,10 +1,11 @@
-/* ── Noch Feedback mini-site ── */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+/* ── Noch Feedback mini-site (Nochi personality, 2-step) ── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 .fb-root {
   --brand: #E86A1E;
   --brand-dark: #C54E0A;
   --blue: #1E3A9F;
+  --blue-dark: #142974;
   --bg: #FBF3E3;
   --card: #ffffff;
   --text: #0B1020;
@@ -33,6 +34,7 @@
   font-weight: 800;
   cursor: pointer;
   box-shadow: 2px 2px 0 var(--text);
+  z-index: 5;
 }
 
 .fb-card {
@@ -42,41 +44,50 @@
   box-shadow: 0 10px 0 var(--text);
   width: 100%;
   max-width: 440px;
-  padding: 28px 24px 32px;
+  padding: 26px 24px 30px;
   text-align: center;
   position: relative;
   overflow: hidden;
 }
 
-.fb-logo { height: 46px; margin: 0 auto 14px; display: block; }
+/* Bigger logo */
+.fb-logo { height: 60px; margin: 0 auto 14px; display: block; }
 
-.fb-title { font-size: 24px; font-weight: 800; margin: 0 0 4px; line-height: 1.25; }
-.fb-sub   { font-size: 14px; color: var(--muted); margin: 0 0 20px; font-weight: 600; }
+.fb-title { font-size: 24px; font-weight: 800; margin: 0 0 4px; line-height: 1.3; }
+.fb-sub   { font-size: 14px; color: var(--muted); margin: 0 0 18px; font-weight: 600; }
+.fb-step-title { font-size: 20px; font-weight: 800; margin: 6px 0 16px; line-height: 1.35; }
 
 /* Cups */
-.fb-cups { display: flex; justify-content: center; gap: 6px; margin: 8px 0 4px; }
+.fb-cups { display: flex; justify-content: center; gap: 6px; margin: 6px 0 10px; }
 .fb-cup {
   font-size: 38px;
   background: none; border: none; cursor: pointer;
   filter: grayscale(1) opacity(0.35);
   transition: transform 0.12s, filter 0.12s;
-  padding: 4px;
-  line-height: 1;
+  padding: 4px; line-height: 1;
 }
 .fb-cup.on { filter: none; }
 .fb-cup.picked { transform: scale(1.25) translateY(-2px); }
 .fb-cup:active { transform: scale(0.9); }
 
-.fb-reaction { font-size: 17px; font-weight: 700; margin: 10px 0 4px; }
+/* Nochi face */
+.fb-nochi-wrap { display: flex; justify-content: center; align-items: center; min-height: 130px; margin: 4px 0; }
+.fb-nochi {
+  width: 130px; height: 130px;
+  object-fit: contain;
+  animation: fb-pop 0.3s cubic-bezier(0.22,1,0.36,1);
+}
+.fb-nochi-sm { min-height: 86px; }
+.fb-nochi-sm .fb-nochi { width: 80px; height: 80px; }
+@keyframes fb-pop { from { transform: scale(0.7); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.fb-reaction { font-size: 17px; font-weight: 800; margin: 2px 0 6px; line-height: 1.4; }
 .fb-reaction.fb-happy { color: var(--brand); }
 .fb-reaction.fb-ok    { color: var(--blue); }
 .fb-reaction.fb-low   { color: #c62828; }
 
 /* Reason chips */
-.fb-reasons {
-  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
-  margin: 14px 0 6px;
-}
+.fb-reasons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 6px; }
 .fb-chip {
   padding: 8px 14px;
   border-radius: 50px;
@@ -84,71 +95,60 @@
   background: #fff;
   font-size: 13px; font-weight: 600;
   color: var(--muted);
-  cursor: pointer;
-  font-family: inherit;
+  cursor: pointer; font-family: inherit;
   transition: all 0.12s;
 }
-.fb-chip.on {
-  background: var(--blue);
-  color: #fff;
-  border-color: var(--text);
-  box-shadow: 2px 2px 0 var(--text);
-}
+.fb-chip.on { background: var(--blue); color: #fff; border-color: var(--text); box-shadow: 2px 2px 0 var(--text); }
+
+/* Sorry block (1–2★) */
+.fb-sorry { margin: 14px 0 4px; }
+.fb-sorry-1 { color: #c62828; font-weight: 800; font-size: 15px; margin: 0 0 4px; }
+.fb-sorry-2 { color: var(--text); font-weight: 700; font-size: 14px; margin: 0 0 4px; }
+.fb-sorry-3 { color: var(--muted); font-size: 13px; margin: 0; line-height: 1.5; }
 
 .fb-comment {
-  width: 100%;
-  margin-top: 14px;
+  width: 100%; margin-top: 14px;
   padding: 12px 14px;
   border: 2px solid var(--border);
   border-radius: 16px;
-  font-family: inherit;
-  font-size: 14px;
-  resize: vertical;
-  outline: none;
-  background: #fff;
-  color: var(--text);
+  font-family: inherit; font-size: 14px;
+  resize: vertical; outline: none;
+  background: #fff; color: var(--text);
 }
-.fb-comment:focus { border-color: var(--brand); }
+.fb-comment:focus { border-color: var(--blue); }
 
-.fb-private-note { font-size: 12px; color: var(--muted); margin: 10px 0 0; line-height: 1.5; }
+.fb-private-note { font-size: 13px; color: var(--muted); margin: 12px 0 0; line-height: 1.6; }
 
-.fb-submit {
-  width: 100%;
-  margin-top: 18px;
+/* Primary button — NOCH blue */
+.fb-btn-primary {
+  width: 100%; margin-top: 18px;
   padding: 15px;
-  background: var(--brand);
+  background: var(--blue);
   color: #fff;
   border: 2.5px solid var(--text);
   border-radius: 50px;
   font-size: 17px; font-weight: 800;
-  cursor: pointer;
-  font-family: inherit;
+  cursor: pointer; font-family: inherit;
   box-shadow: 4px 4px 0 var(--text);
   transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
 }
-.fb-submit:hover:not(:disabled) { background: var(--brand-dark); transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--text); }
-.fb-submit:active:not(:disabled) { transform: translate(0,0); box-shadow: 2px 2px 0 var(--text); }
-.fb-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+.fb-btn-primary:hover:not(:disabled) { background: var(--blue-dark); transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--text); }
+.fb-btn-primary:active:not(:disabled) { transform: translate(0,0); box-shadow: 2px 2px 0 var(--text); }
+.fb-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Thank-you */
-.fb-thanks { padding: 8px 0; }
-.fb-mascot { font-size: 56px; margin-bottom: 8px; }
-.fb-thanks h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; }
-.fb-thanks p { color: var(--muted); margin: 0 0 18px; font-size: 15px; }
+/* Thank-you — orange accent */
+.fb-thanks { padding: 6px 0; }
+.fb-thanks h1 { font-size: 23px; font-weight: 800; margin: 4px 0 6px; color: var(--brand); }
+.fb-thanks p { color: var(--muted); margin: 0 0 16px; font-size: 15px; }
 
-.fb-share { margin: 8px 0 18px; }
-.fb-share-title { font-weight: 700; font-size: 14px; margin: 0 0 10px; color: var(--text); }
+.fb-share { margin: 6px 0 16px; }
 .fb-share-btn {
-  display: block;
-  width: 100%;
-  margin: 8px 0;
-  padding: 13px;
+  display: block; width: 100%;
+  margin: 8px 0; padding: 13px;
   border-radius: 50px;
   border: 2px solid var(--text);
-  font-weight: 800;
-  font-size: 15px;
-  text-decoration: none;
-  color: #fff;
+  font-weight: 800; font-size: 15px;
+  text-decoration: none; color: #fff;
   box-shadow: 3px 3px 0 var(--text);
   transition: transform 0.12s;
 }
@@ -157,19 +157,14 @@
 .fb-google { background: #DB4437; }
 .fb-ig     { background: linear-gradient(45deg,#F58529,#DD2A7B,#8134AF); }
 
-.fb-menu-link { display: inline-block; margin-top: 6px; color: var(--brand); font-weight: 700; text-decoration: none; }
-
+.fb-menu-link { display: inline-block; margin-top: 6px; color: var(--brand); font-weight: 800; text-decoration: none; }
 .fb-footer { margin-top: 18px; font-size: 12px; color: var(--muted); }
 
 /* Confetti */
 .fb-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .fb-confetti span {
-  position: absolute;
-  top: -12px;
-  width: 9px; height: 14px;
-  border-radius: 2px;
+  position: absolute; top: -12px;
+  width: 9px; height: 14px; border-radius: 2px;
   animation: fb-fall 1.6s linear forwards;
 }
-@keyframes fb-fall {
-  to { transform: translateY(520px) rotate(540deg); opacity: 0; }
-}
+@keyframes fb-fall { to { transform: translateY(560px) rotate(540deg); opacity: 0; } }

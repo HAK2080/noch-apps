@@ -2,25 +2,48 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import nochLogo from '../../assets/noch-logo.png'
+// Build-safe fallbacks (these assets exist). Custom per-rating faces live in
+// /public (nochi-fb-1..5.png) and override at runtime when present.
+import nochiBase from '../../assets/nochi-base.png'
+import nochiSad from '../../assets/nochi-sad.png'
+import nochiTired from '../../assets/nochi-tired.png'
+import nochiHappy from '../../assets/nochi-happy.svg'
 import './styles/Feedback.css'
 
-// Reason chips drawn from what customers actually judge Noch on (real reviews):
-// ambiance, drink quality incl. matcha, cake freshness, noise/crowd, price…
+// Reason chips — what customers actually judge Noch on (Libyan labels).
 const REASONS = [
-  { key: 'drinks',     en: 'Drinks / Coffee', ar: 'المشروبات' },
-  { key: 'matcha',     en: 'Matcha',          ar: 'الماتشا' },
-  { key: 'food',       en: 'Food & Cakes',    ar: 'الأكل والكيك' },
-  { key: 'ambiance',   en: 'Ambiance / Decor',ar: 'الأجواء والديكور' },
-  { key: 'noise',      en: 'Noise & Crowd',   ar: 'الهدوء والزحمة' },
-  { key: 'service',    en: 'Service',         ar: 'الخدمة' },
-  { key: 'price',      en: 'Price',           ar: 'الأسعار' },
-  { key: 'cleanliness',en: 'Cleanliness',     ar: 'النظافة' },
+  { key: 'drinks',      ar: 'المشروبات',       en: 'Drinks' },
+  { key: 'matcha',      ar: 'الماتشا',          en: 'Matcha' },
+  { key: 'food',        ar: 'الأكل والحلويات',  en: 'Food & sweets' },
+  { key: 'service',     ar: 'الخدمة',           en: 'Service' },
+  { key: 'cleanliness', ar: 'النظافة',          en: 'Cleanliness' },
+  { key: 'price',       ar: 'الأسعار',          en: 'Price' },
+  { key: 'noise',       ar: 'الهدوء والزحمة',   en: 'Noise & crowd' },
+  { key: 'decor',       ar: 'الديكور',          en: 'Decor' },
 ]
 
 const CUPS = [1, 2, 3, 4, 5]
+const FALLBACK = { 0: nochiBase, 1: nochiSad, 2: nochiSad, 3: nochiTired, 4: nochiHappy, 5: nochiHappy }
+
+// Nochi face that swaps per rating. Prefers the owner's custom /public faces
+// (nochi-fb-N.png); on a missing file it falls back to a built-in expression.
+function NochiFace({ rating }) {
+  const n = rating || 0
+  const initial = n >= 1 ? `/nochi-fb-${n}.png` : FALLBACK[0]
+  const [src, setSrc] = useState(initial)
+  useEffect(() => { setSrc(n >= 1 ? `/nochi-fb-${n}.png` : FALLBACK[0]) }, [n])
+  return (
+    <img
+      src={src}
+      onError={() => setSrc(FALLBACK[n] || nochiBase)}
+      alt="Nochi"
+      className="fb-nochi"
+      draggable={false}
+    />
+  )
+}
 
 function Confetti() {
-  // Lightweight CSS confetti — 40 colored bits.
   const bits = Array.from({ length: 40 })
   const colors = ['#E86A1E', '#1E3A9F', '#7BB661', '#F4C430', '#E0529C']
   return (
@@ -40,46 +63,52 @@ function Confetti() {
 export default function Feedback() {
   const { branchId } = useParams()
   const [params] = useSearchParams()
-  const table = params.get('table')
+  const table = params.get('table')          // captured silently for the owner, never shown
   const orderId = params.get('order')
   const source = params.get('source') || 'qr'
 
   const [lang, setLang] = useState('ar')
   const [branch, setBranch] = useState(null)
+  const [step, setStep] = useState('rate')   // 'rate' | 'details' | 'done'
   const [rating, setRating] = useState(0)
   const [hover, setHover] = useState(0)
   const [tags, setTags] = useState([])
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [done, setDone] = useState(false)
-  const [already, setAlready] = useState(false)
 
   const isAr = lang === 'ar'
   const t = (en, ar) => (isAr ? ar : en)
 
-  // Anti-double-submit key (per order, else per branch+table+day).
-  const dedupeKey = orderId
-    ? `noch-fb-${orderId}`
-    : `noch-fb-${branchId}-${table || 'x'}-${new Date().toISOString().slice(0, 10)}`
+  // Suppress browser auto-translate on this customer-facing page.
+  useEffect(() => {
+    document.documentElement.setAttribute('lang', 'ar')
+    document.documentElement.setAttribute('translate', 'no')
+    return () => document.documentElement.removeAttribute('translate')
+  }, [])
 
   useEffect(() => {
-    if (localStorage.getItem(dedupeKey)) setAlready(true)
     supabase.from('pos_branches')
       .select('name, review_facebook_url, review_google_url, review_instagram_url')
       .eq('id', branchId).single()
       .then(({ data }) => setBranch(data))
-  }, [branchId, dedupeKey])
+  }, [branchId])
 
   const toggleTag = (k) =>
     setTags(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k])
 
   const tier = rating >= 4 ? 'happy' : rating === 3 ? 'ok' : 'low'
 
+  // Dynamic line under Nochi on the rating screen.
+  const nochiLine = rating === 0 ? '' :
+    rating <= 2 ? t('Nochi’s upset… what happened?', 'نوتشي متضايق… شني اللي صار؟') :
+    rating === 3 ? t('We can do better… help Nochi understand', 'نقدروا نكونوا أحسن… ساعدي نوتشي يفهم شن اللي صار') :
+    t('Nochi is sooo happy with you!', 'نوتشي مبسوط منك هااااالبة!')
+
   async function submit() {
     if (submitting || rating === 0) return
     setSubmitting(true)
     try {
-      const { data, error } = await supabase.rpc('submit_feedback', {
+      const { error } = await supabase.rpc('submit_feedback', {
         p_branch_id: branchId,
         p_rating: rating,
         p_comment: comment.trim() || null,
@@ -90,23 +119,24 @@ export default function Feedback() {
         p_reason_tags: tags,
       })
       if (error) throw error
-      localStorage.setItem(dedupeKey, '1')
-      setDone(true)
-    } catch (e) {
-      // Surface but don't trap the customer.
-      alert(t('Could not send — please try again.', 'تعذّر الإرسال — حاول مرة أخرى.'))
+      setStep('done')
+    } catch {
+      alert(t('Could not send — please try again.', 'تعذّر الإرسال — حاولي مرة ثانية.'))
     } finally {
       setSubmitting(false)
     }
   }
 
-  // Public-review links (configured per branch, with sensible fallbacks).
+  function reset() {
+    setStep('rate'); setRating(0); setHover(0); setTags([]); setComment('')
+  }
+
   const fb = branch?.review_facebook_url
   const google = branch?.review_google_url
   const ig = branch?.review_instagram_url || 'https://www.instagram.com/noch.cafe'
 
   return (
-    <div className="fb-root" dir={isAr ? 'rtl' : 'ltr'}>
+    <div className="fb-root notranslate" translate="no" dir={isAr ? 'rtl' : 'ltr'}>
       <button className="fb-lang" onClick={() => setLang(l => (l === 'ar' ? 'en' : 'ar'))}>
         {isAr ? 'EN' : 'ع'}
       </button>
@@ -114,121 +144,111 @@ export default function Feedback() {
       <div className="fb-card">
         <img src={nochLogo} alt="Noch" className="fb-logo" />
 
-        {already && !done ? (
-          <div className="fb-thanks">
-            <div className="fb-mascot">🐰</div>
-            <h1>{t('Already rated — thanks! 💛', 'قيّمت من قبل — شكراً! 💛')}</h1>
-            <p>{t('See you soon at Noch.', 'نشوفك قريب في نوتش.')}</p>
-          </div>
-        ) : done ? (
-          <div className="fb-thanks">
-            {tier === 'happy' && <Confetti />}
-            <div className="fb-mascot">{tier === 'happy' ? '🥳' : '🙏'}</div>
-            <h1>{t('Thank you!', 'شكراً لك!')}</h1>
-            <p>
-              {tier === 'happy'
-                ? t('You made Nochi’s day ☕✨', 'سعّدت نوتشي اليوم ☕✨')
-                : t('We hear you — we’ll do better 💪', 'سمعناك — ونوعد نتحسّن 💪')}
-            </p>
-
-            {tier === 'happy' && (fb || google || ig) && (
-              <div className="fb-share">
-                <p className="fb-share-title">
-                  {t('Mind sharing the love?', 'تحب تشارك رأيك للعالم؟')}
-                </p>
-                {fb && <a className="fb-share-btn fb-fb" href={fb} target="_blank" rel="noreferrer">📘 {t('Review on Facebook', 'قيّمنا على فيسبوك')}</a>}
-                {google && <a className="fb-share-btn fb-google" href={google} target="_blank" rel="noreferrer">⭐ {t('Review on Google', 'قيّمنا على جوجل')}</a>}
-                {ig && <a className="fb-share-btn fb-ig" href={ig} target="_blank" rel="noreferrer">📸 {t('Tag us on Instagram', 'تابعنا على إنستغرام')}</a>}
-              </div>
-            )}
-
-            <a className="fb-menu-link" href={`/menu/${branchId}`}>
-              {t('Back to menu →', 'العودة للمنيو ←')}
-            </a>
-          </div>
-        ) : (
+        {/* ── STEP 1: rating ─────────────────────────────────────── */}
+        {step === 'rate' && (
           <>
-            <h1 className="fb-title">
-              {t('How was your Noch?', 'كيف كانت تجربتك في نوتش؟')}
-            </h1>
-            {(branch?.name || table) && (
-              <p className="fb-sub">
-                {branch?.name}{table ? ` · ${t('Table', 'طاولة')} ${table}` : ''}
-              </p>
-            )}
+            <h1 className="fb-title">{t('How was your Noch?', 'كيف كانت تجربتك في نوتش؟')}</h1>
+            {branch?.name && <p className="fb-sub">{branch.name}</p>}
 
-            {/* Tap-to-rate cups */}
             <div className="fb-cups" onMouseLeave={() => setHover(0)}>
               {CUPS.map(n => (
                 <button
                   key={n}
                   className={`fb-cup${(hover || rating) >= n ? ' on' : ''}${rating === n ? ' picked' : ''}`}
                   onMouseEnter={() => setHover(n)}
-                  onClick={() => { setRating(n); if (n >= 4) setTags([]) }}
+                  onClick={() => setRating(n)}
                   aria-label={`${n}`}
                 >☕</button>
               ))}
             </div>
 
-            {rating > 0 && (
-              <p className={`fb-reaction fb-${tier}`}>
-                {tier === 'happy'
-                  ? t('Love it! ☕✨', 'حلوة! ☕✨')
-                  : tier === 'ok'
-                  ? t('Thanks — how can we make it great?', 'شكراً — شو نحسّن؟')
-                  : t('Sorry to hear that 💔 tell us more', 'آسفين 💔 احكيلنا أكثر')}
-              </p>
-            )}
+            <div className="fb-nochi-wrap">
+              <NochiFace rating={rating} />
+            </div>
+            {nochiLine && <p className={`fb-reaction fb-${tier}`}>{nochiLine}</p>}
 
-            {/* Low/mid score → private reason chips + comment */}
-            {rating > 0 && rating <= 3 && (
-              <div className="fb-reasons">
-                {REASONS.map(r => (
-                  <button
-                    key={r.key}
-                    className={`fb-chip${tags.includes(r.key) ? ' on' : ''}`}
-                    onClick={() => toggleTag(r.key)}
-                  >
-                    {isAr ? r.ar : r.en}
-                  </button>
-                ))}
+            {rating > 0 && (
+              <button className="fb-btn-primary" onClick={() => setStep('details')}>
+                {t('Continue →', 'تابعي ←')}
+              </button>
+            )}
+          </>
+        )}
+
+        {/* ── STEP 2: details ────────────────────────────────────── */}
+        {step === 'details' && (
+          <>
+            <div className="fb-nochi-wrap fb-nochi-sm">
+              <NochiFace rating={rating} />
+            </div>
+            <h2 className="fb-step-title">
+              {rating <= 3
+                ? t('Help Nochi understand what happened', 'ساعدي نوتشي يفهم شن اللي صار')
+                : t('What did you love most?', 'شن أكثر حاجة عجباتك؟')}
+            </h2>
+
+            <div className="fb-reasons">
+              {REASONS.map(r => (
+                <button
+                  key={r.key}
+                  className={`fb-chip${tags.includes(r.key) ? ' on' : ''}`}
+                  onClick={() => toggleTag(r.key)}
+                >
+                  {isAr ? r.ar : r.en}
+                </button>
+              ))}
+            </div>
+
+            {rating <= 2 && (
+              <div className="fb-sorry">
+                <p className="fb-sorry-1">{t('Sorry to hear that — tell me more.', 'آسفين… احكيلي أكثر.')}</p>
+                <p className="fb-sorry-2">{t('What ruined your experience?', 'شنو اللي نغّص عليك تجربتك وما عجبكش؟')}</p>
+                <p className="fb-sorry-3">{t('I’ll take it straight to the owner, and follow up myself.', 'أنا بنوصلها مباشرة لصاحب الكافيه، وأكيد حنتابع معاه بنفسي.')}</p>
               </div>
             )}
 
-            {rating > 0 && (
-              <textarea
-                className="fb-comment"
-                value={comment}
-                onChange={e => setComment(e.target.value)}
-                maxLength={1000}
-                placeholder={rating >= 4
-                  ? t('Leave a sweet note (optional)', 'اكتب لنا كلمة حلوة (اختياري)')
-                  : t('What went wrong? (optional)', 'شو اللي ما عجبك؟ (اختياري)')}
-                rows={3}
-              />
-            )}
+            <textarea
+              className="fb-comment"
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              maxLength={1000}
+              rows={3}
+              placeholder={t('Anything else? Tell Nochi here…', 'عندك ملاحظة ثانية؟ قوليها لنوتشي هنا…')}
+            />
 
-            {rating > 0 && rating <= 3 && (
-              <p className="fb-private-note">
-                🔒 {t('This goes privately to the owner, who will look into it.',
-                       'تروح مباشرة لصاحب الكافيه، وراح ينظر فيها بنفسه.')}
-              </p>
-            )}
+            <p className="fb-private-note">
+              {t('Pssst… between us 🤫', 'بسسست… سر بيني وبينك 🤫')}<br />
+              {t('Your feedback reaches us without your name.', 'رأيك يوصلنا بدون اسمك.')}
+            </p>
 
-            <button
-              className="fb-submit"
-              disabled={rating === 0 || submitting}
-              onClick={submit}
-            >
-              {submitting ? t('Sending…', 'جارٍ الإرسال…') : t('Send feedback', 'إرسال')}
+            <button className="fb-btn-primary" disabled={submitting} onClick={submit}>
+              {submitting ? t('Sending…', 'جارٍ الإرسال…') : t('Send to Nochi', 'أرسلي لنوتشي')}
             </button>
           </>
         )}
+
+        {/* ── STEP 3: thank-you ──────────────────────────────────── */}
+        {step === 'done' && (
+          <div className="fb-thanks">
+            {tier === 'happy' && <Confetti />}
+            <div className="fb-nochi-wrap"><NochiFace rating={5} /></div>
+            <h1>{t('Your message reached Nochi!', 'وصلت رسالتك لنوتشي!')}</h1>
+            <p>{t('We hear you, and we always try to be better 💪', 'سمعناك، ودايمًا نحاولوا نكونوا أحسن 💪')}</p>
+
+            {tier === 'happy' && (fb || google || ig) && (
+              <div className="fb-share">
+                {fb && <a className="fb-share-btn fb-fb" href={fb} target="_blank" rel="noreferrer">📘 {t('Review on Facebook', 'قيّمينا على فيسبوك')}</a>}
+                {google && <a className="fb-share-btn fb-google" href={google} target="_blank" rel="noreferrer">⭐ {t('Review on Google', 'قيّمينا على جوجل')}</a>}
+                {ig && <a className="fb-share-btn fb-ig" href={ig} target="_blank" rel="noreferrer">📸 {t('Follow on Instagram', 'تابعينا على إنستغرام')}</a>}
+              </div>
+            )}
+
+            <a className="fb-menu-link" href={`/menu/${branchId}`}>{t('Back to menu →', '← العودة للمنيو')}</a>
+          </div>
+        )}
       </div>
 
-      <p className="fb-footer">
-        {t('Powered by Noch', 'بدعم من نوتش')} · noch.cloud
-      </p>
+      <p className="fb-footer">{t('Powered by Noch', 'بدعم من نوتش')} · noch.cloud</p>
     </div>
   )
 }
