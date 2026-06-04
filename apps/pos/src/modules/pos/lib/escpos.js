@@ -512,9 +512,17 @@ export async function printTestPage() {
 // See print-queue.js for the host subscriber.
 // ──────────────────────────────────────────────────────────────────
 
+// Only the host tablet WITH a printer actually attached prints directly.
+// A tablet flagged as host but with no printer connected (e.g. Samsung
+// that shares the flag, or a host whose printer dropped) must NOT swallow
+// the job via the direct path — it falls through to the queue so the real
+// printer-bearing host can pick it up.
+function shouldPrintDirect() {
+  return isPrintHost() && isPrinterConnected()
+}
+
 export async function printReceipt(order, branch, items, loyaltyCustomer = null) {
-  // Host tablet prints directly — no round-trip through the queue.
-  if (isPrintHost()) return printReceiptDirect(order, branch, items, loyaltyCustomer)
+  if (shouldPrintDirect()) return printReceiptDirect(order, branch, items, loyaltyCustomer)
   const jobId = await enqueuePrintJob(branch?.id || order?.branch_id, 'receipt', {
     order, branch, items, loyaltyCustomer,
   })
@@ -523,8 +531,7 @@ export async function printReceipt(order, branch, items, loyaltyCustomer = null)
 }
 
 export async function printDrinkTicket(order, items, branch, opts = {}) {
-  // Host tablet prints directly — no round-trip through the queue.
-  if (isPrintHost()) return printDrinkTicketDirect(order, items, branch, opts)
+  if (shouldPrintDirect()) return printDrinkTicketDirect(order, items, branch, opts)
   const jobId = await enqueuePrintJob(branch?.id || order?.branch_id, 'drink_ticket', {
     order, items, branch, opts,
   })
