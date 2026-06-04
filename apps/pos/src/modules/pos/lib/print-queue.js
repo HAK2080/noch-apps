@@ -43,6 +43,19 @@ export function setPrintHost(on) {
   else localStorage.removeItem(HOST_KEY)
 }
 
+// ── Broadcast signal (fast WebSocket path, no DB round-trip) ────────
+// After enqueuing, the sending tablet fires this so the host wakes up
+// immediately via the broadcast channel rather than waiting for the
+// postgres_changes event (which can lag 1-3s).
+export function broadcastJobReady(branchId) {
+  if (!branchId) return
+  try {
+    // Fire-and-forget on a short-lived channel — no need to track/cleanup.
+    const ch = supabase.channel(`print-queue-${branchId}`)
+    ch.send({ type: 'broadcast', event: 'job_ready', payload: {} }).catch(() => {})
+  } catch { /* non-fatal */ }
+}
+
 // ── Enqueue ─────────────────────────────────────────────────────────
 export async function enqueuePrintJob(branchId, jobType, payload) {
   if (!branchId) throw new Error('enqueuePrintJob: branchId required')
@@ -73,6 +86,9 @@ export function startHostSubscriber(branchId) {
 
   _channel = supabase
     .channel(`print-queue-${branchId}`)
+    // Fast path: broadcast signal fires immediately after enqueue (<100ms).
+    .on('broadcast', { event: 'job_ready' }, () => { processQueue(branchId) })
+    // Reliable fallback: postgres_changes catches any missed broadcasts.
     .on(
       'postgres_changes',
       {
@@ -225,7 +241,7 @@ export async function waitForJob(jobId, timeoutMs = 15000) {
       .single()
     if (error) throw error
     if (data.status === 'done' || data.status === 'failed') return data
-    await new Promise(r => setTimeout(r, 500))
+    await new Promise(r => setTimeout(r, 200))
   }
   return { status: 'timeout', error: 'No host picked up the job within 15s' }
 }

@@ -1,7 +1,7 @@
 // escpos.js — ESC/POS printer driver via Web Serial API
 // Target: XPrinter NP-N200L, 48 char width
 
-import { enqueuePrintJob } from './print-queue'
+import { enqueuePrintJob, broadcastJobReady } from './print-queue'
 
 const ESC = 0x1b
 const GS = 0x1d
@@ -513,13 +513,17 @@ export async function printTestPage() {
 // ──────────────────────────────────────────────────────────────────
 
 export async function printReceipt(order, branch, items, loyaltyCustomer = null) {
-  return enqueuePrintJob(branch?.id || order?.branch_id, 'receipt', {
+  const jobId = await enqueuePrintJob(branch?.id || order?.branch_id, 'receipt', {
     order, branch, items, loyaltyCustomer,
   })
+  broadcastJobReady(branch?.id || order?.branch_id)
+  return jobId
 }
 
 export async function printDrinkTicket(order, items, branch, opts = {}) {
-  return enqueuePrintJob(branch?.id || order?.branch_id, 'drink_ticket', {
+  const jobId = await enqueuePrintJob(branch?.id || order?.branch_id, 'drink_ticket', {
     order, items, branch, opts,
   })
+  broadcastJobReady(branch?.id || order?.branch_id)
+  return jobId
 }
