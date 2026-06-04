@@ -351,19 +351,8 @@ export async function printReceipt(order, branch, items, loyaltyCustomer = null)
   pushCmd(CMD.ALIGN_CENTER)
   pushLine(footerText)
 
-  // Passport QR — only when there's a loyalty customer with a token
-  const passportToken = loyaltyCustomer?.passport_token
-  if (passportToken) {
-    const passportUrl = `https://noch.cloud/passport/?t=${passportToken}`
-    pushLine()
-    bytes.push(...separator('-'))
-    pushLine('Scan for your Nochi Pass')
-    bytes.push(...qrCodeBytes(passportUrl, 4))
-    pushLine()
-    pushLine('noch.cloud/passport')
-  }
-
-  // Feedback QR — always printed so every customer can rate us, even guests.
+  // Feedback QR — the single QR on every receipt (replaces the old loyalty
+  // passport QR here, per owner preference). Works for guests too.
   const fbBranch = order.branch_id || branch?.id
   if (fbBranch) {
     const oid = String(order.id || '')
