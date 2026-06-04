@@ -123,8 +123,11 @@ export default function LoyaltySettings() {
     if (!testPhone.trim()) return
     setTestSending(true)
     try {
-      const msg = (settings?.stamp_notify_message_en || 'Thanks for ${activity}! Nochi gave you a stamp 🎁').replace(/\$\{activity\}/g, ar ? 'تجربة' : 'your post')
-      const { data, error } = await supabase.functions.invoke('send-whatsapp', { body: { to: testPhone.trim(), message: msg } })
+      const label = ar ? 'تجربة' : 'your post'
+      const body = settings?.stamp_notify_template_sid
+        ? { to: testPhone.trim(), contentSid: settings.stamp_notify_template_sid, contentVariables: { '1': label } }
+        : { to: testPhone.trim(), message: (settings?.stamp_notify_message_en || 'Thanks for ${activity}! Nochi gave you a stamp 🎁').replace(/\$\{activity\}/g, label) }
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', { body })
       if (error || data?.error) throw new Error(error?.message || data?.error)
       toast.success(ar ? 'تم الإرسال ✓' : 'Sent ✓')
     } catch (e) {
@@ -269,10 +272,14 @@ export default function LoyaltySettings() {
                   <label className="label">{ar ? 'الرسالة (إنجليزي)' : 'Message (EN)'}</label>
                   <input className="input" value={settings?.stamp_notify_message_en || ''} onChange={e => set('stamp_notify_message_en', e.target.value)} placeholder="Thanks for ${activity}! Nochi gave you a stamp 🎁" />
                 </div>
+                <div className="mb-2">
+                  <label className="label">{ar ? 'معرّف القالب (Twilio Content SID)' : 'Template SID (Twilio Content SID)'}</label>
+                  <input className="input font-mono text-xs" value={settings?.stamp_notify_template_sid || ''} onChange={e => set('stamp_notify_template_sid', e.target.value.trim())} placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" dir="ltr" />
+                </div>
                 <p className="text-noch-muted text-[11px] mb-3">
                   {ar
-                    ? 'استخدم ${activity} لاسم النشاط. ⚠️ لإرسال واتساب استباقي يجب تسجيل هذه الرسالة كقالب معتمد في Twilio/Meta. تُرسل فقط للعملاء الموافقين على واتساب.'
-                    : 'Use ${activity} for the activity name. ⚠️ Proactive WhatsApp needs this registered as an approved Twilio/Meta template. Only sends to customers with WhatsApp opt-in.'}
+                    ? 'إذا أدخلت معرّف القالب، يُرسل عبره (الطريقة الصحيحة للرسائل الاستباقية). وإلا تُرسل الرسالة الحرة أعلاه (تعمل فقط خلال ٢٤ ساعة). ${activity} = اسم النشاط ({{1}} في القالب). تُرسل فقط للموافقين على واتساب.'
+                    : 'With a Template SID it sends via the approved template (correct for proactive sends); otherwise the free-form message above is used (24h window only). ${activity} fills the activity ({{1}} in the template). Only sends to opted-in customers.'}
                 </p>
                 <div className="flex gap-2">
                   <input className="input flex-1" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder={ar ? 'رقم لاختبار الإرسال' : 'Phone to test send'} dir="ltr" />

@@ -1,6 +1,11 @@
 [functions.cs-extract-concept]
 verify_jwt = false
 
+# send-whatsapp must require a valid JWT — it spends real Twilio balance, so it
+# must never be publicly callable.
+[functions.send-whatsapp]
+verify_jwt = true
+
 [functions.cs-evaluate-draft]
 verify_jwt = false
 

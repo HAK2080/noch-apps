@@ -21,3 +21,14 @@ export async function sendWhatsAppWithImage(phone, message, imageUrl) {
   if (data?.error) throw new Error(data.error)
   return data
 }
+
+// Send an approved WhatsApp template (Twilio Content API). `variables` is a
+// map like { "1": "value" } matching the template's {{1}} placeholders.
+export async function sendWhatsAppTemplate(phone, contentSid, variables = null) {
+  const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+    body: { to: phone, contentSid, contentVariables: variables },
+  })
+  if (error) throw new Error(error.message ?? 'Failed to send WhatsApp template')
+  if (data?.error) throw new Error(data.error)
+  return data
+}

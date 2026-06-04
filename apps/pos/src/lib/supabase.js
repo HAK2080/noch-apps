@@ -1800,13 +1800,17 @@ export async function notifyStampGranted(customer, activity) {
     if (activity === 'review' && !settings.stamp_notify_review) return { skipped: true, reason: 'activity_off' }
 
     const lang = customer.preferred_language === 'en' ? 'en' : 'ar'
-    const tmpl = (lang === 'en' ? settings.stamp_notify_message_en : settings.stamp_notify_message_ar) || ''
     const label = (STAMP_ACTIVITY_LABELS[activity] || STAMP_ACTIVITY_LABELS.visit)[lang]
-    const message = tmpl.replace(/\$\{activity\}/g, label)
 
-    const { data, error } = await supabase.functions.invoke('send-whatsapp', {
-      body: { to: customer.phone, message },
-    })
+    // Prefer an approved Content API template (proactive-safe); else free-form.
+    let body
+    if (settings.stamp_notify_template_sid) {
+      body = { to: customer.phone, contentSid: settings.stamp_notify_template_sid, contentVariables: { '1': label } }
+    } else {
+      const tmpl = (lang === 'en' ? settings.stamp_notify_message_en : settings.stamp_notify_message_ar) || ''
+      body = { to: customer.phone, message: tmpl.replace(/\$\{activity\}/g, label) }
+    }
+    const { data, error } = await supabase.functions.invoke('send-whatsapp', { body })
     const ok = !error && !data?.error
     // Audit log (best-effort).
     supabase.rpc('record_whatsapp_send', {

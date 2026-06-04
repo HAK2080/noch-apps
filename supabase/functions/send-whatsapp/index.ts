@@ -1,6 +1,10 @@
-// Supabase Edge Function — sends a WhatsApp message via Twilio
+// Supabase Edge Function — sends a WhatsApp message via Twilio.
+// Free-form { to, message, mediaUrl? } for the 24h session window, OR an
+// approved template { to, contentSid, contentVariables? } via the Content API
+// for proactive business-initiated messages.
 // Deploy: npx supabase functions deploy send-whatsapp
-// Secrets: npx supabase secrets set TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_WHATSAPP_NUMBER=...
+// Secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and one sender —
+//   TWILIO_MESSAGING_SERVICE_SID (recommended for templates) or TWILIO_WHATSAPP_NUMBER.
 
 
 const CORS_HEADERS = {
@@ -14,15 +18,19 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { to, message } = await req.json()
+    // Accepts either:
+    //   - free-form: { to, message, mediaUrl? }            (24h session window)
+    //   - template:  { to, contentSid, contentVariables? } (proactive, approved)
+    const { to, message, mediaUrl, contentSid, contentVariables } = await req.json()
 
-    if (!to || !message) {
-      return json({ error: 'Missing required fields: to, message' }, 400)
+    if (!to || (!message && !contentSid)) {
+      return json({ error: 'Missing required fields: to, and (message or contentSid)' }, 400)
     }
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN')
     const fromNumber = Deno.env.get('TWILIO_WHATSAPP_NUMBER') || '+14155238886'
+    const messagingServiceSid = Deno.env.get('TWILIO_MESSAGING_SERVICE_SID')
 
     if (!accountSid || !authToken) {
       return json({ error: 'Twilio credentials not configured' }, 500)
@@ -31,11 +39,23 @@ Deno.serve(async (req: Request) => {
     // Normalise phone: ensure it has + prefix
     const toPhone = to.startsWith('+') ? to : '+' + to.replace(/\D/g, '')
 
-    const params = new URLSearchParams({
-      From: `whatsapp:${fromNumber}`,
-      To: `whatsapp:${toPhone}`,
-      Body: message,
-    })
+    const params = new URLSearchParams({ To: `whatsapp:${toPhone}` })
+    // Prefer a Messaging Service (recommended for templates); else the from number.
+    if (messagingServiceSid) params.set('MessagingServiceSid', messagingServiceSid)
+    else params.set('From', `whatsapp:${fromNumber}`)
+
+    if (contentSid) {
+      // Approved-template send via Twilio Content API.
+      params.set('ContentSid', contentSid)
+      if (contentVariables) {
+        params.set('ContentVariables',
+          typeof contentVariables === 'string' ? contentVariables : JSON.stringify(contentVariables))
+      }
+    } else {
+      // Free-form session message.
+      params.set('Body', message)
+      if (mediaUrl) params.set('MediaUrl', mediaUrl)
+    }
 
     const res = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
