@@ -12,6 +12,22 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Approved WhatsApp template name → Twilio Content SID (HX…).
+// Single source of truth so callers (whatsapp-cron, frontend) can pass a
+// human-readable template name and we resolve it here. Verified against the
+// Twilio Content API on 2026-06-05. Add new rows here once a template is
+// approved in Twilio.
+const TEMPLATE_SIDS: Record<string, string> = {
+  marketing_anniversary:      'HX0ed864bf6d201c75b435358efa9ebbd6',
+  marketing_streak_save:      'HXf13e53d06f67f28309bd4b1ad29f0eaf',
+  marketing_back_in_stock:    'HX16c84ac97be895be6c153b3414e92976',
+  marketing_weather_iced:     'HX20bba1bda93bfd0291b1f2428bd8d6f2',
+  loyalty_marketing_birthday: 'HX2d934c0762f0b623e080b1d382f7c5b1',
+  loyalty_lapsed_checkin:     'HX1bcf158d960d649731d8026e86c70aa5',
+  loyalty_reward_ready:       'HXd1df8cc058afd9e1812ad2881ee9de1e',
+  // loyalty_phoenix_revival: not yet approved in Twilio — add SID once live.
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
@@ -19,12 +35,26 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Accepts either:
-    //   - free-form: { to, message, mediaUrl? }            (24h session window)
-    //   - template:  { to, contentSid, contentVariables? } (proactive, approved)
-    const { to, message, mediaUrl, contentSid, contentVariables } = await req.json()
+    //   - free-form: { to, message, mediaUrl? }                  (24h session window)
+    //   - template:  { to, contentSid, contentVariables? }       (proactive, approved)
+    //   - template by name: { to, templateName, templateVariables? }
+    //       (resolved to a Content SID via TEMPLATE_SIDS — used by whatsapp-cron)
+    const body = await req.json()
+    const { to, message, mediaUrl, templateName } = body
+
+    // Resolve the Content SID: explicit contentSid wins, else map the name.
+    let contentSid: string | undefined = body.contentSid
+    if (!contentSid && templateName) {
+      contentSid = TEMPLATE_SIDS[templateName]
+      if (!contentSid) {
+        return json({ error: `Unknown or unapproved template: ${templateName}` }, 400)
+      }
+    }
+    // Accept either spelling of the variables map.
+    const contentVariables = body.contentVariables ?? body.templateVariables
 
     if (!to || (!message && !contentSid)) {
-      return json({ error: 'Missing required fields: to, and (message or contentSid)' }, 400)
+      return json({ error: 'Missing required fields: to, and (message, contentSid, or templateName)' }, 400)
     }
 
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
