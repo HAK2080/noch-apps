@@ -11,18 +11,19 @@ import { ListOrdered, Clock } from 'lucide-react'
 import { getPOSBranches } from '../modules/pos/lib/pos-supabase'
 import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermissions } from '../contexts/PermissionsContext'
 import Layout from '../components/Layout'
-
-// Roles allowed to see aggregate session/shift totals. Mirrors the
-// gate inside POSSessions.jsx and the POSOrders summary card.
-const SESSION_ROLES = ['owner', 'supervisor']
 
 export default function Sales() {
   const navigate = useNavigate()
   const { profile } = useAuth()
-  // PIN-verified operator takes precedence over Supabase login.
-  const activeRole = getServedBy()?.role || profile?.role
-  const canViewSessions = SESSION_ROLES.includes(activeRole)
+  const { isOwner, hasAccess } = usePermissions()
+  // Session/shift totals: 'sales' permission for the logged-in profile, OR a
+  // PIN-verified owner/supervisor on a shared terminal (role_permissions keys
+  // off the Supabase login, not the PIN operator — keep the role fallback).
+  const canViewSessions = isOwner || hasAccess('sales')
+    || ['owner', 'supervisor'].includes(getServedBy()?.role)
+    || profile?.role === 'supervisor'
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
 

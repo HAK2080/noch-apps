@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
+import { usePermissions } from './contexts/PermissionsContext'
 
 // Eagerly-loaded: critical-path screens that the operator hits within
 // 1 second of opening the app every day. Login + Dashboard + POS +
@@ -124,14 +125,13 @@ function OwnerRoute({ children }) {
   return children
 }
 
-// ElevatedRoute — owner or data_entry. Used for pages that data_entry
-// staff need but regular staff don't (expenses, marketing).
-function ElevatedRoute({ children }) {
-  const { profile, loading } = useAuth()
+// PermissionRoute — gate by role_permissions feature key (Manage Roles).
+// Owner always passes (PermissionsContext short-circuits).
+function PermissionRoute({ feature, children }) {
+  const { hasAccess, loading, isOwner } = usePermissions()
   if (loading) return null
-  if (!profile) return null
-  if (profile.role !== 'owner' && profile.role !== 'data_entry') return <Navigate to="/my-tasks" replace />
-  return children
+  if (isOwner || hasAccess(feature)) return children
+  return <Navigate to="/my-tasks" replace />
 }
 
 function RootRedirect() {
@@ -183,7 +183,7 @@ export default function App() {
         } />
 
         <Route path="/report" element={
-          <ProtectedRoute><OwnerRoute><Report /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><PermissionRoute feature="reports"><Report /></PermissionRoute></ProtectedRoute>
         } />
 
         <Route path="/my-tasks" element={
@@ -203,7 +203,7 @@ export default function App() {
         } />
 
         <Route path="/expenses/*" element={
-          <ProtectedRoute><ElevatedRoute><ExpensesPage /></ElevatedRoute></ProtectedRoute>
+          <ProtectedRoute><PermissionRoute feature="expenses"><ExpensesPage /></PermissionRoute></ProtectedRoute>
         } />
 
         {/* Content Studio 2.0 (Noch 4.0) */}
@@ -254,9 +254,9 @@ export default function App() {
 
         {/* Analytics (owner only) */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
-        <Route path="/finance" element={<ProtectedRoute><OwnerRoute><FinanceDashboard /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/marketing" element={<ProtectedRoute><ElevatedRoute><MarketingDashboard /></ElevatedRoute></ProtectedRoute>} />
-        <Route path="/analytics-legacy" element={<ProtectedRoute><OwnerRoute><BusinessAnalytics /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/finance" element={<ProtectedRoute><PermissionRoute feature="finance"><FinanceDashboard /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/marketing" element={<ProtectedRoute><PermissionRoute feature="marketing"><MarketingDashboard /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/analytics-legacy" element={<ProtectedRoute><PermissionRoute feature="finance"><BusinessAnalytics /></PermissionRoute></ProtectedRoute>} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />

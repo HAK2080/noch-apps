@@ -16,13 +16,9 @@ import { ArrowLeft, Clock, CheckCircle2, DollarSign, CreditCard, Bike, Package, 
 import { getPOSBranch, listShifts } from '../lib/pos-supabase'
 import { getServedBy } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
+import { usePermissions } from '../../../contexts/PermissionsContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
-
-// Roles allowed to view session/shift totals.
-// Aligned with POSOrders.jsx — staff and limited_staff are scoped to
-// per-order detail only; aggregate financial views are owner+supervisor.
-const SESSION_ROLES = ['owner', 'supervisor']
 
 function formatDuration(openedAt, closedAt) {
   if (!openedAt) return '—'
@@ -49,10 +45,13 @@ export default function POSSessions() {
   const { branchId } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
-  // PIN-verified operator takes precedence over the device's Supabase
-  // login. See the same comment in POSOrders.jsx for context.
-  const activeRole = getServedBy()?.role || profile?.role
-  const allowed = SESSION_ROLES.includes(activeRole)
+  const { isOwner, hasAccess } = usePermissions()
+  // Session/shift totals: 'sales' permission for the logged-in profile, OR a
+  // PIN-verified owner/supervisor on a shared terminal (role_permissions keys
+  // off the Supabase login, not the PIN operator — keep the role fallback).
+  const allowed = isOwner || hasAccess('sales')
+    || ['owner', 'supervisor'].includes(getServedBy()?.role)
+    || profile?.role === 'supervisor'
 
   const [branch, setBranch] = useState(null)
   const [shifts, setShifts] = useState([])
