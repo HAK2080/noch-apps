@@ -28,26 +28,32 @@ import ForecastTab from './tabs/ForecastTab'
 import OverviewTab from '../../pages/analytics/OverviewTab'
 import IntelligenceTab from '../../pages/analytics/IntelligenceTab'
 
+// Tab levels (keyed on the 'finance' feature in Manage Roles):
+//   view → visible with finance can_access (read-only for non-editors)
+//   edit → requires finance can_edit (bank import, cost mapping, capex,
+//          forecast scenarios, AI insights)
 const TABS = [
-  { id: 'pnl',         label: 'Daily P&L',          icon: TrendingUp, feature: 'analytics', action: 'view' },
-  { id: 'menu',        label: 'Menu profit',        icon: Coffee,     feature: 'analytics', action: 'view' },
-  { id: 'cash',        label: 'Cash & runway',      icon: Wallet,     feature: 'analytics', action: 'financial' },
-  { id: 'expenses',    label: 'Expenses',           icon: Receipt,    feature: 'analytics', action: 'financial' },
-  { id: 'shifts',      label: 'Shifts',             icon: Clock,      feature: 'analytics', action: 'financial' },
-  { id: 'bank',        label: 'Bank',               icon: Upload,     feature: 'analytics', action: 'financial' },
-  { id: 'recipes',     label: 'Cost mapping',       icon: Link2,      feature: 'analytics', action: 'financial' },
-  { id: 'variance',    label: 'Variance',           icon: Target,     feature: 'analytics', action: 'financial' },
-  { id: 'capex',       label: 'CapEx',              icon: Wrench,     feature: 'analytics', action: 'financial' },
-  { id: 'forecast',    label: 'Forecast',           icon: TrendingUp, feature: 'analytics', action: 'financial' },
-  { id: 'overview',    label: 'Overview (legacy)',  icon: BarChart3,  feature: 'analytics', action: 'view' },
-  { id: 'ai',          label: 'AI insights',        icon: BarChart3,  feature: 'analytics', action: 'financial' },
+  { id: 'pnl',         label: 'Daily P&L',          icon: TrendingUp, level: 'view' },
+  { id: 'menu',        label: 'Menu profit',        icon: Coffee,     level: 'view' },
+  { id: 'cash',        label: 'Cash & runway',      icon: Wallet,     level: 'view' },
+  { id: 'expenses',    label: 'Expenses',           icon: Receipt,    level: 'view' },
+  { id: 'shifts',      label: 'Shifts',             icon: Clock,      level: 'view' },
+  { id: 'bank',        label: 'Bank',               icon: Upload,     level: 'edit' },
+  { id: 'recipes',     label: 'Cost mapping',       icon: Link2,      level: 'edit' },
+  { id: 'variance',    label: 'Variance',           icon: Target,     level: 'view' },
+  { id: 'capex',       label: 'CapEx',              icon: Wrench,     level: 'edit' },
+  { id: 'forecast',    label: 'Forecast',           icon: TrendingUp, level: 'edit' },
+  { id: 'overview',    label: 'Overview (legacy)',  icon: BarChart3,  level: 'view' },
+  { id: 'ai',          label: 'AI insights',        icon: BarChart3,  level: 'edit' },
 ]
 
 export default function FinanceDashboard() {
   const can = usePermission()
   const [tab, setTab] = useState('pnl')
 
-  const visibleTabs = TABS.filter(t => can(t.feature, t.action))
+  // readOnly: has finance view access but not edit — hide all edit affordances.
+  const readOnly = !can('finance', 'edit')
+  const visibleTabs = TABS.filter(t => (t.level === 'edit' ? can('finance', 'edit') : can('finance', 'view')))
   const activeTab = visibleTabs.find(t => t.id === tab) ? tab : visibleTabs[0]?.id || 'pnl'
 
   return (
@@ -75,25 +81,25 @@ export default function FinanceDashboard() {
           ))}
         </div>
 
-        <ProtectedFeature feature="analytics" action="view" fallback={
+        <ProtectedFeature feature="finance" action="view" fallback={
           <div className="bg-noch-card border border-noch-border rounded-xl p-16 text-center">
             <BarChart3 size={40} className="mx-auto text-noch-muted mb-3 opacity-50" />
             <p className="text-noch-muted text-sm">You don't have permission to view Finance.</p>
           </div>
         }>
-          {activeTab === 'pnl'      && <DailyPnLTab />}
-          {activeTab === 'menu'     && <MenuProfitabilityTab />}
-          {activeTab === 'cash'     && <CashRunwayTab />}
-          {activeTab === 'expenses' && <ExpensesTab />}
-          {activeTab === 'shifts'   && <ShiftsTab />}
+          {activeTab === 'pnl'      && <DailyPnLTab readOnly={readOnly} />}
+          {activeTab === 'menu'     && <MenuProfitabilityTab readOnly={readOnly} />}
+          {activeTab === 'cash'     && <CashRunwayTab readOnly={readOnly} />}
+          {activeTab === 'expenses' && <ExpensesTab readOnly={readOnly} />}
+          {activeTab === 'shifts'   && <ShiftsTab readOnly={readOnly} />}
           {activeTab === 'bank'     && <BankTab />}
           {activeTab === 'recipes'  && <RecipeLinkerTab />}
-          {activeTab === 'variance' && <VarianceTab />}
+          {activeTab === 'variance' && <VarianceTab readOnly={readOnly} />}
           {activeTab === 'capex'    && <CapexTab />}
           {activeTab === 'forecast' && <ForecastTab />}
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'ai'       && (
-            <ProtectedFeature feature="analytics" action="financial" fallback={
+            <ProtectedFeature feature="finance" action="edit" fallback={
               <div className="bg-noch-card border border-noch-border rounded-xl p-16 text-center">
                 <BarChart3 size={40} className="mx-auto text-noch-muted mb-3 opacity-50" />
                 <p className="text-noch-muted text-sm">Restricted to authorised roles.</p>

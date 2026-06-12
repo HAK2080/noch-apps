@@ -235,3 +235,34 @@
     border: 1px solid var(--border);
   }
 }
+
+/* ── Print styles — used by the Export/Print buttons on finance reports ── */
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    margin-inline-start: 0 !important;
+    padding: 0 !important;
+  }
+  body,
+  .card,
+  table {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .card {
+    border-color: #ddd !important;
+    box-shadow: none !important;
+  }
+  table th,
+  table td,
+  .card p,
+  .card span,
+  .card h1, .card h2, .card h3 {
+    color: #000 !important;
+  }
+}

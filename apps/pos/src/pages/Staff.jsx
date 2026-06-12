@@ -34,11 +34,20 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
     branch_id: staff.branch_id || '',
     role: staff.role || 'staff',
     is_active: staff.is_active !== false,
+    days_off: Array.isArray(staff.days_off) ? staff.days_off : [],
+    overtime_exempt: staff.overtime_exempt === true,
   } : {
     full_name: fromRequest?.full_name || '', telegram_chat_id: '', phone: fromRequest?.phone || '', photo_url: '',
     monthly_salary: '', hourly_rate: '', employment_type: 'full_time',
     start_date: '', pin_code: '', department: '', branch_id: '', role: 'staff', is_active: true,
+    days_off: [], overtime_exempt: false,
   })
+
+  // ISO day-of-week (matches the shift_labor_cost view's extract(isodow))
+  const DOW_OPTS = [
+    { v: 1, label: 'Mon' }, { v: 2, label: 'Tue' }, { v: 3, label: 'Wed' }, { v: 4, label: 'Thu' },
+    { v: 5, label: 'Fri' }, { v: 6, label: 'Sat' }, { v: 7, label: 'Sun' },
+  ]
 
   const ROLE_OPTIONS = [
     { value: 'owner',         label: 'Owner' },
@@ -126,6 +135,8 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
       if (canSeeSalaries) {
         payload.monthly_salary = form.monthly_salary ? parseFloat(form.monthly_salary) : null
         payload.hourly_rate = form.hourly_rate ? parseFloat(form.hourly_rate) : null
+        payload.days_off = form.days_off?.length ? form.days_off : null
+        payload.overtime_exempt = !!form.overtime_exempt
       }
       if (canEditRole) {
         payload.role = form.role || 'staff'
@@ -252,16 +263,52 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
 
           {/* Salaries — only if canSeeSalaries */}
           {canSeeSalaries && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Monthly Salary (LYD)</label>
-                <input className="input" type="number" value={form.monthly_salary} onChange={e => set('monthly_salary', e.target.value)} placeholder="2500" min="0" step="0.01" />
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Monthly Salary (LYD)</label>
+                  <input className="input" type="number" value={form.monthly_salary} onChange={e => set('monthly_salary', e.target.value)} placeholder="2500" min="0" step="0.01" />
+                </div>
+                <div>
+                  <label className="label">Hourly Rate (LYD)</label>
+                  <input className="input" type="number" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} placeholder="15" min="0" step="0.01" />
+                </div>
               </div>
+
+              {/* Payroll: scheduled days off + overtime exemption.
+                  Only matter when overtime/extra-day pay is enabled in Finance → Shifts. */}
               <div>
-                <label className="label">Hourly Rate (LYD)</label>
-                <input className="input" type="number" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} placeholder="15" min="0" step="0.01" />
+                <label className="label">Scheduled days off</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DOW_OPTS.map(d => {
+                    const on = form.days_off?.includes(d.v)
+                    return (
+                      <button
+                        key={d.v}
+                        type="button"
+                        onClick={() => set('days_off',
+                          on ? form.days_off.filter(x => x !== d.v) : [...(form.days_off || []), d.v].sort())}
+                        className={`px-2.5 py-1 rounded-lg border text-xs transition-colors ${
+                          on ? 'bg-noch-green/20 border-noch-green/50 text-noch-green'
+                             : 'border-noch-border text-noch-muted hover:border-noch-green/30'
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-noch-muted text-[11px] mt-1">
+                  Working a scheduled day off counts as an “extra day” when extra-day pay is enabled.
+                </p>
               </div>
-            </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!form.overtime_exempt} onChange={e => set('overtime_exempt', e.target.checked)} />
+                <span className="text-sm text-white">Overtime exempt</span>
+                <span className="text-noch-muted text-[11px]">(never paid the overtime multiplier)</span>
+              </label>
+            </>
           )}
 
           {/* PIN Code */}

@@ -20,6 +20,8 @@ const ACTION_MAP = {
   'role_management.manage': null, // owner-only
   'analytics.view':         ['analytics',     'access'],
   'analytics.financial':    ['analytics',     'edit'],
+  'finance.view':           ['finance',       'access'],
+  'finance.edit':           ['finance',       'edit'],
 }
 
 export function usePermission() {

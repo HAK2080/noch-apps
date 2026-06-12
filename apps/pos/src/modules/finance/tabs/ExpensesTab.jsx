@@ -12,6 +12,7 @@ import { ExternalLink, Receipt, TrendingDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { lyd } from '../lib/thresholds'
 import PeriodSelector from '../components/PeriodSelector'
+import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
 function defaultPeriod() {
@@ -77,12 +78,25 @@ export default function ExpensesTab() {
             Showing <strong className="text-white">approved &amp; paid</strong> expenses — all feed into <strong className="text-white">Other OpEx</strong> on the Daily P&amp;L.
           </p>
         </div>
-        <a
-          href="/expenses"
-          className="flex items-center gap-1.5 text-noch-green text-xs font-semibold hover:underline"
-        >
-          <ExternalLink size={12} /> Open Expenses module
-        </a>
+        <div className="flex items-center gap-3">
+          <ExportButtons onCsv={() => downloadCsv(`expenses_${period.from}_${period.to}`,
+            ['Date', 'Category', 'Cost centre', 'Vendor / note', 'Amount (LYD)', 'Status', 'Paid by'],
+            rows.map(r => [
+              r.expense_date,
+              r.expense_categories?.name || '',
+              r.cost_centers?.name || '',
+              r.vendor || r.description || '',
+              Number(r.amount_lyd || 0).toFixed(2),
+              r.status,
+              r.paid_by || '',
+            ]))} />
+          <a
+            href="/expenses"
+            className="flex items-center gap-1.5 text-noch-green text-xs font-semibold hover:underline no-print"
+          >
+            <ExternalLink size={12} /> Open Expenses module
+          </a>
+        </div>
       </div>
 
       <PeriodSelector value={period} onChange={setPeriod} />

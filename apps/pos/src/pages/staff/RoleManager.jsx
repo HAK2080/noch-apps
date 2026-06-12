@@ -2,59 +2,13 @@
 // Route: /staff/roles
 
 import { useState, useEffect } from 'react'
-import { Shield, Check, X, Loader2, Bell } from 'lucide-react'
+import { Shield, Check, X, Loader2, Bell, Pencil } from 'lucide-react'
 import { supabase, getRolePermissions, updateRolePermission, approveRoleChange, denyRoleChange } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import { usePermission } from '../../lib/usePermission'
 import { AccessDenied } from '../../components/shared/ProtectedFeature'
+import { FEATURE_GROUPS } from '../../lib/features'
 import toast from 'react-hot-toast'
-
-// ── Feature definitions ──────────────────────────────────────
-const FEATURE_GROUPS = [
-  {
-    label: 'Operations',
-    features: [
-      { key: 'dashboard', label: 'Dashboard' },
-      { key: 'tasks', label: 'Tasks' },
-      { key: 'inventory', label: 'Inventory' },
-      { key: 'suppliers', label: 'Suppliers' },
-      { key: 'recipes', label: 'Recipes' },
-      { key: 'pos', label: 'POS Terminal' },
-      { key: 'pos_eod', label: 'POS End of Day' },
-      { key: 'pos_void', label: 'POS Cancel Orders' },
-      { key: 'pos_discounts', label: 'POS Discounts' },
-      { key: 'loyalty', label: 'Loyalty Admin' },
-      { key: 'loyalty_stamp', label: 'Loyalty Stamp' },
-    ],
-  },
-  {
-    label: 'Finance',
-    features: [
-      { key: 'analytics', label: 'Analytics' },
-      { key: 'cost_calculator', label: 'Cost Calculator' },
-      { key: 'staff_salaries', label: 'Staff Salaries' },
-      { key: 'reports', label: 'Reports' },
-      { key: 'expenses', label: 'Expenses — Submit & View Own' },
-      { key: 'expenses_approve', label: 'Expenses — Approve & Dashboard' },
-    ],
-  },
-  {
-    label: 'Content',
-    features: [
-      { key: 'ideas', label: 'Ideas' },
-      { key: 'content', label: 'Content Studio' },
-    ],
-  },
-  {
-    label: 'System',
-    features: [
-      { key: 'staff', label: 'Staff Management' },
-      { key: 'vestaboard', label: 'Vestaboard' },
-    ],
-  },
-]
-
-const ALL_FEATURES = FEATURE_GROUPS.flatMap(g => g.features.map(f => f.key))
 const ROLES = ['supervisor', 'accountant', 'staff', 'limited_staff', 'data_entry']
 const ROLE_COLORS = {
   supervisor:   'text-blue-400',
@@ -103,11 +57,18 @@ export default function RoleManager() {
     }
   }
 
+  // Each click cycles the cell: off → view → view + edit → off
   const toggleAccess = async (role, feature) => {
     const key = `${role}:${feature}`
     const current = perms[role]?.[feature] || { can_access: false, can_edit: false }
-    const newAccess = !current.can_access
-    const newEdit = newAccess ? current.can_edit : false
+    let newAccess, newEdit
+    if (!current.can_access) {
+      newAccess = true; newEdit = false           // off → view
+    } else if (!current.can_edit) {
+      newAccess = true; newEdit = true            // view → view + edit
+    } else {
+      newAccess = false; newEdit = false          // view + edit → off
+    }
 
     setPerms(prev => ({
       ...prev,
@@ -206,7 +167,10 @@ export default function RoleManager() {
         <div className="card overflow-x-auto">
           <p className="text-noch-muted text-xs mb-4">
             Owner column is always ON and locked.
-            Click a cell to toggle access. Saves immediately.
+            Click a cell to cycle: <span className="text-noch-muted/90">off</span>
+            {' → '}<span className="text-noch-green">view</span>
+            {' → '}<span className="text-blue-400">view + edit</span>
+            {' → off'}. Saves immediately.
           </p>
 
           <table className="w-full text-sm border-collapse">
@@ -252,14 +216,20 @@ export default function RoleManager() {
                               onClick={() => toggleAccess(role, f.key)}
                               disabled={isSaving}
                               className={`w-6 h-6 rounded border flex items-center justify-center mx-auto transition-all ${
-                                p.can_access
+                                p.can_access && p.can_edit
+                                  ? 'bg-blue-400/20 border-blue-400/50 text-blue-400 hover:bg-blue-400/30'
+                                  : p.can_access
                                   ? 'bg-noch-green/20 border-noch-green/50 text-noch-green hover:bg-noch-green/30'
                                   : 'border-noch-border text-noch-muted hover:border-noch-green/30 hover:bg-noch-green/5'
                               }`}
-                              title={`${role}: ${f.label} — ${p.can_access ? 'Enabled' : 'Disabled'}`}
+                              title={`${role}: ${f.label} — ${
+                                p.can_access && p.can_edit ? 'View + Edit' : p.can_access ? 'View only' : 'Disabled'
+                              }`}
                             >
                               {isSaving ? (
                                 <Loader2 size={10} className="animate-spin" />
+                              ) : p.can_access && p.can_edit ? (
+                                <Pencil size={10} />
                               ) : p.can_access ? (
                                 <Check size={10} />
                               ) : (

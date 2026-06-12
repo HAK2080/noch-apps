@@ -1,7 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, Users, BarChart2, LogOut, Coffee, Calculator, Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor, ShoppingBag, Receipt, Settings, ListOrdered } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
+import { usePermissions } from '../contexts/PermissionsContext'
+import { NAV_ITEMS } from '../lib/features'
 import LanguageToggle from './shared/LanguageToggle'
 import ThemeToggle from './shared/ThemeToggle'
 
@@ -45,61 +47,40 @@ export default function Layout({ children }) {
     navigate('/login')
   }
 
-  const ownerNav = [
-    { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
-    { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
-    { type: 'group', label: ar ? 'العمليات' : 'OPERATIONS' },
-    { to: '/tasks', icon: CheckSquare, label: t('tasks') },
-    { to: '/expenses', icon: Receipt, label: ar ? 'المصاريف' : 'Expenses' },
-    { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
-    { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
-    { to: '/sales', icon: ListOrdered, label: ar ? 'المبيعات' : 'Sales' },
-    { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
-    { to: '/staff', icon: Users, label: ar ? 'الفريق' : 'Team' },
-    { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
-    { to: '/vestaboard', icon: Monitor, label: ar ? 'فيستابورد' : 'Vestaboard' },
-    { type: 'group', label: ar ? 'الإدارة' : 'MANAGEMENT' },
-    { to: '/report', icon: BarChart2, label: t('report') },
-    { to: '/finance', icon: BarChart3, label: ar ? 'المالية' : 'Finance' },
-    { to: '/marketing', icon: BarChart3, label: ar ? 'التسويق' : 'Marketing' },
-    { type: 'group', label: ar ? 'المحتوى' : 'CONTENT' },
-    { to: '/content-studio', icon: Sparkles, label: ar ? 'استوديو المحتوى' : 'Content Studio' },
-    { type: 'group', label: ar ? 'الأدوات' : 'TOOLS' },
-    { to: '/ideas', icon: Lightbulb, label: ar ? 'الأفكار' : 'Ideas' },
-    { to: '/cost-calculator', icon: Calculator, label: ar ? 'حاسبة التكلفة' : 'Cost Calculator' },
-    { to: '/recipes', icon: Coffee, label: t('recipes') },
-  ]
+  // Nav from the features registry (src/lib/features.js).
+  // Owner: every item except hideForOwner. Non-owner: fallbackRoles (the old
+  // hardcoded behavior, zero-regression) PLUS anything granted via Manage
+  // Roles. While permissions load, only fallbackRoles render (no flash).
+  const role = profile?.role
+  const isOwner = role === 'owner'
+  const { hasAccess, loading: permsLoading } = usePermissions()
 
-  const staffNav = [
-    { to: '/dashboard', icon: LayoutDashboard, label: t('dashboard'), end: true },
-    { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
-    { to: '/pos', icon: ShoppingCart, label: ar ? 'نقطة البيع' : 'POS' },
-    { to: '/sales', icon: ListOrdered, label: ar ? 'المبيعات' : 'Sales' },
-    { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
-    { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
-    { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
-    { to: '/recipes', icon: Coffee, label: t('recipes') },
-    { to: '/vestaboard', icon: Monitor, label: ar ? 'فيستابورد' : 'Vestaboard' },
-    { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
-  ]
+  const itemVisible = (item) => {
+    if (isOwner) return !item.hideForOwner
+    if (item.ownerOnly) return false
+    if (item.fallbackRoles?.includes(role)) return true
+    if (permsLoading) return false
+    return !!(item.feature && hasAccess(item.feature))
+  }
 
-  const dataEntryNav = [
-    { to: '/staff/my-profile', icon: Settings, label: ar ? 'ملفي' : 'My Profile', end: true },
-    { type: 'group', label: ar ? 'الإدخال' : 'DATA ENTRY' },
-    { to: '/expenses', icon: Receipt, label: ar ? 'المصاريف' : 'Expenses' },
-    { to: '/inventory', icon: Package, label: ar ? 'المخزون' : 'Inventory' },
-    { to: '/products', icon: ShoppingBag, label: ar ? 'المنتجات' : 'Products' },
-    { to: '/recipes', icon: Coffee, label: t('recipes') },
-    { to: '/loyalty', icon: Heart, label: ar ? 'نوتشي لويالتي' : 'Nochi Loyalty' },
-    { type: 'group', label: ar ? 'المحتوى' : 'CONTENT' },
-    { to: '/marketing', icon: BarChart3, label: ar ? 'التسويق' : 'Marketing' },
-    { to: '/ideas', icon: Lightbulb, label: ar ? 'الأفكار' : 'Ideas' },
-    { to: '/my-tasks', icon: CheckSquare, label: t('myTasks') },
-  ]
+  const navLabel = (item) =>
+    item.labelKey ? t(item.labelKey) : (ar ? item.labelAr : item.labelEn)
 
-  const navItems = profile?.role === 'owner' ? ownerNav
-    : profile?.role === 'data_entry' ? dataEntryNav
-    : staffNav
+  // Resolve items, then drop group headers that have no visible children.
+  const navItems = []
+  let pendingGroup = null
+  for (const item of NAV_ITEMS) {
+    if (item.type === 'group') {
+      pendingGroup = item
+      continue
+    }
+    if (!itemVisible(item)) continue
+    if (pendingGroup) {
+      navItems.push({ type: 'group', label: ar ? pendingGroup.labelAr : pendingGroup.labelEn })
+      pendingGroup = null
+    }
+    navItems.push({ to: item.to, icon: item.icon, label: navLabel(item), end: item.end })
+  }
   const navLinkItems = navItems.filter(i => i.type !== 'group')
 
   const initials = profile?.full_name

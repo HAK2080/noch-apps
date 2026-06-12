@@ -12,6 +12,7 @@ import {
 } from '../lib/pos-supabase'
 import { printReceipt, printDrinkTicket, isPrinterConnected } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
+import { usePermissions } from '../../../contexts/PermissionsContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
@@ -211,8 +212,11 @@ export default function POSOrders() {
   // This prevents the owner's elevated profile.role leaking through
   // after they hand the device to a staff member who PIN-swaps.
   const activeRole = getServedBy()?.role || profile?.role
-  const canViewTotals = TOTALS_ROLES.includes(activeRole)
-  const canCancel = canViewTotals  // same gate — supervisors and owners only
+  const { isOwner, hasAccess } = usePermissions()
+  // Totals: role gate OR the 'sales' permission (read-only — e.g. accountant).
+  const canViewTotals = TOTALS_ROLES.includes(activeRole) || isOwner || hasAccess('sales')
+  // Cancelling is a write action — stays role-based (owner/supervisor only).
+  const canCancel = TOTALS_ROLES.includes(activeRole)
 
   const [branch, setBranch] = useState(null)
   const [orders, setOrders] = useState([])

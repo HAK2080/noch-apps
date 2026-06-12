@@ -6,7 +6,7 @@ import { getCashRunway, getFinanceSettings, updateFinanceSettings } from '../lib
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
-export default function CashRunwayTab() {
+export default function CashRunwayTab({ readOnly = false }) {
   const [data, setData] = useState(null)
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -65,7 +65,7 @@ export default function CashRunwayTab() {
           {editing === 'cash' ? (
             <CashEdit defaultVal={settings.cash_on_hand_lyd} onCancel={() => setEditing(null)}
               onSave={(v) => save({ cash_on_hand_lyd: v, cash_on_hand_set_at: new Date().toISOString() })} />
-          ) : (
+          ) : !readOnly && (
             <button onClick={() => setEditing('cash')} className="btn-secondary text-xs px-3 py-1 flex items-center gap-1">
               <Edit2 size={12}/> Update
             </button>
@@ -102,7 +102,7 @@ export default function CashRunwayTab() {
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-white font-semibold text-sm">Monthly fixed OpEx</h3>
-          {editing !== 'fixed' && (
+          {editing !== 'fixed' && !readOnly && (
             <button onClick={() => setEditing('fixed')} className="btn-secondary text-xs px-3 py-1 flex items-center gap-1">
               <Edit2 size={12}/> Edit
             </button>
@@ -126,7 +126,7 @@ export default function CashRunwayTab() {
             <h3 className="text-white font-semibold text-sm">USD reference rate</h3>
             <p className="text-noch-muted text-xs">Display-only. Used for the USD-equivalent line on the cash card.</p>
           </div>
-          {editing !== 'rates' && (
+          {editing !== 'rates' && !readOnly && (
             <button onClick={() => setEditing('rates')} className="btn-secondary text-xs px-3 py-1 flex items-center gap-1">
               <Edit2 size={12}/> Set
             </button>

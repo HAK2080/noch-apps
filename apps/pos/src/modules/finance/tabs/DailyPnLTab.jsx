@@ -8,6 +8,7 @@ import PeriodSelector from '../components/PeriodSelector'
 import KPICard from '../components/KPICard'
 import { getPnL, getFinanceSettings, listBranches } from '../lib/finance-supabase'
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
+import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
 // Seed a default 7-day period synchronously so the data-fetch effect can
@@ -122,8 +123,25 @@ export default function DailyPnLTab() {
             Net of refunds
           </label>
         </div>
-        <div className="text-noch-muted text-xs flex items-center gap-1">
-          <TrendingUp size={12} /> {k.orders} orders
+        <div className="flex items-center gap-3">
+          <div className="text-noch-muted text-xs flex items-center gap-1">
+            <TrendingUp size={12} /> {k.orders} orders
+          </div>
+          <ExportButtons onCsv={() => downloadCsv(`pnl_${period.from}_${period.to}`,
+            ['Line', 'LYD', '% of revenue'],
+            [
+              ['Revenue (net)', k.rev.toFixed(2), ''],
+              ['Discounts', Number(pnl.discounts || 0).toFixed(2), ''],
+              ['Refunds', Number(pnl.refunds || 0).toFixed(2), ''],
+              ['COGS', k.cogs.toFixed(2), k.cogsR != null ? (k.cogsR * 100).toFixed(1) + '%' : ''],
+              ['Labor', k.labor.toFixed(2), k.laborR != null ? (k.laborR * 100).toFixed(1) + '%' : ''],
+              ['Prime cost', k.prime.toFixed(2), k.primeR != null ? (k.primeR * 100).toFixed(1) + '%' : ''],
+              ['Other OpEx', k.opex.toFixed(2), ''],
+              ['Net contribution', k.net.toFixed(2), k.netR != null ? (k.netR * 100).toFixed(1) + '%' : ''],
+              ['Orders', k.orders, ''],
+              ['Period', `${period.from} to ${period.to}`, ''],
+              ['Branch', branchId ? (branches.find(b => b.id === branchId)?.name || branchId) : 'All branches', ''],
+            ])} />
         </div>
       </div>
 
