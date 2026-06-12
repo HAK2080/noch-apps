@@ -30,13 +30,27 @@ Deno.serve(async (req: Request) => {
     const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const admin = createClient(url, key)
 
-    // Read tz from settings; module_enabled is enforced inside the RPC.
-    const { data: s } = await admin.from('ops_settings').select('timezone, module_enabled').eq('id', 'default').maybeSingle()
+    // Read settings; module_enabled is also enforced inside the RPC.
+    const { data: s } = await admin.from('ops_settings')
+      .select('timezone, module_enabled, generate_at_hour').eq('id', 'default').maybeSingle()
     const tz = (s?.timezone as string | undefined) || 'Africa/Tripoli'
     const businessDate = todayInTz(tz)
 
     if (!s?.module_enabled) {
       return json({ ok: true, skipped: 'module_disabled', business_date: businessDate })
+    }
+
+    // The pg_cron job fires hourly; only generate at the configured local
+    // hour (ops_settings.generate_at_hour) so the hour stays configurable
+    // without touching the cron schedule. POST {"force": true} to bypass.
+    let force = false
+    try { force = !!(await req.clone().json())?.force } catch { /* empty body */ }
+    const localHour = Number(new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, hour: '2-digit', hour12: false,
+    }).format(new Date()))
+    const targetHour = Number.isFinite(Number(s?.generate_at_hour)) ? Number(s.generate_at_hour) : 5
+    if (!force && localHour !== targetHour) {
+      return json({ ok: true, skipped: 'not_generation_hour', local_hour: localHour, target_hour: targetHour })
     }
 
     const { data, error } = await admin.rpc('ops_generate_instances_for', { p_business_date: businessDate })

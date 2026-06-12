@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.whatsapp-cron]
 verify_jwt = false
+
+[functions.ops-generate-instances]
+verify_jwt = false
