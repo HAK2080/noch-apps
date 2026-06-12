@@ -16,6 +16,7 @@ import {
   getDailySalesRange, getSalesByBarista,
 } from '../lib/pos-supabase'
 import Layout from '../../../components/Layout'
+import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
 function ymd(d) { return d.toISOString().slice(0, 10) }
@@ -121,6 +122,18 @@ export default function POSReports() {
             <h1 className="text-white font-bold text-xl">Sales Reports</h1>
             <p className="text-noch-muted text-sm">{branch?.name}</p>
           </div>
+          <ExportButtons onCsv={() => downloadCsv(`sales_${branch?.name || 'branch'}_${fromDate}_${toDate}`,
+            ['Day', 'Orders', 'Gross (LYD)', 'Discounts', 'Cash', 'Card', 'Presto', 'Voided'],
+            daily.map(d => [
+              d.day,
+              d.orders,
+              Number(d.gross || 0).toFixed(2),
+              Number(d.discounts || 0).toFixed(2),
+              Number(d.cash_sales || 0).toFixed(2),
+              Number(d.card_sales || 0).toFixed(2),
+              Number(d.presto_sales || 0).toFixed(2),
+              Number(d.voided || 0).toFixed(2),
+            ]))} />
         </div>
 
         {/* Range presets */}

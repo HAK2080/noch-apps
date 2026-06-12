@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Target, Plus, Save, X } from 'lucide-react'
 import { getVariance, listBudgets, upsertBudget, listBranches } from '../lib/finance-supabase'
 import { lyd } from '../lib/thresholds'
+import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
 const CATS = ['rent','utilities','marketing','supplies','maintenance','wages_one_off','professional_fees','licenses','bank_fees','other_opex','capex']
 
 function firstOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10) }
 
-export default function VarianceTab() {
+export default function VarianceTab({ readOnly = false }) {
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState(null)
   const [periodMonth, setPeriodMonth] = useState(firstOfMonth())
@@ -63,6 +64,15 @@ export default function VarianceTab() {
           Budget {lyd(totalBudget)} · Actual {lyd(totalActual)} ·
           <span className={totalVar > 0 ? 'text-red-400' : 'text-noch-green'}> {totalVar > 0 ? '+' : ''}{lyd(totalVar)}</span>
         </span>
+        <ExportButtons onCsv={() => downloadCsv(`variance_${periodMonth.slice(0, 7)}`,
+          ['Category', 'Budget (LYD)', 'Actual (LYD)', 'Variance (LYD)'],
+          [...new Set([...rows.map(r => r.category), ...CATS])].map(cat => {
+            const r = rows.find(x => x.category === cat)
+            const b = budgets.find(x => x.category === cat)
+            const budgeted = Number(b?.budgeted_amount_lyd || r?.budgeted || 0)
+            const actual = Number(r?.actual || 0)
+            return [cat, budgeted.toFixed(2), actual.toFixed(2), (actual - budgeted).toFixed(2)]
+          }))} />
       </div>
 
       {loading ? <p className="text-noch-muted text-center py-12">Loading…</p> : (
@@ -90,6 +100,8 @@ export default function VarianceTab() {
                     <td className="py-1.5 pr-2 text-right">
                       {isEditing ? (
                         <BudgetEdit defaultVal={b?.budgeted_amount_lyd || 0} onSave={v => upsert(cat, v)} onCancel={() => setEditing(null)} />
+                      ) : readOnly ? (
+                        <span className="text-white font-mono">{lyd(b?.budgeted_amount_lyd || 0)}</span>
                       ) : (
                         <button onClick={() => setEditing(cat)} className="text-noch-green underline">{lyd(b?.budgeted_amount_lyd || 0)}</button>
                       )}
