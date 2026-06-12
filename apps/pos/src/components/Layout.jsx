@@ -6,6 +6,8 @@ import { usePermissions } from '../contexts/PermissionsContext'
 import { NAV_ITEMS } from '../lib/features'
 import LanguageToggle from './shared/LanguageToggle'
 import ThemeToggle from './shared/ThemeToggle'
+import { useOpsSettings } from '../modules/ops/lib/useOps'
+import OpsReminderPopup, { OpsPersistentBadge } from '../modules/ops/components/OpsReminderPopup'
 
 function NavItem({ to, icon: Icon, label, end }) {
   return (
@@ -53,9 +55,15 @@ export default function Layout({ children }) {
   // Roles. While permissions load, only fallbackRoles render (no flash).
   const role = profile?.role
   const isOwner = role === 'owner'
-  const { hasAccess, loading: permsLoading } = usePermissions()
+  const { hasAccess, canEdit, loading: permsLoading } = usePermissions()
+  // Ops Checklist module ships disabled. Nav entries flagged
+  // requiresOpsEnabled are filtered out when ops_settings.module_enabled = false.
+  const { moduleEnabled: opsEnabled } = useOpsSettings()
+  const opsManager = isOwner || canEdit('ops')
 
   const itemVisible = (item) => {
+    if (item.requiresOpsEnabled && !opsEnabled) return false
+    if (item.requiresOpsEdit && !opsManager) return false
     if (isOwner) return !item.hideForOwner
     if (item.ownerOnly) return false
     if (item.fallbackRoles?.includes(role)) return true
@@ -71,6 +79,8 @@ export default function Layout({ children }) {
   let pendingGroup = null
   for (const item of NAV_ITEMS) {
     if (item.type === 'group') {
+      // Skip group headers tied to the disabled Ops module entirely.
+      if (item.requiresOpsEnabled && !opsEnabled) { pendingGroup = null; continue }
       pendingGroup = item
       continue
     }
@@ -165,6 +175,9 @@ export default function Layout({ children }) {
             </div>
           </div>
 
+          <div className="flex items-center gap-1.5 ps-1 mb-1">
+            <OpsPersistentBadge />
+          </div>
           <LanguageToggle className="justify-start" />
           <ThemeToggle />
 
@@ -207,6 +220,7 @@ export default function Layout({ children }) {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <OpsPersistentBadge />
             <LanguageToggle />
             <button
               onClick={handleSignOut}
@@ -243,6 +257,11 @@ export default function Layout({ children }) {
           </NavLink>
         ))}
       </nav>
+
+      {/* Ops Checklist reminder popup. Self-gates on module_enabled and
+          renders nothing when no pending tasks. Mounted at Layout level so
+          chromeless POS terminal never shows it during a transaction. */}
+      <OpsReminderPopup />
     </div>
   )
 }

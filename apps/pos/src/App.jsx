@@ -72,6 +72,10 @@ const IdeasBoard       = lazy(() => import('./pages/ideas/IdeasBoard'))
 const IdeasCategories  = lazy(() => import('./pages/ideas/IdeasCategories'))
 const Vestaboard       = lazy(() => import('./pages/Vestaboard'))
 
+const OpsChecklist     = lazy(() => import('./modules/ops/pages/OpsChecklist'))
+const OpsSettings      = lazy(() => import('./modules/ops/pages/OpsSettings'))
+const OpsDashboard     = lazy(() => import('./modules/ops/pages/OpsDashboard'))
+
 const LoyaltyDashboard = lazy(() => import('./modules/loyalty/pages/LoyaltyDashboard'))
 const LoyaltyCustomers = lazy(() => import('./modules/loyalty/pages/LoyaltyCustomers'))
 const CustomerDetail   = lazy(() => import('./modules/loyalty/pages/CustomerDetail'))
@@ -283,6 +287,11 @@ export default function App() {
 
         {/* Vestaboard */}
         <Route path="/vestaboard" element={<ProtectedRoute><Vestaboard /></ProtectedRoute>} />
+
+        {/* Ops Checklist — module ships disabled; UI handles the off case */}
+        <Route path="/ops"          element={<ProtectedRoute><PermissionRoute feature="ops"><OpsChecklist /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/ops/dashboard" element={<ProtectedRoute><PermissionRoute feature="ops"><OpsDashboard /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/ops/settings"  element={<ProtectedRoute><PermissionRoute feature="ops"><OpsSettings /></PermissionRoute></ProtectedRoute>} />
 
         {/* Customer-facing loyalty card */}
         {/* /my-card and /loyalty/register removed — customers use noch.cloud/#loyalty */}

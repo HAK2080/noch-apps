@@ -15,6 +15,7 @@ import {
   LayoutDashboard, CheckSquare, Users, BarChart2, Coffee, Calculator,
   Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor,
   ShoppingBag, Receipt, Settings, ListOrdered, FlaskConical, MessageSquare,
+  ClipboardList,
 } from 'lucide-react'
 
 // ── Role Manager matrix ───────────────────────────────────────────────
@@ -61,6 +62,12 @@ export const FEATURE_GROUPS = [
     ],
   },
   {
+    label: 'Ops Checklist',
+    features: [
+      { key: 'ops', label: 'Ops Checklist (view = staff, edit = manager)' },
+    ],
+  },
+  {
     label: 'System',
     features: [
       { key: 'staff', label: 'Staff Management' },
@@ -98,6 +105,13 @@ export const NAV_ITEMS = [
 
   { type: 'group', labelEn: 'CONTENT', labelAr: 'المحتوى' },
   { to: '/content-studio', icon: Sparkles, labelEn: 'Content Studio', labelAr: 'استوديو المحتوى', feature: 'content_studio', ownerOnly: true },
+
+  // Ops Checklist — only renders when ops_settings.module_enabled (Layout filters
+  // out items flagged requiresOpsEnabled when the module is off).
+  { type: 'group', labelEn: 'OPS CHECKLIST', labelAr: 'قائمة المهام', requiresOpsEnabled: true },
+  { to: '/ops',           icon: ClipboardList, labelEn: 'Checklist',         labelAr: 'القائمة',     feature: 'ops', fallbackRoles: EVERYONE, requiresOpsEnabled: true },
+  { to: '/ops/dashboard', icon: BarChart3,     labelEn: 'Ops dashboard',     labelAr: 'لوحة المهام', feature: 'ops', fallbackRoles: ['supervisor'], requiresOpsEnabled: true, requiresOpsEdit: true },
+  { to: '/ops/settings',  icon: Settings,      labelEn: 'Ops settings',      labelAr: 'إعدادات المهام', feature: 'ops', fallbackRoles: ['supervisor'], requiresOpsEnabled: true, requiresOpsEdit: true },
 
   { type: 'group', labelEn: 'TOOLS', labelAr: 'الأدوات' },
   { to: '/ideas', icon: Lightbulb, labelEn: 'Ideas', labelAr: 'الأفكار', feature: 'ideas', fallbackRoles: ['data_entry'] },
