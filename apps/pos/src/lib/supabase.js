@@ -755,6 +755,70 @@ export async function getStockLogs(ingredientId) {
 }
 
 // ============================================================
+// INVENTORY LOCATIONS - Warehouses / storage areas
+// ============================================================
+
+export async function getInventoryLocations() {
+  const { data, error } = await supabase
+    .from('inventory_locations')
+    .select('*, branch:pos_branches(name, name_ar)')
+    .eq('is_active', true)
+    .order('sort_order')
+    .order('name')
+  if (error) throw error
+  return data || []
+}
+
+export async function createInventoryLocation(location) {
+  const { data, error } = await supabase
+    .from('inventory_locations')
+    .insert(location)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateInventoryLocation(id, updates) {
+  const { data, error } = await supabase
+    .from('inventory_locations')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getInventoryLocationStock() {
+  const { data, error } = await supabase
+    .from('inventory_location_stock')
+    .select('*, ingredient:ingredients(id, name, name_ar, base_unit), location:inventory_locations(id, name, name_ar, location_type, branch_id)')
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertInventoryLocationStock({ ingredientId, locationId, qty, unit, notes }) {
+  const payload = {
+    ingredient_id: ingredientId,
+    location_id: locationId,
+    qty_available: Number(qty) || 0,
+    unit,
+    notes: notes || null,
+    last_counted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase
+    .from('inventory_location_stock')
+    .upsert(payload, { onConflict: 'ingredient_id,location_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ============================================================
 // COST CALCULATOR - Cost Recipes CRUD (aliased functions)
 // ============================================================
 

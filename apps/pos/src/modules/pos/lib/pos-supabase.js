@@ -616,6 +616,56 @@ export async function getPOSOrders(branchId, filters = {}) {
   return data
 }
 
+export async function getSalesExportRows(branchId, filters = {}) {
+  let query = supabase
+    .from('pos_order_items')
+    .select(`
+      id,
+      product_id,
+      product_name,
+      product_name_ar,
+      quantity,
+      unit_price,
+      total,
+      refunded_qty,
+      notes,
+      pos_orders!inner(
+        id,
+        order_number,
+        branch_id,
+        shift_id,
+        status,
+        source,
+        payment_method,
+        subtotal,
+        discount_amount,
+        discount_pct,
+        total,
+        cash_tendered,
+        change_due,
+        card_amount,
+        customer_name,
+        customer_phone,
+        table_number,
+        pickup_code,
+        created_at,
+        served_by,
+        served_by_profile:profiles!pos_orders_served_by_fkey(full_name),
+        pos_branches(name, name_ar)
+      )
+    `)
+    .eq('pos_orders.branch_id', branchId)
+    .order('created_at', { foreignTable: 'pos_orders', ascending: false })
+
+  if (filters.from) query = query.gte('pos_orders.created_at', filters.from)
+  if (filters.to) query = query.lte('pos_orders.created_at', filters.to)
+  if (filters.status) query = query.eq('pos_orders.status', filters.status)
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
 export async function voidPOSOrder(orderId, reason, servedBy = null) {
   // Routes through void_pos_order RPC which atomically reverses stock,
   // shift totals, and writes the audit log.
