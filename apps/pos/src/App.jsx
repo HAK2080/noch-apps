@@ -72,6 +72,8 @@ const IdeasBoard       = lazy(() => import('./pages/ideas/IdeasBoard'))
 const IdeasCategories  = lazy(() => import('./pages/ideas/IdeasCategories'))
 const Vestaboard       = lazy(() => import('./pages/Vestaboard'))
 
+const AccountingDashboard = lazy(() => import('./modules/accounting/AccountingDashboard'))
+
 const OpsChecklist     = lazy(() => import('./modules/ops/pages/OpsChecklist'))
 const OpsSettings      = lazy(() => import('./modules/ops/pages/OpsSettings'))
 const OpsDashboard     = lazy(() => import('./modules/ops/pages/OpsDashboard'))
@@ -287,6 +289,9 @@ export default function App() {
 
         {/* Vestaboard */}
         <Route path="/vestaboard" element={<ProtectedRoute><Vestaboard /></ProtectedRoute>} />
+
+        {/* Accounting — chart of accounts + double-entry GL (accountant/owner) */}
+        <Route path="/accounting"       element={<ProtectedRoute><PermissionRoute feature="accounting"><AccountingDashboard /></PermissionRoute></ProtectedRoute>} />
 
         {/* Ops Checklist — module ships disabled; UI handles the off case */}
         <Route path="/ops"          element={<ProtectedRoute><PermissionRoute feature="ops"><OpsChecklist /></PermissionRoute></ProtectedRoute>} />

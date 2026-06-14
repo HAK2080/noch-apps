@@ -22,6 +22,8 @@ const ACTION_MAP = {
   'analytics.financial':    ['analytics',     'edit'],
   'finance.view':           ['finance',       'access'],
   'finance.edit':           ['finance',       'edit'],
+  'accounting.view':        ['accounting',    'access'],
+  'accounting.edit':        ['accounting',    'edit'],
 }
 
 export function usePermission() {

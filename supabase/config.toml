@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.ops-generate-instances]
 verify_jwt = false
+
+[functions.gl-nightly-sync]
+verify_jwt = false

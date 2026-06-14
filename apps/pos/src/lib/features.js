@@ -15,7 +15,7 @@ import {
   LayoutDashboard, CheckSquare, Users, BarChart2, Coffee, Calculator,
   Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor,
   ShoppingBag, Receipt, Settings, ListOrdered, FlaskConical, MessageSquare,
-  ClipboardList,
+  ClipboardList, BookOpen,
 } from 'lucide-react'
 
 // ── Role Manager matrix ───────────────────────────────────────────────
@@ -42,6 +42,7 @@ export const FEATURE_GROUPS = [
     label: 'Finance',
     features: [
       { key: 'finance', label: 'Finance Dashboard (P&L, Cash, Variance)' },
+      { key: 'accounting', label: 'Accounting (chart of accounts, ledger, journals)' },
       { key: 'analytics', label: 'Analytics (legacy)' },
       { key: 'cost_calculator', label: 'Cost Calculator' },
       { key: 'staff_salaries', label: 'Staff Salaries' },
@@ -101,6 +102,7 @@ export const NAV_ITEMS = [
   { type: 'group', labelEn: 'MANAGEMENT', labelAr: 'الإدارة' },
   { to: '/report', icon: BarChart2, labelKey: 'report', feature: 'reports' },
   { to: '/finance', icon: BarChart3, labelEn: 'Finance', labelAr: 'المالية', feature: 'finance' },
+  { to: '/accounting', icon: BookOpen, labelEn: 'Accounting', labelAr: 'المحاسبة', feature: 'accounting' },
   { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', feature: 'marketing', fallbackRoles: ['data_entry'] },
 
   { type: 'group', labelEn: 'CONTENT', labelAr: 'المحتوى' },
