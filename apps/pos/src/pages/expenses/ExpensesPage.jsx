@@ -441,6 +441,8 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [editModal, setEditModal] = useState(null) // expense object
   const [editForm, setEditForm] = useState({})
+  const [paymentModal, setPaymentModal] = useState(null)
+  const [paymentForm, setPaymentForm] = useState({ account: 'cash', paid_at: new Date().toISOString().slice(0, 10), reference: '', notes: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { load() }, [refreshKey])
@@ -462,7 +464,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
     try {
       await supabase.from('expenses').update({ status: decision, updated_at: new Date().toISOString() }).eq('id', expenseId)
       await supabase.from('expense_approvals').insert({ expense_id: expenseId, acted_by: actorId, decision, notes: notes || null })
-      toast.success(decision === 'paid' ? 'Marked as paid' : `Expense ${decision}`)
+      toast.success(`Expense ${decision}`)
       onAction()
       load()
     } catch (err) { toast.error(err.message) }
@@ -509,24 +511,61 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
     try {
       const rate = rates.find(r => r.currency === editForm.currency)?.rate_to_lyd || 1
       const amount_lyd = parseFloat(editForm.amount) * rate
-      await supabase.from('expenses').update({
-        cost_center_id: editForm.cost_center_id,
-        category_id: editForm.category_id,
-        amount: parseFloat(editForm.amount),
-        currency: editForm.currency,
-        exchange_rate_to_lyd: rate,
-        amount_lyd,
-        vendor: editForm.vendor || null,
-        description: editForm.description || null,
-        paid_by: editForm.paid_by || 'Business',
-        expense_date: editForm.expense_date,
-        updated_at: new Date().toISOString(),
-      }).eq('id', editModal.id)
+      const { error } = await supabase.rpc('update_expense_with_audit', {
+        p_id: editModal.id,
+        p_cost_center_id: editForm.cost_center_id,
+        p_category_id: editForm.category_id,
+        p_amount: parseFloat(editForm.amount),
+        p_currency: editForm.currency,
+        p_exchange_rate_to_lyd: rate,
+        p_amount_lyd: amount_lyd,
+        p_vendor: editForm.vendor || null,
+        p_description: editForm.description || null,
+        p_paid_by: editForm.paid_by || 'Business',
+        p_expense_date: editForm.expense_date,
+      })
+      if (error) throw error
       toast.success('Expense updated')
       setEditModal(null)
       onAction()
       load()
     } catch (err) { toast.error(err.message) }
+    setSaving(false)
+  }
+
+  function openPayment(exp) {
+    setPaymentForm({
+      account: exp.payment_account_key || 'cash',
+      paid_at: exp.paid_at || new Date().toISOString().slice(0, 10),
+      reference: exp.payment_reference || '',
+      notes: exp.payment_notes || '',
+    })
+    setPaymentModal(exp)
+  }
+
+  async function savePayment() {
+    if (!paymentModal) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.rpc('mark_expense_paid', {
+        p_expense_id: paymentModal.id,
+        p_payment_account_key: paymentForm.account,
+        p_paid_at: paymentForm.paid_at,
+        p_reference: paymentForm.reference || null,
+        p_notes: paymentForm.notes || null,
+      })
+      if (error) throw error
+      await supabase.from('expense_approvals').insert({
+        expense_id: paymentModal.id,
+        acted_by: actorId,
+        decision: 'paid',
+        notes: `Paid from ${paymentForm.account}${paymentForm.reference ? ` (${paymentForm.reference})` : ''}`,
+      })
+      toast.success('Expense paid and posted to accounting')
+      setPaymentModal(null)
+      onAction()
+      load()
+    } catch (err) { toast.error(err.message || 'Payment failed') }
     setSaving(false)
   }
 
@@ -603,9 +642,9 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                 </div>
               )}
               {exp.status === 'approved' && isOwner && (
-                <button onClick={() => act(exp.id, 'paid')} disabled={acting === exp.id}
+                <button onClick={() => openPayment(exp)} disabled={acting === exp.id}
                   className="w-full bg-blue-400/10 text-blue-400 border border-blue-400/20 rounded-lg py-2 text-xs font-medium hover:bg-blue-400/20 flex items-center justify-center gap-1 disabled:opacity-50">
-                  <Wallet size={13} /> Mark as Paid
+                  <Wallet size={13} /> Pay from Cash / Bank
                 </button>
               )}
               {exp.status === 'rejected' && (
@@ -646,6 +685,49 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                 className="flex-1 bg-noch-border text-noch-muted rounded-xl py-2 text-sm hover:text-white">Cancel</button>
               <button onClick={confirmNote}
                 className="flex-1 bg-red-500 text-white rounded-xl py-2 text-sm font-medium hover:bg-red-600">Reject</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment modal */}
+      {paymentModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-noch-card border border-noch-border rounded-2xl p-6 w-full max-w-sm space-y-3">
+            <h3 className="text-white font-semibold">Pay Expense</h3>
+            <p className="text-xs text-noch-muted -mt-1">
+              {paymentModal.vendor || paymentModal.description || 'Expense'} · {fmt(amtLyd(paymentModal))}
+            </p>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Pay from</label>
+              <select value={paymentForm.account} onChange={e => setPaymentForm(f => ({ ...f, account: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50">
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Payment date</label>
+              <input type="date" value={paymentForm.paid_at} onChange={e => setPaymentForm(f => ({ ...f, paid_at: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Reference</label>
+              <input value={paymentForm.reference} onChange={e => setPaymentForm(f => ({ ...f, reference: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" placeholder="Receipt, transfer, cheque..." />
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Notes</label>
+              <textarea rows={2} value={paymentForm.notes} onChange={e => setPaymentForm(f => ({ ...f, notes: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50 resize-none" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setPaymentModal(null)}
+                className="flex-1 bg-noch-border text-noch-muted rounded-xl py-2 text-sm hover:text-white">Cancel</button>
+              <button onClick={savePayment} disabled={saving || !paymentForm.paid_at}
+                className="flex-1 bg-blue-500 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-400 disabled:opacity-50 flex items-center justify-center gap-1">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Wallet size={13} />} Pay
+              </button>
             </div>
           </div>
         </div>

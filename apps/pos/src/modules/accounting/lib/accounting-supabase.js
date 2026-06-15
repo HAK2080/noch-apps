@@ -109,6 +109,25 @@ export async function createManualJournal({ journal_date, branch_id = null, memo
   return posted
 }
 
+export async function voidGlBatch(batchId, reason = '') {
+  const { data, error } = await supabase.rpc('void_gl_batch', { p_batch_id: batchId, p_reason: reason || null })
+  if (error) throw error
+  return data
+}
+
+export async function replaceManualJournal({ old_batch_id, journal_date, branch_id = null, memo, lines, reason = '' }) {
+  const { data, error } = await supabase.rpc('replace_manual_journal', {
+    p_old_batch_id: old_batch_id,
+    p_journal_date: journal_date,
+    p_branch_id: branch_id,
+    p_memo: memo,
+    p_lines: lines,
+    p_reason: reason || null,
+  })
+  if (error) throw error
+  return data
+}
+
 // ── Posting RPCs ────────────────────────────────────────────────────────
 export async function postSalesDay(date, branchId) {
   const { data, error } = await supabase.rpc('gl_post_sales_day', { p_date: date, p_branch: branchId })

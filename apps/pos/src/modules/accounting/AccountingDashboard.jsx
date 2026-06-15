@@ -16,6 +16,7 @@ import {
   listAccounts, upsertAccount, deactivateAccount, listAccountMap, setAccountMap,
   listBatches, getBatchLines, createManualJournal, syncPeriod, postOpeningBalances,
   trialBalance, accountLedger, balanceSheet, incomeStatement, listBranches,
+  replaceManualJournal, voidGlBatch,
 } from './lib/accounting-supabase'
 import toast from 'react-hot-toast'
 
@@ -151,6 +152,7 @@ function JournalTab({ ar, branches, canPost }) {
   const [expanded, setExpanded] = useState(null)
   const [lines, setLines] = useState([])
   const [creating, setCreating] = useState(false)
+  const [correcting, setCorrecting] = useState(null)
   const [syncing, setSyncing] = useState(false)
 
   const reload = () => listBatches({ from, to, branchId }).then(setBatches)
@@ -167,6 +169,25 @@ function JournalTab({ ar, branches, canPost }) {
     try { const r = await syncPeriod({ from, to, branchId, force: true }); toast.success(`${r.sales_batches ?? 0} + ${r.expense_batches ?? 0} ${ar ? 'قيود' : 'batches'}`); reload() }
     catch (e) { toast.error(e.message || 'Sync failed') }
     finally { setSyncing(false) }
+  }
+
+  const startCorrection = async (batch) => {
+    const batchLines = await getBatchLines(batch.id)
+    setCorrecting({
+      batch,
+      lines: batchLines.map(l => ({
+        account_id: l.account_id,
+        debit_lyd: Number(l.debit_lyd || 0) || '',
+        credit_lyd: Number(l.credit_lyd || 0) || '',
+        memo: l.memo || '',
+      })),
+    })
+  }
+
+  const voidBatch = async (batch) => {
+    const reason = prompt(ar ? 'سبب إلغاء القيد؟' : 'Reason for voiding this journal?') || ''
+    try { await voidGlBatch(batch.id, reason); toast.success(ar ? 'تم إلغاء القيد' : 'Journal voided'); reload() }
+    catch (e) { toast.error(e.message || 'Void failed') }
   }
 
   return (
@@ -186,6 +207,16 @@ function JournalTab({ ar, branches, canPost }) {
       </div>
 
       {creating && <ManualJournalForm ar={ar} branches={branches} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); reload() }} />}
+      {correcting && (
+        <ManualJournalForm
+          ar={ar}
+          branches={branches}
+          initialBatch={correcting.batch}
+          initialLines={correcting.lines}
+          onClose={() => setCorrecting(null)}
+          onSaved={() => { setCorrecting(null); reload() }}
+        />
+      )}
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
@@ -203,7 +234,19 @@ function JournalTab({ ar, branches, canPost }) {
                 <tr key={b.id} onClick={() => toggle(b)} className="border-t border-noch-border/40 cursor-pointer hover:bg-noch-dark/40">
                   <td className="py-1.5 text-white whitespace-nowrap">{b.journal_date}</td>
                   <td className="py-1.5 text-noch-muted">{b.source_type}</td>
-                  <td className="py-1.5 text-noch-muted truncate max-w-[220px]">{b.memo}</td>
+                  <td className="py-1.5 text-noch-muted truncate max-w-[220px]">
+                    {b.memo}
+                    {canPost && ['manual','journal_correction'].includes(b.source_type) && b.status === 'posted' && (
+                      <span className="ms-2 inline-flex gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); startCorrection(b) }} className="text-noch-green hover:underline text-xs">
+                          {ar ? 'تصحيح' : 'Correct'}
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); voidBatch(b) }} className="text-red-400 hover:underline text-xs">
+                          {ar ? 'إلغاء' : 'Void'}
+                        </button>
+                      </span>
+                    )}
+                  </td>
                   <td className="py-1.5 text-noch-muted">{b.branch?.name || '—'}</td>
                   <td className="py-1.5 text-right font-mono text-white">{lyd(b.total_debit)}</td>
                   <td className="py-1.5 text-right font-mono text-white">{lyd(b.total_credit)}</td>
@@ -227,13 +270,15 @@ function JournalTab({ ar, branches, canPost }) {
   )
 }
 
-function ManualJournalForm({ ar, branches, onClose, onSaved }) {
-  const [date, setDate] = useState(TODAY)
-  const [branchId, setBranchId] = useState(null)
-  const [memo, setMemo] = useState('')
+function ManualJournalForm({ ar, branches, onClose, onSaved, initialBatch = null, initialLines = null }) {
+  const isCorrection = !!initialBatch
+  const [date, setDate] = useState(initialBatch?.journal_date || TODAY)
+  const [branchId, setBranchId] = useState(initialBatch?.branch_id || null)
+  const [memo, setMemo] = useState(initialBatch?.memo || '')
   const [accounts, setAccounts] = useState([])
-  const [lines, setLines] = useState([{ account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }, { account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }])
+  const [lines, setLines] = useState(initialLines?.length ? initialLines : [{ account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }, { account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }])
   const [saving, setSaving] = useState(false)
+  const [reason, setReason] = useState('')
   useEffect(() => { listAccounts({ activeOnly: true }).then(a => setAccounts(a.filter(x => x.is_postable))) }, [])
 
   const td = lines.reduce((s, l) => s + Number(l.debit_lyd || 0), 0)
@@ -244,8 +289,15 @@ function ManualJournalForm({ ar, branches, onClose, onSaved }) {
   const save = async () => {
     setSaving(true)
     try {
-      await createManualJournal({ journal_date: date, branch_id: branchId, memo, lines: lines.filter(l => l.account_id) })
-      toast.success(ar ? 'تم ترحيل القيد' : 'Posted'); onSaved()
+      const payload = { journal_date: date, branch_id: branchId, memo, lines: lines.filter(l => l.account_id) }
+      if (isCorrection) {
+        await replaceManualJournal({ old_batch_id: initialBatch.id, ...payload, reason })
+        toast.success('Journal corrected')
+      } else {
+        await createManualJournal(payload)
+        toast.success('Posted')
+      }
+      onSaved()
     } catch (e) { toast.error(e.message || 'Failed') } finally { setSaving(false) }
   }
 
@@ -253,7 +305,7 @@ function ManualJournalForm({ ar, branches, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-2xl p-5 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-white font-bold">{ar ? 'قيد يومية يدوي' : 'Manual journal entry'}</h2>
+          <h2 className="text-white font-bold">{isCorrection ? 'Correct journal entry' : 'Manual journal entry'}</h2>
           <button onClick={onClose}><X className="text-noch-muted" size={18}/></button>
         </div>
         <div className="flex flex-wrap gap-2 mb-3">
@@ -264,6 +316,9 @@ function ManualJournalForm({ ar, branches, onClose, onSaved }) {
           </select>
           <input className="input text-sm flex-1" placeholder={ar ? 'البيان' : 'Memo'} value={memo} onChange={e => setMemo(e.target.value)} />
         </div>
+        {isCorrection && (
+          <input className="input text-sm w-full mb-3" placeholder="Correction reason" value={reason} onChange={e => setReason(e.target.value)} />
+        )}
         <table className="w-full text-sm mb-2">
           <thead className="text-noch-muted text-xs"><tr><th className="text-left">{ar ? 'الحساب' : 'Account'}</th><th className="text-right w-28">{ar ? 'مدين' : 'Debit'}</th><th className="text-right w-28">{ar ? 'دائن' : 'Credit'}</th></tr></thead>
           <tbody>
