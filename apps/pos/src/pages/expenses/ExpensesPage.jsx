@@ -307,13 +307,18 @@ function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onS
 }
 
 // ── MY EXPENSES TAB ──────────────────────────────────────────
-function MyExpensesTab({ userId, refreshKey }) {
+function MyExpensesTab({ userId, actorId, canApprove, refreshKey, onAction, costCenters, categories, rates }) {
   const [expenses, setExpenses] = useState([])
   const [approvals, setApprovals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [deleting, setDeleting] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [editModal, setEditModal] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [paymentModal, setPaymentModal] = useState(null)
+  const [paymentForm, setPaymentForm] = useState({ account: 'cash', paid_at: new Date().toISOString().slice(0, 10), reference: '', notes: '' })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => { load() }, [userId, refreshKey])
 
@@ -338,6 +343,88 @@ function MyExpensesTab({ userId, refreshKey }) {
     } catch (err) { toast.error(err.message) }
     setDeleting(null)
   }
+
+  function openEdit(exp) {
+    setEditForm({
+      cost_center_id: exp.cost_center_id || '',
+      category_id: exp.category_id || '',
+      amount: exp.amount || '',
+      currency: exp.currency || 'LYD',
+      vendor: exp.vendor || '',
+      description: exp.description || '',
+      expense_date: exp.expense_date || '',
+      paid_by: exp.paid_by || 'Business',
+    })
+    setEditModal(exp)
+  }
+
+  async function saveEdit() {
+    if (!editForm.cost_center_id) { toast.error('Select a cost center'); return }
+    if (!editForm.category_id) { toast.error('Select a category'); return }
+    if (!editForm.amount || isNaN(parseFloat(editForm.amount))) { toast.error('Enter a valid amount'); return }
+    setSaving(true)
+    try {
+      const rate = rates.find(r => r.currency === editForm.currency)?.rate_to_lyd || 1
+      const amount_lyd = parseFloat(editForm.amount) * rate
+      const { error } = await supabase.rpc('update_expense_with_audit', {
+        p_id: editModal.id,
+        p_cost_center_id: editForm.cost_center_id,
+        p_category_id: editForm.category_id,
+        p_amount: parseFloat(editForm.amount),
+        p_currency: editForm.currency,
+        p_exchange_rate_to_lyd: rate,
+        p_amount_lyd: amount_lyd,
+        p_vendor: editForm.vendor || null,
+        p_description: editForm.description || null,
+        p_paid_by: editForm.paid_by || 'Business',
+        p_expense_date: editForm.expense_date,
+      })
+      if (error) throw error
+      toast.success('Expense updated')
+      setEditModal(null)
+      onAction?.()
+      load()
+    } catch (err) { toast.error(err.message) }
+    setSaving(false)
+  }
+
+  function openPayment(exp) {
+    setPaymentForm({
+      account: exp.payment_account_key || 'cash',
+      paid_at: exp.paid_at || new Date().toISOString().slice(0, 10),
+      reference: exp.payment_reference || '',
+      notes: exp.payment_notes || '',
+    })
+    setPaymentModal(exp)
+  }
+
+  async function savePayment() {
+    if (!paymentModal) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.rpc('mark_expense_paid', {
+        p_expense_id: paymentModal.id,
+        p_payment_account_key: paymentForm.account,
+        p_paid_at: paymentForm.paid_at,
+        p_reference: paymentForm.reference || null,
+        p_notes: paymentForm.notes || null,
+      })
+      if (error) throw error
+      await supabase.from('expense_approvals').insert({
+        expense_id: paymentModal.id,
+        acted_by: actorId,
+        decision: 'paid',
+        notes: `Paid from ${paymentForm.account}${paymentForm.reference ? ` (${paymentForm.reference})` : ''}`,
+      })
+      toast.success('Expense paid and posted to accounting')
+      setPaymentModal(null)
+      onAction?.()
+      load()
+    } catch (err) { toast.error(err.message || 'Payment failed') }
+    setSaving(false)
+  }
+
+  const setE = (k, v) => setEditForm(f => ({ ...f, [k]: v }))
 
   const filtered = filter === 'all' ? expenses : expenses.filter(e => e.status === filter)
   const totalLyd = filtered.reduce((s, e) => s + amtLyd(e), 0)
@@ -397,8 +484,20 @@ function MyExpensesTab({ userId, refreshKey }) {
                           <Eye size={11} /> Receipt
                         </a>
                       )}
+                      {canApprove && (
+                        <button onClick={() => openEdit(exp)}
+                          className="text-xs text-noch-muted hover:text-white flex items-center gap-1 mt-1 justify-end">
+                          Edit
+                        </button>
+                      )}
                     </div>
                   </div>
+                  {exp.status === 'approved' && canApprove && (
+                    <button onClick={() => openPayment(exp)} disabled={saving}
+                      className="mt-3 w-full bg-blue-400/10 text-blue-400 border border-blue-400/20 rounded-lg py-2 text-xs font-medium hover:bg-blue-400/20 flex items-center justify-center gap-1 disabled:opacity-50">
+                      <Wallet size={13} /> Pay from Cash / Bank
+                    </button>
+                  )}
                   {exp.status === 'rejected' && (
                     <div className="mt-3 pt-3 border-t border-noch-border">
                       {confirmDelete === exp.id ? (
@@ -425,12 +524,94 @@ function MyExpensesTab({ userId, refreshKey }) {
           </div>
         </>
       )}
+
+      {paymentModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-noch-card border border-noch-border rounded-2xl p-6 w-full max-w-sm space-y-3">
+            <h3 className="text-white font-semibold">Pay Expense</h3>
+            <p className="text-xs text-noch-muted -mt-1">
+              {paymentModal.vendor || paymentModal.description || 'Expense'} - {fmt(amtLyd(paymentModal))}
+            </p>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Pay from</label>
+              <select value={paymentForm.account} onChange={e => setPaymentForm(f => ({ ...f, account: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50">
+                <option value="cash">Cash</option>
+                <option value="bank">Bank</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Payment date</label>
+              <input type="date" value={paymentForm.paid_at} onChange={e => setPaymentForm(f => ({ ...f, paid_at: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Reference</label>
+              <input value={paymentForm.reference} onChange={e => setPaymentForm(f => ({ ...f, reference: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" placeholder="Receipt, transfer, cheque..." />
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Notes</label>
+              <textarea rows={2} value={paymentForm.notes} onChange={e => setPaymentForm(f => ({ ...f, notes: e.target.value }))}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50 resize-none" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setPaymentModal(null)}
+                className="flex-1 bg-noch-border text-noch-muted rounded-xl py-2 text-sm hover:text-white">Cancel</button>
+              <button onClick={savePayment} disabled={saving || !paymentForm.paid_at}
+                className="flex-1 bg-blue-500 text-white rounded-xl py-2 text-sm font-semibold hover:bg-blue-400 disabled:opacity-50 flex items-center justify-center gap-1">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Wallet size={13} />} Pay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-noch-card border border-noch-border rounded-2xl p-6 w-full max-w-lg space-y-3">
+            <h3 className="text-white font-semibold">Edit Expense</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select value={editForm.cost_center_id} onChange={e => setE('cost_center_id', e.target.value)}
+                className="bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50">
+                <option value="">Cost center</option>
+                {costCenters.map(cc => <option key={cc.id} value={cc.id}>{cc.id} - {cc.name}</option>)}
+              </select>
+              <select value={editForm.category_id} onChange={e => setE('category_id', e.target.value)}
+                className="bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50">
+                <option value="">Category</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input type="number" step="0.01" value={editForm.amount} onChange={e => setE('amount', e.target.value)}
+                className="bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" placeholder="Amount" />
+              <select value={editForm.currency} onChange={e => setE('currency', e.target.value)}
+                className="bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50">
+                {rates.map(r => <option key={r.currency} value={r.currency}>{r.currency}</option>)}
+              </select>
+              <input type="date" value={editForm.expense_date} onChange={e => setE('expense_date', e.target.value)}
+                className="bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+              <input value={editForm.vendor} onChange={e => setE('vendor', e.target.value)}
+                className="bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50" placeholder="Vendor" />
+            </div>
+            <textarea rows={3} value={editForm.description} onChange={e => setE('description', e.target.value)}
+              className="w-full bg-noch-dark border border-noch-border rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-noch-green/50 resize-none" placeholder="Description" />
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setEditModal(null)}
+                className="flex-1 bg-noch-border text-noch-muted rounded-xl py-2 text-sm hover:text-white">Cancel</button>
+              <button onClick={saveEdit} disabled={saving}
+                className="flex-1 bg-noch-green text-black rounded-xl py-2 text-sm font-semibold hover:bg-noch-green/90 disabled:opacity-50">
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── APPROVE TAB ──────────────────────────────────────────────
-function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categories, rates }) {
+function ApproveTab({ actorId, canApprove, refreshKey, onAction, costCenters, categories, rates }) {
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('pending')
@@ -620,7 +801,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                       <Eye size={13} /> Receipt
                     </a>
                   )}
-                  {isOwner && (
+                  {canApprove && (
                     <button onClick={() => openEdit(exp)}
                       className="text-xs text-noch-muted hover:text-white flex items-center gap-1">
                       ✏️ Edit
@@ -629,7 +810,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                 </div>
               </div>
 
-              {exp.status === 'pending' && isOwner && (
+              {exp.status === 'pending' && canApprove && (
                 <div className="flex gap-2">
                   <button onClick={() => act(exp.id, 'approved')} disabled={acting === exp.id}
                     className="flex-1 bg-noch-green/10 text-noch-green border border-noch-green/20 rounded-lg py-2 text-xs font-medium hover:bg-noch-green/20 flex items-center justify-center gap-1 disabled:opacity-50">
@@ -641,7 +822,7 @@ function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categ
                   </button>
                 </div>
               )}
-              {exp.status === 'approved' && isOwner && (
+              {exp.status === 'approved' && canApprove && (
                 <button onClick={() => openPayment(exp)} disabled={acting === exp.id}
                   className="w-full bg-blue-400/10 text-blue-400 border border-blue-400/20 rounded-lg py-2 text-xs font-medium hover:bg-blue-400/20 flex items-center justify-center gap-1 disabled:opacity-50">
                   <Wallet size={13} /> Pay from Cash / Bank
@@ -1285,11 +1466,15 @@ export default function ExpensesPage() {
           />
         )}
         {activeTab === 'mine' && (
-          <MyExpensesTab userId={user?.id} refreshKey={refreshKey} />
+          <MyExpensesTab
+            userId={user?.id} actorId={user?.id} canApprove={canApprove}
+            refreshKey={refreshKey} onAction={refresh}
+            costCenters={costCenters} categories={categories} rates={rates}
+          />
         )}
         {activeTab === 'approve' && canApprove && (
           <ApproveTab
-            actorId={user?.id} isOwner={isOwner} refreshKey={refreshKey} onAction={refresh}
+            actorId={user?.id} canApprove={canApprove} refreshKey={refreshKey} onAction={refresh}
             costCenters={costCenters} categories={categories} rates={rates}
           />
         )}
