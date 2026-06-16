@@ -5,7 +5,7 @@
 //   Orders   — every individual transaction (search, refund, void, reprint)
 //   Sessions — group by trading shift (best for cafes that cross midnight)
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListOrdered, Clock, Download, Calendar } from 'lucide-react'
 import { getPOSBranches, getSalesExportRows } from '../modules/pos/lib/pos-supabase'
@@ -25,6 +25,7 @@ function rangeForPreset(preset) {
   const to = new Date()
   const from = new Date()
   if (preset === '7days') from.setDate(from.getDate() - 6)
+  if (preset === 'month') from.setDate(1)
   return { fromDate: localYmd(from), toDate: localYmd(to) }
 }
 
@@ -45,6 +46,8 @@ export default function Sales() {
   const [toDate, setToDate] = useState(() => rangeForPreset('today').toDate)
   const [exportBranchId, setExportBranchId] = useState('all')
   const [exporting, setExporting] = useState(false)
+  const fromDateInputRef = useRef(null)
+  const toDateInputRef = useRef(null)
 
   useEffect(() => {
     getPOSBranches()
@@ -66,11 +69,22 @@ export default function Sales() {
   const handleExport = async () => {
     setExporting(true)
     try {
+      const effectiveFromDate = rangePreset === 'custom'
+        ? fromDateInputRef.current?.value || fromDate
+        : fromDate
+      const effectiveToDate = rangePreset === 'custom'
+        ? toDateInputRef.current?.value || toDate
+        : toDate
+
+      if (!effectiveFromDate || !effectiveToDate || effectiveFromDate > effectiveToDate) {
+        throw new Error('Choose a valid export date range')
+      }
+
       const selectedBranches = exportBranchId === 'all'
         ? branches
         : branches.filter(b => b.id === exportBranchId)
-      const fromIso = new Date(`${fromDate}T00:00:00`).toISOString()
-      const toIso = new Date(`${toDate}T23:59:59.999`).toISOString()
+      const fromIso = new Date(`${effectiveFromDate}T00:00:00`).toISOString()
+      const toIso = new Date(`${effectiveToDate}T23:59:59.999`).toISOString()
       const chunks = await Promise.all(
         selectedBranches.map(branch =>
           getSalesExportRows(branch.id, { from: fromIso, to: toIso })
@@ -119,7 +133,7 @@ export default function Sales() {
       })
 
       downloadCsv(
-        `sales_detail_${exportBranchId === 'all' ? 'all_branches' : selectedBranches[0]?.name || 'branch'}_${fromDate}_${toDate}`,
+        `sales_detail_${exportBranchId === 'all' ? 'all_branches' : selectedBranches[0]?.name || 'branch'}_${effectiveFromDate}_${effectiveToDate}`,
         [
           'timestamp', 'date', 'hour', 'branch', 'order_number', 'order_status', 'source',
           'payment_method', 'customer_name', 'customer_phone', 'table_number', 'pickup_code',
@@ -164,10 +178,11 @@ export default function Sales() {
               <Download size={14} /> {exporting ? 'Exporting...' : 'Export CSV'}
             </button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-3">
             {[
               ['today', 'Today'],
               ['7days', '7 days'],
+              ['month', 'This month'],
               ['custom', 'Custom'],
             ].map(([key, label]) => (
               <button
@@ -183,15 +198,18 @@ export default function Sales() {
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
+          <p className="text-noch-muted text-xs mb-3">
+            Exporting {fromDate} to {toDate}
+          </p>
           {rangePreset === 'custom' && (
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs text-noch-muted">
                 <span className="flex items-center gap-1 mb-1"><Calendar size={12} /> From</span>
-                <input type="date" value={fromDate} max={toDate} onChange={e => setFromDate(e.target.value)} className="input text-sm" />
+                <input ref={fromDateInputRef} type="date" value={fromDate} max={toDate} onChange={e => setFromDate(e.target.value)} className="input text-sm" />
               </label>
               <label className="text-xs text-noch-muted">
                 <span className="flex items-center gap-1 mb-1"><Calendar size={12} /> To</span>
-                <input type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)} className="input text-sm" />
+                <input ref={toDateInputRef} type="date" value={toDate} min={fromDate} onChange={e => setToDate(e.target.value)} className="input text-sm" />
               </label>
             </div>
           )}
