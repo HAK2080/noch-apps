@@ -179,6 +179,30 @@ export async function listExpenses({ branchId = null, from, to } = {}) {
   return data || []
 }
 
+export async function listCanonicalExpenses({ branchId = null, from, to } = {}) {
+  let q = supabase
+    .from('finance_expense_documents')
+    .select('*')
+    .order('booked_at', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (branchId) q = q.eq('branch_id', branchId)
+  if (from) q = q.gte('booked_at', from)
+  if (to)   q = q.lte('booked_at', to)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
+export async function listRecurringExpensesDue() {
+  const { data, error } = await supabase
+    .from('recurring_expense_due')
+    .select('*')
+    .order('next_due_on')
+    .limit(12)
+  if (error) throw error
+  return data || []
+}
+
 export async function createExpense(expense) {
   const { data: { user } = {} } = await supabase.auth.getUser()
   const payload = { ...expense, created_by: user?.id }
@@ -281,6 +305,14 @@ export async function updateBankTransactionCategory(id, category) {
   const { error } = await supabase
     .from('bank_transactions')
     .update({ category, category_source: 'manual' })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function updateBankTransactionReconciled(id, reconciled) {
+  const { error } = await supabase
+    .from('bank_transactions')
+    .update({ reconciled: !!reconciled })
     .eq('id', id)
   if (error) throw error
 }

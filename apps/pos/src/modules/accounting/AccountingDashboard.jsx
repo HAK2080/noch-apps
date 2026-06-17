@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  BookOpen, ListTree, NotebookPen, Scale, FileBarChart, Settings as Cog, Plus, Save, Trash2, X, AlertTriangle,
+  BookOpen, ListTree, NotebookPen, Scale, FileBarChart, Settings as Cog, Plus, Save, Trash2, X, AlertTriangle, Wallet,
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useLanguage } from '../../contexts/LanguageContext'
@@ -15,7 +15,7 @@ import {
   getGlSettings, updateGlSettings,
   listAccounts, upsertAccount, deactivateAccount, listAccountMap, setAccountMap,
   listBatches, getBatchLines, createManualJournal, syncPeriod, postOpeningBalances,
-  trialBalance, accountLedger, balanceSheet, incomeStatement, listBranches,
+  trialBalance, accountLedger, balanceSheet, incomeStatement, listBranches, apAging, supplierStatement,
   replaceManualJournal, voidGlBatch,
 } from './lib/accounting-supabase'
 import toast from 'react-hot-toast'
@@ -34,6 +34,7 @@ export default function AccountingDashboard() {
   useEffect(() => { listBranches().then(setBranches) }, [])
 
   const TABS = [
+    { id: 'payables', label: ar ? 'حسابات الموردين' : 'Payables', icon: Wallet },
     { id: 'coa',     label: ar ? 'شجرة الحسابات' : 'Chart of accounts', icon: ListTree },
     { id: 'journal', label: ar ? 'دفتر اليومية' : 'Journal',            icon: NotebookPen },
     { id: 'ledger',  label: ar ? 'دفتر الأستاذ' : 'Ledger',             icon: BookOpen },
@@ -61,6 +62,7 @@ export default function AccountingDashboard() {
           ))}
         </div>
 
+        {tab === 'payables' && <PayablesTab ar={ar} branches={branches} />}
         {tab === 'coa'      && <ChartOfAccountsTab ar={ar} canEdit={canManageChart} />}
         {tab === 'journal'  && <JournalTab ar={ar} branches={branches} canPost={isOwner || canEdit('accounting')} />}
         {tab === 'ledger'   && <LedgerTab ar={ar} branches={branches} />}
@@ -521,6 +523,157 @@ function ReportsTab({ ar, branches }) {
 }
 
 // ── Settings ────────────────────────────────────────────────────────────
+function PayablesTab({ ar, branches }) {
+  const [asOf, setAsOf] = useState(TODAY)
+  const [branchId, setBranchId] = useState(null)
+  const [rows, setRows] = useState([])
+  const [supplier, setSupplier] = useState('')
+  const [statement, setStatement] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    apAging(asOf, branchId)
+      .then(data => {
+        if (cancelled) return
+        setRows(data || [])
+        const defaultSupplier = (data || []).find(r => Number(r.outstanding_amount_lyd || 0) > 0)?.supplier_name || data?.[0]?.supplier_name || ''
+        setSupplier(prev => prev || defaultSupplier)
+      })
+      .catch(err => toast.error(err.message || 'Failed to load payables'))
+    return () => { cancelled = true }
+  }, [asOf, branchId])
+
+  useEffect(() => {
+    if (!supplier) { setStatement([]); return }
+    let cancelled = false
+    supplierStatement(supplier, asOf, branchId)
+      .then(data => { if (!cancelled) setStatement(data || []) })
+      .catch(err => toast.error(err.message || 'Failed to load supplier statement'))
+    return () => { cancelled = true }
+  }, [supplier, asOf, branchId])
+
+  const openRows = rows.filter(r => Number(r.outstanding_amount_lyd || 0) > 0)
+  const totalOpen = openRows.reduce((sum, row) => sum + Number(row.outstanding_amount_lyd || 0), 0)
+  const overdue = openRows
+    .filter(r => Number(r.days_past_due || 0) > 0)
+    .reduce((sum, row) => sum + Number(row.outstanding_amount_lyd || 0), 0)
+  const suppliers = [...new Set(rows.map(r => r.supplier_name).filter(Boolean))]
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} className="input py-1 px-2 text-xs" />
+        <select value={branchId || ''} onChange={e => setBranchId(e.target.value || null)} className="input py-1 px-2 text-xs">
+          <option value="">{ar ? 'كل الفروع' : 'All branches'}</option>
+          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <span className="ms-auto">
+          <ExportButtons onCsv={() => downloadCsv(
+            `payables_${asOf}`,
+            ['Supplier', 'Invoice', 'Due date', 'Outstanding', 'Days past due', 'Status', 'Payment status'],
+            rows.map(r => [
+              r.supplier_name,
+              r.invoice_no || '',
+              r.due_date || r.invoice_date || '',
+              Number(r.outstanding_amount_lyd || 0).toFixed(2),
+              r.days_past_due || 0,
+              r.status,
+              r.payment_status,
+            ]),
+          )} />
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Open AP</p>
+          <p className="text-white text-lg font-bold">{lyd(totalOpen)}</p>
+        </div>
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Overdue</p>
+          <p className="text-red-400 text-lg font-bold">{lyd(overdue)}</p>
+        </div>
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Unpaid invoices</p>
+          <p className="text-white text-lg font-bold">{openRows.length}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-4">
+        <div className="card overflow-x-auto">
+          <h2 className="text-white font-semibold mb-3">{ar ? 'فواتير الموردين' : 'Supplier invoices'}</h2>
+          <table className="w-full text-xs">
+            <thead className="text-noch-muted">
+              <tr>
+                <th className="text-left py-1 pr-2">Supplier</th>
+                <th className="text-left py-1 pr-2">Invoice</th>
+                <th className="text-left py-1 pr-2">Due</th>
+                <th className="text-right py-1 pr-2">Outstanding</th>
+                <th className="text-right py-1 pr-2">Days</th>
+                <th className="text-left py-1">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.order_id} className="border-t border-noch-border/40">
+                  <td className="py-1.5 pr-2 text-white">{r.supplier_name}</td>
+                  <td className="py-1.5 pr-2 text-noch-muted">{r.invoice_no || '-'}</td>
+                  <td className="py-1.5 pr-2 text-noch-muted">{r.due_date || r.invoice_date || '-'}</td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-white">{lyd(r.outstanding_amount_lyd)}</td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-noch-muted">{r.days_past_due || 0}</td>
+                  <td className="py-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      r.payment_status === 'paid'
+                        ? 'bg-noch-green/10 text-noch-green'
+                        : Number(r.days_past_due || 0) > 30
+                          ? 'bg-red-500/10 text-red-400'
+                          : 'bg-yellow-500/10 text-yellow-300'
+                    }`}>
+                      {r.payment_status === 'paid' ? 'paid' : r.aging_bucket}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-noch-muted">No supplier invoices found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-white font-semibold">{ar ? 'كشف المورد' : 'Supplier statement'}</h2>
+            <select value={supplier} onChange={e => setSupplier(e.target.value)} className="input py-1 px-2 text-xs max-w-[14rem]">
+              <option value="">{ar ? 'اختر مورداً' : 'Select supplier'}</option>
+              {suppliers.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+          {supplier ? (
+            <div className="space-y-2">
+              {statement.map((row, idx) => (
+                <div key={`${row.event_date}-${row.event_type}-${idx}`} className="rounded-xl border border-noch-border/50 bg-noch-dark/30 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-white text-sm font-medium">{row.event_type === 'invoice' ? 'Invoice' : 'Payment'}</p>
+                    <p className="text-noch-muted text-xs">{row.event_date}</p>
+                  </div>
+                  <p className="text-noch-muted text-xs mt-0.5">{row.invoice_no || '-'} · {row.memo || '-'}</p>
+                  <div className="flex items-center justify-between mt-2 text-xs font-mono">
+                    <span className="text-noch-green">Dr {lyd(row.debit_lyd)}</span>
+                    <span className="text-blue-300">Cr {lyd(row.credit_lyd)}</span>
+                    <span className="text-white">Bal {lyd(row.running_balance_lyd)}</span>
+                  </div>
+                </div>
+              ))}
+              {statement.length === 0 && <p className="text-noch-muted text-sm">No statement activity for this supplier.</p>}
+            </div>
+          ) : (
+            <p className="text-noch-muted text-sm">Select a supplier to inspect invoice and payment history.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SettingsTab({ ar, canEdit }) {
   const [settings, setSettings] = useState(null)
   const [map, setMap] = useState([])
