@@ -52,7 +52,6 @@ const StockManager     = lazy(() => import('./pages/inventory/StockManager'))
 const ProcurementOrders= lazy(() => import('./pages/inventory/ProcurementOrders'))
 const Suppliers        = lazy(() => import('./pages/inventory/Suppliers'))
 const StockCheckAll    = lazy(() => import('./pages/StockCheckAll'))
-const BusinessAnalytics= lazy(() => import('./pages/BusinessAnalytics'))
 const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
 const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
 
@@ -258,11 +257,11 @@ export default function App() {
         <Route path="/inventory/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
         <Route path="/inventory/intelligence" element={<ProtectedRoute><OwnerRoute><InventoryIntelligence /></OwnerRoute></ProtectedRoute>} />
 
-        {/* Analytics (owner only) */}
+        {/* Analytics: finance is canonical, analytics-legacy kept as a safe alias */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
         <Route path="/finance" element={<ProtectedRoute><PermissionRoute feature="finance"><FinanceDashboard /></PermissionRoute></ProtectedRoute>} />
         <Route path="/marketing" element={<ProtectedRoute><PermissionRoute feature="marketing"><MarketingDashboard /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/analytics-legacy" element={<ProtectedRoute><PermissionRoute feature="finance"><BusinessAnalytics /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/analytics-legacy" element={<Navigate to="/finance" replace />} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
