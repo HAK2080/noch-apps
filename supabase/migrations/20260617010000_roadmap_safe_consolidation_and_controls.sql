@@ -63,8 +63,8 @@ grant select on finance_expense_documents to authenticated;
 create or replace view procurement_payables_status as
 select
   po.id,
-  po.branch_id,
-  pb.name as branch_name,
+  null::uuid as branch_id,
+  'All branches'::text as branch_name,
   po.ingredient_id,
   i.name as ingredient_name,
   po.supplier_name,
@@ -93,7 +93,6 @@ select
     else '90+'
   end as aging_bucket
 from procurement_orders po
-left join pos_branches pb on pb.id = po.branch_id
 left join ingredients i on i.id = po.ingredient_id;
 
 grant select on procurement_payables_status to authenticated;
@@ -119,8 +118,8 @@ create or replace function gl_ap_aging(
 language sql stable security definer set search_path = public as $$
   select
     po.id as order_id,
-    po.branch_id,
-    pb.name as branch_name,
+    null::uuid as branch_id,
+    'All branches'::text as branch_name,
     coalesce(po.supplier_name, 'Unspecified supplier') as supplier_name,
     po.invoice_no,
     po.invoice_date,
@@ -143,9 +142,7 @@ language sql stable security definer set search_path = public as $$
       else '90+'
     end as aging_bucket
   from procurement_orders po
-  left join pos_branches pb on pb.id = po.branch_id
-  where (p_branch is null or po.branch_id = p_branch)
-    and po.status <> 'cancelled'
+  where po.status <> 'cancelled'
   order by
     coalesce(po.due_date, po.invoice_date, po.received_at::date, po.created_at::date) asc nulls last,
     coalesce(po.supplier_name, 'Unspecified supplier'),
@@ -181,7 +178,6 @@ language sql stable security definer set search_path = public as $$
     from procurement_orders po
     left join ingredients i on i.id = po.ingredient_id
     where coalesce(po.supplier_name, 'Unspecified supplier') = coalesce(p_supplier_name, coalesce(po.supplier_name, 'Unspecified supplier'))
-      and (p_branch is null or po.branch_id = p_branch)
       and po.status <> 'cancelled'
       and coalesce(po.invoice_date, po.received_at::date, po.created_at::date) <= p_as_of
 
@@ -198,7 +194,6 @@ language sql stable security definer set search_path = public as $$
       coalesce(po.paid_at::timestamptz, po.created_at) as sort_at
     from procurement_orders po
     where coalesce(po.supplier_name, 'Unspecified supplier') = coalesce(p_supplier_name, coalesce(po.supplier_name, 'Unspecified supplier'))
-      and (p_branch is null or po.branch_id = p_branch)
       and po.payment_status = 'paid'
       and po.paid_at is not null
       and po.paid_at <= p_as_of
@@ -373,8 +368,8 @@ grant select on recurring_expense_due to authenticated;
 create or replace view inventory_supplier_price_history as
 select
   po.id as procurement_order_id,
-  po.branch_id,
-  pb.name as branch_name,
+  null::uuid as branch_id,
+  'All branches'::text as branch_name,
   po.ingredient_id,
   i.name as ingredient_name,
   po.supplier_name,
@@ -390,7 +385,6 @@ select
   ) as previous_unit_cost_lyd
 from procurement_orders po
 left join ingredients i on i.id = po.ingredient_id
-left join pos_branches pb on pb.id = po.branch_id
 where po.status in ('received', 'ordered')
   and po.unit_cost_lyd is not null;
 
