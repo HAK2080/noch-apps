@@ -174,6 +174,31 @@ export function renderTemplate(template, recipient) {
     .replaceAll('{{days}}',  String(recipient?.context?.days_since ?? ''))
 }
 
+const WHATSAPP_TEMPLATE_BY_SEGMENT = {
+  birthday_this_week: 'loyalty_marketing_birthday',
+  inactive: 'loyalty_lapsed_checkin',
+  reward_ready: 'loyalty_reward_ready',
+}
+
+function templateVariablesForSegment(segment, recipient) {
+  if (segment === 'birthday_this_week') {
+    return { '1': recipient?.full_name || '' }
+  }
+  if (segment === 'inactive') {
+    return {
+      '1': recipient?.full_name || '',
+      '2': String(recipient?.context?.days_since ?? 30),
+    }
+  }
+  if (segment === 'reward_ready') {
+    return {
+      '1': recipient?.full_name || '',
+      '2': recipient?.top_drink || 'your reward',
+    }
+  }
+  return {}
+}
+
 // Phase 6 — dispatch a WhatsApp campaign by looping through the chosen
 // segment's recipients and invoking the send-whatsapp edge function.
 // Each send is logged via record_whatsapp_send for dedupe + audit.
@@ -192,10 +217,13 @@ export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArg
 
   for (const r of recipients) {
     const message = renderTemplate(template, r)
+    const templateName = WHATSAPP_TEMPLATE_BY_SEGMENT[segment]
     let status = 'sent', error = null
     try {
       const { data, error: invokeErr } = await supabase.functions.invoke('send-whatsapp', {
-        body: { to: r.phone, message },
+        body: templateName
+          ? { to: r.phone, templateName, templateVariables: templateVariablesForSegment(segment, r) }
+          : { to: r.phone, message },
       })
       if (invokeErr) { status = 'failed'; error = invokeErr.message || 'invoke_failed' }
       else if (data?.error) { status = 'failed'; error = data.error }
@@ -211,7 +239,7 @@ export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArg
       await supabase.rpc('record_whatsapp_send', {
         p_customer_id: r.id,
         p_phone:       r.phone,
-        p_template:    template?.slice(0, 200) || null,
+        p_template:    templateName || template?.slice(0, 200) || null,
         p_trigger:     `campaign:${segment}`,
         p_status:      status,
         p_error:       error,

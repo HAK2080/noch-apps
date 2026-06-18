@@ -28,6 +28,21 @@ const TEMPLATE_SIDS: Record<string, string> = {
   // loyalty_phoenix_revival: not yet approved in Twilio — add SID once live.
 }
 
+function normaliseWhatsAppPhone(input: string): string {
+  const trimmed = String(input || '').trim()
+  if (!trimmed) return ''
+  const digits = trimmed.replace(/\D/g, '')
+
+  // Libya mobile numbers are commonly stored locally as 09xxxxxxxx.
+  // Twilio requires E.164, so convert those to +2189xxxxxxxx instead
+  // of the invalid +09xxxxxxxx shape.
+  if (/^09\d{7,9}$/.test(digits)) return `+218${digits.slice(1)}`
+  if (/^9\d{7,9}$/.test(digits)) return `+218${digits}`
+  if (/^2189\d{7,9}$/.test(digits)) return `+${digits}`
+
+  return trimmed.startsWith('+') ? `+${digits}` : `+${digits}`
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
@@ -66,8 +81,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'Twilio credentials not configured' }, 500)
     }
 
-    // Normalise phone: ensure it has + prefix
-    const toPhone = to.startsWith('+') ? to : '+' + to.replace(/\D/g, '')
+    const toPhone = normaliseWhatsAppPhone(to)
 
     const params = new URLSearchParams({ To: `whatsapp:${toPhone}` })
     // Prefer a Messaging Service (recommended for templates); else the from number.
