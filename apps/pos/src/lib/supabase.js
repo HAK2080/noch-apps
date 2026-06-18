@@ -1592,7 +1592,10 @@ export async function upsertContentCategory(brandId, category, catData) {
 // ============================================================
 
 export async function getProcurementOrders(ingredientId) {
-  let query = supabase.from('procurement_orders').select('*, ingredient:ingredients(name)').order('created_at', { ascending: false })
+  let query = supabase
+    .from('procurement_orders')
+    .select('*, ingredient:ingredients(name)')
+    .order('created_at', { ascending: false })
   if (ingredientId) query = query.eq('ingredient_id', ingredientId)
   const { data, error } = await query
   if (error) throw error
@@ -1609,6 +1612,74 @@ export async function updateProcurementOrder(id, updates) {
   const { data, error } = await supabase.from('procurement_orders').update(updates).eq('id', id).select().single()
   if (error) throw error
   return data
+}
+
+export async function receiveProcurementOrder({
+  orderId,
+  receivedQty,
+  receivedAt = new Date().toISOString(),
+  updateBulkCost = false,
+  receiptNotes = null,
+  locationId = null,
+}) {
+  const { data, error } = await supabase.rpc('receive_procurement_order_v2', {
+    p_order_id: orderId,
+    p_received_qty: Number(receivedQty),
+    p_received_at: receivedAt,
+    p_update_bulk_cost: !!updateBulkCost,
+    p_receipt_notes: receiptNotes || null,
+    p_location_id: locationId || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function returnProcurementOrder({
+  orderId,
+  returnQty,
+  returnedAt = new Date().toISOString(),
+  reason = null,
+  locationId = null,
+}) {
+  const { data, error } = await supabase.rpc('return_procurement_order', {
+    p_order_id: orderId,
+    p_return_qty: Number(returnQty),
+    p_returned_at: returnedAt,
+    p_reason: reason || null,
+    p_location_id: locationId || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function getInventoryStockValuation() {
+  const { data, error } = await supabase
+    .from('inventory_stock_valuation')
+    .select('*')
+    .order('stock_value_lyd', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getInventoryReorderSuggestions() {
+  const { data, error } = await supabase
+    .from('inventory_reorder_suggestions')
+    .select('*')
+    .order('suggested_reorder_qty', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getInventorySupplierPriceHistory(ingredientId = null) {
+  let query = supabase
+    .from('inventory_supplier_price_history')
+    .select('*')
+    .order('effective_date', { ascending: false })
+    .order('procurement_order_id', { ascending: false })
+  if (ingredientId) query = query.eq('ingredient_id', ingredientId)
+  const { data, error } = await query.limit(20)
+  if (error) throw error
+  return data || []
 }
 
 export async function uploadIngredientImage(ingredientId, file) {

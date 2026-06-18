@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ShoppingCart, Plus, X, Check, Loader2, Package, Wallet } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { ShoppingCart, Plus, X, Check, Loader2, Package, Wallet, RotateCcw, TrendingUp, AlertTriangle } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'
@@ -8,6 +8,12 @@ import {
   createProcurementOrder,
   updateProcurementOrder,
   getIngredientsForCost,
+  getInventoryLocations,
+  getInventoryStockValuation,
+  getInventoryReorderSuggestions,
+  getInventorySupplierPriceHistory,
+  receiveProcurementOrder,
+  returnProcurementOrder,
   supabase,
 } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -84,7 +90,9 @@ const localT = (lang, key, fallback) => (lang === 'ar' ? AR[key] : EN[key]) || f
 function StatusBadge({ status, tr }) {
   const styles = {
     ordered: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
+    partially_received: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
     received: 'bg-green-500/10 text-green-400 border-green-500/30',
+    over_received: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
     cancelled: 'bg-red-500/10 text-red-400 border-red-500/30',
   }
   return (
@@ -100,6 +108,11 @@ export default function ProcurementOrders() {
   const tr = (key, fallback) => localT(lang, key, fallback)
   const [orders, setOrders] = useState([])
   const [ingredients, setIngredients] = useState([])
+  const [locations, setLocations] = useState([])
+  const [locationsLoaded, setLocationsLoaded] = useState(false)
+  const [valuationRows, setValuationRows] = useState([])
+  const [reorderRows, setReorderRows] = useState([])
+  const [priceHistory, setPriceHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -126,28 +139,65 @@ export default function ProcurementOrders() {
 
   // Receive modal
   const [receiveModal, setReceiveModal] = useState(null) // order object
+  const [receiveQty, setReceiveQty] = useState('')
+  const [receiveNotes, setReceiveNotes] = useState('')
+  const [receiveLocationId, setReceiveLocationId] = useState('')
   const [updateBulkCost, setUpdateBulkCost] = useState(false)
   const [receiving, setReceiving] = useState(false)
+  const [returnModal, setReturnModal] = useState(null)
+  const [returnQty, setReturnQty] = useState('')
+  const [returnReason, setReturnReason] = useState('')
+  const [returnLocationId, setReturnLocationId] = useState('')
+  const [returning, setReturning] = useState(false)
   const [paymentModal, setPaymentModal] = useState(null)
   const [paymentForm, setPaymentForm] = useState({ account: 'cash', paid_at: new Date().toISOString().slice(0, 10), reference: '' })
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    if (!receiveModal && !returnModal) return
+    if (locationsLoaded) return
+    loadLocations()
+  }, [receiveModal, returnModal, locationsLoaded])
 
   async function loadData() {
     try {
       setLoading(true)
-      const [orderData, ingredientData] = await Promise.all([
+      const [orderData, ingredientData, valuationData, reorderData, priceData] = await Promise.all([
         getProcurementOrders(),
         getIngredientsForCost(),
+        getInventoryStockValuation().catch(() => []),
+        getInventoryReorderSuggestions().catch(() => []),
+        getInventorySupplierPriceHistory().catch(() => []),
       ])
       setOrders(orderData || [])
       setIngredients(ingredientData || [])
+      setValuationRows(valuationData || [])
+      setReorderRows(reorderData || [])
+      setPriceHistory(priceData || [])
     } catch (err) {
       toast.error(tr('loadError', 'Failed to load procurement data'))
     } finally {
       setLoading(false)
     }
   }
+
+  async function loadLocations() {
+    try {
+      const data = await getInventoryLocations()
+      setLocations(data || [])
+    } catch {
+      setLocations([])
+    } finally {
+      setLocationsLoaded(true)
+    }
+  }
+
+  const netReceived = (order) => Math.max(0, Number(order.quantity_received || 0) - Number(order.quantity_returned || 0))
+  const remainingQty = (order) => Math.max(0, Number(order.quantity_ordered || 0) - Number(order.quantity_received || 0))
+  const totalStockValue = useMemo(
+    () => valuationRows.reduce((sum, row) => sum + Number(row.stock_value_lyd || 0), 0),
+    [valuationRows],
+  )
 
   // Calculate total
   const calcTotal = (f) => {
@@ -211,20 +261,49 @@ export default function ProcurementOrders() {
     if (!receiveModal) return
     setReceiving(true)
     try {
-      const { error } = await supabase.rpc('receive_procurement_order', {
-        p_order_id: receiveModal.id,
-        p_received_at: new Date().toISOString(),
-        p_update_bulk_cost: updateBulkCost,
+      await receiveProcurementOrder({
+        orderId: receiveModal.id,
+        receivedQty: parseFloat(receiveQty) || 0,
+        receivedAt: new Date().toISOString(),
+        updateBulkCost,
+        receiptNotes: receiveNotes || null,
+        locationId: receiveLocationId || null,
       })
-      if (error) throw error
       toast.success(tr('receivedOk', 'Order received, stock updated, and accounting posted'))
       setReceiveModal(null)
+      setReceiveQty('')
+      setReceiveNotes('')
+      setReceiveLocationId('')
       setUpdateBulkCost(false)
       await loadData()
     } catch (err) {
       toast.error(err.message || tr('receiveError', 'Failed to receive order'))
     } finally {
       setReceiving(false)
+    }
+  }
+
+  async function handleReturn() {
+    if (!returnModal) return
+    setReturning(true)
+    try {
+      await returnProcurementOrder({
+        orderId: returnModal.id,
+        returnQty: parseFloat(returnQty) || 0,
+        returnedAt: new Date().toISOString(),
+        reason: returnReason || null,
+        locationId: returnLocationId || null,
+      })
+      toast.success('Purchase return posted to stock and accounting')
+      setReturnModal(null)
+      setReturnQty('')
+      setReturnReason('')
+      setReturnLocationId('')
+      await loadData()
+    } catch (err) {
+      toast.error(err.message || 'Failed to process purchase return')
+    } finally {
+      setReturning(false)
     }
   }
 
@@ -289,7 +368,9 @@ export default function ProcurementOrders() {
             >
               <option value="all">{tr('all', 'All')}</option>
               <option value="ordered">{tr('ordered', 'Ordered')}</option>
+              <option value="partially_received">Partially received</option>
               <option value="received">{tr('received', 'Received')}</option>
+              <option value="over_received">Over received</option>
               <option value="cancelled">{tr('cancelled', 'Cancelled')}</option>
             </select>
           </div>
@@ -305,6 +386,27 @@ export default function ProcurementOrders() {
                 <option key={ing.id} value={ing.id}>{ing.name}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1">Outstanding supplier invoices</p>
+            <p className="text-white text-xl font-bold">
+              {orders.filter(order => order.status !== 'cancelled' && order.payment_status !== 'paid').length}
+            </p>
+          </div>
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1 flex items-center gap-1"><AlertTriangle size={12} /> Reorder alerts</p>
+            <p className="text-yellow-300 text-xl font-bold">{reorderRows.length}</p>
+          </div>
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1 flex items-center gap-1"><Package size={12} /> Stock valuation</p>
+            <p className="text-white text-xl font-bold">{totalStockValue.toFixed(2)} LYD</p>
+          </div>
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1 flex items-center gap-1"><TrendingUp size={12} /> Recent supplier price updates</p>
+            <p className="text-white text-xl font-bold">{priceHistory.length}</p>
           </div>
         </div>
 
@@ -341,7 +443,12 @@ export default function ProcurementOrders() {
                   <tr key={order.id} className="border-b border-noch-border/50 hover:bg-noch-border/20">
                     <td className="py-3 px-3 text-white font-medium">{order.ingredient?.name || '—'}</td>
                     <td className="py-3 px-3 text-noch-muted">{order.supplier_name || '—'}</td>
-                    <td className="py-3 px-3 text-white text-right">{order.quantity_ordered} {order.unit}</td>
+                    <td className="py-3 px-3 text-right">
+                      <p className="text-white">{order.quantity_ordered} {order.unit}</p>
+                      <p className="text-[11px] text-noch-muted">
+                        received {Number(order.quantity_received || 0).toFixed(2)} · returned {Number(order.quantity_returned || 0).toFixed(2)}
+                      </p>
+                    </td>
                     <td className="py-3 px-3 text-white text-right">{order.unit_cost_lyd || 0}</td>
                     <td className="py-3 px-3 text-noch-muted text-right">{order.shipping_cost_lyd || 0}</td>
                     <td className="py-3 px-3 text-noch-muted text-right">{order.customs_cost_lyd || 0}</td>
@@ -350,6 +457,12 @@ export default function ProcurementOrders() {
                     <td className="py-3 px-3 text-noch-muted text-xs">{new Date(order.created_at).toLocaleDateString()}</td>
                     <td className="py-3 px-3">
                       <StatusBadge status={order.status} tr={tr} />
+                      {remainingQty(order) > 0 && order.status !== 'cancelled' && (
+                        <p className="text-noch-muted text-xs mt-1">remaining {remainingQty(order).toFixed(2)} {order.unit}</p>
+                      )}
+                      {netReceived(order) > 0 && (
+                        <p className="text-noch-muted text-xs mt-1">net on hand {netReceived(order).toFixed(2)} {order.unit}</p>
+                      )}
                       {order.payment_status === 'paid' ? (
                         <p className="text-blue-300 text-xs mt-1">{tr('paid', 'Paid')} {order.paid_at || ''}</p>
                       ) : (
@@ -357,10 +470,16 @@ export default function ProcurementOrders() {
                       )}
                     </td>
                     <td className="py-3 px-3 text-right">
-                      {order.status === 'ordered' && (
+                      {(order.status === 'ordered' || order.status === 'partially_received') && (
                         <div className="flex items-center gap-1 justify-end">
                           <button
-                            onClick={() => setReceiveModal(order)}
+                            onClick={() => {
+                              setReceiveModal(order)
+                              setReceiveQty(String(remainingQty(order) || order.quantity_ordered || ''))
+                              setReceiveNotes('')
+                              setReceiveLocationId('')
+                              setUpdateBulkCost(false)
+                            }}
                             className="text-green-400 hover:text-green-300 text-xs px-2 py-1 rounded hover:bg-green-500/10"
                             title={tr('markReceived', 'Mark Received')}
                           >
@@ -375,7 +494,21 @@ export default function ProcurementOrders() {
                           </button>
                         </div>
                       )}
-                      {order.status === 'received' && order.payment_status !== 'paid' && (
+                      {netReceived(order) > 0 && order.status !== 'cancelled' && (
+                        <button
+                          onClick={() => {
+                            setReturnModal(order)
+                            setReturnQty(String(netReceived(order)))
+                            setReturnReason('')
+                            setReturnLocationId('')
+                          }}
+                          className="text-yellow-300 hover:text-yellow-200 text-xs px-2 py-1 rounded hover:bg-yellow-500/10 inline-flex items-center gap-1 mt-1"
+                          title="Purchase return"
+                        >
+                          <RotateCcw size={14} /> Return
+                        </button>
+                      )}
+                      {(order.status === 'received' || order.status === 'over_received') && order.payment_status !== 'paid' && (
                         <button
                           onClick={() => setPaymentModal(order)}
                           className="text-blue-400 hover:text-blue-300 text-xs px-2 py-1 rounded hover:bg-blue-500/10 inline-flex items-center gap-1"
@@ -397,6 +530,78 @@ export default function ProcurementOrders() {
             </table>
           </div>
         )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-4">
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="text-white font-semibold">Reorder suggestions</h2>
+              <span className="text-noch-muted text-xs">{reorderRows.length} items</span>
+            </div>
+            {reorderRows.length === 0 ? (
+              <p className="text-noch-muted text-sm">No ingredients are currently below threshold.</p>
+            ) : (
+              <div className="space-y-2">
+                {reorderRows.slice(0, 6).map(row => (
+                  <div key={row.ingredient_id} className="rounded-lg border border-noch-border/60 bg-noch-dark/40 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-white text-sm font-medium">{row.ingredient_name}</p>
+                      <span className={`text-[10px] font-semibold uppercase ${row.priority === 'critical' ? 'text-red-400' : 'text-yellow-300'}`}>
+                        {row.priority}
+                      </span>
+                    </div>
+                    <p className="text-noch-muted text-xs mt-1">
+                      on hand {Number(row.qty_available || 0).toFixed(2)} {row.unit} · threshold {Number(row.min_threshold || 0).toFixed(2)}
+                    </p>
+                    <p className="text-noch-green text-xs mt-1">suggested reorder {Number(row.suggested_reorder_qty || 0).toFixed(2)} {row.unit}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="text-white font-semibold">Supplier price history</h2>
+                <span className="text-noch-muted text-xs">recent receipts</span>
+              </div>
+              {priceHistory.length === 0 ? (
+                <p className="text-noch-muted text-sm">No supplier price history yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {priceHistory.slice(0, 5).map(row => {
+                    const previous = Number(row.previous_unit_cost_lyd || 0)
+                    const current = Number(row.unit_cost_lyd || 0)
+                    const delta = previous > 0 ? (((current - previous) / previous) * 100) : null
+                    return (
+                      <div key={`${row.procurement_order_id}-${row.effective_date}`} className="rounded-lg border border-noch-border/60 bg-noch-dark/40 px-3 py-2">
+                        <p className="text-white text-sm font-medium">{row.ingredient_name}</p>
+                        <p className="text-noch-muted text-xs mt-0.5">{row.supplier_name || 'Unspecified supplier'} · {row.effective_date}</p>
+                        <div className="flex items-center justify-between mt-2 text-xs font-mono">
+                          <span className="text-white">{current.toFixed(2)} LYD/{row.unit || '-'}</span>
+                          <span className={delta == null ? 'text-noch-muted' : delta > 0 ? 'text-red-400' : delta < 0 ? 'text-noch-green' : 'text-noch-muted'}>
+                            {delta == null ? 'new' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="text-white font-semibold">Warehouse signals</h2>
+                <span className="text-noch-muted text-xs">{locations.length} active locations</span>
+              </div>
+              <p className="text-noch-muted text-sm">
+                Receipts can now be assigned to a specific warehouse or storage location without changing legacy stock tables.
+              </p>
+              <p className="text-white text-sm mt-3">Tracked valuation: {totalStockValue.toFixed(2)} LYD</p>
+            </div>
+          </div>
+        </div>
 
         {/* Add Order Modal */}
         {showAddModal && (
@@ -573,6 +778,42 @@ export default function ProcurementOrders() {
                   <span className="text-white font-medium">{receiveModal.ingredient?.name || tr('unknown', 'Unknown')}</span>
                 </p>
                 <p className="text-noch-muted text-xs">{tr('receiveHint', 'This will add the quantity to current stock as a restock entry.')}</p>
+                <div>
+                  <label className="text-noch-muted text-xs mb-1 block">Receipt quantity</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={receiveQty}
+                    onChange={e => setReceiveQty(e.target.value)}
+                    className="w-full px-3 py-2 bg-noch-dark border border-noch-border rounded-lg text-white text-sm focus:outline-none focus:border-noch-green/50"
+                  />
+                  <p className="text-noch-muted text-[11px] mt-1">
+                    Ordered {Number(receiveModal.quantity_ordered || 0).toFixed(2)} · already received {Number(receiveModal.quantity_received || 0).toFixed(2)} · remaining {remainingQty(receiveModal).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs mb-1 block">Warehouse / location</label>
+                  <select
+                    value={receiveLocationId}
+                    onChange={e => setReceiveLocationId(e.target.value)}
+                    className="w-full px-3 py-2 bg-noch-dark border border-noch-border rounded-lg text-white text-sm focus:outline-none focus:border-noch-green/50"
+                  >
+                    <option value="">Main stock only</option>
+                    {locations.map(location => (
+                      <option key={location.id} value={location.id}>{location.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs mb-1 block">Receipt notes</label>
+                  <textarea
+                    rows={2}
+                    value={receiveNotes}
+                    onChange={e => setReceiveNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-noch-dark border border-noch-border rounded-lg text-white text-sm resize-none focus:outline-none focus:border-noch-green/50"
+                    placeholder="Partial delivery, overage, damaged bags excluded..."
+                  />
+                </div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -587,11 +828,75 @@ export default function ProcurementOrders() {
                 <button onClick={() => { setReceiveModal(null); setUpdateBulkCost(false) }} className="px-4 py-2 text-sm text-noch-muted hover:text-white">{tr('cancel', 'Cancel')}</button>
                 <button
                   onClick={handleReceive}
-                  disabled={receiving}
+                  disabled={receiving || !(parseFloat(receiveQty) > 0)}
                   className="bg-green-500/10 text-green-400 border border-green-500/30 rounded-lg px-4 py-2 text-sm font-medium hover:bg-green-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {receiving && <Loader2 size={14} className="animate-spin" />}
                   <Check size={14} /> {tr('confirmReceived', 'Confirm Received')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {returnModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-noch-card border border-noch-border rounded-xl p-6 w-full max-w-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white font-semibold">Purchase Return</h2>
+                <button onClick={() => setReturnModal(null)} className="text-noch-muted hover:text-white"><X size={20} /></button>
+              </div>
+              <div className="space-y-3">
+                <p className="text-noch-muted text-sm">
+                  Returning <span className="text-white font-medium">{returnModal.ingredient?.name || tr('unknown', 'Unknown')}</span>{' '}
+                  to <span className="text-white font-medium">{returnModal.supplier_name || tr('supplierFallback', 'supplier')}</span>
+                </p>
+                <div>
+                  <label className="text-noch-muted text-xs mb-1 block">Return quantity</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={returnQty}
+                    onChange={e => setReturnQty(e.target.value)}
+                    className="w-full px-3 py-2 bg-noch-dark border border-noch-border rounded-lg text-white text-sm focus:outline-none focus:border-yellow-400/50"
+                  />
+                  <p className="text-noch-muted text-[11px] mt-1">
+                    Available to return {netReceived(returnModal).toFixed(2)} {returnModal.unit}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs mb-1 block">Warehouse / location</label>
+                  <select
+                    value={returnLocationId}
+                    onChange={e => setReturnLocationId(e.target.value)}
+                    className="w-full px-3 py-2 bg-noch-dark border border-noch-border rounded-lg text-white text-sm focus:outline-none focus:border-yellow-400/50"
+                  >
+                    <option value="">Main stock only</option>
+                    {locations.map(location => (
+                      <option key={location.id} value={location.id}>{location.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs mb-1 block">Reason</label>
+                  <textarea
+                    rows={2}
+                    value={returnReason}
+                    onChange={e => setReturnReason(e.target.value)}
+                    className="w-full px-3 py-2 bg-noch-dark border border-noch-border rounded-lg text-white text-sm resize-none focus:outline-none focus:border-yellow-400/50"
+                    placeholder="Damaged stock, short expiry, supplier pickup..."
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button onClick={() => setReturnModal(null)} className="px-4 py-2 text-sm text-noch-muted hover:text-white">{tr('cancel', 'Cancel')}</button>
+                <button
+                  onClick={handleReturn}
+                  disabled={returning || !(parseFloat(returnQty) > 0)}
+                  className="bg-yellow-500/10 text-yellow-300 border border-yellow-500/30 rounded-lg px-4 py-2 text-sm font-medium hover:bg-yellow-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {returning && <Loader2 size={14} className="animate-spin" />}
+                  <RotateCcw size={14} /> Confirm return
                 </button>
               </div>
             </div>

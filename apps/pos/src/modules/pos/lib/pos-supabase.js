@@ -312,6 +312,16 @@ export async function closeShift(shiftId, closeData) {
     p_notes: closeData.notes || null,
   })
   if (error) throw error
+  if (closeData.closed_by) {
+    try {
+      await supabase.rpc('annotate_shift_close_operator', {
+        p_shift_id: shiftId,
+        p_served_by: closeData.closed_by,
+      })
+    } catch (auditError) {
+      return { ...data, audit_warning: auditError.message || 'Shift close operator was not recorded.' }
+    }
+  }
   return data
 }
 
@@ -591,11 +601,29 @@ export async function createPOSOrder(orderData, items) {
   })
   if (error) throw error
 
+  if (orderData.override_by && data?.order?.id) {
+    try {
+      await supabase.rpc('annotate_pos_sale_override', {
+        p_order_id: data.order.id,
+        p_manager_override_by: orderData.override_by,
+        p_note: orderData.override_note || 'Discount approved above staff cap.',
+      })
+      data.order.manager_override_by = orderData.override_by
+    } catch (auditError) {
+      data.audit_warning = auditError.message || 'Manager override audit was not recorded.'
+    }
+  }
+
   // RPC returns { order, items, idempotent_replay }. Flatten for callers
   // that expected the old shape (order with pos_order_items inline).
   const order = data?.order || {}
   const returnedItems = data?.items || []
-  return { ...order, pos_order_items: returnedItems, idempotent_replay: !!data?.idempotent_replay }
+  return {
+    ...order,
+    pos_order_items: returnedItems,
+    idempotent_replay: !!data?.idempotent_replay,
+    audit_warning: data?.audit_warning || null,
+  }
 }
 
 export async function getPOSOrders(branchId, filters = {}) {

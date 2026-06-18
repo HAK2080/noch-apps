@@ -15,7 +15,8 @@ import {
   getGlSettings, updateGlSettings,
   listAccounts, upsertAccount, deactivateAccount, listAccountMap, setAccountMap,
   listBatches, getBatchLines, createManualJournal, syncPeriod, postOpeningBalances,
-  trialBalance, accountLedger, balanceSheet, incomeStatement, listBranches, apAging, supplierStatement,
+  trialBalance, accountLedger, balanceSheet, incomeStatement, statementLines, cashFlowStatement,
+  listBranches, apAging, supplierStatement,
   replaceManualJournal, voidGlBatch,
 } from './lib/accounting-supabase'
 import toast from 'react-hot-toast'
@@ -471,7 +472,15 @@ function ReportsTab({ ar, branches }) {
   const [branchId, setBranchId] = useState(null)
   const [bs, setBs] = useState([])
   const [is, setIs] = useState([])
-  useEffect(() => { balanceSheet(to, branchId).then(setBs); incomeStatement(from, to, branchId).then(setIs) }, [from, to, branchId])
+  const [cf, setCf] = useState([])
+  const [lines, setLines] = useState([])
+  const [lineFilter, setLineFilter] = useState('all')
+  useEffect(() => {
+    balanceSheet(to, branchId).then(setBs)
+    incomeStatement(from, to, branchId).then(setIs)
+    cashFlowStatement(from, to, branchId).then(setCf)
+    statementLines(from, to, branchId).then(setLines)
+  }, [from, to, branchId])
 
   const group = (rows, types) => rows.filter(r => types.includes(r.section))
   const sum = rows => rows.reduce((s, r) => s + Number(r.amount ?? r.balance ?? 0), 0)
@@ -487,7 +496,10 @@ function ReportsTab({ ar, branches }) {
     </div>
   )
   const revenue = group(is, ['revenue']), cogs = group(is, ['cogs']), expenses = group(is, ['expense'])
+  const operatingCash = group(cf, ['operating']), investingCash = group(cf, ['investing']), financingCash = group(cf, ['financing'])
   const netProfit = sum(revenue) - sum(cogs) - sum(expenses)
+  const netCashFlow = sum(operatingCash) + sum(investingCash) + sum(financingCash)
+  const filteredLines = lineFilter === 'all' ? lines : lines.filter(row => row.section === lineFilter)
 
   return (
     <div className="flex flex-col gap-3">
@@ -499,8 +511,21 @@ function ReportsTab({ ar, branches }) {
           <option value="">{ar ? 'كل الفروع' : 'All branches'}</option>
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        <select value={lineFilter} onChange={e => setLineFilter(e.target.value)} className="input py-1 px-2 text-xs ms-auto">
+          <option value="all">{ar ? 'ظƒظ„ ط§ظ„ط¨ظ†ظˆط¯' : 'All statement lines'}</option>
+          <option value="revenue">{ar ? 'ط¥ظٹط±ط§ط¯' : 'Revenue'}</option>
+          <option value="cogs">{ar ? 'طھظƒظ„ظپط© ظ…ط¨ظٹط¹ط§طھ' : 'COGS'}</option>
+          <option value="expense">{ar ? 'ظ…طµط±ظˆظپ' : 'Expense'}</option>
+        </select>
+        <span className="no-print">
+          <ExportButtons onCsv={() => downloadCsv(
+            `statements_${from}_${to}`,
+            ['Section', 'Code', 'Account', 'Amount'],
+            filteredLines.map(row => [row.section, row.code, ar ? row.name_ar : row.name_en, Number(row.amount || 0).toFixed(2)]),
+          )} />
+        </span>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card">
           <h2 className="text-white font-semibold mb-3">{ar ? 'قائمة الدخل' : 'Income statement'}</h2>
           <Section title={ar ? 'الإيرادات' : 'Revenue'} rows={revenue} valueKey="amount" />
@@ -529,6 +554,27 @@ function PayablesTab({ ar, branches }) {
   const [rows, setRows] = useState([])
   const [supplier, setSupplier] = useState('')
   const [statement, setStatement] = useState([])
+  const [cf, setCf] = useState([])
+  const [lines, setLines] = useState([])
+  const [lineFilter] = useState('all')
+
+  const Section = ({ title, rows: sectionRows, valueKey }) => (
+    <div className="mb-3">
+      <h3 className="text-noch-muted text-xs font-bold uppercase tracking-wider mb-1">{title}</h3>
+      {sectionRows.length === 0 ? <p className="text-noch-muted text-xs italic">â€”</p> : sectionRows.map(r => (
+        <div key={`${title}-${r.code || r.event_date}`} className="flex justify-between text-sm py-0.5">
+          <span className="text-white">{r.code ? `${r.code} آ· ${ar ? r.name_ar : r.name_en}` : (r.memo || r.event_type || 'Line')}</span>
+          <span className="font-mono text-noch-muted">{lyd(r[valueKey])}</span>
+        </div>
+      ))}
+    </div>
+  )
+  const groupCash = (section) => cf.filter(r => r.section === section)
+  const operatingCash = groupCash('operating')
+  const investingCash = groupCash('investing')
+  const financingCash = groupCash('financing')
+  const netCashFlow = [...operatingCash, ...investingCash, ...financingCash].reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const filteredLines = lineFilter === 'all' ? lines : lines.filter(row => row.section === lineFilter)
 
   useEffect(() => {
     let cancelled = false
@@ -551,6 +597,18 @@ function PayablesTab({ ar, branches }) {
       .catch(err => toast.error(err.message || 'Failed to load supplier statement'))
     return () => { cancelled = true }
   }, [supplier, asOf, branchId])
+
+  useEffect(() => {
+    let cancelled = false
+    const from = ymd(new Date(new Date(asOf).getTime() - 30 * 86400000))
+    cashFlowStatement(from, asOf, branchId)
+      .then(data => { if (!cancelled) setCf(data || []) })
+      .catch(err => toast.error(err.message || 'Failed to load cash flow statement'))
+    statementLines(from, asOf, branchId)
+      .then(data => { if (!cancelled) setLines(data || []) })
+      .catch(err => toast.error(err.message || 'Failed to load statement lines'))
+    return () => { cancelled = true }
+  }, [asOf, branchId])
 
   const openRows = rows.filter(r => Number(r.outstanding_amount_lyd || 0) > 0)
   const totalOpen = openRows.reduce((sum, row) => sum + Number(row.outstanding_amount_lyd || 0), 0)
@@ -669,6 +727,80 @@ function PayablesTab({ ar, branches }) {
             <p className="text-noch-muted text-sm">Select a supplier to inspect invoice and payment history.</p>
           )}
         </div>
+        <div className="card">
+          <h2 className="text-white font-semibold mb-3">{ar ? 'التدفق النقدي' : 'Cash flow statement'}</h2>
+          <Section title={ar ? 'أنشطة تشغيلية' : 'Operating'} rows={operatingCash} valueKey="amount" />
+          <Section title={ar ? 'أنشطة استثمارية' : 'Investing'} rows={investingCash} valueKey="amount" />
+          <Section title={ar ? 'أنشطة تمويلية' : 'Financing'} rows={financingCash} valueKey="amount" />
+          <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
+            <span className="text-white">{ar ? 'صافي التدفق' : 'Net cash movement'}</span>
+            <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
+          </div>
+        </div>
+      </div>
+      <div className="card overflow-x-auto">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-white font-semibold">{ar ? 'تفصيل الربح والخسائر' : 'P&L drill-down'}</h2>
+          <span className="text-noch-muted text-xs">{filteredLines.length} lines</span>
+        </div>
+        <table className="w-full text-xs">
+          <thead className="text-noch-muted">
+            <tr>
+              <th className="text-left py-1 pr-2">Section</th>
+              <th className="text-left py-1 pr-2">Code</th>
+              <th className="text-left py-1 pr-2">Account</th>
+              <th className="text-right py-1">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLines.map(row => (
+              <tr key={`${row.section}-${row.account_id}`} className="border-t border-noch-border/40">
+                <td className="py-1.5 pr-2 text-noch-muted uppercase">{row.section}</td>
+                <td className="py-1.5 pr-2 text-white font-mono">{row.code}</td>
+                <td className="py-1.5 pr-2 text-white">{ar ? row.name_ar : row.name_en}</td>
+                <td className="py-1.5 text-right font-mono text-white">{lyd(row.amount)}</td>
+              </tr>
+            ))}
+            {filteredLines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'لا توجد بنود لهذه الفترة.' : 'No statement lines for this period.'}</td></tr>}
+          </tbody>
+        </table>
+        <div className="card">
+          <h2 className="text-white font-semibold mb-3">{ar ? 'ط§ظ„طھط¯ظپظ‚ ط§ظ„ظ†ظ‚ط¯ظٹ' : 'Cash flow statement'}</h2>
+          <Section title={ar ? 'ط£ظ†ط´ط·ط© طھط´ط؛ظٹظ„ظٹط©' : 'Operating'} rows={operatingCash} valueKey="amount" />
+          <Section title={ar ? 'ط£ظ†ط´ط·ط© ط§ط³طھط«ظ…ط§ط±ظٹط©' : 'Investing'} rows={investingCash} valueKey="amount" />
+          <Section title={ar ? 'ط£ظ†ط´ط·ط© طھظ…ظˆظٹظ„ظٹط©' : 'Financing'} rows={financingCash} valueKey="amount" />
+          <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
+            <span className="text-white">{ar ? 'طµط§ظپظٹ ط§ظ„طھط¯ظپظ‚' : 'Net cash movement'}</span>
+            <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
+          </div>
+        </div>
+      </div>
+      <div className="card overflow-x-auto">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-white font-semibold">{ar ? 'طھظپطµظٹظ„ ط§ظ„ط±ط¨ط­ ظˆط§ظ„ط®ط³ط§ط¦ط±' : 'P&L drill-down'}</h2>
+          <span className="text-noch-muted text-xs">{filteredLines.length} lines</span>
+        </div>
+        <table className="w-full text-xs">
+          <thead className="text-noch-muted">
+            <tr>
+              <th className="text-left py-1 pr-2">Section</th>
+              <th className="text-left py-1 pr-2">Code</th>
+              <th className="text-left py-1 pr-2">Account</th>
+              <th className="text-right py-1">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredLines.map(row => (
+              <tr key={`${row.section}-${row.account_id}`} className="border-t border-noch-border/40">
+                <td className="py-1.5 pr-2 text-noch-muted uppercase">{row.section}</td>
+                <td className="py-1.5 pr-2 text-white font-mono">{row.code}</td>
+                <td className="py-1.5 pr-2 text-white">{ar ? row.name_ar : row.name_en}</td>
+                <td className="py-1.5 text-right font-mono text-white">{lyd(row.amount)}</td>
+              </tr>
+            ))}
+            {filteredLines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'ظ„ط§ طھظˆط¬ط¯ ط¨ظ†ظˆط¯ ظ„ظ‡ط°ظ‡ ط§ظ„ظپطھط±ط©.' : 'No statement lines for this period.'}</td></tr>}
+          </tbody>
+        </table>
       </div>
     </div>
   )

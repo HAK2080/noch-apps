@@ -60,6 +60,7 @@ test.describe('Read-only app walkthrough', () => {
     await page.waitForLoadState('domcontentloaded')
     await page.getByRole('button', { name: /Payables/i }).click()
     await expect(page.getByText(/Supplier invoices|Open AP/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Cash flow statement|P&L drill-down/i).first()).toBeVisible({ timeout: 10000 })
     expect(errors.slice(0, 3), 'accounting payables console/page errors').toEqual([])
   })
 
@@ -85,6 +86,19 @@ test.describe('Read-only app walkthrough', () => {
     if (await branchHeading.count()) {
       await expect(branchHeading).toBeVisible()
       await expect(page.getByText(/Shift open|No open shift|Open Shift/i).first()).toBeVisible({ timeout: 10000 })
+    }
+  })
+
+  test('Procurement exposes receiving controls and purchasing signals without posting changes', async ({ page }) => {
+    await page.goto('/inventory/procurement')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Reorder suggestions|Warehouse signals/i).first()).toBeVisible({ timeout: 10000 })
+
+    const receiveButton = page.locator('button[title*="Received"], button[title*="received"]').first()
+    if (await receiveButton.count()) {
+      await receiveButton.click()
+      await expect(page.getByText(/Mark as Received|Receipt quantity/i).first()).toBeVisible({ timeout: 10000 })
+      await page.keyboard.press('Escape')
     }
   })
 
