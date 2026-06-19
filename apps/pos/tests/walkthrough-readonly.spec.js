@@ -64,6 +64,17 @@ test.describe('Read-only app walkthrough', () => {
     expect(errors.slice(0, 3), 'accounting payables console/page errors').toEqual([])
   })
 
+  test('Finance expenses and bank scaffolding render without mutation', async ({ page }) => {
+    await page.goto('/finance')
+    await page.waitForLoadState('domcontentloaded')
+
+    await page.getByRole('button', { name: /Expenses/i }).click()
+    await expect(page.getByText(/consolidated expense register|No approved expenses in this period/i).first()).toBeVisible({ timeout: 10000 })
+
+    await page.getByRole('button', { name: /Bank/i }).click()
+    await expect(page.getByText(/Recon queue|No bank transactions yet/i).first()).toBeVisible({ timeout: 10000 })
+  })
+
   test('Accounting statements render without crashing', async ({ page }) => {
     await page.goto('/accounting')
     await page.waitForLoadState('domcontentloaded')

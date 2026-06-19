@@ -556,7 +556,6 @@ function PayablesTab({ ar, branches }) {
   const [statement, setStatement] = useState([])
   const [cf, setCf] = useState([])
   const [lines, setLines] = useState([])
-  const [lineFilter] = useState('all')
 
   const Section = ({ title, rows: sectionRows, valueKey }) => (
     <div className="mb-3">
@@ -574,7 +573,6 @@ function PayablesTab({ ar, branches }) {
   const investingCash = groupCash('investing')
   const financingCash = groupCash('financing')
   const netCashFlow = [...operatingCash, ...investingCash, ...financingCash].reduce((sum, row) => sum + Number(row.amount || 0), 0)
-  const filteredLines = lineFilter === 'all' ? lines : lines.filter(row => row.section === lineFilter)
 
   useEffect(() => {
     let cancelled = false
@@ -741,7 +739,7 @@ function PayablesTab({ ar, branches }) {
       <div className="card overflow-x-auto">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h2 className="text-white font-semibold">{ar ? 'تفصيل الربح والخسائر' : 'P&L drill-down'}</h2>
-          <span className="text-noch-muted text-xs">{filteredLines.length} lines</span>
+          <span className="text-noch-muted text-xs">{lines.length} lines</span>
         </div>
         <table className="w-full text-xs">
           <thead className="text-noch-muted">
@@ -753,7 +751,7 @@ function PayablesTab({ ar, branches }) {
             </tr>
           </thead>
           <tbody>
-            {filteredLines.map(row => (
+            {lines.map(row => (
               <tr key={`${row.section}-${row.account_id}`} className="border-t border-noch-border/40">
                 <td className="py-1.5 pr-2 text-noch-muted uppercase">{row.section}</td>
                 <td className="py-1.5 pr-2 text-white font-mono">{row.code}</td>
@@ -761,7 +759,7 @@ function PayablesTab({ ar, branches }) {
                 <td className="py-1.5 text-right font-mono text-white">{lyd(row.amount)}</td>
               </tr>
             ))}
-            {filteredLines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'لا توجد بنود لهذه الفترة.' : 'No statement lines for this period.'}</td></tr>}
+            {lines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'لا توجد بنود لهذه الفترة.' : 'No statement lines for this period.'}</td></tr>}
           </tbody>
         </table>
         <div className="card">
@@ -778,7 +776,7 @@ function PayablesTab({ ar, branches }) {
       <div className="card overflow-x-auto">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h2 className="text-white font-semibold">{ar ? 'طھظپطµظٹظ„ ط§ظ„ط±ط¨ط­ ظˆط§ظ„ط®ط³ط§ط¦ط±' : 'P&L drill-down'}</h2>
-          <span className="text-noch-muted text-xs">{filteredLines.length} lines</span>
+          <span className="text-noch-muted text-xs">{lines.length} lines</span>
         </div>
         <table className="w-full text-xs">
           <thead className="text-noch-muted">
@@ -790,7 +788,7 @@ function PayablesTab({ ar, branches }) {
             </tr>
           </thead>
           <tbody>
-            {filteredLines.map(row => (
+            {lines.map(row => (
               <tr key={`${row.section}-${row.account_id}`} className="border-t border-noch-border/40">
                 <td className="py-1.5 pr-2 text-noch-muted uppercase">{row.section}</td>
                 <td className="py-1.5 pr-2 text-white font-mono">{row.code}</td>
@@ -798,7 +796,7 @@ function PayablesTab({ ar, branches }) {
                 <td className="py-1.5 text-right font-mono text-white">{lyd(row.amount)}</td>
               </tr>
             ))}
-            {filteredLines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'ظ„ط§ طھظˆط¬ط¯ ط¨ظ†ظˆط¯ ظ„ظ‡ط°ظ‡ ط§ظ„ظپطھط±ط©.' : 'No statement lines for this period.'}</td></tr>}
+            {lines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'ظ„ط§ طھظˆط¬ط¯ ط¨ظ†ظˆط¯ ظ„ظ‡ط°ظ‡ ط§ظ„ظپطھط±ط©.' : 'No statement lines for this period.'}</td></tr>}
           </tbody>
         </table>
       </div>
