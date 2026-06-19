@@ -128,6 +128,7 @@ export default function LoyaltySettings() {
   const [saving, setSaving] = useState(false)
   const [branches, setBranches] = useState([])
   const [branchUrls, setBranchUrls] = useState({})
+  const [branchFacebookUrls, setBranchFacebookUrls] = useState({})
   const [savingBranch, setSavingBranch] = useState(null)
   const [testPhone, setTestPhone] = useState('')
   const [testSending, setTestSending] = useState(false)
@@ -182,8 +183,13 @@ export default function LoyaltySettings() {
       .then(data => {
         setBranches(data || [])
         const urlMap = {}
-        for (const b of data || []) urlMap[b.id] = b.google_maps_url || ''
+        const facebookUrlMap = {}
+        for (const b of data || []) {
+          urlMap[b.id] = b.google_maps_url || ''
+          facebookUrlMap[b.id] = b.facebook_review_url || ''
+        }
         setBranchUrls(urlMap)
+        setBranchFacebookUrls(facebookUrlMap)
       })
       .catch(() => {})
   }, [])
@@ -191,7 +197,10 @@ export default function LoyaltySettings() {
   const handleSaveBranchUrl = async (branchId) => {
     setSavingBranch(branchId)
     try {
-      await updatePOSBranch(branchId, { google_maps_url: branchUrls[branchId] || null })
+      await updatePOSBranch(branchId, {
+        google_maps_url: branchUrls[branchId] || null,
+        facebook_review_url: branchFacebookUrls[branchId] || null,
+      })
       toast.success('Saved ✓')
     } catch (err) { toast.error(err.message) }
     finally { setSavingBranch(null) }
@@ -592,18 +601,18 @@ export default function LoyaltySettings() {
             </div>
           </div>
 
-          {/* Google Maps URLs per branch */}
+          {/* Review URLs per branch */}
           {branches.length > 0 && (
             <div className="card">
               <div className="flex items-center gap-2 mb-3">
                 <MapPin size={16} className="text-noch-green" />
-                <h2 className="text-white font-semibold text-sm">Google Maps URLs</h2>
+                <h2 className="text-white font-semibold text-sm">Review URLs</h2>
               </div>
               <div className="flex flex-col gap-4">
                 {branches.map(branch => (
                   <div key={branch.id}>
                     <label className="label">{branch.name}</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
                       <input
                         className="input flex-1"
                         type="url"
@@ -611,6 +620,17 @@ export default function LoyaltySettings() {
                         value={branchUrls[branch.id] || ''}
                         onChange={e => setBranchUrls(prev => ({ ...prev, [branch.id]: e.target.value }))}
                       />
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        className="input flex-1"
+                        type="url"
+                        placeholder="Paste Facebook review/page/group URL..."
+                        value={branchFacebookUrls[branch.id] || ''}
+                        onChange={e => setBranchFacebookUrls(prev => ({ ...prev, [branch.id]: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex justify-end">
                       <button onClick={() => handleSaveBranchUrl(branch.id)} disabled={savingBranch === branch.id} className="btn-primary px-3 flex items-center gap-1">
                         <Save size={14} />
                         {savingBranch === branch.id ? '...' : 'Save'}

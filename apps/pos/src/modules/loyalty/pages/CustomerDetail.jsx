@@ -153,8 +153,11 @@ export default function CustomerDetail() {
 
   const handleFacebookReview = async () => {
     try {
-      await navigator.clipboard.writeText(FACEBOOK_REVIEW_URL).catch(() => {})
-      window.open(FACEBOOK_REVIEW_URL, '_blank', 'noopener,noreferrer')
+      const branches = await getPOSBranches().catch(() => [])
+      const branchWithUrl = branches.find(b => b.facebook_review_url) || branches[0]
+      const facebookUrl = branchWithUrl?.facebook_review_url || FACEBOOK_REVIEW_URL
+      await navigator.clipboard.writeText(facebookUrl).catch(() => {})
+      window.open(facebookUrl, '_blank', 'noopener,noreferrer')
       toast.success(ar ? 'تم فتح رابط فيسبوك ونسخه' : 'Facebook link opened and copied')
     } catch (err) {
       toast.error(err.message || (ar ? 'تعذر فتح رابط فيسبوك' : 'Could not open Facebook link'))
