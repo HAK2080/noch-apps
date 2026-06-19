@@ -1,18 +1,18 @@
 // loyalty-notify: compatibility wrapper for manual loyalty/customer sends.
-// All customer delivery now goes through send-notification + notification_outbox.
+// All customer delivery goes through send-notification + notification_outbox.
 
 import { CORS_HEADERS, createAdminClient, json, normaliseWhatsAppPhone } from '../_shared/notifications.ts'
 
-const RANDOM_LOVE_VARIANTS = {
+const THANK_REVIEW_VARIANTS = {
   ar: [
-    'نوتشي يفكر فيك اليوم.',
-    'أنت من الناس اللي تفرح نوتشي.',
-    'القهوة أحلى لما نشوفك عندنا.',
+    'شكراً لزيارتك يا {{name}}. رأيك يهم نوتشي.',
+    'نورتنا يا {{name}}. إذا عجبتك التجربة، يسعدنا تقييمك.',
+    'شكراً على دعمك يا {{name}}. تقييمك يساعد نوتشي يتحسن.',
   ],
   en: [
-    'Nochi is thinking of you today.',
-    'You are one of the people who makes Nochi happy.',
-    'Coffee feels better when we see you here.',
+    'Thanks for visiting, {{name}}. Your review helps Nochi grow.',
+    'We loved having you, {{name}}. If you enjoyed it, please leave us a review.',
+    'Thanks for supporting Nochi, {{name}}. Your feedback means a lot.',
   ],
 }
 
@@ -54,7 +54,8 @@ Deno.serve(async (req: Request) => {
 
     const language = (lang === 'en' || customer.preferred_language === 'en') ? 'en' : 'ar'
     const previewMessage = type === 'random_love'
-      ? RANDOM_LOVE_VARIANTS[language][Math.floor(Math.random() * RANDOM_LOVE_VARIANTS[language].length)]
+      ? THANK_REVIEW_VARIANTS[language][Math.floor(Math.random() * THANK_REVIEW_VARIANTS[language].length)]
+          .replace(/\{\{name\}\}/g, customer.full_name || '')
       : null
 
     const sendRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`, {

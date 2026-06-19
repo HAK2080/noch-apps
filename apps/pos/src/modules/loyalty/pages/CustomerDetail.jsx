@@ -15,8 +15,10 @@ import StampCard from '../components/StampCard'
 import ConfirmModal from '../../../components/shared/ConfirmModal'
 import toast from 'react-hot-toast'
 
+const FACEBOOK_REVIEW_URL = 'https://www.facebook.com/share/g/1HEKKx8BZP/'
+
 const NOTIFY_TYPES = [
-  { type: 'random_love', ar: '🌹 رسالة محبة عشوائية', en: '🌹 Random Love Message' },
+  { type: 'random_love', ar: '💚 شكر وطلب تقييم', en: '💚 Thank customer / ask for review' },
   { type: 'nochi_sad', ar: '😢 تنبيه حزن نوتشي', en: '😢 Nochi Sad Alert' },
   { type: 'nochi_tired', ar: '😴 نوتشي تعبان', en: '😴 Nochi Tired' },
   { type: 'nochi_deathbed', ar: '🛏️ نوتشي مريض', en: '🛏️ Nochi Sick' },
@@ -146,6 +148,16 @@ export default function CustomerDetail() {
       load()
     } catch (err) {
       toast.error(err.message)
+    }
+  }
+
+  const handleFacebookReview = async () => {
+    try {
+      await navigator.clipboard.writeText(FACEBOOK_REVIEW_URL).catch(() => {})
+      window.open(FACEBOOK_REVIEW_URL, '_blank', 'noopener,noreferrer')
+      toast.success(ar ? 'تم فتح رابط فيسبوك ونسخه' : 'Facebook link opened and copied')
+    } catch (err) {
+      toast.error(err.message || (ar ? 'تعذر فتح رابط فيسبوك' : 'Could not open Facebook link'))
     }
   }
 
@@ -310,11 +322,11 @@ export default function CustomerDetail() {
         </div>
       )}
 
-      {/* Google Review Nudge */}
+      {/* Review Nudges */}
       <div className="card mb-4">
         <div className="flex items-center gap-2 mb-3">
           <Star size={16} className="text-yellow-400" />
-          <p className="text-white font-semibold text-sm">{ar ? 'طلب مراجعة Google' : 'Google Review'}</p>
+          <p className="text-white font-semibold text-sm">{ar ? 'طلب تقييم' : 'Review request'}</p>
         </div>
         {reviewRecentlyRequested ? (
           <p className="text-noch-muted text-sm">
@@ -325,12 +337,19 @@ export default function CustomerDetail() {
         ) : (
           <button
             onClick={handleRequestReview}
-            className="btn-secondary flex items-center gap-2 text-sm"
+            className="btn-secondary flex items-center gap-2 text-sm mb-2"
           >
             <Star size={14} className="text-yellow-400" />
             {ar ? '⭐ طلب مراجعة Google' : '⭐ Request Google Review'}
           </button>
         )}
+        <button
+          onClick={handleFacebookReview}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <ExternalLink size={14} />
+          {ar ? 'طلب تقييم / مشاركة على Facebook' : 'Request Facebook rating / post'}
+        </button>
       </div>
 
       {/* Notifications */}
