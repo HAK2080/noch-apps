@@ -231,6 +231,7 @@ function buildTwilioVariables(row: NotificationOutboxRow, templateKey: string, v
       return { '1': name, '2': toStringValue(firstValue(variables.item, (row.context || {}).item, 'your favorite item')) }
     case 'loyalty_marketing_birthday':
     case 'birthday':
+    case 'loyalty_thank_review':
     case 'random_love':
       return { '1': name }
     case 'loyalty_lapsed_checkin':
@@ -286,15 +287,19 @@ async function recordWhatsAppSend(
 
   const templateLabel = result.templateLabel || row.template_key || row.event_key || 'manual'
 
-  await admin.rpc('record_whatsapp_send', {
-    p_customer_id: row.customer_id,
-    p_phone: row.recipient_phone,
-    p_template: templateLabel,
-    p_trigger: row.event_key || row.template_key || row.source_module || 'notification',
-    p_status: result.status,
-    p_error: result.status === 'failed' ? result.errorText : null,
-    p_payload_key: row.dedupe_key || row.id,
-  }).catch(() => {})
+  try {
+    await admin.rpc('record_whatsapp_send', {
+      p_customer_id: row.customer_id,
+      p_phone: row.recipient_phone,
+      p_template: templateLabel,
+      p_trigger: row.event_key || row.template_key || row.source_module || 'notification',
+      p_status: result.status,
+      p_error: result.status === 'failed' ? result.errorText : null,
+      p_payload_key: row.dedupe_key || row.id,
+    })
+  } catch {
+    // Audit logging must not block the customer message result.
+  }
 }
 
 export async function dispatchNotification(

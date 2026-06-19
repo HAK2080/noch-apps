@@ -18,7 +18,7 @@ import toast from 'react-hot-toast'
 const FACEBOOK_REVIEW_URL = 'https://www.facebook.com/share/g/1HEKKx8BZP/'
 
 const NOTIFY_TYPES = [
-  { type: 'random_love', ar: '💚 شكر وطلب تقييم', en: '💚 Thank customer / ask for review' },
+  { type: 'loyalty_thank_review', ar: '💚 شكر وطلب تقييم', en: '💚 Thank customer / ask for review' },
   { type: 'nochi_sad', ar: '😢 تنبيه حزن نوتشي', en: '😢 Nochi Sad Alert' },
   { type: 'nochi_tired', ar: '😴 نوتشي تعبان', en: '😴 Nochi Tired' },
   { type: 'nochi_deathbed', ar: '🛏️ نوتشي مريض', en: '🛏️ Nochi Sick' },

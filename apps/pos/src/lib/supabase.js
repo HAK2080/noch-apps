@@ -2064,7 +2064,14 @@ export async function sendLoyaltyNotification(customerId, type, vars = {}) {
   const { data, error } = await supabase.functions.invoke('loyalty-notify', {
     body: { customer_id: customerId, type, vars },
   })
-  if (error) throw new Error(error.message ?? 'Failed to send notification')
+  if (error) {
+    let detail = ''
+    try {
+      const payload = await error.context?.json?.()
+      detail = payload?.error || payload?.message || ''
+    } catch {}
+    throw new Error(detail || error.message || 'Failed to send notification')
+  }
   if (data?.error) throw new Error(data.error)
   return data
 }

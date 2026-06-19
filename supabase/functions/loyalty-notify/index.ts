@@ -22,7 +22,8 @@ const EVENT_META: Record<string, { templateKey: string; requiresTemplate: boolea
   nochi_tired: { templateKey: 'nochi_tired', requiresTemplate: true },
   nochi_deathbed: { templateKey: 'nochi_deathbed', requiresTemplate: true },
   birthday: { templateKey: 'birthday', requiresTemplate: true },
-  random_love: { templateKey: 'random_love', requiresTemplate: true },
+  loyalty_thank_review: { templateKey: 'loyalty_thank_review', requiresTemplate: true },
+  random_love: { templateKey: 'loyalty_thank_review', requiresTemplate: true },
 }
 
 Deno.serve(async (req: Request) => {
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
     if (customer.whatsapp_opt_in === false) return json({ error: 'Customer is not opted in to WhatsApp' }, 409)
 
     const language = (lang === 'en' || customer.preferred_language === 'en') ? 'en' : 'ar'
-    const previewMessage = type === 'random_love'
+    const previewMessage = (type === 'loyalty_thank_review' || type === 'random_love')
       ? THANK_REVIEW_VARIANTS[language][Math.floor(Math.random() * THANK_REVIEW_VARIANTS[language].length)]
           .replace(/\{\{name\}\}/g, customer.full_name || '')
       : null
