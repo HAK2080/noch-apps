@@ -9,6 +9,7 @@ export const CORS_HEADERS = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const REWARD_READY_CONTENT_SID = 'HXd1df8cc058afd9e1812ad2881ee9de1e'
 
 type JsonMap = Record<string, unknown>
 
@@ -375,6 +376,15 @@ export async function dispatchNotification(
     settings?.stamp_notify_template_sid,
   )
   const variables = buildTwilioVariables(row, row.template_key || row.event_key || '', row.template_variables || {})
+
+  if (row.template_key === 'stamp_grant' && contentSid === REWARD_READY_CONTENT_SID) {
+    return {
+      status: 'failed',
+      providerStatus: 'wrong_template_sid',
+      errorText: 'The reward-ready Twilio template SID cannot be used for stamp-grant messages.',
+      templateLabel: 'stamp_grant',
+    }
+  }
 
   const sendPayload: JsonMap = {
     to: normaliseWhatsAppPhone(row.recipient_phone),

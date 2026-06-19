@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, MapPin, Gift, Sparkles, Star, Zap, Trash2, Plus, X, ToggleLeft, ToggleRight, Calendar, MessageSquare, Users, Trophy } from 'lucide-react'
+import { Save, MapPin, Gift, Sparkles, Star, Zap, Trash2, Plus, X, ToggleLeft, ToggleRight, Calendar, MessageSquare, Users, Trophy, AlertTriangle } from 'lucide-react'
 import { getLoyaltySettings, updateLoyaltySettings } from '../../../lib/supabase'
 import { getPOSBranches, updatePOSBranch } from '../../pos/lib/pos-supabase'
 import { supabase } from '../../../lib/supabase'
@@ -16,6 +16,20 @@ const SKINS = [
   { id: 'winter', label: 'Winter', emoji: '❄️' },
   { id: 'birthday', label: 'Birthday Mode', emoji: '🎂' },
 ]
+
+const KNOWN_WHATSAPP_TEMPLATES = {
+  loyalty_reward_ready: 'HXd1df8cc058afd9e1812ad2881ee9de1e',
+}
+
+function getStampTemplateWarning(sid) {
+  const value = String(sid || '').trim()
+  if (!value) return 'No approved stamp template SID is set. Proactive test sends will fail.'
+  if (value === KNOWN_WHATSAPP_TEMPLATES.loyalty_reward_ready) {
+    return 'This SID is for reward-ready messages, not stamp grants. Create/approve a stamp-grant Twilio template before testing.'
+  }
+  if (!/^HX[a-fA-F0-9]{32}$/.test(value)) return 'This does not look like a valid Twilio Content SID.'
+  return ''
+}
 
 function SpinPrizeManager() {
   const [prizes, setPrizes] = useState([])
@@ -118,9 +132,14 @@ export default function LoyaltySettings() {
   const [testPhone, setTestPhone] = useState('')
   const [testSending, setTestSending] = useState(false)
   const ar = lang === 'ar'
+  const stampTemplateWarning = getStampTemplateWarning(settings?.stamp_notify_template_sid)
 
   const sendStampTest = async () => {
     if (!testPhone.trim()) return
+    if (stampTemplateWarning) {
+      toast.error(stampTemplateWarning)
+      return
+    }
     setTestSending(true)
     try {
       const label = ar ? 'تجربة' : 'your post'
@@ -290,6 +309,12 @@ export default function LoyaltySettings() {
                   <label className="label">{ar ? 'معرّف القالب (Twilio Content SID)' : 'Template SID (Twilio Content SID)'}</label>
                   <input className="input font-mono text-xs" value={settings?.stamp_notify_template_sid || ''} onChange={e => set('stamp_notify_template_sid', e.target.value.trim())} placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" dir="ltr" />
                 </div>
+                {stampTemplateWarning && (
+                  <div className="mb-3 flex items-start gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-200">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>{stampTemplateWarning}</span>
+                  </div>
+                )}
                 <p className="text-noch-muted text-[11px] mb-3">
                   {ar
                     ? 'الرسائل الاستباقية هنا تتطلب قالب واتساب معتمد. إذا تركت معرّف القالب فارغاً فستفشل الرسالة في الـ outbox حتى تتم إضافة SID معتمد. ${activity} = اسم النشاط ({{1}} داخل القالب).'
@@ -297,7 +322,7 @@ export default function LoyaltySettings() {
                 </p>
                 <div className="flex gap-2">
                   <input className="input flex-1" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder={ar ? 'رقم لاختبار الإرسال' : 'Phone to test send'} dir="ltr" />
-                  <button onClick={sendStampTest} disabled={testSending || !testPhone.trim()} className="btn-secondary px-4 text-sm">
+                  <button onClick={sendStampTest} disabled={testSending || !testPhone.trim() || !!stampTemplateWarning} className="btn-secondary px-4 text-sm">
                     {testSending ? '…' : (ar ? 'إرسال تجريبي' : 'Send test')}
                   </button>
                 </div>
