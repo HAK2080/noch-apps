@@ -142,7 +142,9 @@ export default function LoyaltySettings() {
     }
     setTestSending(true)
     try {
-      const label = ar ? 'تجربة' : 'your post'
+      const languageMode = settings?.stamp_notify_language || 'ar'
+      const testLang = languageMode === 'en' ? 'en' : 'ar'
+      const label = testLang === 'ar' ? 'منشورك' : 'your post'
       const { data, error } = await supabase.functions.invoke('send-notification', {
         body: {
           send_now: true,
@@ -152,7 +154,7 @@ export default function LoyaltySettings() {
           template_key: 'stamp_grant',
           recipient_name: 'Test recipient',
           recipient_phone: testPhone.trim(),
-          language: ar ? 'ar' : 'en',
+          language: testLang,
           template_variables: { activity: label },
           context: { activity: 'test' },
           source_module: 'loyalty-settings-test',
@@ -296,6 +298,14 @@ export default function LoyaltySettings() {
                     <input type="checkbox" className="w-4 h-4 accent-noch-green" checked={settings?.stamp_notify_review !== false} onChange={e => set('stamp_notify_review', e.target.checked)} />
                     {ar ? 'تقييم جوجل / فيسبوك' : 'Google / Facebook review'}
                   </label>
+                </div>
+                <div className="mb-2">
+                  <label className="label">{ar ? 'لغة الإرسال' : 'Send language'}</label>
+                  <select className="input" value={settings?.stamp_notify_language || 'ar'} onChange={e => set('stamp_notify_language', e.target.value)}>
+                    <option value="ar">{ar ? 'العربية' : 'Arabic'}</option>
+                    <option value="en">{ar ? 'الإنجليزية' : 'English'}</option>
+                    <option value="customer">{ar ? 'حسب لغة العميل' : 'Customer preference'}</option>
+                  </select>
                 </div>
                 <div className="mb-2">
                   <label className="label">{ar ? 'الرسالة (عربي)' : 'Message (AR)'}</label>

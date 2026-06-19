@@ -1964,7 +1964,10 @@ export async function notifyStampGranted(customer, activity) {
     if (activity === 'ugc' && !settings.stamp_notify_ugc) return { skipped: true, reason: 'activity_off' }
     if (activity === 'review' && !settings.stamp_notify_review) return { skipped: true, reason: 'activity_off' }
 
-    const lang = customer.preferred_language === 'en' ? 'en' : 'ar'
+    const languageMode = settings.stamp_notify_language || 'ar'
+    const lang = languageMode === 'customer'
+      ? (customer.preferred_language === 'en' ? 'en' : 'ar')
+      : (languageMode === 'en' ? 'en' : 'ar')
     const label = (STAMP_ACTIVITY_LABELS[activity] || STAMP_ACTIVITY_LABELS.visit)[lang]
 
     const { data, error } = await supabase.functions.invoke('send-notification', {
