@@ -81,14 +81,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: result.error }), { status: 400, headers })
     }
 
-    // If reward earned, send notification (fire and forget)
+    // If reward earned, send notification through the central outbox path.
     if (result?.reward_earned) {
-      fetch(`${SUPABASE_URL}/functions/v1/loyalty-notify`, {
+      fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
         method: 'POST',
         headers: { ...sbHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'reward_earned',
+          send_now: true,
+          channel: 'whatsapp',
+          audience: 'customer',
+          event_key: 'reward_earned',
+          template_key: 'reward_earned',
           customer_id: finalCustomerId,
+          source_module: 'loyalty-stamp',
+          requires_template: true,
         }),
       }).catch(() => {})
     }

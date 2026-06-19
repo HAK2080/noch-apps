@@ -12,6 +12,7 @@ const ROUTES = [
   '/accounting',
   '/analytics-legacy',
   '/marketing',
+  '/messages',
   '/products',
   '/loyalty',
   '/content-studio',
@@ -121,5 +122,17 @@ test.describe('Read-only app walkthrough', () => {
     await page.goto('/content/research')
     await page.waitForLoadState('domcontentloaded')
     await expect(page).toHaveURL(/\/content$/)
+  })
+
+  test('Messages page exposes notification outbox copy', async ({ page }) => {
+    await page.goto('/messages')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Notification outbox|loyalty, feedback, campaigns/i).first()).toBeVisible({ timeout: 10000 })
+  })
+
+  test('Loyalty settings call out approved WhatsApp templates', async ({ page }) => {
+    await page.goto('/loyalty/settings')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Template SID|approved WhatsApp template/i).first()).toBeVisible({ timeout: 10000 })
   })
 })

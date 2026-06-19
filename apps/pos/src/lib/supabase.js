@@ -108,7 +108,7 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
 
 export async function updateProfile(id, updates) {
   // Filter out pin_code from direct updates; it must be set via RPC
-  const { pin_code, ...safeUpdates } = updates
+  const { pin_code: _PIN_CODE, ...safeUpdates } = updates
 
   const { data, error } = await supabase
     .from('profiles')
@@ -1549,7 +1549,7 @@ export async function getGenerationFeedbackSummary(brandId, limit = 50) {
   return data || []
 }
 
-export async function getAveragePerformance(brandId) {
+export async function getAveragePerformance() {
   const { data, error } = await supabase
     .from('post_performance')
     .select('reach, likes, comments, shares, saves')
@@ -1842,13 +1842,43 @@ export async function getLoyaltySettings() {
 }
 
 export async function updateLoyaltySettings(settings) {
-  const { id, created_at, ...updates } = settings
+  const { id, created_at: _CREATED_AT, ...updates } = settings
   const { data, error } = await supabase
     .from('loyalty_settings')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select().single()
   if (error) throw error
+  return data
+}
+
+export async function getNotificationOutbox(status) {
+  let query = supabase
+    .from('notification_outbox')
+    .select(`
+      *,
+      customer:loyalty_customers!customer_id(id, full_name, phone),
+      campaign:marketing_campaigns!campaign_id(id, name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (status) query = query.eq('status', status)
+
+  const { data, error } = await query
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('does not exist')) return []
+    throw error
+  }
+  return data || []
+}
+
+export async function retryNotification(outboxId) {
+  const { data, error } = await supabase.functions.invoke('send-notification', {
+    body: { outbox_id: outboxId, send_now: true },
+  })
+  if (error) throw new Error(error.message ?? 'Failed to retry notification')
+  if (data?.error) throw new Error(data.error)
   return data
 }
 
@@ -1937,27 +1967,34 @@ export async function notifyStampGranted(customer, activity) {
     const lang = customer.preferred_language === 'en' ? 'en' : 'ar'
     const label = (STAMP_ACTIVITY_LABELS[activity] || STAMP_ACTIVITY_LABELS.visit)[lang]
 
-    // Prefer an approved Content API template (proactive-safe); else free-form.
-    let body
-    if (settings.stamp_notify_template_sid) {
-      body = { to: customer.phone, contentSid: settings.stamp_notify_template_sid, contentVariables: { '1': label } }
-    } else {
-      const tmpl = (lang === 'en' ? settings.stamp_notify_message_en : settings.stamp_notify_message_ar) || ''
-      body = { to: customer.phone, message: tmpl.replace(/\$\{activity\}/g, label) }
-    }
-    const { data, error } = await supabase.functions.invoke('send-whatsapp', { body })
-    const ok = !error && !data?.error
-    // Audit log (best-effort).
-    supabase.rpc('record_whatsapp_send', {
-      p_customer_id: customer.id, p_phone: customer.phone,
-      p_template: 'stamp_grant', p_trigger: `stamp_${activity}`,
-      p_status: ok ? 'sent' : 'failed',
-      p_error: ok ? null : (error?.message || data?.error || 'unknown'),
-      p_payload_key: null,
-    }).catch(() => {})
+    const { data, error } = await supabase.functions.invoke('send-notification', {
+      body: {
+        send_now: true,
+        channel: 'whatsapp',
+        audience: 'customer',
+        event_key: 'stamp_grant',
+        template_key: 'stamp_grant',
+        customer_id: customer.id,
+        recipient_name: customer.full_name,
+        recipient_phone: customer.phone,
+        language: lang,
+        template_variables: {
+          activity: label,
+        },
+        context: {
+          activity,
+          source: 'stamp_grant',
+        },
+        source_module: 'loyalty-stamp',
+        requires_template: true,
+      },
+    })
 
-    if (!ok) return { skipped: false, sent: false, error: error?.message || data?.error }
-    return { sent: true }
+    if (error) return { skipped: false, sent: false, error: error.message }
+    if (data?.error) return { skipped: false, sent: false, error: data.error }
+    if (data?.status === 'failed') return { skipped: false, sent: false, error: data.error || 'template_required' }
+
+    return { sent: true, outbox_id: data?.outbox_id || null }
   } catch (e) {
     return { skipped: false, sent: false, error: e.message }
   }

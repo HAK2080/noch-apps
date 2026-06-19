@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.send-whatsapp]
 verify_jwt = true
 
+[functions.send-notification]
+verify_jwt = true
+
 [functions.cs-evaluate-draft]
 verify_jwt = false
 
@@ -34,6 +37,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.whatsapp-cron]
+verify_jwt = false
+
+[functions.process-notification-outbox]
 verify_jwt = false
 
 [functions.ops-generate-instances]

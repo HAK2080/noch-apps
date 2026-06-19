@@ -124,11 +124,25 @@ export default function LoyaltySettings() {
     setTestSending(true)
     try {
       const label = ar ? 'تجربة' : 'your post'
-      const body = settings?.stamp_notify_template_sid
-        ? { to: testPhone.trim(), contentSid: settings.stamp_notify_template_sid, contentVariables: { '1': label } }
-        : { to: testPhone.trim(), message: (settings?.stamp_notify_message_en || 'Thanks for ${activity}! Nochi gave you a stamp 🎁').replace(/\$\{activity\}/g, label) }
-      const { data, error } = await supabase.functions.invoke('send-whatsapp', { body })
-      if (error || data?.error) throw new Error(error?.message || data?.error)
+      const { data, error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          send_now: true,
+          channel: 'whatsapp',
+          audience: 'customer',
+          event_key: 'stamp_grant',
+          template_key: 'stamp_grant',
+          recipient_name: 'Test recipient',
+          recipient_phone: testPhone.trim(),
+          language: ar ? 'ar' : 'en',
+          template_variables: { activity: label },
+          context: { activity: 'test' },
+          source_module: 'loyalty-settings-test',
+          requires_template: true,
+        },
+      })
+      if (error || data?.error || data?.status === 'failed') {
+        throw new Error(error?.message || data?.error || 'Template required')
+      }
       toast.success(ar ? 'تم الإرسال ✓' : 'Sent ✓')
     } catch (e) {
       toast.error((ar ? 'فشل: ' : 'Failed: ') + (e.message || ''))
@@ -278,8 +292,8 @@ export default function LoyaltySettings() {
                 </div>
                 <p className="text-noch-muted text-[11px] mb-3">
                   {ar
-                    ? 'إذا أدخلت معرّف القالب، يُرسل عبره (الطريقة الصحيحة للرسائل الاستباقية). وإلا تُرسل الرسالة الحرة أعلاه (تعمل فقط خلال ٢٤ ساعة). ${activity} = اسم النشاط ({{1}} في القالب). تُرسل فقط للموافقين على واتساب.'
-                    : 'With a Template SID it sends via the approved template (correct for proactive sends); otherwise the free-form message above is used (24h window only). ${activity} fills the activity ({{1}} in the template). Only sends to opted-in customers.'}
+                    ? 'الرسائل الاستباقية هنا تتطلب قالب واتساب معتمد. إذا تركت معرّف القالب فارغاً فستفشل الرسالة في الـ outbox حتى تتم إضافة SID معتمد. ${activity} = اسم النشاط ({{1}} داخل القالب).'
+                    : 'Proactive sends here require an approved WhatsApp template. If the SID is blank, the notification will fail in the outbox until an approved SID is added. ${activity} maps to {{1}} inside the template.'}
                 </p>
                 <div className="flex gap-2">
                   <input className="input flex-1" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder={ar ? 'رقم لاختبار الإرسال' : 'Phone to test send'} dir="ltr" />
