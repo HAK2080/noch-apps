@@ -15,8 +15,11 @@ import StampCard from '../components/StampCard'
 import ConfirmModal from '../../../components/shared/ConfirmModal'
 import toast from 'react-hot-toast'
 
+const FACEBOOK_REVIEW_URL = 'https://www.facebook.com/share/g/1HEKKx8BZP/'
+
 const NOTIFY_TYPES = [
-  { type: 'random_love', ar: '🌹 رسالة محبة عشوائية', en: '🌹 Random Love Message' },
+  { type: 'loyalty_thank_review', ar: '💚 شكر وطلب تقييم', en: '💚 Thank customer / ask for review' },
+  { type: 'feedback_stamp_thank_you', ar: '🎁 شكر على التقييم + طابع مجاني', en: '🎁 Thank feedback/review + free stamp' },
   { type: 'nochi_sad', ar: '😢 تنبيه حزن نوتشي', en: '😢 Nochi Sad Alert' },
   { type: 'nochi_tired', ar: '😴 نوتشي تعبان', en: '😴 Nochi Tired' },
   { type: 'nochi_deathbed', ar: '🛏️ نوتشي مريض', en: '🛏️ Nochi Sick' },
@@ -42,8 +45,9 @@ export default function CustomerDetail() {
   const notifyEligible = stampActivity === 'ugc' || stampActivity === 'review'
   const activityEnabled = stampActivity === 'ugc' ? loySettings?.stamp_notify_ugc !== false
     : stampActivity === 'review' ? loySettings?.stamp_notify_review !== false : false
+  const customerWhatsAppPhone = customer?.phone || customer?.phone_normalised
   const canNotify = !!loySettings?.stamp_notify_enabled && notifyEligible && activityEnabled
-    && customer?.whatsapp_opt_in !== false && !!customer?.phone
+    && customer?.whatsapp_opt_in !== false && !!customerWhatsAppPhone
 
   const load = async () => {
     try {
@@ -108,6 +112,14 @@ export default function CustomerDetail() {
 
   const handleNotify = async (type) => {
     try {
+      if (type === 'feedback_stamp_thank_you') {
+        await awardLoyaltyStamp(id, user?.id, 'review')
+        const result = await notifyStampGranted(customer, 'review')
+        if (result?.error) throw new Error(result.error)
+        toast.success(ar ? 'تمت إضافة طابع وإرسال الشكر ✓' : 'Stamp added and thank-you sent ✓')
+        load()
+        return
+      }
       await sendLoyaltyNotification(id, type)
       toast.success(ar ? 'تم إرسال الرسالة ✓' : 'Message sent ✓')
     } catch (err) {
@@ -146,6 +158,19 @@ export default function CustomerDetail() {
       load()
     } catch (err) {
       toast.error(err.message)
+    }
+  }
+
+  const handleFacebookReview = async () => {
+    try {
+      const branches = await getPOSBranches().catch(() => [])
+      const branchWithUrl = branches.find(b => b.facebook_review_url) || branches[0]
+      const facebookUrl = branchWithUrl?.facebook_review_url || FACEBOOK_REVIEW_URL
+      await navigator.clipboard.writeText(facebookUrl).catch(() => {})
+      window.open(facebookUrl, '_blank', 'noopener,noreferrer')
+      toast.success(ar ? 'تم فتح رابط فيسبوك ونسخه' : 'Facebook link opened and copied')
+    } catch (err) {
+      toast.error(err.message || (ar ? 'تعذر فتح رابط فيسبوك' : 'Could not open Facebook link'))
     }
   }
 
@@ -310,11 +335,11 @@ export default function CustomerDetail() {
         </div>
       )}
 
-      {/* Google Review Nudge */}
+      {/* Review Nudges */}
       <div className="card mb-4">
         <div className="flex items-center gap-2 mb-3">
           <Star size={16} className="text-yellow-400" />
-          <p className="text-white font-semibold text-sm">{ar ? 'طلب مراجعة Google' : 'Google Review'}</p>
+          <p className="text-white font-semibold text-sm">{ar ? 'طلب تقييم' : 'Review request'}</p>
         </div>
         {reviewRecentlyRequested ? (
           <p className="text-noch-muted text-sm">
@@ -325,12 +350,19 @@ export default function CustomerDetail() {
         ) : (
           <button
             onClick={handleRequestReview}
-            className="btn-secondary flex items-center gap-2 text-sm"
+            className="btn-secondary flex items-center gap-2 text-sm mb-2"
           >
             <Star size={14} className="text-yellow-400" />
             {ar ? '⭐ طلب مراجعة Google' : '⭐ Request Google Review'}
           </button>
         )}
+        <button
+          onClick={handleFacebookReview}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <ExternalLink size={14} />
+          {ar ? 'طلب تقييم / مشاركة على Facebook' : 'Request Facebook rating / post'}
+        </button>
       </div>
 
       {/* Notifications */}

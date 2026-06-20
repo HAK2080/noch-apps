@@ -108,7 +108,7 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
 
 export async function updateProfile(id, updates) {
   // Filter out pin_code from direct updates; it must be set via RPC
-  const { pin_code, ...safeUpdates } = updates
+  const { pin_code: _PIN_CODE, ...safeUpdates } = updates
 
   const { data, error } = await supabase
     .from('profiles')
@@ -423,6 +423,176 @@ export async function logReport(recipientPhone, summary) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function getManagementReport({ days = 7 } = {}) {
+  const periodDays = Number(days) || 7
+  const localDateKey = (date) => {
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+  const to = new Date()
+  const from = new Date(to)
+  from.setDate(to.getDate() - (periodDays - 1))
+  from.setHours(0, 0, 0, 0)
+
+  const prevTo = new Date(from)
+  prevTo.setMilliseconds(-1)
+  const prevFrom = new Date(prevTo)
+  prevFrom.setDate(prevTo.getDate() - (periodDays - 1))
+  prevFrom.setHours(0, 0, 0, 0)
+
+  const fromIso = from.toISOString()
+  const toIso = to.toISOString()
+  const prevFromIso = prevFrom.toISOString()
+  const prevToIso = prevTo.toISOString()
+  const fromDate = localDateKey(from)
+  const toDate = localDateKey(to)
+
+  const safeRows = async (query, fallback = []) => {
+    try {
+      const { data, error } = await query
+      if (error) return fallback
+      return data || fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  const [orders, prevOrders, expenses, stock, customers, outbox] = await Promise.all([
+    safeRows(
+      supabase
+        .from('pos_orders')
+        .select('id, total, subtotal, discount_amount, status, payment_method, created_at, loyalty_customer_id')
+        .eq('status', 'completed')
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+    ),
+    safeRows(
+      supabase
+        .from('pos_orders')
+        .select('id, total, status, created_at')
+        .eq('status', 'completed')
+        .gte('created_at', prevFromIso)
+        .lte('created_at', prevToIso)
+    ),
+    safeRows(
+      supabase
+        .from('expenses')
+        .select('id, amount, amount_lyd, exchange_rate_to_lyd, status, expense_date, paid_at, vendor, description')
+        .gte('expense_date', fromDate)
+        .lte('expense_date', toDate)
+    ),
+    safeRows(
+      supabase
+        .from('stock')
+        .select('id, qty_available, min_threshold, unit, ingredient:ingredients(name, name_ar, category)')
+        .order('qty_available', { ascending: true })
+    ),
+    safeRows(
+      supabase
+        .from('loyalty_customers')
+        .select('id, created_at, last_visit_at, whatsapp_opt_in, nochi_state')
+    ),
+    safeRows(
+      supabase
+        .from('notification_outbox')
+        .select('id, status, provider_status, channel, template_key, created_at')
+        .eq('channel', 'whatsapp')
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso)
+        .order('created_at', { ascending: false })
+    ),
+  ])
+
+  const money = (value) => Number(value || 0)
+  const expenseAmount = (row) => money(row.amount_lyd ?? (money(row.amount) * money(row.exchange_rate_to_lyd || 1)))
+  const revenue = orders.reduce((sum, row) => sum + money(row.total), 0)
+  const grossRevenue = orders.reduce((sum, row) => sum + Math.max(0, money(row.total)), 0)
+  const revenueAdjustments = orders.reduce((sum, row) => sum + Math.min(0, money(row.total)), 0)
+  const prevRevenue = prevOrders.reduce((sum, row) => sum + money(row.total), 0)
+  const expenseRows = expenses.filter(row => row.status !== 'rejected')
+  const expenseTotal = expenseRows.reduce((sum, row) => sum + expenseAmount(row), 0)
+  const paidExpenses = expenses.filter(row => row.status === 'paid')
+  const approvedUnpaidExpenses = expenses.filter(row => row.status === 'approved' && !row.paid_at)
+  const lowStock = stock.filter(row => money(row.min_threshold) > 0 && money(row.qty_available) < money(row.min_threshold))
+  const outOfStock = lowStock.filter(row => money(row.qty_available) <= 0)
+  const recentCustomers = customers.filter(row => row.last_visit_at && new Date(row.last_visit_at) >= from)
+  const newCustomers = customers.filter(row => row.created_at && new Date(row.created_at) >= from)
+  const whatsappProblemStatuses = ['failed', 'undelivered', 'error', 'cooldown_recent_send', 'not_opted_in', 'missing_template_sid']
+  const whatsappFailed = outbox.filter(row => whatsappProblemStatuses.includes(String(row.provider_status || row.status || '').toLowerCase()))
+  const whatsappQueued = outbox.filter(row => ['queued', 'pending', 'claimed', 'sent'].includes(String(row.provider_status || row.status || '').toLowerCase()))
+  const revenueChangePct = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : null
+
+  const insights = []
+  if (revenueChangePct !== null) {
+    insights.push({
+      type: revenueChangePct >= 0 ? 'good' : 'risk',
+      title: revenueChangePct >= 0 ? 'Sales are up' : 'Sales are down',
+      detail: `${Math.abs(revenueChangePct).toFixed(1)}% vs previous ${periodDays} days`,
+    })
+  }
+  if (approvedUnpaidExpenses.length > 0) {
+    insights.push({
+      type: 'warn',
+      title: 'Approved expenses need payment',
+      detail: `${approvedUnpaidExpenses.length} unpaid approved expenses`,
+    })
+  }
+  if (lowStock.length > 0) {
+    insights.push({
+      type: 'risk',
+      title: 'Stock risk',
+      detail: `${lowStock.length} items below minimum, ${outOfStock.length} out of stock`,
+    })
+  }
+  if (whatsappFailed.length > 0) {
+    insights.push({
+      type: 'risk',
+      title: 'WhatsApp delivery failures',
+      detail: `${whatsappFailed.length} failed messages in this period`,
+    })
+  }
+  if (insights.length === 0) {
+    insights.push({
+      type: 'good',
+      title: 'No critical management alerts',
+      detail: 'Sales, costs, stock, and messaging have no obvious red flags in this period',
+    })
+  }
+
+  return {
+    period: { days: periodDays, from: fromDate, to: toDate },
+    metrics: {
+      revenue,
+      grossRevenue,
+      revenueAdjustments,
+      previousRevenue: prevRevenue,
+      revenueChangePct,
+      orders: orders.length,
+      averageTicket: orders.length ? revenue / orders.length : 0,
+      expenses: expenseTotal,
+      paidExpenses: paidExpenses.reduce((sum, row) => sum + expenseAmount(row), 0),
+      approvedUnpaidExpenses: approvedUnpaidExpenses.reduce((sum, row) => sum + expenseAmount(row), 0),
+      netAfterExpenses: revenue - expenseTotal,
+      lowStockCount: lowStock.length,
+      outOfStockCount: outOfStock.length,
+      loyaltyCustomers: customers.length,
+      loyaltyActive: recentCustomers.length,
+      newCustomers: newCustomers.length,
+      whatsappSent: outbox.length,
+      whatsappFailed: whatsappFailed.length,
+      whatsappQueued: whatsappQueued.length,
+    },
+    insights,
+    stockRisk: lowStock.slice(0, 8),
+    expenses: expenseRows
+      .sort((a, b) => expenseAmount(b) - expenseAmount(a))
+      .slice(0, 8),
+    whatsapp: outbox.slice(0, 8),
+  }
 }
 
 // ============================================================
@@ -750,6 +920,70 @@ export async function getStockLogs(ingredientId) {
     query = query.eq('ingredient_id', ingredientId)
   }
   const { data, error } = await query
+  if (error) throw error
+  return data
+}
+
+// ============================================================
+// INVENTORY LOCATIONS - Warehouses / storage areas
+// ============================================================
+
+export async function getInventoryLocations() {
+  const { data, error } = await supabase
+    .from('inventory_locations')
+    .select('*, branch:pos_branches(name, name_ar)')
+    .eq('is_active', true)
+    .order('sort_order')
+    .order('name')
+  if (error) throw error
+  return data || []
+}
+
+export async function createInventoryLocation(location) {
+  const { data, error } = await supabase
+    .from('inventory_locations')
+    .insert(location)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateInventoryLocation(id, updates) {
+  const { data, error } = await supabase
+    .from('inventory_locations')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getInventoryLocationStock() {
+  const { data, error } = await supabase
+    .from('inventory_location_stock')
+    .select('*, ingredient:ingredients(id, name, name_ar, base_unit), location:inventory_locations(id, name, name_ar, location_type, branch_id)')
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertInventoryLocationStock({ ingredientId, locationId, qty, unit, notes }) {
+  const payload = {
+    ingredient_id: ingredientId,
+    location_id: locationId,
+    qty_available: Number(qty) || 0,
+    unit,
+    notes: notes || null,
+    last_counted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase
+    .from('inventory_location_stock')
+    .upsert(payload, { onConflict: 'ingredient_id,location_id' })
+    .select()
+    .single()
   if (error) throw error
   return data
 }
@@ -1485,7 +1719,7 @@ export async function getGenerationFeedbackSummary(brandId, limit = 50) {
   return data || []
 }
 
-export async function getAveragePerformance(brandId) {
+export async function getAveragePerformance() {
   const { data, error } = await supabase
     .from('post_performance')
     .select('reach, likes, comments, shares, saves')
@@ -1528,7 +1762,10 @@ export async function upsertContentCategory(brandId, category, catData) {
 // ============================================================
 
 export async function getProcurementOrders(ingredientId) {
-  let query = supabase.from('procurement_orders').select('*, ingredient:ingredients(name)').order('created_at', { ascending: false })
+  let query = supabase
+    .from('procurement_orders')
+    .select('*, ingredient:ingredients(name)')
+    .order('created_at', { ascending: false })
   if (ingredientId) query = query.eq('ingredient_id', ingredientId)
   const { data, error } = await query
   if (error) throw error
@@ -1545,6 +1782,74 @@ export async function updateProcurementOrder(id, updates) {
   const { data, error } = await supabase.from('procurement_orders').update(updates).eq('id', id).select().single()
   if (error) throw error
   return data
+}
+
+export async function receiveProcurementOrder({
+  orderId,
+  receivedQty,
+  receivedAt = new Date().toISOString(),
+  updateBulkCost = false,
+  receiptNotes = null,
+  locationId = null,
+}) {
+  const { data, error } = await supabase.rpc('receive_procurement_order_v2', {
+    p_order_id: orderId,
+    p_received_qty: Number(receivedQty),
+    p_received_at: receivedAt,
+    p_update_bulk_cost: !!updateBulkCost,
+    p_receipt_notes: receiptNotes || null,
+    p_location_id: locationId || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function returnProcurementOrder({
+  orderId,
+  returnQty,
+  returnedAt = new Date().toISOString(),
+  reason = null,
+  locationId = null,
+}) {
+  const { data, error } = await supabase.rpc('return_procurement_order', {
+    p_order_id: orderId,
+    p_return_qty: Number(returnQty),
+    p_returned_at: returnedAt,
+    p_reason: reason || null,
+    p_location_id: locationId || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function getInventoryStockValuation() {
+  const { data, error } = await supabase
+    .from('inventory_stock_valuation')
+    .select('*')
+    .order('stock_value_lyd', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getInventoryReorderSuggestions() {
+  const { data, error } = await supabase
+    .from('inventory_reorder_suggestions')
+    .select('*')
+    .order('suggested_reorder_qty', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getInventorySupplierPriceHistory(ingredientId = null) {
+  let query = supabase
+    .from('inventory_supplier_price_history')
+    .select('*')
+    .order('effective_date', { ascending: false })
+    .order('procurement_order_id', { ascending: false })
+  if (ingredientId) query = query.eq('ingredient_id', ingredientId)
+  const { data, error } = await query.limit(20)
+  if (error) throw error
+  return data || []
 }
 
 export async function uploadIngredientImage(ingredientId, file) {
@@ -1707,13 +2012,43 @@ export async function getLoyaltySettings() {
 }
 
 export async function updateLoyaltySettings(settings) {
-  const { id, created_at, ...updates } = settings
+  const { id, created_at: _CREATED_AT, ...updates } = settings
   const { data, error } = await supabase
     .from('loyalty_settings')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select().single()
   if (error) throw error
+  return data
+}
+
+export async function getNotificationOutbox(status) {
+  let query = supabase
+    .from('notification_outbox')
+    .select(`
+      *,
+      customer:loyalty_customers!customer_id(id, full_name, phone),
+      campaign:marketing_campaigns!campaign_id(id, name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (status) query = query.eq('status', status)
+
+  const { data, error } = await query
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('does not exist')) return []
+    throw error
+  }
+  return data || []
+}
+
+export async function retryNotification(outboxId) {
+  const { data, error } = await supabase.functions.invoke('send-notification', {
+    body: { outbox_id: outboxId, send_now: true },
+  })
+  if (error) throw new Error(error.message ?? 'Failed to retry notification')
+  if (data?.error) throw new Error(data.error)
   return data
 }
 
@@ -1791,7 +2126,8 @@ const STAMP_ACTIVITY_LABELS = {
 // Never throws — returns a result object the caller can toast.
 export async function notifyStampGranted(customer, activity) {
   try {
-    if (!customer?.phone) return { skipped: true, reason: 'no_phone' }
+    const recipientPhone = customer?.phone || customer?.phone_normalised
+    if (!recipientPhone) return { skipped: true, reason: 'no_phone' }
     if (customer.whatsapp_opt_in === false) return { skipped: true, reason: 'not_opted_in' }
 
     const settings = await getLoyaltySettings()
@@ -1799,30 +2135,40 @@ export async function notifyStampGranted(customer, activity) {
     if (activity === 'ugc' && !settings.stamp_notify_ugc) return { skipped: true, reason: 'activity_off' }
     if (activity === 'review' && !settings.stamp_notify_review) return { skipped: true, reason: 'activity_off' }
 
-    const lang = customer.preferred_language === 'en' ? 'en' : 'ar'
+    const languageMode = settings.stamp_notify_language || 'ar'
+    const lang = languageMode === 'customer'
+      ? (customer.preferred_language === 'en' ? 'en' : 'ar')
+      : (languageMode === 'en' ? 'en' : 'ar')
     const label = (STAMP_ACTIVITY_LABELS[activity] || STAMP_ACTIVITY_LABELS.visit)[lang]
 
-    // Prefer an approved Content API template (proactive-safe); else free-form.
-    let body
-    if (settings.stamp_notify_template_sid) {
-      body = { to: customer.phone, contentSid: settings.stamp_notify_template_sid, contentVariables: { '1': label } }
-    } else {
-      const tmpl = (lang === 'en' ? settings.stamp_notify_message_en : settings.stamp_notify_message_ar) || ''
-      body = { to: customer.phone, message: tmpl.replace(/\$\{activity\}/g, label) }
-    }
-    const { data, error } = await supabase.functions.invoke('send-whatsapp', { body })
-    const ok = !error && !data?.error
-    // Audit log (best-effort).
-    supabase.rpc('record_whatsapp_send', {
-      p_customer_id: customer.id, p_phone: customer.phone,
-      p_template: 'stamp_grant', p_trigger: `stamp_${activity}`,
-      p_status: ok ? 'sent' : 'failed',
-      p_error: ok ? null : (error?.message || data?.error || 'unknown'),
-      p_payload_key: null,
-    }).catch(() => {})
+    const { data, error } = await supabase.functions.invoke('send-notification', {
+      body: {
+        send_now: true,
+        channel: 'whatsapp',
+        audience: 'customer',
+        event_key: 'stamp_grant',
+        template_key: 'stamp_grant',
+        customer_id: customer.id,
+        recipient_name: customer.full_name,
+        recipient_phone: recipientPhone,
+        language: lang,
+        template_variables: {
+          activity: label,
+        },
+        context: {
+          activity,
+          source: 'stamp_grant',
+        },
+        source_module: 'loyalty-stamp',
+        requires_template: true,
+      },
+    })
 
-    if (!ok) return { skipped: false, sent: false, error: error?.message || data?.error }
-    return { sent: true }
+    if (error) return { skipped: false, sent: false, error: error.message }
+    if (data?.error) return { skipped: false, sent: false, error: data.error }
+    if (data?.status === 'failed') return { skipped: false, sent: false, error: data.error || 'template_required' }
+
+    return { sent: true, outbox_id: data?.outbox_id || null }
   } catch (e) {
     return { skipped: false, sent: false, error: e.message }
   }
@@ -1889,7 +2235,14 @@ export async function sendLoyaltyNotification(customerId, type, vars = {}) {
   const { data, error } = await supabase.functions.invoke('loyalty-notify', {
     body: { customer_id: customerId, type, vars },
   })
-  if (error) throw new Error(error.message ?? 'Failed to send notification')
+  if (error) {
+    let detail = ''
+    try {
+      const payload = await error.context?.json?.()
+      detail = payload?.error || payload?.message || ''
+    } catch {}
+    throw new Error(detail || error.message || 'Failed to send notification')
+  }
   if (data?.error) throw new Error(data.error)
   return data
 }

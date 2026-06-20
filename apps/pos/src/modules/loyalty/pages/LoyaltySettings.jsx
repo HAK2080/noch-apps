@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, MapPin, Gift, Sparkles, Star, Zap, Trash2, Plus, X, ToggleLeft, ToggleRight, Calendar, MessageSquare, Users, Trophy } from 'lucide-react'
+import { Save, MapPin, Gift, Sparkles, Star, Zap, Trash2, Plus, X, ToggleLeft, ToggleRight, Calendar, MessageSquare, Users, Trophy, AlertTriangle } from 'lucide-react'
 import { getLoyaltySettings, updateLoyaltySettings } from '../../../lib/supabase'
 import { getPOSBranches, updatePOSBranch } from '../../pos/lib/pos-supabase'
 import { supabase } from '../../../lib/supabase'
@@ -16,6 +16,20 @@ const SKINS = [
   { id: 'winter', label: 'Winter', emoji: '❄️' },
   { id: 'birthday', label: 'Birthday Mode', emoji: '🎂' },
 ]
+
+const KNOWN_WHATSAPP_TEMPLATES = {
+  loyalty_reward_ready: 'HXd1df8cc058afd9e1812ad2881ee9de1e',
+}
+
+function getStampTemplateWarning(sid) {
+  const value = String(sid || '').trim()
+  if (!value) return 'No approved stamp template SID is set. Proactive test sends will fail.'
+  if (value === KNOWN_WHATSAPP_TEMPLATES.loyalty_reward_ready) {
+    return 'This SID is for reward-ready messages, not stamp grants. Create/approve a stamp-grant Twilio template before testing.'
+  }
+  if (!/^HX[a-fA-F0-9]{32}$/.test(value)) return 'This does not look like a valid Twilio Content SID.'
+  return ''
+}
 
 function SpinPrizeManager() {
   const [prizes, setPrizes] = useState([])
@@ -114,21 +128,43 @@ export default function LoyaltySettings() {
   const [saving, setSaving] = useState(false)
   const [branches, setBranches] = useState([])
   const [branchUrls, setBranchUrls] = useState({})
+  const [branchFacebookUrls, setBranchFacebookUrls] = useState({})
   const [savingBranch, setSavingBranch] = useState(null)
   const [testPhone, setTestPhone] = useState('')
   const [testSending, setTestSending] = useState(false)
   const ar = lang === 'ar'
+  const stampTemplateWarning = getStampTemplateWarning(settings?.stamp_notify_template_sid)
 
   const sendStampTest = async () => {
     if (!testPhone.trim()) return
+    if (stampTemplateWarning) {
+      toast.error(stampTemplateWarning)
+      return
+    }
     setTestSending(true)
     try {
-      const label = ar ? 'تجربة' : 'your post'
-      const body = settings?.stamp_notify_template_sid
-        ? { to: testPhone.trim(), contentSid: settings.stamp_notify_template_sid, contentVariables: { '1': label } }
-        : { to: testPhone.trim(), message: (settings?.stamp_notify_message_en || 'Thanks for ${activity}! Nochi gave you a stamp 🎁').replace(/\$\{activity\}/g, label) }
-      const { data, error } = await supabase.functions.invoke('send-whatsapp', { body })
-      if (error || data?.error) throw new Error(error?.message || data?.error)
+      const languageMode = settings?.stamp_notify_language || 'ar'
+      const testLang = languageMode === 'en' ? 'en' : 'ar'
+      const label = testLang === 'ar' ? 'منشورك' : 'your post'
+      const { data, error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          send_now: true,
+          channel: 'whatsapp',
+          audience: 'customer',
+          event_key: 'stamp_grant',
+          template_key: 'stamp_grant',
+          recipient_name: 'Test recipient',
+          recipient_phone: testPhone.trim(),
+          language: testLang,
+          template_variables: { activity: label },
+          context: { activity: 'test' },
+          source_module: 'loyalty-settings-test',
+          requires_template: true,
+        },
+      })
+      if (error || data?.error || data?.status === 'failed') {
+        throw new Error(error?.message || data?.error || 'Template required')
+      }
       toast.success(ar ? 'تم الإرسال ✓' : 'Sent ✓')
     } catch (e) {
       toast.error((ar ? 'فشل: ' : 'Failed: ') + (e.message || ''))
@@ -147,8 +183,13 @@ export default function LoyaltySettings() {
       .then(data => {
         setBranches(data || [])
         const urlMap = {}
-        for (const b of data || []) urlMap[b.id] = b.google_maps_url || ''
+        const facebookUrlMap = {}
+        for (const b of data || []) {
+          urlMap[b.id] = b.google_maps_url || ''
+          facebookUrlMap[b.id] = b.facebook_review_url || ''
+        }
         setBranchUrls(urlMap)
+        setBranchFacebookUrls(facebookUrlMap)
       })
       .catch(() => {})
   }, [])
@@ -156,7 +197,10 @@ export default function LoyaltySettings() {
   const handleSaveBranchUrl = async (branchId) => {
     setSavingBranch(branchId)
     try {
-      await updatePOSBranch(branchId, { google_maps_url: branchUrls[branchId] || null })
+      await updatePOSBranch(branchId, {
+        google_maps_url: branchUrls[branchId] || null,
+        facebook_review_url: branchFacebookUrls[branchId] || null,
+      })
       toast.success('Saved ✓')
     } catch (err) { toast.error(err.message) }
     finally { setSavingBranch(null) }
@@ -265,6 +309,14 @@ export default function LoyaltySettings() {
                   </label>
                 </div>
                 <div className="mb-2">
+                  <label className="label">{ar ? 'لغة الإرسال' : 'Send language'}</label>
+                  <select className="input" value={settings?.stamp_notify_language || 'ar'} onChange={e => set('stamp_notify_language', e.target.value)}>
+                    <option value="ar">{ar ? 'العربية' : 'Arabic'}</option>
+                    <option value="en">{ar ? 'الإنجليزية' : 'English'}</option>
+                    <option value="customer">{ar ? 'حسب لغة العميل' : 'Customer preference'}</option>
+                  </select>
+                </div>
+                <div className="mb-2">
                   <label className="label">{ar ? 'الرسالة (عربي)' : 'Message (AR)'}</label>
                   <input className="input" value={settings?.stamp_notify_message_ar || ''} onChange={e => set('stamp_notify_message_ar', e.target.value)} placeholder="شكراً على ${activity}! نوتشي منحك طابع 🎁" />
                 </div>
@@ -276,14 +328,20 @@ export default function LoyaltySettings() {
                   <label className="label">{ar ? 'معرّف القالب (Twilio Content SID)' : 'Template SID (Twilio Content SID)'}</label>
                   <input className="input font-mono text-xs" value={settings?.stamp_notify_template_sid || ''} onChange={e => set('stamp_notify_template_sid', e.target.value.trim())} placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" dir="ltr" />
                 </div>
+                {stampTemplateWarning && (
+                  <div className="mb-3 flex items-start gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-3 text-xs text-yellow-200">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>{stampTemplateWarning}</span>
+                  </div>
+                )}
                 <p className="text-noch-muted text-[11px] mb-3">
                   {ar
-                    ? 'إذا أدخلت معرّف القالب، يُرسل عبره (الطريقة الصحيحة للرسائل الاستباقية). وإلا تُرسل الرسالة الحرة أعلاه (تعمل فقط خلال ٢٤ ساعة). ${activity} = اسم النشاط ({{1}} في القالب). تُرسل فقط للموافقين على واتساب.'
-                    : 'With a Template SID it sends via the approved template (correct for proactive sends); otherwise the free-form message above is used (24h window only). ${activity} fills the activity ({{1}} in the template). Only sends to opted-in customers.'}
+                    ? 'الرسائل الاستباقية هنا تتطلب قالب واتساب معتمد. إذا تركت معرّف القالب فارغاً فستفشل الرسالة في الـ outbox حتى تتم إضافة SID معتمد. ${activity} = اسم النشاط ({{1}} داخل القالب).'
+                    : 'Proactive sends here require an approved WhatsApp template. If the SID is blank, the notification will fail in the outbox until an approved SID is added. ${activity} maps to {{1}} inside the template.'}
                 </p>
                 <div className="flex gap-2">
                   <input className="input flex-1" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder={ar ? 'رقم لاختبار الإرسال' : 'Phone to test send'} dir="ltr" />
-                  <button onClick={sendStampTest} disabled={testSending || !testPhone.trim()} className="btn-secondary px-4 text-sm">
+                  <button onClick={sendStampTest} disabled={testSending || !testPhone.trim() || !!stampTemplateWarning} className="btn-secondary px-4 text-sm">
                     {testSending ? '…' : (ar ? 'إرسال تجريبي' : 'Send test')}
                   </button>
                 </div>
@@ -543,18 +601,18 @@ export default function LoyaltySettings() {
             </div>
           </div>
 
-          {/* Google Maps URLs per branch */}
+          {/* Review URLs per branch */}
           {branches.length > 0 && (
             <div className="card">
               <div className="flex items-center gap-2 mb-3">
                 <MapPin size={16} className="text-noch-green" />
-                <h2 className="text-white font-semibold text-sm">Google Maps URLs</h2>
+                <h2 className="text-white font-semibold text-sm">Review URLs</h2>
               </div>
               <div className="flex flex-col gap-4">
                 {branches.map(branch => (
                   <div key={branch.id}>
                     <label className="label">{branch.name}</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
                       <input
                         className="input flex-1"
                         type="url"
@@ -562,6 +620,17 @@ export default function LoyaltySettings() {
                         value={branchUrls[branch.id] || ''}
                         onChange={e => setBranchUrls(prev => ({ ...prev, [branch.id]: e.target.value }))}
                       />
+                    </div>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        className="input flex-1"
+                        type="url"
+                        placeholder="Paste Facebook review/page/group URL..."
+                        value={branchFacebookUrls[branch.id] || ''}
+                        onChange={e => setBranchFacebookUrls(prev => ({ ...prev, [branch.id]: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex justify-end">
                       <button onClick={() => handleSaveBranchUrl(branch.id)} disabled={savingBranch === branch.id} className="btn-primary px-3 flex items-center gap-1">
                         <Save size={14} />
                         {savingBranch === branch.id ? '...' : 'Save'}
