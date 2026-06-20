@@ -496,9 +496,8 @@ function ReportsTab({ ar, branches }) {
     </div>
   )
   const revenue = group(is, ['revenue']), cogs = group(is, ['cogs']), expenses = group(is, ['expense'])
-  const operatingCash = group(cf, ['operating']), investingCash = group(cf, ['investing']), financingCash = group(cf, ['financing'])
   const netProfit = sum(revenue) - sum(cogs) - sum(expenses)
-  const netCashFlow = sum(operatingCash) + sum(investingCash) + sum(financingCash)
+  const netCashFlow = cf.reduce((total, row) => total + Number(row.net_lyd || 0), 0)
   const filteredLines = lineFilter === 'all' ? lines : lines.filter(row => row.section === lineFilter)
 
   return (
@@ -542,6 +541,23 @@ function ReportsTab({ ar, branches }) {
           <Section title={ar ? 'الالتزامات' : 'Liabilities'} rows={group(bs, ['liability'])} valueKey="balance" />
           <Section title={ar ? 'حقوق الملكية' : 'Equity'} rows={group(bs, ['equity'])} valueKey="balance" />
         </div>
+        <div className="card">
+          <h2 className="text-white font-semibold mb-3">Cash flow statement</h2>
+          {cf.length === 0 ? (
+            <p className="text-noch-muted text-xs italic">-</p>
+          ) : cf.map(row => (
+            <div key={row.source_type} className="flex justify-between text-sm py-0.5">
+              <span className="text-white">{row.line_label}</span>
+              <span className={`font-mono ${Number(row.net_lyd || 0) >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                {lyd(row.net_lyd)}
+              </span>
+            </div>
+          ))}
+          <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
+            <span className="text-white">Net cash movement</span>
+            <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -568,11 +584,7 @@ function PayablesTab({ ar, branches }) {
       ))}
     </div>
   )
-  const groupCash = (section) => cf.filter(r => r.section === section)
-  const operatingCash = groupCash('operating')
-  const investingCash = groupCash('investing')
-  const financingCash = groupCash('financing')
-  const netCashFlow = [...operatingCash, ...investingCash, ...financingCash].reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const netCashFlow = cf.reduce((sum, row) => sum + Number(row.net_lyd || 0), 0)
 
   useEffect(() => {
     let cancelled = false
@@ -726,12 +738,19 @@ function PayablesTab({ ar, branches }) {
           )}
         </div>
         <div className="card">
-          <h2 className="text-white font-semibold mb-3">{ar ? 'التدفق النقدي' : 'Cash flow statement'}</h2>
-          <Section title={ar ? 'أنشطة تشغيلية' : 'Operating'} rows={operatingCash} valueKey="amount" />
-          <Section title={ar ? 'أنشطة استثمارية' : 'Investing'} rows={investingCash} valueKey="amount" />
-          <Section title={ar ? 'أنشطة تمويلية' : 'Financing'} rows={financingCash} valueKey="amount" />
+          <h2 className="text-white font-semibold mb-3">Cash flow statement</h2>
+          {cf.length === 0 ? (
+            <p className="text-noch-muted text-xs italic">-</p>
+          ) : cf.map(row => (
+            <div key={row.source_type} className="flex justify-between text-sm py-0.5">
+              <span className="text-white">{row.line_label}</span>
+              <span className={`font-mono ${Number(row.net_lyd || 0) >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                {lyd(row.net_lyd)}
+              </span>
+            </div>
+          ))}
           <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
-            <span className="text-white">{ar ? 'صافي التدفق' : 'Net cash movement'}</span>
+            <span className="text-white">Net cash movement</span>
             <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
           </div>
         </div>
@@ -760,43 +779,6 @@ function PayablesTab({ ar, branches }) {
               </tr>
             ))}
             {lines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'لا توجد بنود لهذه الفترة.' : 'No statement lines for this period.'}</td></tr>}
-          </tbody>
-        </table>
-        <div className="card">
-          <h2 className="text-white font-semibold mb-3">{ar ? 'ط§ظ„طھط¯ظپظ‚ ط§ظ„ظ†ظ‚ط¯ظٹ' : 'Cash flow statement'}</h2>
-          <Section title={ar ? 'ط£ظ†ط´ط·ط© طھط´ط؛ظٹظ„ظٹط©' : 'Operating'} rows={operatingCash} valueKey="amount" />
-          <Section title={ar ? 'ط£ظ†ط´ط·ط© ط§ط³طھط«ظ…ط§ط±ظٹط©' : 'Investing'} rows={investingCash} valueKey="amount" />
-          <Section title={ar ? 'ط£ظ†ط´ط·ط© طھظ…ظˆظٹظ„ظٹط©' : 'Financing'} rows={financingCash} valueKey="amount" />
-          <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
-            <span className="text-white">{ar ? 'طµط§ظپظٹ ط§ظ„طھط¯ظپظ‚' : 'Net cash movement'}</span>
-            <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
-          </div>
-        </div>
-      </div>
-      <div className="card overflow-x-auto">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h2 className="text-white font-semibold">{ar ? 'طھظپطµظٹظ„ ط§ظ„ط±ط¨ط­ ظˆط§ظ„ط®ط³ط§ط¦ط±' : 'P&L drill-down'}</h2>
-          <span className="text-noch-muted text-xs">{lines.length} lines</span>
-        </div>
-        <table className="w-full text-xs">
-          <thead className="text-noch-muted">
-            <tr>
-              <th className="text-left py-1 pr-2">Section</th>
-              <th className="text-left py-1 pr-2">Code</th>
-              <th className="text-left py-1 pr-2">Account</th>
-              <th className="text-right py-1">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map(row => (
-              <tr key={`${row.section}-${row.account_id}`} className="border-t border-noch-border/40">
-                <td className="py-1.5 pr-2 text-noch-muted uppercase">{row.section}</td>
-                <td className="py-1.5 pr-2 text-white font-mono">{row.code}</td>
-                <td className="py-1.5 pr-2 text-white">{ar ? row.name_ar : row.name_en}</td>
-                <td className="py-1.5 text-right font-mono text-white">{lyd(row.amount)}</td>
-              </tr>
-            ))}
-            {lines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'ظ„ط§ طھظˆط¬ط¯ ط¨ظ†ظˆط¯ ظ„ظ‡ط°ظ‡ ط§ظ„ظپطھط±ط©.' : 'No statement lines for this period.'}</td></tr>}
           </tbody>
         </table>
       </div>

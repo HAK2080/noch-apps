@@ -9,7 +9,7 @@ Nothing listed here was deleted from production data or from the repository.
 - `/analytics-legacy` now redirects to `/finance` as a safe compatibility alias.
 - `/content-studio/*` remains the canonical Content Studio v2 surface.
 
-## Deprecated but retained routes
+## Deprecated routes now redirected to v2
 
 - `/content`
 - `/content/studio`
@@ -18,8 +18,12 @@ Nothing listed here was deleted from production data or from the repository.
 - `/content/brand/:id`
 - `/content/review`
 - `/content/ideas`
+- `/content/create`
+- `/content/research`
+- `/content/calendar`
+- `/content/experiments`
 
-These routes are legacy Content Studio v1 surfaces. They remain available until v2 feature parity and migration sign-off are complete.
+These routes no longer render the legacy Content Studio v1 UI directly. They now redirect into the supported `/content-studio/*` surfaces so v2 remains canonical without deleting the old implementation files from the repo.
 
 ## Expense and finance consolidation
 

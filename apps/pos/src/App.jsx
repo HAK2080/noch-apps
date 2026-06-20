@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 import { usePermissions } from './contexts/PermissionsContext'
@@ -39,12 +39,6 @@ const RecipeDetail     = lazy(() => import('./pages/RecipeDetail'))
 const CostCalculator   = lazy(() => import('./pages/CostCalculator'))
 
 const ContentStudio2   = lazy(() => import('./modules/contentStudio'))
-const ContentStudio    = lazy(() => import('./pages/content/ContentStudio'))
-const Studio           = lazy(() => import('./pages/content/Studio'))
-const BrandSetup       = lazy(() => import('./pages/content/BrandSetup'))
-const BrandDetail      = lazy(() => import('./pages/content/BrandDetail'))
-const ReviewQueue      = lazy(() => import('./pages/content/ReviewQueue'))
-const IdeaBank         = lazy(() => import('./pages/content/IdeaBank'))
 
 const ProductCatalog   = lazy(() => import('./pages/ProductCatalog'))
 const InventoryHub     = lazy(() => import('./pages/InventoryHub'))
@@ -120,6 +114,11 @@ function KioskEntry() {
   // chromeless. Then render POSHome (the branch picker).
   enableKioskMode()
   return <POSHome />
+}
+
+function LegacyContentBusinessRedirect() {
+  const { id } = useParams()
+  return <Navigate to={id ? `/content-studio/businesses/${id}` : '/content-studio/businesses'} replace />
 }
 
 function OwnerRoute({ children }) {
@@ -217,32 +216,18 @@ export default function App() {
         } />
 
         {/* Content Studio (legacy) */}
-        <Route path="/content" element={
-          <ProtectedRoute><OwnerRoute><ContentStudio /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/studio" element={
-          <ProtectedRoute><OwnerRoute><Studio /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/brand/setup" element={
-          <ProtectedRoute><OwnerRoute><BrandSetup /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/brands/new" element={
-          <ProtectedRoute><OwnerRoute><BrandSetup /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/brand/:id" element={
-          <ProtectedRoute><OwnerRoute><BrandDetail /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/review" element={
-          <ProtectedRoute><OwnerRoute><ReviewQueue /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/ideas" element={
-          <ProtectedRoute><OwnerRoute><IdeaBank /></OwnerRoute></ProtectedRoute>
-        } />
+        <Route path="/content" element={<Navigate to="/content-studio" replace />} />
+        <Route path="/content/studio" element={<Navigate to="/content-studio" replace />} />
+        <Route path="/content/brand/setup" element={<Navigate to="/content-studio/businesses/new" replace />} />
+        <Route path="/content/brands/new" element={<Navigate to="/content-studio/businesses/new" replace />} />
+        <Route path="/content/brand/:id" element={<LegacyContentBusinessRedirect />} />
+        <Route path="/content/review" element={<Navigate to="/content-studio/drafts" replace />} />
+        <Route path="/content/ideas" element={<Navigate to="/content-studio/concepts" replace />} />
         {/* Legacy routes — redirect to new studio */}
-        <Route path="/content/create" element={<Navigate to="/content/studio" replace />} />
-        <Route path="/content/research" element={<Navigate to="/content" replace />} />
-        <Route path="/content/calendar" element={<Navigate to="/content" replace />} />
-        <Route path="/content/experiments" element={<Navigate to="/content" replace />} />
+        <Route path="/content/create" element={<Navigate to="/content-studio" replace />} />
+        <Route path="/content/research" element={<Navigate to="/content-studio/inspiration" replace />} />
+        <Route path="/content/calendar" element={<Navigate to="/content-studio/campaigns" replace />} />
+        <Route path="/content/experiments" element={<Navigate to="/content-studio/signals" replace />} />
 
         {/* Product Catalog — staff get read-only via in-page gating */}
         <Route path="/products" element={

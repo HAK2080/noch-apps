@@ -62,7 +62,16 @@ test.describe('Read-only app walkthrough', () => {
     await page.getByRole('button', { name: /Payables/i }).click()
     await expect(page.getByText(/Supplier invoices|Open AP/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Cash flow statement|P&L drill-down/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Cash flow statement/i)).toHaveCount(1)
+    await expect(page.getByText(/P&L drill-down/i)).toHaveCount(1)
     expect(errors.slice(0, 3), 'accounting payables console/page errors').toEqual([])
+  })
+
+  test('Expenses module exposes submit and review workflow affordances', async ({ page }) => {
+    await page.goto('/expenses')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Submit Expense|Expenses/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/My Expenses|Approve|Dashboard/i).first()).toBeVisible({ timeout: 10000 })
   })
 
   test('Finance expenses and bank scaffolding render without mutation', async ({ page }) => {
@@ -112,16 +121,34 @@ test.describe('Read-only app walkthrough', () => {
       await expect(page.getByText(/Mark as Received|Receipt quantity/i).first()).toBeVisible({ timeout: 10000 })
       await page.keyboard.press('Escape')
     }
+
+    const returnButton = page.locator('button[title*="Purchase return"]').first()
+    if (await returnButton.count()) {
+      await returnButton.click()
+      await expect(page.getByText(/Purchase Return|Return quantity/i).first()).toBeVisible({ timeout: 10000 })
+      await page.keyboard.press('Escape')
+    }
+
+    const payButton = page.locator('button[title*="Pay Supplier Invoice"], button[title*="Pay supplier invoice"]').first()
+    if (await payButton.count()) {
+      await payButton.click()
+      await expect(page.getByText(/Pay Supplier Invoice|Payment Date/i).first()).toBeVisible({ timeout: 10000 })
+      await page.keyboard.press('Escape')
+    }
   })
 
   test('Legacy content routes redirect to supported surfaces', async ({ page }) => {
-    await page.goto('/content/create')
+    await page.goto('/content')
     await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content\/studio/)
+    await expect(page).toHaveURL(/\/content-studio$/)
 
     await page.goto('/content/research')
     await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content$/)
+    await expect(page).toHaveURL(/\/content-studio\/inspiration/)
+
+    await page.goto('/content/brand/setup')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page).toHaveURL(/\/content-studio\/businesses\/new/)
   })
 
   test('Messages page exposes notification outbox copy', async ({ page }) => {
