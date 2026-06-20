@@ -9,6 +9,9 @@ import { supabase, recordPosCustomerVisit, lookupCustomerByPassportToken } from 
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
 const QRScanner      = lazy(() => import('../components/QRScanner'))
 const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
+// Lazy: only mounts after a sale completes. Keeping it (and its `qrcode`
+// dependency) off the eager POSTerminal path trims the critical-path JS.
+const ReceiptModal   = lazy(() => import('../components/ReceiptModal'))
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
@@ -29,7 +32,6 @@ import { startSyncListener } from '../lib/pos-sync'
 import ProductGrid from '../components/ProductGrid'
 import CartPanel from '../components/CartPanel'
 import PaymentModal from '../components/PaymentModal'
-import ReceiptModal from '../components/ReceiptModal'
 import PrintHostBadge from '../components/PrintHostBadge'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
@@ -1119,15 +1121,17 @@ export default function POSTerminal() {
       )}
 
       {showReceipt && (
-        <ReceiptModal
-          order={showReceipt.order}
-          items={showReceipt.items}
-          branch={branch}
-          loyaltyCustomer={showReceipt.loyaltyCustomer}
-          onNewOrder={() => setShowReceipt(null)}
-          onClose={() => setShowReceipt(null)}
-          posLang={tileLang === 'ar' ? 'ar' : 'en'}
-        />
+        <Suspense fallback={null}>
+          <ReceiptModal
+            order={showReceipt.order}
+            items={showReceipt.items}
+            branch={branch}
+            loyaltyCustomer={showReceipt.loyaltyCustomer}
+            onNewOrder={() => setShowReceipt(null)}
+            onClose={() => setShowReceipt(null)}
+            posLang={tileLang === 'ar' ? 'ar' : 'en'}
+          />
+        </Suspense>
       )}
 
       {showCustomerSearch && (
