@@ -427,6 +427,12 @@ export async function logReport(recipientPhone, summary) {
 
 export async function getManagementReport({ days = 7 } = {}) {
   const periodDays = Number(days) || 7
+  const localDateKey = (date) => {
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
   const to = new Date()
   const from = new Date(to)
   from.setDate(to.getDate() - (periodDays - 1))
@@ -442,8 +448,8 @@ export async function getManagementReport({ days = 7 } = {}) {
   const toIso = to.toISOString()
   const prevFromIso = prevFrom.toISOString()
   const prevToIso = prevTo.toISOString()
-  const fromDate = fromIso.slice(0, 10)
-  const toDate = toIso.slice(0, 10)
+  const fromDate = localDateKey(from)
+  const toDate = localDateKey(to)
 
   const safeRows = async (query, fallback = []) => {
     try {
@@ -504,6 +510,8 @@ export async function getManagementReport({ days = 7 } = {}) {
   const money = (value) => Number(value || 0)
   const expenseAmount = (row) => money(row.amount_lyd ?? (money(row.amount) * money(row.exchange_rate_to_lyd || 1)))
   const revenue = orders.reduce((sum, row) => sum + money(row.total), 0)
+  const grossRevenue = orders.reduce((sum, row) => sum + Math.max(0, money(row.total)), 0)
+  const revenueAdjustments = orders.reduce((sum, row) => sum + Math.min(0, money(row.total)), 0)
   const prevRevenue = prevOrders.reduce((sum, row) => sum + money(row.total), 0)
   const expenseRows = expenses.filter(row => row.status !== 'rejected')
   const expenseTotal = expenseRows.reduce((sum, row) => sum + expenseAmount(row), 0)
@@ -559,6 +567,8 @@ export async function getManagementReport({ days = 7 } = {}) {
     period: { days: periodDays, from: fromDate, to: toDate },
     metrics: {
       revenue,
+      grossRevenue,
+      revenueAdjustments,
       previousRevenue: prevRevenue,
       revenueChangePct,
       orders: orders.length,

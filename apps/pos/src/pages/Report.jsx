@@ -66,6 +66,14 @@ function Empty({ text }) {
   return <p className="text-noch-muted text-sm py-2">{text}</p>
 }
 
+function PeriodBadge({ children }) {
+  return (
+    <span className="text-[11px] px-2 py-1 rounded border border-noch-border text-noch-muted">
+      {children}
+    </span>
+  )
+}
+
 export default function Report() {
   const { t, lang } = useLanguage()
   const { profile } = useAuth()
@@ -118,14 +126,15 @@ export default function Report() {
     const m = report?.metrics || {}
     const lines = [
       `Noch management report (${report?.period?.from} to ${report?.period?.to})`,
-      `Sales: ${fmtLyd(m.revenue)} from ${m.orders || 0} orders`,
+      `Net sales: ${fmtLyd(m.revenue)} from ${m.orders || 0} orders`,
+      m.revenueAdjustments < 0 ? `Adjustments/refunds: ${fmtLyd(Math.abs(m.revenueAdjustments))}` : null,
       `Average ticket: ${fmtLyd(m.averageTicket)}`,
       `Expenses: ${fmtLyd(m.expenses)}`,
       `Net after expenses: ${fmtLyd(m.netAfterExpenses)}`,
       `Low stock: ${m.lowStockCount || 0} items`,
       `WhatsApp failures: ${m.whatsappFailed || 0}`,
       `Tasks: ${stats?.pending || 0} pending, ${stats?.overdue || 0} overdue`,
-    ]
+    ].filter(Boolean)
     report?.insights?.slice(0, 4).forEach(item => lines.push(`- ${item.title}: ${item.detail}`))
     return lines.join('\n')
   }
@@ -146,6 +155,8 @@ export default function Report() {
   const m = report?.metrics || {}
   const trendTone = m.revenueChangePct == null ? 'text-noch-muted' : m.revenueChangePct >= 0 ? 'text-noch-green' : 'text-red-400'
   const TrendIcon = m.revenueChangePct == null || m.revenueChangePct >= 0 ? TrendingUp : TrendingDown
+  const selectedPeriodLabel = periods.find(period => period.days === periodDays)?.label || `${periodDays} days`
+  const salesSub = `${m.orders || 0} orders${m.revenueAdjustments < 0 ? ` · ${fmtLyd(Math.abs(m.revenueAdjustments))} adjustments` : ''}`
 
   return (
     <Layout>
@@ -153,7 +164,7 @@ export default function Report() {
         <div>
           <h1 className="text-white font-bold text-xl">Management Report</h1>
           <p className="text-noch-muted text-sm mt-1">
-            {report ? `${fmtDate(report.period.from)} - ${fmtDate(report.period.to)}` : 'Sales, costs, stock, loyalty, messaging, and execution'}
+            {report ? `${selectedPeriodLabel}: ${fmtDate(report.period.from)} - ${fmtDate(report.period.to)}` : 'Sales, costs, stock, loyalty, messaging, and execution'}
           </p>
           {lastReport && (
             <p className="text-noch-muted text-xs mt-1">
@@ -189,21 +200,21 @@ export default function Report() {
         <p className="text-noch-muted text-center py-16">{t('loading')}</p>
       ) : (
         <div className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard icon={ShoppingBag} label="Sales" value={fmtLyd(m.revenue)} sub={`${m.orders || 0} orders`} tone="text-noch-green" />
+          <div className={`grid gap-3 md:grid-cols-2 xl:grid-cols-4 ${refreshing ? 'opacity-60' : ''}`}>
+            <MetricCard icon={ShoppingBag} label={`Net Sales (${selectedPeriodLabel})`} value={fmtLyd(m.revenue)} sub={salesSub} tone="text-noch-green" />
             <MetricCard icon={TrendIcon} label="Sales Trend" value={m.revenueChangePct == null ? 'No prior period' : `${m.revenueChangePct.toFixed(1)}%`} sub="vs previous period" tone={trendTone} />
-            <MetricCard icon={Receipt} label="Expenses" value={fmtLyd(m.expenses)} sub={`${fmtLyd(m.approvedUnpaidExpenses)} approved unpaid`} tone="text-yellow-300" />
+            <MetricCard icon={Receipt} label={`Expenses (${selectedPeriodLabel})`} value={fmtLyd(m.expenses)} sub={`${fmtLyd(m.approvedUnpaidExpenses)} approved unpaid`} tone="text-yellow-300" />
             <MetricCard icon={CheckCircle2} label="Net After Expenses" value={fmtLyd(m.netAfterExpenses)} sub={`Avg ticket ${fmtLyd(m.averageTicket)}`} tone={m.netAfterExpenses >= 0 ? 'text-white' : 'text-red-400'} />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard icon={Package} label="Stock Risk" value={`${m.lowStockCount || 0}`} sub={`${m.outOfStockCount || 0} out of stock`} tone={m.lowStockCount ? 'text-red-400' : 'text-noch-green'} />
-            <MetricCard icon={Users} label="Loyalty" value={`${m.loyaltyActive || 0}`} sub={`${m.newCustomers || 0} new, ${m.loyaltyCustomers || 0} total`} tone="text-blue-300" />
-            <MetricCard icon={MessageSquare} label="WhatsApp" value={`${m.whatsappSent || 0}`} sub={`${m.whatsappFailed || 0} failed, ${m.whatsappQueued || 0} queued/sent`} tone={m.whatsappFailed ? 'text-red-400' : 'text-noch-green'} />
-            <MetricCard icon={Clock} label="Tasks" value={`${stats?.pending || 0} pending`} sub={`${stats?.overdue || 0} overdue, ${stats?.done || 0} done`} tone={stats?.overdue ? 'text-red-400' : 'text-white'} />
+          <div className={`grid gap-3 md:grid-cols-2 xl:grid-cols-4 ${refreshing ? 'opacity-60' : ''}`}>
+            <MetricCard icon={Package} label="Stock Risk (live)" value={`${m.lowStockCount || 0}`} sub={`${m.outOfStockCount || 0} out of stock`} tone={m.lowStockCount ? 'text-red-400' : 'text-noch-green'} />
+            <MetricCard icon={Users} label={`Loyalty (${selectedPeriodLabel})`} value={`${m.loyaltyActive || 0}`} sub={`${m.newCustomers || 0} new, ${m.loyaltyCustomers || 0} total`} tone="text-blue-300" />
+            <MetricCard icon={MessageSquare} label={`WhatsApp (${selectedPeriodLabel})`} value={`${m.whatsappSent || 0}`} sub={`${m.whatsappFailed || 0} failed, ${m.whatsappQueued || 0} queued/sent`} tone={m.whatsappFailed ? 'text-red-400' : 'text-noch-green'} />
+            <MetricCard icon={Clock} label="Tasks (live)" value={`${stats?.pending || 0} pending`} sub={`${stats?.overdue || 0} overdue, ${stats?.done || 0} done`} tone={stats?.overdue ? 'text-red-400' : 'text-white'} />
           </div>
 
-          <Section title="Management Attention">
+          <Section title="Management Attention" action={<PeriodBadge>{selectedPeriodLabel}</PeriodBadge>}>
             <div className="grid gap-3 lg:grid-cols-2">
               {report?.insights?.map((item, index) => (
                 <div key={index} className={`rounded-lg border px-3 py-3 ${insightStyle[item.type] || insightStyle.warn}`}>
@@ -220,7 +231,7 @@ export default function Report() {
           </Section>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <Section title="Stock Risks">
+            <Section title="Stock Risks" action={<PeriodBadge>Live</PeriodBadge>}>
               {!report?.stockRisk?.length ? (
                 <Empty text="No stock items below minimum." />
               ) : (
@@ -238,7 +249,7 @@ export default function Report() {
               )}
             </Section>
 
-            <Section title="Expense Pressure">
+            <Section title="Expense Pressure" action={<PeriodBadge>{selectedPeriodLabel}</PeriodBadge>}>
               {!report?.expenses?.length ? (
                 <Empty text="No expenses recorded in this period." />
               ) : (
@@ -258,7 +269,7 @@ export default function Report() {
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <Section title="Staff Execution">
+            <Section title="Staff Execution" action={<PeriodBadge>Live</PeriodBadge>}>
               {Object.keys(staffBreakdown).length === 0 ? (
                 <Empty text="No assigned tasks." />
               ) : (
@@ -283,7 +294,7 @@ export default function Report() {
               )}
             </Section>
 
-            <Section title="WhatsApp Health">
+            <Section title="WhatsApp Health" action={<PeriodBadge>{selectedPeriodLabel}</PeriodBadge>}>
               {!report?.whatsapp?.length ? (
                 <Empty text="No WhatsApp sends in this period." />
               ) : (
