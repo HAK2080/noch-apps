@@ -114,7 +114,31 @@ export async function getPOSProducts(branchId) {
   if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
   const { data, error } = await q
   if (error) throw error
-  return data
+
+  // Popularity sort: best-sellers (last 30 days) float to the top so the
+  // cashier finds the most-tapped items first. Ties keep the existing
+  // menu_sort/name order (Array.prototype.sort is stable), and unsold
+  // products fall to the bottom in that same order. Falls back silently
+  // to the unsorted order if the popularity RPC is unavailable (e.g.
+  // before the migration is applied) so the grid always loads.
+  try {
+    const pop = await getProductPopularity(branchId)
+    return [...data].sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))
+  } catch {
+    return data
+  }
+}
+
+// Units sold per product over the last 30 days (per branch), as a
+// { [productId]: count } map. Backed by the get_product_popularity RPC.
+export async function getProductPopularity(branchId) {
+  const { data, error } = await supabase.rpc('get_product_popularity', {
+    p_branch_id: branchId || null,
+  })
+  if (error) throw error
+  const map = {}
+  for (const row of data || []) map[row.product_id] = Number(row.units_sold) || 0
+  return map
 }
 
 // All products across all branches (for catalog page)
