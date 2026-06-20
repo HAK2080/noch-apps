@@ -231,6 +231,7 @@ function buildTwilioVariables(row: NotificationOutboxRow, templateKey: string, v
       return { '1': name, '2': toStringValue(firstValue(variables.item, (row.context || {}).item, 'your favorite item')) }
     case 'loyalty_marketing_birthday':
     case 'birthday':
+      return { '1': name }
     case 'loyalty_thank_review':
     case 'random_love':
       return { '1': name }

@@ -1956,7 +1956,8 @@ const STAMP_ACTIVITY_LABELS = {
 // Never throws — returns a result object the caller can toast.
 export async function notifyStampGranted(customer, activity) {
   try {
-    if (!customer?.phone) return { skipped: true, reason: 'no_phone' }
+    const recipientPhone = customer?.phone || customer?.phone_normalised
+    if (!recipientPhone) return { skipped: true, reason: 'no_phone' }
     if (customer.whatsapp_opt_in === false) return { skipped: true, reason: 'not_opted_in' }
 
     const settings = await getLoyaltySettings()
@@ -1979,7 +1980,7 @@ export async function notifyStampGranted(customer, activity) {
         template_key: 'stamp_grant',
         customer_id: customer.id,
         recipient_name: customer.full_name,
-        recipient_phone: customer.phone,
+        recipient_phone: recipientPhone,
         language: lang,
         template_variables: {
           activity: label,

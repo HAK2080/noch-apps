@@ -19,6 +19,7 @@ const FACEBOOK_REVIEW_URL = 'https://www.facebook.com/share/g/1HEKKx8BZP/'
 
 const NOTIFY_TYPES = [
   { type: 'loyalty_thank_review', ar: '💚 شكر وطلب تقييم', en: '💚 Thank customer / ask for review' },
+  { type: 'feedback_stamp_thank_you', ar: '🎁 شكر على التقييم + طابع مجاني', en: '🎁 Thank feedback/review + free stamp' },
   { type: 'nochi_sad', ar: '😢 تنبيه حزن نوتشي', en: '😢 Nochi Sad Alert' },
   { type: 'nochi_tired', ar: '😴 نوتشي تعبان', en: '😴 Nochi Tired' },
   { type: 'nochi_deathbed', ar: '🛏️ نوتشي مريض', en: '🛏️ Nochi Sick' },
@@ -44,8 +45,9 @@ export default function CustomerDetail() {
   const notifyEligible = stampActivity === 'ugc' || stampActivity === 'review'
   const activityEnabled = stampActivity === 'ugc' ? loySettings?.stamp_notify_ugc !== false
     : stampActivity === 'review' ? loySettings?.stamp_notify_review !== false : false
+  const customerWhatsAppPhone = customer?.phone || customer?.phone_normalised
   const canNotify = !!loySettings?.stamp_notify_enabled && notifyEligible && activityEnabled
-    && customer?.whatsapp_opt_in !== false && !!customer?.phone
+    && customer?.whatsapp_opt_in !== false && !!customerWhatsAppPhone
 
   const load = async () => {
     try {
@@ -110,6 +112,14 @@ export default function CustomerDetail() {
 
   const handleNotify = async (type) => {
     try {
+      if (type === 'feedback_stamp_thank_you') {
+        await awardLoyaltyStamp(id, user?.id, 'review')
+        const result = await notifyStampGranted(customer, 'review')
+        if (result?.error) throw new Error(result.error)
+        toast.success(ar ? 'تمت إضافة طابع وإرسال الشكر ✓' : 'Stamp added and thank-you sent ✓')
+        load()
+        return
+      }
       await sendLoyaltyNotification(id, type)
       toast.success(ar ? 'تم إرسال الرسالة ✓' : 'Message sent ✓')
     } catch (err) {

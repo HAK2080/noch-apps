@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
     const toPhone = normaliseWhatsAppPhone(to)
 
     const params = new URLSearchParams({ To: `whatsapp:${toPhone}` })
+    params.set('StatusCallback', `${Deno.env.get('SUPABASE_URL')}/functions/v1/twilio-status-callback`)
     // Prefer a Messaging Service (recommended for templates); else the from number.
     if (messagingServiceSid) params.set('MessagingServiceSid', messagingServiceSid)
     else params.set('From', `whatsapp:${fromNumber}`)
@@ -119,7 +120,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: data.message ?? 'Twilio API request failed', code: data.code }, res.status)
     }
 
-    return json({ messageId: data.sid, status: 'sent' })
+    return json({ messageId: data.sid, status: data.status || 'accepted' })
   } catch (err) {
     return json({ error: (err as Error).message ?? 'Internal error' }, 500)
   }
