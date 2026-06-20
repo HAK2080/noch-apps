@@ -1554,9 +1554,13 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
 }
 
 function NochiStamp({ slot, filled }){
+  // `slot` is the 1-based stamp number; map it to a real Nochi pose image.
+  // (Previously built `assets/<slot>.png`, e.g. assets/1.png — files that
+  // don't exist, so every stamp rendered a broken image.)
+  const pose = POSES[(slot - 1) % POSES.length] || POSES[0];
   return (
     <img className={'loy-stamp-img' + (filled ? ' filled' : ' empty')}
-         src={'assets/' + slot + '.png'}
+         src={pose.src}
          alt=""
          draggable="false"/>
   );
