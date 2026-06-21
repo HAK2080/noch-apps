@@ -1,10 +1,13 @@
 // Vestaboard API — supports both Local API (LAN) and cloud Subscription API
+// Supabase message-queue helpers (getVestaboardMessages et al.) live below the hardware API.
 //
 // Local API:  set VITE_VESTABOARD_HOST=vestaboard-c4208692.local
 //             → sends to http://<host>:7000/local-api/message (no cloud account needed)
 //
 // Cloud API:  set VITE_VESTABOARD_API_KEY=<subscription-read-write-key>
 //             → sends to https://rw.vestaboard.com/
+
+import { supabase } from './supabase'
 
 const VB_HOST  = import.meta.env.VITE_VESTABOARD_HOST  || null
 const VB_KEY   = import.meta.env.VITE_VESTABOARD_API_KEY || null
@@ -354,4 +357,62 @@ export async function sendCustomerGreeting(customerName, opts = {}) {
   }, 30000)
 
   return result
+}
+
+// ============================================================
+// VESTABOARD — Supabase message queue
+// ============================================================
+
+export async function getVestaboardMessages() {
+  const { data, error } = await supabase
+    .from('vestaboard_messages')
+    .select('*, submitted_by_profile:profiles!vestaboard_messages_submitted_by_fkey(full_name)')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return data || []
+}
+
+export async function submitVestaboardMessage(message) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('vestaboard_messages')
+    .insert({ message, submitted_by: user.id })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function approveVestaboardMessage(id) {
+  const { data, error } = await supabase
+    .from('vestaboard_messages')
+    .update({ status: 'approved' })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function rejectVestaboardMessage(id, note) {
+  const { data, error } = await supabase
+    .from('vestaboard_messages')
+    .update({ status: 'rejected', rejection_note: note })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function markVestaboardSent(id) {
+  const { data, error } = await supabase
+    .from('vestaboard_messages')
+    .update({ status: 'sent', sent_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
 }

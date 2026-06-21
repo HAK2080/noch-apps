@@ -9,8 +9,12 @@ import {
   approveVestaboardMessage,
   rejectVestaboardMessage,
   markVestaboardSent,
-} from '../lib/supabase'
-import { sendVestaboard, sendCustomerGreeting, VB_ROWS, VB_COLS, VB_MAX_CHARS } from '../lib/vestaboard'
+  sendVestaboard,
+  sendCustomerGreeting,
+  VB_ROWS,
+  VB_COLS,
+  VB_MAX_CHARS,
+} from '../lib/vestaboard'
 import toast from 'react-hot-toast'
 
 // ─── Character code helpers ───────────────────────────────────────────────────
