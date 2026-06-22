@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Bell, X, Trash2 } from 'lucide-react'
-import { createReminder, deleteReminder } from '../../lib/supabase'
+import { createReminder, deleteReminder } from '../../lib/tasks'
 import { useLanguage } from '../../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 

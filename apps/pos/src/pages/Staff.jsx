@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Send, CheckSquare, Trash2, X, RefreshCw, UserCheck, Share2, Pencil, Save, Bell, Eye, EyeOff, Shield, Link as LinkIcon } from 'lucide-react'
-import { getAllTeamMembers, createStaffProfile, deleteProfile, getTasks, updateProfile, setPIN, supabase } from '../lib/supabase'
+import { getAllTeamMembers, createStaffProfile, deleteProfile, updateProfile, setPIN, supabase } from '../lib/supabase'
+import { getTasks } from '../lib/tasks'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePermission } from '../lib/usePermission'
 import { useNavigate } from 'react-router-dom'

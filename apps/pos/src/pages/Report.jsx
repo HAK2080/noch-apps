@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Send, RefreshCw } from 'lucide-react'
-import { getTasks, getTaskStats, getLastReport, logReport } from '../lib/supabase'
+import { getTasks, getTaskStats, getLastReport, logReport } from '../lib/tasks'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'

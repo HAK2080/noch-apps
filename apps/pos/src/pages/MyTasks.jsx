@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar, CheckCircle } from 'lucide-react'
-import { getMyTasks, updateTask, formatDueDate, isOverdue } from '../lib/supabase'
+import { getMyTasks, updateTask, formatDueDate, isOverdue } from '../lib/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import Layout from '../components/Layout'

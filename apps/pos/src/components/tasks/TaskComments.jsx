@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Send } from 'lucide-react'
-import { getComments, createComment } from '../../lib/supabase'
+import { getComments, createComment } from '../../lib/tasks'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { sendTelegram } from '../../lib/telegram'

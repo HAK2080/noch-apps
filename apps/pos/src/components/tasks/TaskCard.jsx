@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, User, Paperclip, Users, Trash2 } from 'lucide-react'
 import PriorityBadge from '../shared/PriorityBadge'
 import StatusBadge from '../shared/StatusBadge'
-import { formatDueDate, isOverdue } from '../../lib/supabase'
+import { formatDueDate, isOverdue } from '../../lib/tasks'
 import { useLanguage } from '../../contexts/LanguageContext'
 import { useAuth } from '../../contexts/AuthContext'
 

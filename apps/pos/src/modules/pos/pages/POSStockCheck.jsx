@@ -15,7 +15,8 @@ import {
   getStockCheckReminder, upsertStockCheckReminder,
   getPOSBranch, getPOSProducts,
 } from '../lib/pos-supabase'
-import { createTask, getStaffProfiles, supabase } from '../../../lib/supabase'
+import { getStaffProfiles, supabase } from '../../../lib/supabase'
+import { createTask } from '../../../lib/tasks'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
