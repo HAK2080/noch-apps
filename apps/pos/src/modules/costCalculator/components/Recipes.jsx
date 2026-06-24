@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  getRecipes, getIngredients, getCurrencyRates, calcCostPerBaseUnit, deleteRecipe
-} from '../../../lib/supabase'
+import { getRecipes, deleteRecipe } from '../../../lib/recipes'
+import { getIngredients, getCurrencyRates, calcCostPerBaseUnit } from '../../../lib/supabase'
 import {
   BookOpen, Plus, Search, Edit3, Trash2, TrendingUp, Filter
 } from 'lucide-react'

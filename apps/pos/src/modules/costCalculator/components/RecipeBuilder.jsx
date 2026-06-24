@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import {
-  getIngredients, getCategories, getCurrencyRates, calcCostPerBaseUnit,
-  createRecipe, updateRecipe, getRecipe
-} from '../../../lib/supabase'
+import { getRecipe, createRecipe, updateRecipe } from '../../../lib/recipes'
+import { getIngredients, getCategories, getCurrencyRates, calcCostPerBaseUnit } from '../../../lib/supabase'
 import {
   Plus, Trash2, Save, ArrowLeft, X, GripVertical, Calculator, TrendingUp, ShoppingBag
 } from 'lucide-react'

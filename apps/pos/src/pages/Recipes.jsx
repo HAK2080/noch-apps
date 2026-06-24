@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Search, RefreshCw, Archive, ChevronDown, ArrowUpDown } from 'lucide-react'
-import { getRecipes, createRecipe, updateRecipe, archiveRecipe, unarchiveRecipe } from '../lib/supabase'
+import { getRecipes, createRecipe, updateRecipe, archiveRecipe, unarchiveRecipe } from '../lib/recipes'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'

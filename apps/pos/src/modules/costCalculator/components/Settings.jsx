@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { getRecipes } from '../../../lib/recipes'
 import {
   getCurrencyRates, updateCurrencyRate, getCategories, createCategory, deleteCategory,
-  getRecipes, getIngredients, calcCostPerBaseUnit
+  getIngredients, calcCostPerBaseUnit
 } from '../../../lib/supabase'
 import {
   Settings as SettingsIcon, DollarSign, Tag, Download, Save, Trash2, Plus, X,

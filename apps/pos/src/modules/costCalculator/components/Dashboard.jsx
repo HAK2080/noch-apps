@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getRecipes, getIngredients, getStock, getCurrencyRates, calcCostPerBaseUnit } from '../../../lib/supabase'
+import { getRecipes } from '../../../lib/recipes'
+import { getIngredients, getStock, getCurrencyRates, calcCostPerBaseUnit } from '../../../lib/supabase'
 import {
   FlaskConical, BookOpen, Package, AlertTriangle, TrendingUp,
   ArrowRight, DollarSign
