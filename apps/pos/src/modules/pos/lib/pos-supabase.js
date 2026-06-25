@@ -402,6 +402,17 @@ export async function getSalesByProduct(branchId, fromIso, toIso) {
   if (error) throw error
   return data || []
 }
+export async function getProductDemandLines(branchId, fromIso, toIso) {
+  const { data, error } = await supabase
+    .from('pos_order_items')
+    .select('product_id, product_name, quantity, total, pos_orders!inner(branch_id, status, created_at)')
+    .eq('pos_orders.branch_id', branchId)
+    .eq('pos_orders.status', 'completed')
+    .gte('pos_orders.created_at', fromIso)
+    .lt('pos_orders.created_at', toIso)
+  if (error) throw error
+  return data || []
+}
 export async function getSalesByBarista(branchId, fromIso, toIso) {
   const { data, error } = await supabase.rpc('pos_sales_by_barista', {
     p_branch_id: branchId, p_from: fromIso, p_to: toIso,
