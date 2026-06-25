@@ -1,8 +1,15 @@
 # Noch — Pages Inventory
 
-**Updated:** 2026-05-07. **Source of truth:** `src/App.jsx`. If you add a route, update this file.
+**Updated:** 2026-06-25. **Source of truth:** `apps/pos/src/App.jsx`. If you add a route, update this file.
 
 This file maps every page in this repo to its file, URL, audience, and access gate. When you ask me about "the website" or "a page," check this first.
+
+## Roadmap note (2026-06-25)
+
+- `/analytics-legacy` is now a redirect to `/finance`; the old analytics page is no longer routed directly.
+- Legacy Content Studio v1 routes such as `/content`, `/content/studio`, `/content/research`, and `/content/ideas` now redirect into `/content-studio/*`.
+- `/accounting` is an active route backed by `apps/pos/src/modules/accounting/AccountingDashboard.jsx`.
+- `RootRedirect` now sends `data_entry` users to `/expenses`; it does not send all staff to `/my-tasks`.
 
 ---
 

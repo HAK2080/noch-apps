@@ -560,14 +560,14 @@ export default function POSSettings({ onClose } = {}) {
                 onChange={v => handleToggleFlag('require_pin', v)}
               />
               <FlagRow
-                label="Manager override (coming soon)"
-                hint="When on, baristas above their discount cap or attempting a void/refund prompt for a manager PIN. Wired but not yet active."
+                label="Manager override for discounts"
+                hint="When on, discounts above the staff cap prompt for a manager PIN and record the override on the sale audit trail."
                 value={!!posSettings.manager_override_enabled}
                 onChange={v => handleToggleFlag('manager_override_enabled', v)}
               />
               <FlagRow
-                label="Per-barista shift attendees (coming soon)"
-                hint="When on, multiple staff clock in/out on the same shift with per-barista totals. Wired but not yet active."
+                label="Per-barista shift attendees"
+                hint="When on, multiple staff can clock into the same shift and the terminal records per-barista attendance and sales attribution."
                 value={!!posSettings.per_barista_shift}
                 onChange={v => handleToggleFlag('per_barista_shift', v)}
               />

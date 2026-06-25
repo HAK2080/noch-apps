@@ -30,11 +30,14 @@ These routes no longer render the legacy Content Studio v1 UI directly. They now
 - `expenses` remains the canonical workflow table for approvals and payments.
 - `expense_entries` is retained for backward compatibility and historical reads.
 - `finance_expense_documents` is the additive read model used to consolidate both sources without destructive migration.
+- Older finance planning/setup notes may still mention `expense_entries` as the primary Finance source. Treat current Supabase migrations plus [`apps/pos/src/modules/finance/tabs/ExpensesTab.jsx`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/apps/pos/src/modules/finance/tabs/ExpensesTab.jsx) as the current source of truth.
 
 ## Manual setup artifacts retained for archive/reference
 
 - [`EXPENSES_SETUP.sql`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/EXPENSES_SETUP.sql)
 - [`INVENTORY_ALERTS_SETUP.sql`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/INVENTORY_ALERTS_SETUP.sql)
 - [`RECIPES_MODULE_SETUP.md`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/RECIPES_MODULE_SETUP.md)
+- [`docs/finance/01-mvp-plan.md`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/docs/finance/01-mvp-plan.md)
+- [`docs/finance/02-mvp-shipped.md`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/docs/finance/02-mvp-shipped.md)
 
-These are treated as historical/manual setup material and should not be used as the source of truth over current Supabase migrations.
+These are treated as historical/manual setup material and should not be used as the source of truth over current Supabase migrations, current route wiring, or the additive roadmap smoke checks in [`scripts/roadmap_db_smoke.sql`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/scripts/roadmap_db_smoke.sql).

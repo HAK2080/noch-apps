@@ -10,15 +10,16 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     // Use the production preview build (no React StrictMode double-effects)
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
     headless: true,
+    serviceWorkers: 'block',
   },
   webServer: {
-    command: 'npx vite preview --port 4173',
-    url: 'http://localhost:4173',
+    command: 'npx vite preview --port 4173 --host 127.0.0.1',
+    url: 'http://127.0.0.1:4173',
     reuseExistingServer: true,
     timeout: 30000,
   },
