@@ -10,6 +10,15 @@ select 'inventory_stock_valuation_exists' as check_name,
 select 'inventory_reorder_suggestions_exists' as check_name,
        case when to_regclass('public.inventory_reorder_suggestions') is not null then 'ok' else 'missing' end as result;
 
+select 'procurement_receipt_events_exists' as check_name,
+       case when to_regclass('public.procurement_receipt_events') is not null then 'ok' else 'missing' end as result;
+
+select 'procurement_return_events_exists' as check_name,
+       case when to_regclass('public.procurement_return_events') is not null then 'ok' else 'missing' end as result;
+
+select 'staff_branches_exists' as check_name,
+       case when to_regclass('public.staff_branches') is not null then 'ok' else 'missing' end as result;
+
 select 'create_pos_order_rpc_exists' as check_name,
        case when to_regprocedure('public.create_pos_order(uuid,uuid,uuid,uuid,numeric,numeric,numeric,numeric,text,numeric,numeric,numeric,uuid,timestamp with time zone,text,jsonb,text,text)') is not null then 'ok' else 'missing' end as result;
 
@@ -67,6 +76,11 @@ select 'procurement_orders_return_columns' as check_name,
            and column_name in ('quantity_received', 'quantity_returned', 'payment_status')
        ) = 3 then 'ok' else 'missing' end as result;
 
+select 'pos_open_rls_policy_rows' as check_name, count(*)::text as result
+from pg_policies
+where schemaname = 'public'
+  and policyname = 'pos_all';
+
 select 'finance_expense_documents_rows' as check_name, count(*)::text as result
 from finance_expense_documents;
 
@@ -82,6 +96,45 @@ from inventory_stock_valuation;
 
 select 'inventory_reorder_suggestions_rows' as check_name, count(*)::text as result
 from inventory_reorder_suggestions;
+
+select 'procurement_receipt_events_rows' as check_name, count(*)::text as result
+from procurement_receipt_events;
+
+select 'procurement_return_events_rows' as check_name, count(*)::text as result
+from procurement_return_events;
+
+select 'gl_sales_daily_batches_rows' as check_name, count(*)::text as result
+from gl_journal_batches
+where source_type = 'sales_daily';
+
+select 'gl_expense_batches_rows' as check_name, count(*)::text as result
+from gl_journal_batches
+where source_type = 'expense';
+
+select 'gl_procurement_receipt_batches_rows' as check_name, count(*)::text as result
+from gl_journal_batches
+where source_type = 'procurement_receipt';
+
+select 'gl_procurement_payment_batches_rows' as check_name, count(*)::text as result
+from gl_journal_batches
+where source_type = 'procurement_payment';
+
+select 'gl_procurement_return_batches_rows' as check_name, count(*)::text as result
+from gl_journal_batches
+where source_type = 'procurement_return';
+
+select 'pos_completed_orders_with_staff_rows' as check_name, count(*)::text as result
+from pos_orders
+where status = 'completed'
+  and served_by is not null;
+
+select 'pos_manager_override_audit_rows' as check_name, count(*)::text as result
+from pos_audit_log
+where action = 'manager_override_applied';
+
+select 'pos_shift_close_audit_rows' as check_name, count(*)::text as result
+from pos_audit_log
+where action = 'shift_closed';
 
 select 'gl_ap_aging_rows' as check_name, count(*)::text as result
 from gl_ap_aging(current_date, null);

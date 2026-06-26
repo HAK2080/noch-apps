@@ -71,7 +71,7 @@ Legend: 🟢 public · 🔒 logged-in any role · 👑 owner only
 
 | Route | Page file | Purpose |
 |---|---|---|
-| 🔒 `/` | `RootRedirect` (in `App.jsx`) | Redirects to `/dashboard` for owners, `/my-tasks` for staff |
+| 🔒 `/` | `RootRedirect` (in `App.jsx`) | Redirects owners to `/dashboard`, `data_entry` staff to `/expenses`, and other staff to `/pos` |
 | 🔒 `/dashboard` | `src/pages/Dashboard.jsx` | Main app home for owners |
 | 🔒 `/my-tasks` | `src/pages/MyTasks.jsx` | Staff personal task view |
 
@@ -103,15 +103,15 @@ Legend: 🟢 public · 🔒 logged-in any role · 👑 owner only
 
 | Route | Page file | Purpose |
 |---|---|---|
-| 👑 `/content` | `src/modules/contentStudio` (default) | Content studio v2 home |
+| 👑 `/content` | redirect → `/content-studio` | Legacy alias preserved; lands on Content Studio v2 |
 | 👑 `/content-studio/*` | `src/modules/contentStudio` | Content studio v2 (nested routes) |
-| 👑 `/content/studio` | `src/pages/content/Studio.jsx` | Content studio v1 (legacy) |
-| 👑 `/content/brand/setup` | `src/pages/content/BrandSetup.jsx` | Brand wizard |
-| 👑 `/content/brands/new` | `src/pages/content/BrandSetup.jsx` | New brand |
-| 👑 `/content/brand/:id` | `src/pages/content/BrandDetail.jsx` | Brand detail |
-| 👑 `/content/review` | `src/pages/content/ReviewQueue.jsx` | Review queue |
-| 🔒 `/content/ideas` | `src/pages/content/IdeaBank.jsx` | Idea bank (legacy — use `/ideas`) |
-| `/content/create`, `/content/research`, `/content/calendar`, `/content/experiments` | redirects | Legacy redirects |
+| 👑 `/content/studio` | redirect → `/content-studio` | Legacy studio URL preserved; lands on v2 |
+| 👑 `/content/brand/setup` | redirect → `/content-studio/businesses/new` | Legacy brand wizard alias |
+| 👑 `/content/brands/new` | redirect → `/content-studio/businesses/new` | Legacy brand-creation alias |
+| 👑 `/content/brand/:id` | redirect → `/content-studio/businesses/:id` | Legacy brand detail alias |
+| 👑 `/content/review` | redirect → `/content-studio/drafts` | Legacy review queue alias |
+| 🔒 `/content/ideas` | redirect → `/content-studio/concepts` | Legacy idea bank alias |
+| `/content/create`, `/content/research`, `/content/calendar`, `/content/experiments` | redirects | Legacy aliases into supported Content Studio v2 surfaces |
 
 ### Products / Inventory
 
@@ -128,9 +128,9 @@ Legend: 🟢 public · 🔒 logged-in any role · 👑 owner only
 
 | Route | Page file | Purpose |
 |---|---|---|
-| 👑 `/finance` | `apps/pos/src/modules/finance/FinanceDashboard.jsx` | CFO-style management dashboard. Tabs: Daily P&L · Menu profit · Cash & runway · Expenses · Shifts · Bank · Cost mapping · Overview (legacy) · AI insights. Schema: `finance_settings`, `expense_entries`, `bank_transactions`, `shift_labor_cost` view, `pos_products.cost_lyd`, `profiles.hourly_rate_lyd`. RPCs: `finance_pnl`, `finance_menu_matrix`, `finance_cash_runway`. |
+| 👑 `/finance` | `apps/pos/src/modules/finance/FinanceDashboard.jsx` | CFO-style management dashboard. Tabs: Daily P&L · Menu profit · Cash & runway · Expenses · Shifts · Bank · Cost mapping · Variance · CapEx · Forecast · Overview (legacy) · AI insights. Finance expenses read the canonical `finance_expense_documents` register with recurring-expense scaffolding. Core schema: `finance_settings`, `finance_expense_documents`, `bank_transactions`, `shift_labor_cost` view, `pos_products.cost_lyd`, `profiles.hourly_rate_lyd`. RPCs: `finance_pnl`, `finance_menu_matrix`, `finance_cash_runway`, `finance_variance`, `finance_forecast`. |
 | 👑 `/analytics` | redirect → `/finance` | Legacy URL preserved as a Navigate. |
-| 👑 `/analytics-legacy` | `apps/pos/src/pages/BusinessAnalytics.jsx` | The old analytics dashboard (Overview, Branch, Category, Financial, Intelligence, BusinessLines, Bloom). Kept for parity until Finance fully replaces it. |
+| 👑 `/analytics-legacy` | redirect → `/finance` | Compatibility alias; query string is preserved and the old dashboard is no longer routed directly. |
 
 ### Marketing
 
@@ -204,7 +204,7 @@ Defined in `src/App.jsx`:
 |---|---|
 | `ProtectedRoute` | Redirects to `/login` if not signed in |
 | `OwnerRoute` | Redirects to `/my-tasks` if `profile.role !== 'owner'` |
-| `RootRedirect` | At `/` — redirects owners to `/dashboard`, others to `/my-tasks` |
+| `RootRedirect` | At `/` — redirects owners to `/dashboard`, `data_entry` staff to `/expenses`, and everyone else to `/pos` |
 
 Note: the **canonical permission system** is `usePermission` + `PermissionsContext`, backed by the `role_permissions` table. `OwnerRoute` is a coarse gate; finer-grained checks happen inside the page (e.g. `can('pos', 'end_of_day')` in `POSEndOfDay`).
 

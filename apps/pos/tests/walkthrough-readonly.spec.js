@@ -68,6 +68,8 @@ test.describe('Read-only app walkthrough', () => {
     await expect(page.getByText(/Supplier invoices|Open AP/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Supplier statement|Select supplier/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Cash flow statement|P&L drill-down/i).first()).toBeVisible({ timeout: 10000 })
+    await clickTab(page, /Journal|دفتر اليومية/i)
+    await expect(page.getByText(/Post period|Manual entry|No journal entries in this range/i).first()).toBeVisible({ timeout: 10000 })
     expect(errors.slice(0, 3), 'accounting payables console/page errors').toEqual([])
   })
 
@@ -99,9 +101,9 @@ test.describe('Read-only app walkthrough', () => {
   })
 
   test('Analytics legacy redirects to finance', async ({ page }) => {
-    await page.goto('/analytics-legacy')
+    await page.goto('/analytics-legacy?period=30d')
     await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/finance/)
+    await expect(page).toHaveURL(/\/finance\?period=30d/)
   })
 
   test('POS selling entrypoint loads without posting a sale', async ({ page }) => {

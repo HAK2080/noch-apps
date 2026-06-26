@@ -151,6 +151,7 @@ export default function ProcurementOrders() {
   const [returning, setReturning] = useState(false)
   const [paymentModal, setPaymentModal] = useState(null)
   const [paymentForm, setPaymentForm] = useState({ account: 'cash', paid_at: new Date().toISOString().slice(0, 10), reference: '' })
+  const [paying, setPaying] = useState(false)
 
   useEffect(() => { loadData() }, [])
   useEffect(() => {
@@ -309,7 +310,7 @@ export default function ProcurementOrders() {
 
   async function handlePay() {
     if (!paymentModal) return
-    setReceiving(true)
+    setPaying(true)
     try {
       const { error } = await supabase.rpc('pay_procurement_order', {
         p_order_id: paymentModal.id,
@@ -325,7 +326,7 @@ export default function ProcurementOrders() {
     } catch (err) {
       toast.error(err.message || tr('payError', 'Failed to pay invoice'))
     } finally {
-      setReceiving(false)
+      setPaying(false)
     }
   }
 
@@ -952,10 +953,10 @@ export default function ProcurementOrders() {
                 <button onClick={() => setPaymentModal(null)} className="px-4 py-2 text-sm text-noch-muted hover:text-white">{tr('cancel', 'Cancel')}</button>
                 <button
                   onClick={handlePay}
-                  disabled={receiving || !paymentForm.paid_at}
+                  disabled={paying || !paymentForm.paid_at}
                   className="bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-500/20 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
-                  {receiving && <Loader2 size={14} className="animate-spin" />}
+                  {paying && <Loader2 size={14} className="animate-spin" />}
                   <Wallet size={14} /> {tr('pay', 'Pay')}
                 </button>
               </div>
