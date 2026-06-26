@@ -15,7 +15,8 @@ import {
   getStockCheckReminder, upsertStockCheckReminder,
   getPOSBranch, getPOSProducts,
 } from '../lib/pos-supabase'
-import { getStaffProfiles, supabase } from '../../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
+import { getStaffProfiles } from '../../../lib/profiles'
 import { createTask } from '../../../lib/tasks'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'

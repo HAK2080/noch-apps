@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Paperclip, MessageCircle } from 'lucide-react'
 import { useLanguage } from '../../contexts/LanguageContext'
-import { getStaffProfiles } from '../../lib/supabase'
+import { getStaffProfiles } from '../../lib/profiles'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 

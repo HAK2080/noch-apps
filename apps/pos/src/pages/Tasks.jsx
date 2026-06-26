@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, RefreshCw } from 'lucide-react'
-import { getStaffProfiles } from '../lib/supabase'
+import { getStaffProfiles } from '../lib/profiles'
 import { getTasks, createTask, assignStaffToTask, uploadAttachment } from '../lib/tasks'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'

@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import { Shield, Check, X, Loader2, Bell, Pencil } from 'lucide-react'
-import { supabase, getRolePermissions, updateRolePermission, approveRoleChange, denyRoleChange } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
+import { getRolePermissions, updateRolePermission, approveRoleChange, denyRoleChange } from '../../lib/profiles'
 import Layout from '../../components/Layout'
 import { usePermission } from '../../lib/usePermission'
 import { AccessDenied } from '../../components/shared/ProtectedFeature'

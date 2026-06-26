@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Trash2, Bell, Edit, Paperclip, ExternalLink, Users } from 'lucide-react'
-import { getProfiles } from '../lib/supabase'
+import { getProfiles } from '../lib/profiles'
 import { getTask, updateTask, deleteTask, getTaskAttachments, uploadAttachment, getReminders, assignStaffToTask, removeAssignmentFromTask, requestTaskCompletion, approveTaskCompletion, rejectTaskCompletion } from '../lib/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
