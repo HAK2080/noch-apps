@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Save, MapPin, Gift, Sparkles, Star, Zap, Trash2, Plus, X, ToggleLeft, ToggleRight, Calendar, MessageSquare, Users, Trophy } from 'lucide-react'
-import { getLoyaltySettings, updateLoyaltySettings } from '../../../lib/supabase'
+import { getLoyaltySettings, updateLoyaltySettings } from '../lib/loyalty-supabase'
 import { getPOSBranches, updatePOSBranch } from '../../pos/lib/pos-supabase'
 import { supabase } from '../../../lib/supabase'
 import { useLanguage } from '../../../contexts/LanguageContext'

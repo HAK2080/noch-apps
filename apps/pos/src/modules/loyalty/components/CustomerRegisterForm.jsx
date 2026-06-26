@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, UserPlus } from 'lucide-react'
 import { useLanguage } from '../../../contexts/LanguageContext'
-import { registerLoyaltyCustomer } from '../../../lib/supabase'
+import { registerLoyaltyCustomer } from '../lib/loyalty-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 

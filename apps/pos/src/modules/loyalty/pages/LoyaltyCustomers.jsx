@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { UserPlus, Search, RefreshCw } from 'lucide-react'
-import { getLoyaltyCustomers } from '../../../lib/supabase'
+import { getLoyaltyCustomers } from '../lib/loyalty-supabase'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
 import BackButton from '../../../components/shared/BackButton'

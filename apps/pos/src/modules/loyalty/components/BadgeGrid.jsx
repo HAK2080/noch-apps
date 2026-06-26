@@ -1,7 +1,7 @@
 // BadgeGrid.jsx — Display earned/unearned badges for a customer
 
 import { useState, useEffect } from 'react'
-import { getCustomerBadges } from '../../../lib/supabase'
+import { getCustomerBadges } from '../lib/loyalty-supabase'
 
 const BADGES = [
   { key: 'goat', emoji: '🐐', name: 'GOAT', nameAr: 'الأفضل', desc: 'One of the first 100 customers' },

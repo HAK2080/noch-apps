@@ -6,7 +6,7 @@ import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
 // import chain doesn't drag them into the cold bundle.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 const QRScanner      = lazy(() => import('./QRScanner'))
-import { lookupLoyaltyQR } from '../../../lib/supabase'
+import { lookupLoyaltyQR } from '../../loyalty/lib/loyalty-supabase'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 

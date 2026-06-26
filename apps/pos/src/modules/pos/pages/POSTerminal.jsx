@@ -4,7 +4,8 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle } from 'lucide-react'
-import { supabase, recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
+import { recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../loyalty/lib/loyalty-supabase'
 // Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
 const QRScanner      = lazy(() => import('../components/QRScanner'))

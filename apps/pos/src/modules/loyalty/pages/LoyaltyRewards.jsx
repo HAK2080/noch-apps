@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Gift, RefreshCw, Check } from 'lucide-react'
-import { getLoyaltyRewards, redeemLoyaltyReward } from '../../../lib/supabase'
+import { getLoyaltyRewards, redeemLoyaltyReward } from '../lib/loyalty-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'

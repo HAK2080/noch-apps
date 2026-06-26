@@ -4,7 +4,7 @@ import { Brain, Users, TrendingDown, Star, Sparkles, ChevronRight, Loader2 } fro
 import toast from 'react-hot-toast'
 import Layout from '../../../components/Layout'
 import BackButton from '../../../components/shared/BackButton'
-import { getLoyaltyCustomers } from '../../../lib/supabase'
+import { getLoyaltyCustomers } from '../lib/loyalty-supabase'
 import { useLanguage } from '../../../contexts/LanguageContext'
 
 const SEGMENTS = [

@@ -6,7 +6,7 @@ import { QrCode, RefreshCw, Maximize2 } from 'lucide-react'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
 import BackButton from '../../../components/shared/BackButton'
-import { generateLoyaltyQR } from '../../../lib/supabase'
+import { generateLoyaltyQR } from '../lib/loyalty-supabase'
 import toast from 'react-hot-toast'
 let nochiImg = null
 try { nochiImg = new URL('../../../assets/nochi-happy.svg', import.meta.url).href } catch { nochiImg = null }
