@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3 } from 'lucide-react'
-import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories } from '../lib/pos-supabase'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Shield } from 'lucide-react'
+import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories, getPOSSecurityStatus, listPOSAuditEvents } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
@@ -73,6 +73,9 @@ export default function POSSettings({ onClose } = {}) {
   const [categories, setCategories] = useState([])
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
   const [printHost, setPrintHostState] = useState(() => isPrintHost())
+  const [securityStatus, setSecurityStatus] = useState(null)
+  const [auditEvents, setAuditEvents] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
 
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
@@ -109,6 +112,24 @@ export default function POSSettings({ onClose } = {}) {
       })
       .catch(err => toast.error(err.message || 'Failed to load'))
       .finally(() => setLoading(false))
+  }, [branchId])
+
+  useEffect(() => {
+    let cancelled = false
+    setAuditLoading(true)
+    Promise.all([
+      getPOSSecurityStatus(branchId).catch(() => null),
+      listPOSAuditEvents(branchId).catch(() => []),
+    ])
+      .then(([status, events]) => {
+        if (cancelled) return
+        setSecurityStatus(status)
+        setAuditEvents(events)
+      })
+      .finally(() => {
+        if (!cancelled) setAuditLoading(false)
+      })
+    return () => { cancelled = true }
   }, [branchId])
 
   const handleAutoPrintToggle = (value) => {
@@ -203,6 +224,16 @@ export default function POSSettings({ onClose } = {}) {
   }
 
   if (loading) return <Layout><p className="text-noch-muted text-center py-16">Loading...</p></Layout>
+
+  const actionLabels = {
+    manager_override_applied: 'Manager override applied',
+    shift_closed: 'Shift closed',
+    shift_close_operator_recorded: 'Shift close operator recorded',
+    order_voided: 'Order voided',
+    refund_completed: 'Refund completed',
+    refund_applied: 'Refund applied',
+    discount_applied: 'Discount applied',
+  }
 
   return (
     <Layout>
@@ -580,6 +611,103 @@ export default function POSSettings({ onClose } = {}) {
             </div>
           </div>
         )}
+
+        <div className="card mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield size={16} className="text-noch-green" />
+            <div>
+              <h2 className="text-white font-semibold">Audit & Security</h2>
+              <p className="text-noch-muted text-xs mt-0.5">Read-only visibility for manager overrides, shift-close attribution, and POS RLS status.</p>
+            </div>
+          </div>
+
+          {securityStatus ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Manager overrides (30d)</p>
+                  <p className="text-white text-lg font-semibold">{securityStatus.recent_override_events || 0}</p>
+                </div>
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Shift-close audit (30d)</p>
+                  <p className="text-white text-lg font-semibold">{securityStatus.recent_shift_close_events || 0}</p>
+                </div>
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Staff assignments</p>
+                  <p className="text-white text-lg font-semibold">{securityStatus.staff_assignment_count || 0}</p>
+                </div>
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Open RLS policies</p>
+                  <p className={`text-lg font-semibold ${(securityStatus.open_pos_policy_count || 0) > 0 ? 'text-yellow-300' : 'text-noch-green'}`}>
+                    {securityStatus.open_pos_policy_count || 0}
+                  </p>
+                </div>
+              </div>
+
+              {(securityStatus.open_pos_policy_count || 0) > 0 && (
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 mb-3">
+                  <p className="text-yellow-200 text-sm font-medium">Branch-scoped POS RLS is still blocked</p>
+                  <p className="text-yellow-100/90 text-xs mt-1">
+                    The legacy <code>pos_all</code> policy family is still open on {securityStatus.open_pos_policy_count} tables:
+                    {' '}{(securityStatus.open_pos_policy_tables || []).join(', ') || 'none reported'}.
+                    Tightening this automatically is still unsafe until every active staff member has a validated <code>staff_branches</code> assignment model.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-noch-muted mb-3">
+                <span>Manager assignments: {securityStatus.manager_assignment_count || 0}</span>
+                <span>Void events (30d): {securityStatus.recent_void_events || 0}</span>
+                <span>Refund events (30d): {securityStatus.recent_refund_events || 0}</span>
+                <span>
+                  Last audit event: {securityStatus.last_audit_at ? new Date(securityStatus.last_audit_at).toLocaleString('en-GB') : 'none'}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2 mb-3">
+              <p className="text-white text-sm font-medium">Security status unavailable</p>
+              <p className="text-noch-muted text-xs mt-1">
+                The additive <code>pos_security_status</code> RPC is not reachable in this environment yet. Audit rows below still load directly from <code>pos_audit_log</code>.
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-noch-border bg-noch-dark/20 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-noch-border/60">
+              <h3 className="text-white text-sm font-medium">Recent POS audit trail</h3>
+              <span className="text-noch-muted text-xs">Latest 10 events</span>
+            </div>
+            {auditLoading ? (
+              <p className="text-noch-muted text-sm px-3 py-4">Loading audit events...</p>
+            ) : auditEvents.length === 0 ? (
+              <p className="text-noch-muted text-sm px-3 py-4">No audit events recorded for this branch yet.</p>
+            ) : (
+              <div className="divide-y divide-noch-border/40">
+                {auditEvents.map(event => (
+                  <div key={event.id} className="px-3 py-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-white text-sm font-medium">{actionLabels[event.action] || event.action.replaceAll('_', ' ')}</p>
+                        <p className="text-noch-muted text-xs mt-0.5">
+                          {event.served_by_name ? `Staff: ${event.served_by_name}` : 'Staff not recorded'}
+                          {event.approved_by_name ? ` · Approved by: ${event.approved_by_name}` : ''}
+                          {event.actor_name ? ` · Triggered by: ${event.actor_name}` : ''}
+                        </p>
+                        {event.metadata?.note && (
+                          <p className="text-noch-muted text-xs mt-1">{event.metadata.note}</p>
+                        )}
+                      </div>
+                      <span className="text-noch-muted text-[11px] whitespace-nowrap">
+                        {new Date(event.created_at).toLocaleString('en-GB')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Shift */}
         <div className="card">

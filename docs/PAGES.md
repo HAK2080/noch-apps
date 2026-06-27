@@ -1,15 +1,16 @@
 # Noch — Pages Inventory
 
-**Updated:** 2026-06-25. **Source of truth:** `apps/pos/src/App.jsx`. If you add a route, update this file.
+**Updated:** 2026-06-27. **Source of truth:** `apps/pos/src/App.jsx`. If you add a route, update this file.
 
 This file maps every page in this repo to its file, URL, audience, and access gate. When you ask me about "the website" or "a page," check this first.
 
-## Roadmap note (2026-06-25)
+## Roadmap note (2026-06-27)
 
 - `/analytics-legacy` is now a redirect to `/finance`; the old analytics page is no longer routed directly.
 - Legacy Content Studio v1 routes such as `/content`, `/content/studio`, `/content/research`, and `/content/ideas` now redirect into `/content-studio/*`.
 - `/accounting` is an active route backed by `apps/pos/src/modules/accounting/AccountingDashboard.jsx`.
 - `RootRedirect` now sends `data_entry` users to `/expenses`; it does not send all staff to `/my-tasks`.
+- `/pos/:branchId/settings` now includes a read-only audit/security summary for manager overrides, shift-close attribution, and the still-open POS `pos_all` RLS blocker.
 
 ---
 
@@ -178,7 +179,7 @@ All POS page files live in `src/modules/pos/pages/`. See [`docs/audit/01-repo-ma
 | 🔒 `/pos/:branchId` | `POSTerminal.jsx` | The register itself (PIN-gated) |
 | 🔒 `/pos/:branchId/end-of-day` | `POSEndOfDay.jsx` | Z-report + cash count + cash movements |
 | 🔒 `/pos/:branchId/inventory` | `POSInventory.jsx` | Per-branch stock |
-| 🔒 `/pos/:branchId/settings` | `POSSettings.jsx` | Printer + branch + feature flags |
+| 🔒 `/pos/:branchId/settings` | `POSSettings.jsx` | Printer + branch + feature flags + read-only audit/security summary |
 | 🔒 `/pos/:branchId/products` | `POSProducts.jsx` | Product CRUD |
 | 🔒 `/pos/:branchId/stock-check` | `POSStockCheck.jsx` | Weekly stock check |
 | 🔒 `/pos/:branchId/orders` | `POSOrders.jsx` | Today's/range orders + reprint + refund + Presto-collected |

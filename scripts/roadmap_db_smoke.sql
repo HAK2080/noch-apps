@@ -37,6 +37,9 @@ select 'annotate_pos_sale_override_rpc_exists' as check_name,
 select 'annotate_shift_close_operator_rpc_exists' as check_name,
        case when to_regprocedure('public.annotate_shift_close_operator(uuid,uuid)') is not null then 'ok' else 'missing' end as result;
 
+select 'pos_security_status_rpc_exists' as check_name,
+       case when to_regprocedure('public.pos_security_status(uuid)') is not null then 'ok' else 'missing' end as result;
+
 select 'gl_ap_aging_rpc_exists' as check_name,
        case when to_regprocedure('public.gl_ap_aging(date,uuid)') is not null then 'ok' else 'missing' end as result;
 
@@ -135,6 +138,16 @@ where action = 'manager_override_applied';
 select 'pos_shift_close_audit_rows' as check_name, count(*)::text as result
 from pos_audit_log
 where action = 'shift_closed';
+
+with branch_seed as (
+  select id
+  from pos_branches
+  order by created_at
+  limit 1
+)
+select 'pos_security_status_rows' as check_name, count(*)::text as result
+from branch_seed b
+cross join lateral pos_security_status(b.id);
 
 select 'gl_ap_aging_rows' as check_name, count(*)::text as result
 from gl_ap_aging(current_date, null);

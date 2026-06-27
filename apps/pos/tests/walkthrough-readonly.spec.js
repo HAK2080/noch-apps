@@ -118,6 +118,25 @@ test.describe('Read-only app walkthrough', () => {
     }
   })
 
+  test('POS settings exposes audit visibility without mutating data', async ({ page }) => {
+    await page.goto('/pos')
+    await page.waitForLoadState('domcontentloaded')
+
+    const branchLink = page.locator('a[href^="/pos/"]').first()
+    const branchCount = await branchLink.count()
+
+    if (branchCount === 0) {
+      await expect(page.getByText(/Point of Sale|No branches found/i).first()).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    const href = await branchLink.getAttribute('href')
+    await page.goto(`${href}/settings`)
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Audit & Security|Security status unavailable/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Recent POS audit trail|Open RLS policies|Manager overrides \(30d\)/i).first()).toBeVisible({ timeout: 10000 })
+  })
+
   test('Procurement exposes receiving controls and purchasing signals without posting changes', async ({ page }) => {
     await page.goto('/inventory/procurement')
     await page.waitForLoadState('domcontentloaded')
