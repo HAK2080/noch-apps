@@ -85,6 +85,7 @@ const EVERYONE = [...STAFFISH, 'data_entry']
 
 export const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard', feature: 'dashboard', end: true, fallbackRoles: STAFFISH },
+  { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', feature: 'vestaboard', fallbackRoles: STAFFISH },
   { to: '/staff/my-profile', icon: Settings, labelEn: 'My Profile', labelAr: 'ملفي', feature: null, end: true, fallbackRoles: EVERYONE },
 
   { type: 'group', labelEn: 'OPERATIONS', labelAr: 'العمليات' },
@@ -97,7 +98,6 @@ export const NAV_ITEMS = [
   { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', feature: 'products', fallbackRoles: EVERYONE },
   { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', feature: 'staff', ownerOnly: true },
   { to: '/loyalty', icon: Heart, labelEn: 'Nochi Loyalty', labelAr: 'نوتشي لويالتي', feature: 'loyalty', fallbackRoles: EVERYONE },
-  { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', feature: 'vestaboard', fallbackRoles: STAFFISH },
 
   { type: 'group', labelEn: 'MANAGEMENT', labelAr: 'الإدارة' },
   { to: '/report', icon: BarChart2, labelKey: 'report', feature: 'reports' },

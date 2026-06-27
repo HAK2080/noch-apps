@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.gl-nightly-sync]
 verify_jwt = false
+
+[functions.vestaboard-cron]
+verify_jwt = false

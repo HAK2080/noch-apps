@@ -83,6 +83,57 @@ export async function sendVestaboard(message) {
 export const VB_ROWS = 6
 export const VB_COLS = 22
 export const VB_MAX_CHARS = VB_ROWS * VB_COLS
+export const VB_MIN_SEND_INTERVAL_SECONDS = 15
+export const VESTABOARD_OPERATING_HOURS = {
+  regular: { open: '09:00', close: '00:00' },
+  friday: { open: '16:00', close: '00:30' },
+}
+
+function minutesFromTime(time) {
+  const [hours, minutes] = String(time).split(':').map(Number)
+  return (hours * 60) + minutes
+}
+
+function formatHoursRange(hours) {
+  return `${hours.open}-${hours.close}`
+}
+
+export function getVestaboardOperatingStatus(now = new Date()) {
+  const day = now.getDay()
+  const minutes = (now.getHours() * 60) + now.getMinutes()
+  const regularOpen = minutesFromTime(VESTABOARD_OPERATING_HOURS.regular.open)
+  const fridayOpen = minutesFromTime(VESTABOARD_OPERATING_HOURS.friday.open)
+  const fridayCloseNextDay = minutesFromTime(VESTABOARD_OPERATING_HOURS.friday.close)
+
+  const isFridayWindow = day === 5 && minutes >= fridayOpen
+  const isFridayLateWindow = day === 6 && minutes < fridayCloseNextDay
+  const isRegularWindow = day !== 5 && minutes >= regularOpen
+
+  const isOpen = isFridayWindow || isFridayLateWindow || isRegularWindow
+  const todayHours = day === 5
+    ? VESTABOARD_OPERATING_HOURS.friday
+    : VESTABOARD_OPERATING_HOURS.regular
+
+  return {
+    isOpen,
+    label: isOpen ? 'Open' : 'Closed',
+    todayLabel: day === 5 ? 'Friday 16:00-00:30' : 'Daily 09:00-00:00',
+    summary: `Daily ${formatHoursRange(VESTABOARD_OPERATING_HOURS.regular)}, Friday ${formatHoursRange(VESTABOARD_OPERATING_HOURS.friday)}`,
+    open: todayHours.open,
+    close: todayHours.close,
+  }
+}
+
+export function getVestaboardConfigStatus() {
+  return {
+    provider: VB_HOST ? 'local' : (VB_KEY ? 'cloud' : 'simulation'),
+    hasHost: Boolean(VB_HOST),
+    hasKey: Boolean(VB_KEY),
+    host: VB_HOST || '',
+    endpoint: VB_HOST ? `http://${VB_HOST}:7000/local-api/message` : 'https://rw.vestaboard.com/',
+    modeLabel: VB_HOST ? 'Local API' : (VB_KEY ? 'Cloud Read/Write API' : 'Simulation'),
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────
 // Character-grid mode — required for colored squares.
@@ -306,6 +357,253 @@ const GREETING_TEMPLATES = [
   (n) => [`OH, ${n}`, "DIDN'T SEE YOU", '(TOTALLY DID)'],
 ]
 
+export const VESTABOARD_AUTOMATIONS = [
+  {
+    id: 'order_greeting',
+    title: 'Order greeting',
+    audience: 'In-store customers',
+    trigger: 'Completed POS order with customer name',
+    cadence: 'Every named order',
+    goal: 'Make the guest feel noticed while their drink is being prepared.',
+    status: 'live',
+  },
+  {
+    id: 'pickup_ready',
+    title: 'Pickup ready',
+    audience: 'Waiting customers',
+    trigger: 'Kitchen/bar marks order ready',
+    cadence: 'Per ready order',
+    goal: 'Reduce counter questions and make pickup feel theatrical.',
+    status: 'planned',
+  },
+  {
+    id: 'loyalty_milestone',
+    title: 'Loyalty milestone',
+    audience: 'Regulars',
+    trigger: 'Stamp, reward, birthday, leaderboard, or badge event',
+    cadence: 'High-signal events only',
+    goal: 'Turn loyalty into a public celebration without exposing private data.',
+    status: 'ready',
+  },
+  {
+    id: 'campaign_drop',
+    title: 'Campaign drop',
+    audience: 'Walk-ins and social viewers',
+    trigger: 'Approved marketing campaign or limited menu item',
+    cadence: 'Time-boxed service windows',
+    goal: 'Make the board sell the current offer while staff stay focused.',
+    status: 'ready',
+  },
+  {
+    id: 'social_proof',
+    title: 'Social proof',
+    audience: 'Guests deciding what to order',
+    trigger: 'Review, UGC post, or best-seller threshold',
+    cadence: 'Rotated, not spammed',
+    goal: 'Surface reviews, fan posts, and best sellers at the point of purchase.',
+    status: 'ready',
+  },
+  {
+    id: 'ops_signal',
+    title: 'Ops signal',
+    audience: 'Staff',
+    trigger: 'Low stock, shift note, or rush mode',
+    cadence: 'Owner/staff controlled',
+    goal: 'Use the board as a lightweight back-of-house signal when needed.',
+    status: 'ready',
+  },
+  {
+    id: 'world_cup_score',
+    title: 'World Cup score',
+    audience: 'Football fans',
+    trigger: 'Manual now; live feed once a sports API is connected',
+    cadence: 'Only during open hours and active matches',
+    goal: 'Give guests a reason to look up, talk, and stay for another drink.',
+    status: 'ready',
+  },
+  {
+    id: 'news_flash',
+    title: 'News flash',
+    audience: 'Guests in line',
+    trigger: 'Manual now; live feed once a curated news source is connected',
+    cadence: 'Low frequency, high signal',
+    goal: 'Make waiting feel current without turning the board into noise.',
+    status: 'ready',
+  },
+  {
+    id: 'joke_break',
+    title: 'Joke break',
+    audience: 'Everyone',
+    trigger: 'Staff quick-send or scheduled quiet moments',
+    cadence: 'Occasional',
+    goal: 'Add personality during slower moments and make the board worth watching.',
+    status: 'ready',
+  },
+  {
+    id: 'quote_break',
+    title: 'Deep quote',
+    audience: 'Guests pausing between conversations',
+    trigger: 'Automatic rotation during quieter windows',
+    cadence: 'Occasional',
+    goal: 'Make the board feel thoughtful, memorable, and worth photographing.',
+    status: 'ready',
+  },
+]
+
+const MARKETING_TEMPLATES = {
+  campaign_drop: {
+    label: 'Campaign drop',
+    palette: { top: COLOR.ORANGE, bot: COLOR.YELLOW },
+    lines: ({ headline = 'TODAY ONLY', detail = 'ASK FOR THE DROP', cta = 'LIMITED BATCH' } = {}) => [
+      headline,
+      detail,
+      cta,
+    ],
+  },
+  pickup_ready: {
+    label: 'Pickup ready',
+    palette: { top: COLOR.GREEN, bot: COLOR.BLUE },
+    lines: ({ name = 'GUEST', order = 'ORDER' } = {}) => [
+      sanitizeName(name) || 'GUEST',
+      `${String(order).toUpperCase()} READY`,
+      'COME CLAIM IT',
+    ],
+  },
+  loyalty_milestone: {
+    label: 'Loyalty milestone',
+    palette: { top: COLOR.VIOLET, bot: COLOR.YELLOW },
+    lines: ({ name = 'REGULAR', detail = 'UNLOCKED A REWARD' } = {}) => [
+      sanitizeName(name) || 'REGULAR',
+      detail,
+      'NOCHI APPROVES',
+    ],
+  },
+  social_proof: {
+    label: 'Social proof',
+    palette: { top: COLOR.BLUE, bot: COLOR.WHITE },
+    lines: ({ headline = 'FAN FAVORITE', detail = 'MOST ORDERED TODAY', cta = 'TRY IT NEXT' } = {}) => [
+      headline,
+      detail,
+      cta,
+    ],
+  },
+  ops_signal: {
+    label: 'Ops signal',
+    palette: { top: COLOR.RED, bot: COLOR.ORANGE },
+    lines: ({ headline = 'STAFF NOTE', detail = 'LOW STOCK CHECK', cta = 'TELL LEAD' } = {}) => [
+      headline,
+      detail,
+      cta,
+    ],
+  },
+  world_cup_score: {
+    label: 'World Cup score',
+    palette: { top: COLOR.GREEN, bot: COLOR.WHITE },
+    lines: ({ match = 'WORLD CUP', score = 'LIVE SCORE', status = 'ASK STAFF' } = {}) => [
+      match,
+      score,
+      status,
+    ],
+  },
+  news_flash: {
+    label: 'News flash',
+    palette: { top: COLOR.BLUE, bot: COLOR.WHITE },
+    lines: ({ headline = 'NEWS FLASH', detail = 'CHECK THE COUNTER', source = 'NOCH UPDATE' } = {}) => [
+      headline,
+      detail,
+      source,
+    ],
+  },
+  joke_break: {
+    label: 'Joke break',
+    palette: { top: COLOR.YELLOW, bot: COLOR.VIOLET },
+    lines: ({ setup = 'WHY DID COFFEE', punchline = 'FILE A POLICE REPORT?', cta = 'IT GOT MUGGED' } = {}) => [
+      setup,
+      punchline,
+      cta,
+    ],
+  },
+  quote_break: {
+    label: 'Deep quote',
+    palette: { top: COLOR.VIOLET, bot: COLOR.BLUE },
+    lines: ({ author = 'MARCUS AURELIUS', quote = 'THE MOMENT IS YOURS', cta = 'USE IT WELL' } = {}) => [
+      author,
+      quote,
+      cta,
+    ],
+  },
+}
+
+export const VESTABOARD_JOKE_LIBRARY = [
+  { setup: 'WHY DID COFFEE', punchline: 'FILE A REPORT?', cta: 'IT GOT MUGGED' },
+  { setup: 'ESPRESSO YOURSELF', punchline: 'BUT PLEASE', cta: 'ORDER FIRST' },
+  { setup: 'DECAF EXISTS', punchline: 'FOR PEOPLE WHO', cta: 'ENJOY RISK' },
+  { setup: 'NOCHI SAYS', punchline: 'ONE MORE DRINK', cta: 'IS RESEARCH' },
+  { setup: 'MATCHA LATTE', punchline: 'IS JUST GREEN', cta: 'CONFIDENCE' },
+]
+
+export function getRandomVestaboardJoke(seed = Date.now()) {
+  const idx = pickTemplateIndex(seed) % VESTABOARD_JOKE_LIBRARY.length
+  return VESTABOARD_JOKE_LIBRARY[idx]
+}
+
+export const VESTABOARD_QUOTE_LIBRARY = [
+  { author: 'SENECA', quote: 'LUCK FAVORS', cta: 'THE PREPARED MIND' },
+  { author: 'MAYA ANGELOU', quote: 'COURAGE MAKES', cta: 'EVERYTHING POSSIBLE' },
+  { author: 'RUMI', quote: 'WHAT YOU SEEK', cta: 'IS SEEKING YOU' },
+  { author: 'SOCRATES', quote: 'KNOW THYSELF', cta: 'BEGIN THERE' },
+  { author: 'JAMES BALDWIN', quote: 'NOT EVERYTHING FACED', cta: 'CAN BE CHANGED' },
+  { author: 'MARY OLIVER', quote: 'PAY ATTENTION', cta: 'BE ASTONISHED' },
+  { author: 'CONFUCIUS', quote: 'WHEREVER YOU GO', cta: 'GO WITH ALL HEART' },
+  { author: 'MARCUS AURELIUS', quote: 'MEET THE MOMENT', cta: 'WITHOUT COMPLAINT' },
+]
+
+export function getRandomVestaboardQuote(seed = Date.now()) {
+  const idx = pickTemplateIndex(seed) % VESTABOARD_QUOTE_LIBRARY.length
+  return VESTABOARD_QUOTE_LIBRARY[idx]
+}
+
+function sanitizeBoardLine(line) {
+  return String(line || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 !@#$()+\-&=;:'"%.,/?]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+    .slice(0, VB_COLS)
+}
+
+export function buildVestaboardAutomationGrid(templateId, context = {}) {
+  const template = MARKETING_TEMPLATES[templateId] || MARKETING_TEMPLATES.campaign_drop
+  const lines = template.lines(context).map(sanitizeBoardLine)
+  return buildColorfulFrame(lines, template.palette)
+}
+
+export function previewVestaboardAutomationText(templateId, context = {}) {
+  const grid = buildVestaboardAutomationGrid(templateId, context)
+  return grid.map(row => row.map(code => {
+    if (code === 0 || code >= 63) return ' '
+    if (code >= 1 && code <= 26) return String.fromCharCode(64 + code)
+    if (code >= 27 && code <= 35) return String(code - 26)
+    if (code === 36) return '0'
+    return {
+      37: '!', 38: '@', 39: '#', 40: '$', 41: '(', 42: ')', 43: '-',
+      44: '+', 45: '&', 46: '=', 47: ';', 48: ':', 49: "'", 50: '"',
+      51: '%', 52: ',', 53: '.', 54: '/', 55: '?',
+    }[code] || ' '
+  }).join('')).join('\n').trimEnd()
+}
+
+export async function sendVestaboardAutomation(templateId, context = {}, options = {}) {
+  if (options.respectOperatingHours !== false) {
+    const status = getVestaboardOperatingStatus()
+    if (!status.isOpen) return { skipped: true, reason: 'outside_operating_hours', status }
+  }
+  const grid = buildVestaboardAutomationGrid(templateId, context)
+  return sendVestaboardCharacters(grid)
+}
+
 // Deterministic-ish pick from order_number so reprints / re-fires of
 // the SAME order land on the same greeting + palette. Returns the
 // template's index so we can pair it with a matching colour palette.
@@ -332,6 +630,10 @@ let _greetingRefreshTimerId = null
 // so the stripes actually render in colour. The plain-text API used
 // previously stripped all colour codes.
 export async function sendCustomerGreeting(customerName, opts = {}) {
+  if (opts.respectOperatingHours !== false) {
+    const status = getVestaboardOperatingStatus()
+    if (!status.isOpen) return { skipped: true, reason: 'outside_operating_hours', status }
+  }
   const name = sanitizeName(customerName)
   if (!name) return { skipped: true, reason: 'no_name' }
   const idx = pickTemplateIndex(opts.seed)

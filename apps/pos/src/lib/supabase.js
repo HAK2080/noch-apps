@@ -2125,6 +2125,21 @@ export async function incrementSeriesPostCount(seriesId) {
 // VESTABOARD
 // ============================================================
 
+const DEFAULT_VESTABOARD_AUTOMATION_SETTINGS = [
+  { automation_id: 'order_greeting', enabled: true, cadence_minutes: 5, max_per_day: 200, priority: 10, provider: 'pos' },
+  { automation_id: 'pickup_ready', enabled: false, cadence_minutes: 5, max_per_day: 200, priority: 20, provider: 'pos' },
+  { automation_id: 'loyalty_milestone', enabled: false, cadence_minutes: 30, max_per_day: 12, priority: 30, provider: 'loyalty' },
+  { automation_id: 'campaign_drop', enabled: false, cadence_minutes: 60, max_per_day: 8, priority: 40, provider: 'marketing' },
+  { automation_id: 'social_proof', enabled: false, cadence_minutes: 60, max_per_day: 8, priority: 50, provider: 'sales' },
+  { automation_id: 'ops_signal', enabled: false, cadence_minutes: 15, max_per_day: 20, priority: 25, provider: 'inventory' },
+  { automation_id: 'world_cup_score', enabled: false, cadence_minutes: 15, max_per_day: 20, priority: 60, provider: 'worldcup2026' },
+  { automation_id: 'news_flash', enabled: false, cadence_minutes: 120, max_per_day: 4, priority: 70, provider: 'custom' },
+  { automation_id: 'joke_break', enabled: false, cadence_minutes: 90, max_per_day: 6, priority: 90, provider: 'jokeapi' },
+  { automation_id: 'quote_break', enabled: false, cadence_minutes: 90, max_per_day: 6, priority: 95, provider: 'zenquotes' },
+]
+
+const VESTABOARD_AUTOMATION_SETTINGS_KEY = 'vestaboard_automation_settings'
+
 export async function getVestaboardMessages() {
   const { data, error } = await supabase
     .from('vestaboard_messages')
@@ -2135,11 +2150,17 @@ export async function getVestaboardMessages() {
   return data || []
 }
 
-export async function submitVestaboardMessage(message) {
+export async function submitVestaboardMessage(message, options = {}) {
   const { data: { user } } = await supabase.auth.getUser()
+  const payload = {
+    message,
+    submitted_by: user.id,
+    status: options.status || 'pending',
+  }
+  if (options.sent_at) payload.sent_at = options.sent_at
   const { data, error } = await supabase
     .from('vestaboard_messages')
-    .insert({ message, submitted_by: user.id })
+    .insert(payload)
     .select()
     .single()
   if (error) throw error
@@ -2177,6 +2198,45 @@ export async function markVestaboardSent(id) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function getVestaboardAutomationSettings() {
+  const { data, error } = await supabase
+    .from('owner_settings')
+    .select('value')
+    .eq('key', VESTABOARD_AUTOMATION_SETTINGS_KEY)
+    .maybeSingle()
+  if (error) {
+    if (error.code === '42P01' || /does not exist/i.test(error.message || '')) {
+      return DEFAULT_VESTABOARD_AUTOMATION_SETTINGS
+    }
+    throw error
+  }
+  const saved = Array.isArray(data?.value) ? data.value : []
+  const savedById = Object.fromEntries(saved.map(item => [item.automation_id, item]))
+  return DEFAULT_VESTABOARD_AUTOMATION_SETTINGS
+    .map(item => ({ ...item, ...(savedById[item.automation_id] || {}) }))
+    .sort((a, b) => a.priority - b.priority)
+}
+
+export async function updateVestaboardAutomationSetting(automationId, updates) {
+  const current = await getVestaboardAutomationSettings()
+  const next = current.map(item =>
+    item.automation_id === automationId
+      ? { ...item, ...updates, automation_id: automationId, updated_at: new Date().toISOString() }
+      : item
+  )
+  const { data, error } = await supabase
+    .from('owner_settings')
+    .upsert({
+      key: VESTABOARD_AUTOMATION_SETTINGS_KEY,
+      value: next,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' })
+    .select()
+    .single()
+  if (error) throw error
+  return next.find(item => item.automation_id === automationId)
 }
 
 // ============================================================
