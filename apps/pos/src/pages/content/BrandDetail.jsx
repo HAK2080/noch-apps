@@ -8,7 +8,7 @@ import {
   getVoiceFingerprint, upsertVoiceFingerprint,
   getDialectCorpus, addDialectEntries,
   getNegativeExamples, createNegativeExample, deleteNegativeExample,
-} from '../../lib/supabase'
+} from '../../modules/contentStudio/lib/content-supabase'
 import { buildBrandProgram } from '../../lib/contentEngine'
 import { getApiKey, setApiKey } from '../../lib/claudeClient'
 import toast from 'react-hot-toast'

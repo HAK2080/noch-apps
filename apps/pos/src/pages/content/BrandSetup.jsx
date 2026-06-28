@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, ChevronLeft, Check, Upload, Plus, X } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
-import { createBrand, createBrandMaterial, updateBrand } from '../../lib/supabase'
+import { createBrand, createBrandMaterial, updateBrand } from '../../modules/contentStudio/lib/content-supabase'
 import { buildBrandProgram } from '../../lib/contentEngine'
 import toast from 'react-hot-toast'
 

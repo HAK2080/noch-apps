@@ -5,7 +5,7 @@ import {
   getBrand, getBrandMaterials, getContentPost, getResearch,
   createContentPost, updateContentPost, generateContent, getSwipeFile,
   logGeneration, getGenerationLogs, updateGenerationLog,
-} from '../../lib/supabase'
+} from '../../modules/contentStudio/lib/content-supabase'
 import {
   CONTENT_FORMATS, PLATFORMS,
   buildGenerationPrompt, generateSampleContent,

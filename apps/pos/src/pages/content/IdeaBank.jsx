@@ -7,7 +7,7 @@ import { Lightbulb, Plus, X, Upload, Star, Filter, Search, Trash2, Zap } from 'l
 import {
   getContentIdeas, createContentIdea, updateContentIdea,
   deleteContentIdea, uploadIdeaImage, getBrand
-} from '../../lib/supabase'
+} from '../../modules/contentStudio/lib/content-supabase'
 import { scoreIdeaAgainstBrand } from '../../lib/claudeClient'
 import { useLanguage } from '../../contexts/LanguageContext'
 import Layout from '../../components/Layout'

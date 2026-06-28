@@ -5,7 +5,7 @@
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk'
-import { getBrand, getGenerationLogs, updateBrand } from './supabase'
+import { getBrand, getGenerationLogs, updateBrand } from '../modules/contentStudio/lib/content-supabase'
 
 // ── API key — localStorage overrides .env ──────────────────────
 export const STORAGE_KEY = 'noch_anthropic_api_key'

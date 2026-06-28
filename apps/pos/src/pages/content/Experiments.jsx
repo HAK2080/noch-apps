@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { TrendingUp, Zap } from 'lucide-react'
-import { getContentExperiments, getBrand } from '../../lib/supabase'
+import { getContentExperiments, getBrand } from '../../modules/contentStudio/lib/content-supabase'
 import Layout from '../../components/Layout'
 import toast from 'react-hot-toast'
 

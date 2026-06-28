@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { BookOpen, Plus, Search, ExternalLink, Trash2, Star, RefreshCw, Zap, X, Sparkles, Eye, Radar, Globe, ToggleLeft, ToggleRight, CheckSquare, Link } from 'lucide-react'
-import { getContentResearch, createResearch, updateResearch, getBrand, autoResearch, getSwipeFile, createSwipeEntries, updateSwipeEntry, webScout, getScoutSources, createScoutSource, updateScoutSource, deleteScoutSource, scrapeSources, discoverSources } from '../../lib/supabase'
+import { getContentResearch, createResearch, updateResearch, getBrand, autoResearch, getSwipeFile, createSwipeEntries, updateSwipeEntry, webScout, getScoutSources, createScoutSource, updateScoutSource, deleteScoutSource, scrapeSources, discoverSources } from '../../modules/contentStudio/lib/content-supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import Layout from '../../components/Layout'
 import toast from 'react-hot-toast'

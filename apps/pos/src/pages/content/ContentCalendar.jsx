@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Calendar, Plus, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
-import { getContentPosts, getContentCalendar, schedulePost, getBrand } from '../../lib/supabase'
+import { getContentPosts, getContentCalendar, schedulePost, getBrand } from '../../modules/contentStudio/lib/content-supabase'
 import { getStatusConfig, PLATFORMS, CONTENT_FORMATS } from '../../lib/contentEngine'
 import Layout from '../../components/Layout'
 import toast from 'react-hot-toast'

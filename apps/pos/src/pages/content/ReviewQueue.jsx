@@ -12,7 +12,7 @@ import {
   getContentPosts, updateContentPost, getBrand,
   createExperiment, createBrandMaterial,
   logPostPerformance, getPostPerformance, getAveragePerformance,
-} from '../../lib/supabase'
+} from '../../modules/contentStudio/lib/content-supabase'
 import {
   POST_STATUSES, getStatusConfig, CONTENT_FORMATS,
   extractLesson,

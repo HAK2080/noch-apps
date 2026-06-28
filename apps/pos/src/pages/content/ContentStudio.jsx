@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Zap, Eye, Settings, Plus, BarChart3, AlertTriangle, RefreshCw, Lightbulb, List } from 'lucide-react'
-import { getBrands, createBrand, updateBrand, createBrandMaterial, createResearch, createContentPost, getContentPosts, getContentIdeas, getContentSeries, createContentSeries } from '../../lib/supabase'
+import { getBrands, createBrand, updateBrand, createBrandMaterial, createResearch, createContentPost, getContentPosts, getContentIdeas, getContentSeries, createContentSeries } from '../../modules/contentStudio/lib/content-supabase'
 import { NOCH_SEED, buildBrandProgram } from '../../lib/contentEngine'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLanguage } from '../../contexts/LanguageContext'

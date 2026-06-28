@@ -11,7 +11,7 @@ import {
   generatePostStream, generateVariantsStream, parseVariants, extractJSON,
   INTENTS, PLATFORMS, FORMATS,
 } from '../../lib/claudeClient'
-import { getBrand, createContentPost, logGeneration, getContentSeries, incrementSeriesPostCount } from '../../lib/supabase'
+import { getBrand, createContentPost, logGeneration, getContentSeries, incrementSeriesPostCount } from '../../modules/contentStudio/lib/content-supabase'
 import toast from 'react-hot-toast'
 
 // ── Phase indicators ──────────────────────────────────────────
