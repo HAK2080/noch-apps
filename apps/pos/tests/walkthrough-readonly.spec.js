@@ -137,6 +137,46 @@ test.describe('Read-only app walkthrough', () => {
     await expect(page.getByText(/Recent POS audit trail|Open RLS policies|Manager overrides \(30d\)/i).first()).toBeVisible({ timeout: 10000 })
   })
 
+  test('POS sale shell can open payment flow without submitting an order', async ({ page }) => {
+    await page.goto('/pos')
+    await page.waitForLoadState('domcontentloaded')
+
+    const branchLink = page.locator('a[href^="/pos/"]').first()
+    if (await branchLink.count() === 0) {
+      await expect(page.getByText(/Point of Sale|No branches found/i).first()).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    const href = await branchLink.getAttribute('href')
+    await page.goto(href)
+    await page.waitForLoadState('domcontentloaded')
+
+    const shiftPrompt = page.getByText(/No open shift|Open Shift/i).first()
+    if (await shiftPrompt.count()) {
+      await expect(shiftPrompt).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    const emptyState = page.getByText(/No products in this category|No results for/i).first()
+    if (await emptyState.count()) {
+      await expect(emptyState).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    const productTile = page.locator('button').filter({ hasText: /LYD/ }).first()
+    await expect(productTile).toBeVisible({ timeout: 10000 })
+    await productTile.click()
+
+    const chargeButton = page.locator('button').filter({ hasText: /Charge .* LYD/i }).first()
+    await expect(chargeButton).toBeVisible({ timeout: 10000 })
+    await chargeButton.click()
+
+    const paymentText = page.getByText(/Payment|Cash Tendered|Confirm card|Complete sale/i).first()
+    await expect(paymentText).toBeVisible({ timeout: 10000 })
+    await page.keyboard.press('Escape')
+    await expect(paymentText).not.toBeVisible({ timeout: 10000 })
+  })
+
   test('Procurement exposes receiving controls and purchasing signals without posting changes', async ({ page }) => {
     await page.goto('/inventory/procurement')
     await page.waitForLoadState('domcontentloaded')
@@ -203,6 +243,6 @@ test.describe('Read-only app walkthrough', () => {
   test('Loyalty settings call out approved WhatsApp templates', async ({ page }) => {
     await page.goto('/loyalty/settings')
     await page.waitForLoadState('domcontentloaded')
-    await expect(page.getByText(/Template SID|approved WhatsApp template/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Stamp-grant WhatsApp|Template SID|approved WhatsApp template/i).first()).toBeVisible({ timeout: 10000 })
   })
 })
