@@ -424,7 +424,7 @@ After this migration, `expense_entries`, `bank_transactions`, `finance_settings`
 
 **[D] Daily P&L Tab** (default tab on `/finance`)
 - **Period selector** (Today / 7d / 30d / 90d / Custom). Default: 7d.
-- **Branch selector** (All / Hay Alandlous / Jaraba / Bloom Abu Nawas).
+- **Branch selector** (All / Hay Al-Andalus / Gallery Mall / Bloom Abu Nawas).
 - KPI grid (4 cards top row, 4 below) — every card has `actual / target band / status badge`:
   1. Revenue (net) · target n/a · just shown
   2. COGS · target 25–32% of revenue
@@ -519,7 +519,7 @@ The Day-1 set is the foundation; without these the headline screen has nothing t
 ## 6. Open assumptions (called out so you can correct before code lands)
 
 1. **Hourly wage data lives on `profiles.hourly_rate_lyd`.** If wages are hidden from staff (likely yes — RLS on profiles needs to gate this), I'll add an explicit `wages` policy. (Today `profiles` is broadly readable per the audit; will tighten.)
-2. **Active branches** = "Noch Hay Alandlous", "Noch Jaraba", and "Bloom Abu Nawas". All active branches appear in the FinanceDashboard branch selector.
+2. **Active branches** = "Noch Hay Al-Andalus", "Noch Gallery Mall", and "Bloom Abu Nawas". All active branches appear in the FinanceDashboard branch selector.
 3. **Monthly OpEx defaults** are entered once via Settings; they're not auto-posted as `expense_entries` rows. They're a Cash & Runway "upcoming outflows" hint only, not a P&L line. (If you'd rather they auto-post each month, say so — I'll add a cron RPC.)
 4. **Receipt photos** go to a new Supabase Storage bucket `expense-receipts`, owner-only access. ~50 MB ceiling; receipts are usually <1 MB each.
 5. **Existing `business_metrics`, `sales_transactions`, `sales_uploads` tables** are explicitly **not consumed** by the Finance MVP. They stay in the schema for now (no destructive migration). A future cleanup can drop them.

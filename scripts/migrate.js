@@ -75,8 +75,8 @@ async function main() {
       created_at timestamptz DEFAULT now()
     );
     INSERT INTO cost_centers (id, name) VALUES
-      ('CC00', 'CEO'), ('CC01', 'Noch City Walk'),
-      ('CC02', 'Noch Galaria Mall'), ('CC03', 'Bloom Abu Nawas'), ('CC99', 'MD')
+      ('CC00', 'CEO'), ('CC01', 'Noch Hay Al-Andalus'),
+      ('CC02', 'Noch Gallery Mall'), ('CC03', 'Bloom Abu Nawas'), ('CC99', 'MD')
     ON CONFLICT (id) DO NOTHING;
     ALTER TABLE cost_centers ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "cc_all" ON cost_centers;

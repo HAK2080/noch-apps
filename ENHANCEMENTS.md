@@ -92,7 +92,7 @@ Legend: ✅ verified correct · 🔧 fixed during audit · 🔴 bug/open · 🟠
 - 🔴 P1 — **43 approved-unpaid expenses**: approval flow works, payment is the
   bottleneck. Schema already has `paid_at`/`payment_account_key` — add batch
   "mark paid" with account picker in ApproveTab.
-- 🟠 P1 — Cost centers (CC01 City Walk…) vs POS branches (Hay Alandlous, Jaraba)
+- 🟠 P1 — Cost centers (Hay Al-Andalus, Gallery Mall, Bloom Abu Nawas) vs POS branches: keep names identical
   naming drift — add `pos_branch_id` to `cost_centers` so expense and sales
   reports can join.
 - 🟠 P2 — Expense categories (11) vs finance opex categories (rent/utilities/…)

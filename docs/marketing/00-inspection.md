@@ -171,7 +171,7 @@ The same phone could enter the system through:
 2. **Stamp linkage.** Are POS-issued stamps (`pos_orders.loyalty_stamps_awarded`) backfilled into `loyalty_stamps` rows, or do stamps only get rows when entered manually via `/loyalty/stamp`? (Determines whether the visit log is complete.)
 3. **% of orders with `loyalty_customer_id` set.** A quick `select count(*) filter (where loyalty_customer_id is not null) * 100.0 / count(*) from pos_orders where status='completed'` — drives reliability of RFM Monetary.
 4. **TikTok Business profile** — does Noch have one? If not, ship manual-entry only.
-5. **Google Business Profile** — is the Hay Alandlous location claimed? Owner-verified?
+5. **Google Business Profile** — is the Hay Al-Andalus location claimed? Owner-verified?
 6. **Meta Business / Instagram Professional** — is the IG account a Professional account linked to a Facebook Page? (Pre-req for Graph API.)
 7. **WhatsApp inbound** — are customers messaging the WhatsApp Business number to place orders or ask questions? If yes, do we have a triage process today (manual reply)?
 8. **NFC stickers in-store** — exist? Point to which URL?
