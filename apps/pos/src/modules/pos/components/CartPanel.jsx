@@ -5,6 +5,7 @@ import { Minus, Plus, X, Trash2, Tag, Shield, PauseCircle } from 'lucide-react'
 import { usePermission } from '../../../lib/usePermission'
 import { translations } from '../../../lib/i18n'
 import ManagerOverrideModal from './ManagerOverrideModal'
+import { format } from '../lib/money'
 
 // Local-only POS translation. Does NOT change document direction or
 // the global app language — only the in-cart button labels switch.
@@ -28,13 +29,13 @@ function CartItem({ item, onUpdateQty, onRemove }) {
           <p className="text-noch-muted text-xs italic mt-0.5">{item.notes}</p>
         )}
         <p className="text-noch-muted text-xs mt-0.5">
-          {parseFloat(item.price).toFixed(2)} LYD each
+          {format(item.price)} LYD each
         </p>
       </div>
 
       <div className="flex flex-col items-end gap-1 shrink-0">
         <p className="text-noch-green text-sm font-bold">
-          {(parseFloat(item.price) * item.quantity).toFixed(2)}
+          {format(parseFloat(item.price) * item.quantity)}
         </p>
 
         <div className="flex items-center gap-1">
@@ -168,21 +169,21 @@ function CartPanel({
           {/* Subtotal */}
           <div className="flex justify-between text-sm mb-1">
             <span className="text-noch-muted">{t('posSubtotal')}</span>
-            <span className="text-white">{subtotal.toFixed(2)} LYD</span>
+            <span className="text-white">{format(subtotal)} LYD</span>
           </div>
 
           {/* Discount */}
           {discountAmount > 0 && (
             <div className="flex justify-between text-sm mb-1">
               <span className="text-noch-muted">{t('posDiscount')}</span>
-              <span className="text-yellow-400">-{discountAmount.toFixed(2)} LYD</span>
+              <span className="text-yellow-400">-{format(discountAmount)} LYD</span>
             </div>
           )}
 
           {/* Total */}
           <div className="flex justify-between items-center mb-4">
             <span className="text-white font-bold text-lg">{t('posTotal')}</span>
-            <span className="text-noch-green font-bold text-2xl">{total.toFixed(2)} LYD</span>
+            <span className="text-noch-green font-bold text-2xl">{format(total)} LYD</span>
           </div>
 
           {/* Discount toggle */}
@@ -303,7 +304,7 @@ function CartPanel({
               className="btn-primary flex-1 py-4 text-lg font-bold rounded-xl"
               disabled={items.length === 0}
             >
-              {t('posCharge')} {total.toFixed(2)} LYD
+              {t('posCharge')} {format(total)} LYD
             </button>
           </div>
         </div>

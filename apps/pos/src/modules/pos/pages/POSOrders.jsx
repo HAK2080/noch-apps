@@ -16,6 +16,7 @@ import { usePermissions } from '../../../contexts/PermissionsContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+import { format } from '../lib/money'
 
 // Roles allowed to see top-line totals (Revenue / Cash / Card / Presto).
 // Staff and limited_staff are scoped to per-order detail only.
@@ -122,7 +123,7 @@ function RefundModal({ order, onClose, onSaved }) {
     try {
       const servedBy = getServedBy()?.id || null
       await refundPOSOrderLines(order.id, lines, reason, servedBy)
-      toast.success(`Refunded ${totalToRefund.toFixed(2)} LYD`)
+      toast.success(`Refunded ${format(totalToRefund)} LYD`)
       onSaved()
       onClose()
     } catch (err) {
@@ -154,7 +155,7 @@ function RefundModal({ order, onClose, onSaved }) {
                   <div className="min-w-0">
                     <p className="text-white text-sm truncate">{it.product_name}</p>
                     <p className="text-noch-muted text-xs">
-                      {it.quantity} × {Number(it.unit_price).toFixed(2)}
+                      {Number(it.quantity || 0).toLocaleString('en-US')} × {format(it.unit_price)}
                       {it.refunded_qty > 0 && ` · ${it.refunded_qty} refunded`}
                     </p>
                   </div>
@@ -187,7 +188,7 @@ function RefundModal({ order, onClose, onSaved }) {
 
           <div className="flex justify-between items-center bg-noch-dark/50 rounded-lg px-3 py-2 mb-3">
             <span className="text-noch-muted text-sm">Refund total</span>
-            <span className="text-noch-green font-bold">{totalToRefund.toFixed(2)} LYD</span>
+            <span className="text-noch-green font-bold">{format(totalToRefund)} LYD</span>
           </div>
 
           <div className="flex gap-3">
@@ -482,7 +483,7 @@ export default function POSOrders() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Revenue</p>
-                <p className="text-noch-green font-bold text-lg leading-tight">{summary.revenue.toFixed(2)}</p>
+                <p className="text-noch-green font-bold text-lg leading-tight">{format(summary.revenue)}</p>
                 <p className="text-noch-muted text-[10px]">LYD</p>
               </div>
               <div>
@@ -492,26 +493,26 @@ export default function POSOrders() {
               </div>
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Cash</p>
-                <p className="text-white font-bold text-lg leading-tight">{summary.cash.toFixed(2)}</p>
+                <p className="text-white font-bold text-lg leading-tight">{format(summary.cash)}</p>
                 <p className="text-noch-muted text-[10px]">LYD</p>
               </div>
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Card</p>
-                <p className="text-white font-bold text-lg leading-tight">{summary.card.toFixed(2)}</p>
+                <p className="text-white font-bold text-lg leading-tight">{format(summary.card)}</p>
                 <p className="text-noch-muted text-[10px]">LYD</p>
               </div>
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Presto</p>
-                <p className="text-white font-bold text-lg leading-tight">{summary.presto.toFixed(2)}</p>
+                <p className="text-white font-bold text-lg leading-tight">{format(summary.presto)}</p>
                 <p className="text-noch-muted text-[10px]">LYD</p>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-2 flex-wrap text-xs">
               {summary.refunds > 0 && (
-                <span className="text-red-400">↩ {summary.refunds.toFixed(2)} LYD refunded (already deducted from Revenue)</span>
+                <span className="text-red-400">↩ {format(summary.refunds)} LYD refunded (already deducted from Revenue)</span>
               )}
               {summary.other > 0 && (
-                <span className="text-noch-muted">+ {summary.other.toFixed(2)} LYD other methods</span>
+                <span className="text-noch-muted">+ {format(summary.other)} LYD other methods</span>
               )}
             </div>
           </div>
@@ -573,15 +574,15 @@ export default function POSOrders() {
                     <div className="text-right">
                       {refundAmt > 0 ? (
                         <>
-                          <p className="text-white font-bold line-through opacity-60 text-sm">{Number(o.total).toFixed(2)}</p>
-                          <p className="text-red-400 text-xs">-{refundAmt.toFixed(2)} refunded</p>
-                          <p className="text-noch-green font-bold">{netTotal.toFixed(2)} LYD</p>
+                          <p className="text-white font-bold line-through opacity-60 text-sm">{format(o.total)}</p>
+                          <p className="text-red-400 text-xs">-{format(refundAmt)} refunded</p>
+                          <p className="text-noch-green font-bold">{format(netTotal)} LYD</p>
                         </>
                       ) : (
-                        <p className="text-white font-bold">{Number(o.total).toFixed(2)} LYD</p>
+                        <p className="text-white font-bold">{format(o.total)} LYD</p>
                       )}
                       {Number(o.discount_amount) > 0 && (
-                        <p className="text-yellow-400 text-xs">-{Number(o.discount_amount).toFixed(2)} disc</p>
+                        <p className="text-yellow-400 text-xs">-{format(o.discount_amount)} disc</p>
                       )}
                     </div>
                     <span className="text-noch-muted text-xs">{isExpanded ? '▲' : '▼'}</span>
@@ -616,9 +617,9 @@ export default function POSOrders() {
                                 )}
                               </div>
                               <div className="text-right shrink-0 ml-3">
-                                <p className="text-noch-muted text-xs">{it.quantity} × {Number(it.unit_price).toFixed(2)}</p>
+                                <p className="text-noch-muted text-xs">{Number(it.quantity || 0).toLocaleString('en-US')} × {format(it.unit_price)}</p>
                                 <p className={`text-white text-sm font-medium ${fullyRefunded ? 'line-through' : ''}`}>
-                                  {Number(it.total || it.unit_price * it.quantity).toFixed(2)} LYD
+                                  {format(it.total || it.unit_price * it.quantity)} LYD
                                 </p>
                               </div>
                             </div>

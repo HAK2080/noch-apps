@@ -1,3 +1,5 @@
+import { formatCurrency } from '../../../lib/numbers'
+
 // thresholds.js — colour-band logic for Finance KPI cards.
 // A ratio (0–1) sits inside, on the edge of, or outside the band.
 
@@ -41,7 +43,5 @@ export function pct(ratio, dp = 1) {
 }
 
 export function lyd(amount, dp = 2) {
-  const n = Number(amount)
-  if (!Number.isFinite(n)) return '—'
-  return `${n.toFixed(dp)} LYD`
+  return formatCurrency(amount, 'LYD', dp)
 }

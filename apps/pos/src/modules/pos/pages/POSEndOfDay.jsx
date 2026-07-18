@@ -14,6 +14,7 @@ import Layout from '../../../components/Layout'
 import { usePermission } from '../../../lib/usePermission'
 import { AccessDenied } from '../../../components/shared/ProtectedFeature'
 import toast from 'react-hot-toast'
+import { format } from '../lib/money'
 
 const MOVEMENT_TYPES = [
   { key: 'paid_in',         label: 'Paid In',     icon: ArrowDownCircle, color: 'text-noch-green',  hint: 'Cash added to drawer (e.g. owner top-up)' },
@@ -246,7 +247,7 @@ export default function POSEndOfDay() {
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="card text-center">
                 <p className="text-noch-muted text-xs mb-1">Total Sales</p>
-                <p className="text-noch-green font-bold text-xl">{parseFloat(shift.total_sales).toFixed(2)}</p>
+                <p className="text-noch-green font-bold text-xl">{format(shift.total_sales)}</p>
                 <p className="text-noch-muted text-xs">LYD</p>
               </div>
               <div className="card text-center">
@@ -255,11 +256,11 @@ export default function POSEndOfDay() {
               </div>
               <div className="card text-center">
                 <p className="text-noch-muted text-xs mb-1">Cash Sales</p>
-                <p className="text-white font-bold text-lg">{parseFloat(shift.total_cash_sales).toFixed(2)}</p>
+                <p className="text-white font-bold text-lg">{format(shift.total_cash_sales)}</p>
               </div>
               <div className="card text-center">
                 <p className="text-noch-muted text-xs mb-1">Card Sales</p>
-                <p className="text-white font-bold text-lg">{parseFloat(shift.total_card_sales).toFixed(2)}</p>
+                <p className="text-white font-bold text-lg">{format(shift.total_card_sales)}</p>
               </div>
             </div>
 
@@ -275,12 +276,12 @@ export default function POSEndOfDay() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-noch-muted text-xs mb-0.5">Presto Sales</p>
-                    <p className="text-white font-bold">{parseFloat(shift.total_presto_sales).toFixed(2)} LYD</p>
+                    <p className="text-white font-bold">{format(shift.total_presto_sales)} LYD</p>
                   </div>
                   <div>
                     <p className="text-noch-muted text-xs mb-0.5">Owed by Presto</p>
                     <p className={`font-bold ${parseFloat(shift.total_presto_uncollected || 0) > 0 ? 'text-yellow-400' : 'text-noch-green'}`}>
-                      {parseFloat(shift.total_presto_uncollected || 0).toFixed(2)} LYD
+                      {format(shift.total_presto_uncollected || 0)} LYD
                     </p>
                   </div>
                 </div>
@@ -296,7 +297,7 @@ export default function POSEndOfDay() {
                     <span className="text-white text-sm">{p.name}</span>
                     <div className="text-right">
                       <span className="text-noch-muted text-xs">{p.qty} sold</span>
-                      <span className="text-noch-green text-sm font-medium ml-3">{p.total.toFixed(2)}</span>
+                      <span className="text-noch-green text-sm font-medium ml-3">{format(p.total)}</span>
                     </div>
                   </div>
                 ))}
@@ -318,19 +319,19 @@ export default function POSEndOfDay() {
               <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                 <div className="flex justify-between bg-noch-dark/50 rounded px-2 py-1">
                   <span className="text-noch-muted">Paid In</span>
-                  <span className="text-noch-green">+{parseFloat(shift.total_paid_in || 0).toFixed(2)}</span>
+                  <span className="text-noch-green">+{format(shift.total_paid_in || 0)}</span>
                 </div>
                 <div className="flex justify-between bg-noch-dark/50 rounded px-2 py-1">
                   <span className="text-noch-muted">Paid Out</span>
-                  <span className="text-yellow-400">-{parseFloat(shift.total_paid_out || 0).toFixed(2)}</span>
+                  <span className="text-yellow-400">-{format(shift.total_paid_out || 0)}</span>
                 </div>
                 <div className="flex justify-between bg-noch-dark/50 rounded px-2 py-1">
                   <span className="text-noch-muted">Safe Drop</span>
-                  <span className="text-blue-400">-{parseFloat(shift.total_safe_drop || 0).toFixed(2)}</span>
+                  <span className="text-blue-400">-{format(shift.total_safe_drop || 0)}</span>
                 </div>
                 <div className="flex justify-between bg-noch-dark/50 rounded px-2 py-1">
                   <span className="text-noch-muted">Tip Out</span>
-                  <span className="text-purple-400">-{parseFloat(shift.total_tip_out || 0).toFixed(2)}</span>
+                  <span className="text-purple-400">-{format(shift.total_tip_out || 0)}</span>
                 </div>
               </div>
               {/* Recent list */}
@@ -350,7 +351,7 @@ export default function POSEndOfDay() {
                           </div>
                         </div>
                         <span className={`shrink-0 font-mono ${meta?.color || 'text-white'}`}>
-                          {m.movement_type === 'drawer_no_sale' ? '—' : `${m.movement_type === 'paid_in' ? '+' : '-'}${parseFloat(m.amount).toFixed(2)}`}
+                          {m.movement_type === 'drawer_no_sale' ? '—' : `${m.movement_type === 'paid_in' ? '+' : '-'}${format(m.amount)}`}
                         </span>
                       </div>
                     )
@@ -365,11 +366,11 @@ export default function POSEndOfDay() {
               <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
                 <div>
                   <p className="text-noch-muted text-xs mb-1">Expected Cash</p>
-                  <p className="text-white font-bold">{expectedCash.toFixed(2)} LYD</p>
+                  <p className="text-white font-bold">{format(expectedCash)} LYD</p>
                 </div>
                 <div>
                   <p className="text-noch-muted text-xs mb-1">Opening Cash</p>
-                  <p className="text-white">{parseFloat(shift.opening_cash).toFixed(2)} LYD</p>
+                  <p className="text-white">{format(shift.opening_cash)} LYD</p>
                 </div>
               </div>
 
@@ -394,7 +395,7 @@ export default function POSEndOfDay() {
                     cashDiff === 0 ? 'text-noch-green' :
                     cashDiff > 0 ? 'text-blue-400' : 'text-red-400'
                   }`}>
-                    {cashDiff > 0 ? '+' : ''}{cashDiff.toFixed(2)} LYD
+                    {cashDiff > 0 ? '+' : ''}{format(cashDiff)} LYD
                   </span>
                 </div>
               )}

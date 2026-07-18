@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, CheckCircle, Clock, Package, ShoppingBag, RefreshCw, Plus, ChevronRight, UserCheck, X, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { formatCurrency } from '../lib/numbers'
 import { getStaffProfiles } from '../lib/profiles'
 import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment } from '../lib/tasks'
 import { getPnL } from '../modules/finance/lib/finance-supabase'
@@ -541,7 +542,7 @@ export default function Dashboard() {
                       <p className="text-noch-muted text-xs mt-0.5">{order.order_number} · {order.branch?.name}</p>
                     </div>
                     <div className="text-right shrink-0 ml-3">
-                      <p className="text-blue-400 text-sm font-semibold">{order.total?.toFixed(2)} LYD</p>
+                      <p className="text-blue-400 text-sm font-semibold">{formatCurrency(order.total || 0)}</p>
                       <p className="text-noch-muted text-xs">{paymentLabel[order.payment_method] || order.payment_method}</p>
                     </div>
                   </div>

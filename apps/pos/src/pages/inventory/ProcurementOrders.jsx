@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { ShoppingCart, Plus, X, Check, Loader2, Package } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatFixed, formatCurrency } from '../../lib/numbers'
 import {
   getProcurementOrders,
   createProcurementOrder,
@@ -278,7 +279,7 @@ export default function ProcurementOrders() {
                     <td className="py-3 px-3 text-noch-muted text-right">{order.shipping_cost_lyd || 0}</td>
                     <td className="py-3 px-3 text-noch-muted text-right">{order.customs_cost_lyd || 0}</td>
                     <td className="py-3 px-3 text-noch-muted text-right">{order.other_cost_lyd || 0}</td>
-                    <td className="py-3 px-3 text-white font-medium text-right">{parseFloat(order.total_cost_lyd || 0).toFixed(2)}</td>
+                    <td className="py-3 px-3 text-white font-medium text-right">{formatFixed(order.total_cost_lyd || 0, 2, '0.00')}</td>
                     <td className="py-3 px-3 text-noch-muted text-xs">{new Date(order.created_at).toLocaleDateString()}</td>
                     <td className="py-3 px-3"><StatusBadge status={order.status} /></td>
                     <td className="py-3 px-3 text-right">
@@ -306,7 +307,7 @@ export default function ProcurementOrders() {
                 {/* Totals row */}
                 <tr className="border-t-2 border-noch-border bg-noch-dark/50">
                   <td colSpan={7} className="py-3 px-3 text-noch-muted font-medium text-right">Total:</td>
-                  <td className="py-3 px-3 text-noch-green font-bold text-right">{totalCost.toFixed(2)} LYD</td>
+                  <td className="py-3 px-3 text-noch-green font-bold text-right">{formatCurrency(totalCost)}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tbody>
@@ -418,7 +419,7 @@ export default function ProcurementOrders() {
                 {/* Auto-calculated total */}
                 <div className="bg-noch-dark rounded-lg p-3 flex items-center justify-between">
                   <span className="text-noch-muted text-sm">Total Cost:</span>
-                  <span className="text-noch-green font-bold">{calcTotal(form).toFixed(2)} LYD</span>
+                  <span className="text-noch-green font-bold">{formatCurrency(calcTotal(form))}</span>
                 </div>
                 <div>
                   <label className="text-noch-muted text-xs mb-1 block">Notes</label>

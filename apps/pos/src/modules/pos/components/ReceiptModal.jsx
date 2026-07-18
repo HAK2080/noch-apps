@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
+import { format } from '../lib/money'
 
 // Where the customer-facing Passport page lives. The clean URL is
 // served by /var/www/html/passport/index.html (a redirect file from the
@@ -129,7 +130,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
               <div key={i} className="flex justify-between mb-1">
                 <span className="text-white flex-1 truncate">{item.product_name || item.name}</span>
                 <span className="text-noch-muted ml-2 shrink-0">
-                  {item.quantity}x {parseFloat(item.unit_price || item.price).toFixed(2)}
+                  {Number(item.quantity || 0).toLocaleString('en-US')}x {format(item.unit_price || item.price)}
                 </span>
               </div>
             ))}
@@ -137,28 +138,28 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
             <div className="border-t border-dashed border-noch-border my-2" />
             <div className="flex justify-between text-noch-muted">
               <span>{t('posSubtotal')}</span>
-              <span>{parseFloat(order.subtotal).toFixed(2)}</span>
+              <span>{format(order.subtotal)}</span>
             </div>
             {parseFloat(order.discount_amount) > 0 && (
               <div className="flex justify-between text-yellow-400">
                 <span>{t('posDiscount')}</span>
-                <span>-{parseFloat(order.discount_amount).toFixed(2)}</span>
+                <span>-{format(order.discount_amount)}</span>
               </div>
             )}
             <div className="flex justify-between text-white font-bold text-sm mt-1">
               <span>{t('receiptTotal')}</span>
-              <span>{parseFloat(order.total).toFixed(2)} LYD</span>
+              <span>{format(order.total)} LYD</span>
             </div>
 
             {order.payment_method === 'cash' && order.cash_tendered && (
               <>
                 <div className="flex justify-between text-noch-muted mt-1">
                   <span>{t('receiptCash')}</span>
-                  <span>{parseFloat(order.cash_tendered).toFixed(2)}</span>
+                  <span>{format(order.cash_tendered)}</span>
                 </div>
                 <div className="flex justify-between text-noch-green">
                   <span>{t('receiptChange')}</span>
-                  <span>{parseFloat(order.change_due || 0).toFixed(2)}</span>
+                  <span>{format(order.change_due || 0)}</span>
                 </div>
               </>
             )}

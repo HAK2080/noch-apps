@@ -6,6 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../loyalty/lib/loyalty-supabase'
+import { format, round, sum, lineTotal } from '../lib/money'
 // Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
 const QRScanner      = lazy(() => import('../components/QRScanner'))
@@ -37,7 +38,6 @@ import PrintHostBadge from '../components/PrintHostBadge'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
-import { round, sum, lineTotal } from '../lib/money'
 import { isPrinterConnected, printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
 import { isPrintHost, startHostSubscriber, stopHostSubscriber } from '../lib/print-queue'
 import { sendCustomerGreeting } from '../../../lib/vestaboard'
@@ -131,7 +131,7 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
             {order.pos_order_items.map((it, i) => (
               <div key={i} className="flex justify-between text-sm py-1">
                 <span className="text-white">{it.quantity}× {it.product_name_ar || it.product_name}</span>
-                <span className="text-noch-muted">{Number(it.total).toFixed(2)}</span>
+                <span className="text-noch-muted">{format(it.total)}</span>
               </div>
             ))}
           </div>
@@ -139,7 +139,7 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
         {/* Total */}
         <div className="flex justify-between items-center px-5 py-3 border-b border-noch-border">
           <span className="text-noch-muted">Total</span>
-          <span className="text-white font-bold text-lg">{Number(order.total).toFixed(2)} LYD</span>
+          <span className="text-white font-bold text-lg">{format(order.total)} LYD</span>
         </div>
         {/* Pickup code */}
         {order.pickup_code && (
@@ -242,7 +242,7 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-white font-semibold">{Number(order.total).toFixed(2)} LYD</span>
+          <span className="text-white font-semibold">{format(order.total)} LYD</span>
           <span className="text-noch-muted text-xs">
             {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>

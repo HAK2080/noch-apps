@@ -9,6 +9,7 @@ const QRScanner      = lazy(() => import('./QRScanner'))
 import { lookupLoyaltyQR, lookupOrCreateLoyaltyCustomer } from '../../loyalty/lib/loyalty-supabase'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
+import { format } from '../lib/money'
 
 // Local-only POS translation — see CartPanel for rationale.
 const posT = (key, lang) =>
@@ -153,7 +154,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
               <h2 className="text-white font-bold text-xl">{t('posPayment')}</h2>
-              <p className="text-noch-green text-2xl font-bold mt-1">{total.toFixed(2)} LYD</p>
+              <p className="text-noch-green text-2xl font-bold mt-1">{format(total)} LYD</p>
             </div>
             <button onClick={onClose} className="text-noch-muted hover:text-white p-1">
               <X size={20} />
@@ -189,12 +190,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
               <div>
                 <p className="text-noch-muted text-sm mb-2">{t('posCashTendered')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
-                  <span className="text-white text-2xl font-bold">{parseFloat(cashTendered || 0).toFixed(2)} LYD</span>
+                  <span className="text-white text-2xl font-bold">{format(cashTendered || 0)} LYD</span>
                 </div>
                 {changeDue > 0 && (
                   <div className="flex justify-between items-center mt-3 bg-noch-green/10 border border-noch-green/20 rounded-xl px-4 py-3">
                     <span className="text-noch-green font-medium">{t('posChangeDue')}</span>
-                    <span className="text-noch-green font-bold text-xl">{changeDue.toFixed(2)} LYD</span>
+                    <span className="text-noch-green font-bold text-xl">{format(changeDue)} LYD</span>
                   </div>
                 )}
                 {/* Quick amounts — big tappable buttons, shown first */}
@@ -224,7 +225,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 <p className="text-white font-semibold mb-1">{t('posVerifoneHint')}</p>
                 <p className="text-noch-muted text-sm mb-4">{t('posVerifoneSub')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(total)} LYD</p>
                 </div>
               </div>
             )}
@@ -234,12 +235,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
               <div>
                 <p className="text-noch-muted text-sm mb-2">{t('posCardAmount')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
-                  <span className="text-white text-2xl font-bold">{parseFloat(cardAmount || 0).toFixed(2)} LYD</span>
+                  <span className="text-white text-2xl font-bold">{format(cardAmount || 0)} LYD</span>
                 </div>
                 {splitValid && (
                   <div className="flex justify-between items-center mt-2 bg-noch-card border border-noch-border rounded-xl px-4 py-2">
                     <span className="text-noch-muted text-sm">{t('posCashRemaining')}</span>
-                    <span className="text-white font-semibold">{splitCash.toFixed(2)} LYD</span>
+                    <span className="text-white font-semibold">{format(splitCash)} LYD</span>
                   </div>
                 )}
                 <Numpad value={cardAmount} onChange={setCardAmount} />
@@ -254,7 +255,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 <p className="text-noch-muted text-sm mb-1">{t('posPrestoSub')}</p>
                 <p className="text-yellow-400 text-xs mb-4">{t('posPrestoNote')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(total)} LYD</p>
                 </div>
               </div>
             )}

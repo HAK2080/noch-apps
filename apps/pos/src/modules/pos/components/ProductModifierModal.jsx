@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { getModifierGroupsForProduct } from '../lib/pos-supabase'
-import { round, lineTotal } from '../lib/money'
+import { format, round, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
 
 export default function ProductModifierModal({ product, onAdd, onClose, groups: groupsProp = null, posLang = 'en' }) {
@@ -167,8 +167,8 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
                             >
                               <span>{mName(m)}</span>
                               <span className={`text-xs font-mono ${checked ? 'text-noch-green' : ''}`}>
-                                {Number(m.price_delta) > 0 ? `+${Number(m.price_delta).toFixed(2)}` :
-                                 Number(m.price_delta) < 0 ? `${Number(m.price_delta).toFixed(2)}` : ''}
+                                {Number(m.price_delta) > 0 ? `+${format(m.price_delta)}` :
+                                 Number(m.price_delta) < 0 ? format(m.price_delta) : ''}
                               </span>
                             </button>
                           )
@@ -183,7 +183,7 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
 
           <div className="flex items-center justify-between mt-5 mb-3 bg-noch-dark/50 rounded-lg px-3 py-2">
             <span className="text-noch-muted text-sm">{isAr ? 'المجموع' : 'Total'}</span>
-            <span className="text-noch-green font-bold">{lineTtl.toFixed(2)} LYD</span>
+            <span className="text-noch-green font-bold">{format(lineTtl)} LYD</span>
           </div>
           <button
             onClick={handleAdd}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { formatCurrency } from '../../lib/numbers'
 import './styles/Checkout.css'
 
 export default function Checkout() {
@@ -144,14 +145,14 @@ export default function Checkout() {
                 <p className="item-qty">Qty: {item.quantity}</p>
               </div>
               <p className="item-price">
-                {(product.price * item.quantity).toFixed(2)} LYD
+                {formatCurrency(product.price * item.quantity)}
               </p>
             </div>
           )
         })}
         <div className="checkout-total">
           <strong>Total:</strong>
-          <strong>{total.toFixed(2)} LYD</strong>
+          <strong>{formatCurrency(total)}</strong>
         </div>
       </div>
 

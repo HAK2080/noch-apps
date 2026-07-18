@@ -1,9 +1,9 @@
 // expensesData.js — Expenses module: formatting helpers + DB access
 import { supabase } from '../../../lib/supabase'
+import { formatCurrency } from '../../../lib/numbers'
 
 // ── Formatting ──────────────────────────────────────────────
-export const fmt = (n, currency = 'LYD') =>
-  `${Number(n || 0).toLocaleString('en', { maximumFractionDigits: 2 })} ${currency}`
+export const fmt = (n, currency = 'LYD') => formatCurrency(n || 0, currency, 2)
 
 // Fall back to amount when amount_lyd wasn't populated (older records)
 export const amtLyd = (e) => e.amount_lyd ?? ((e.amount || 0) * (e.exchange_rate_to_lyd || 1))

@@ -9,6 +9,7 @@ import {
 } from '../lib/pos-supabase'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
+import { format } from '../lib/money'
 
 function formatHm(start, end) {
   if (!start) return '—'
@@ -92,7 +93,7 @@ export default function ShiftAttendees({ shiftId, branchId, onClose }) {
                       <div>
                         <p className="text-white text-sm">{a.profiles?.full_name || 'Staff'}</p>
                         <p className="text-noch-muted text-[10px]">
-                          {formatHm(a.clocked_in_at, null)} · {a.total_orders} orders · {Number(a.total_sales).toFixed(2)} LYD
+                          {formatHm(a.clocked_in_at, null)} · {Number(a.total_orders || 0).toLocaleString('en-US')} orders · {format(a.total_sales)} LYD
                         </p>
                       </div>
                       <button
@@ -137,7 +138,7 @@ export default function ShiftAttendees({ shiftId, branchId, onClose }) {
                       <div key={a.id} className="flex items-center justify-between text-xs">
                         <span className="text-white">{a.profiles?.full_name || 'Staff'}</span>
                         <span className="text-noch-muted">
-                          {formatHm(a.clocked_in_at, a.clocked_out_at)} · {Number(a.total_sales).toFixed(2)} LYD
+                          {formatHm(a.clocked_in_at, a.clocked_out_at)} · {format(a.total_sales)} LYD
                         </span>
                       </div>
                     ))}

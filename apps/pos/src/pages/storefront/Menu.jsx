@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { formatFixed } from '../../lib/numbers'
 import nochLogo from '../../assets/noch-logo.png'
 import './styles/Menu.css'
 
@@ -101,7 +102,7 @@ function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor,
         </div>
       </button>
       <div className="scroll-card-footer">
-        <span className="scroll-card-price">{parseFloat(p.price).toFixed(2)}<small> {currency}</small></span>
+        <span className="scroll-card-price">{formatFixed(p.price)}<small> {currency}</small></span>
         {!soldOut && (qty === 0 ? (
           <button className="btn-add" onClick={onAdd}>+</button>
         ) : (
@@ -148,7 +149,7 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, on
         </div>
       </button>
       <div className="list-row-right">
-        <span className="list-row-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+        <span className="list-row-price">{formatFixed(p.price)} <small>{currency}</small></span>
         {!soldOut && (qty === 0 ? (
           <button className="btn-add btn-add-sm" onClick={onAdd}>+</button>
         ) : (
@@ -197,7 +198,7 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, o
       </button>
       <div className="grid-card-body">
         <div className="grid-card-footer">
-          <span className="grid-card-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+          <span className="grid-card-price">{formatFixed(p.price)} <small>{currency}</small></span>
           {!soldOut && (qty === 0 ? (
             <button className="btn-add" onClick={onAdd}>+</button>
           ) : (
@@ -234,7 +235,7 @@ function TextSection({ products, cart, onAdd, onRemove, name_, desc_, currency, 
               <div className="text-row-line">
                 <span className="text-row-name">{name_(p)}</span>
                 <span className="text-row-dots" />
-                <span className="text-row-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+                <span className="text-row-price">{formatFixed(p.price)} <small>{currency}</small></span>
               </div>
               {desc && <p className="text-row-desc">{desc}</p>}
             </div>
@@ -278,7 +279,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
               </div>
             )}
             <p className="addon-name">{name_(p)}</p>
-            <p className="addon-price">{parseFloat(p.price).toFixed(2)} {currency}</p>
+            <p className="addon-price">{formatFixed(p.price)} {currency}</p>
             {!soldOut && (qty === 0 ? (
               <button className="btn-add btn-add-xs" onClick={() => onAdd(p.id)}>+</button>
             ) : (
@@ -392,7 +393,7 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
           {fullDesc && <p className="detail-desc">{fullDesc}</p>}
 
           <div className="detail-footer">
-            <span className="detail-price">{parseFloat(p.price).toFixed(2)} <small>{currency}</small></span>
+            <span className="detail-price">{formatFixed(p.price)} <small>{currency}</small></span>
             {soldOut ? (
               <span className="detail-unavailable">{t('Unavailable', 'غير متوفر')}</span>
             ) : qty === 0 ? (
@@ -599,7 +600,7 @@ export default function Menu() {
       }
       if (data?.error) throw new Error(data.error)
       setOrderResult(data); setCart({})
-      const msg = `🛎 NEW ORDER ${data.order_number}${tableNumber ? ` · Table ${tableNumber}` : ''}\n${name} · ${finalTotal.toFixed(2)} ${currency}${couponApplied ? ` (${couponApplied.message})` : ''}\nCode: ${data.pickup_code} ← confirm at POS`
+      const msg = `🛎 NEW ORDER ${data.order_number}${tableNumber ? ` · Table ${tableNumber}` : ''}\n${name} · ${formatFixed(finalTotal)} ${currency}${couponApplied ? ` (${couponApplied.message})` : ''}\nCode: ${data.pickup_code} ← confirm at POS`
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace('/rest/v1', '') || ''
       fetch(`${supabaseUrl}/functions/v1/send-telegram`, {
         method: 'POST',
@@ -729,7 +730,7 @@ export default function Menu() {
         <div className="cart-bar" onClick={() => setShowCheckout(true)}>
           <span className="cart-badge">{cartCount}</span>
           <span className="cart-bar-label">{t('View Order', 'عرض الطلب')}</span>
-          <span className="cart-bar-total">{cartTotal.toFixed(2)} {currency}</span>
+          <span className="cart-bar-total">{formatFixed(cartTotal)} {currency}</span>
         </div>
       )}
 
@@ -765,7 +766,7 @@ export default function Menu() {
                   </button>
                 </div>
                 <p className="order-number">{orderResult.order_number}</p>
-                <p className="order-total">{Number(orderResult.total).toFixed(2)} {currency}</p>
+                <p className="order-total">{formatFixed(orderResult.total)} {currency}</p>
                 {tableNumber && <p className="order-table">{t('Table', 'طاولة')} {tableNumber}</p>}
                 <p className="staff-note">{t('The cashier will confirm your order shortly.', 'سيقوم الكاشير بتأكيد طلبك في أقرب وقت.')}</p>
                 <a
@@ -796,23 +797,23 @@ export default function Menu() {
                       <div key={id} className="sheet-item">
                         <span className="sheet-item-qty">{qty}×</span>
                         <span className="sheet-item-name">{name_(p)}</span>
-                        <span className="sheet-item-price">{(p.price * qty).toFixed(2)} {currency}</span>
+                        <span className="sheet-item-price">{formatFixed(p.price * qty)} {currency}</span>
                       </div>
                     )
                   })}
                   <div className={`sheet-total${couponApplied ? ' crossed' : ''}`}>
                     <span>{t('Subtotal', 'المجموع الفرعي')}</span>
-                    <span>{cartTotal.toFixed(2)} {currency}</span>
+                    <span>{formatFixed(cartTotal)} {currency}</span>
                   </div>
                   {couponApplied && (
                     <>
                       <div className="sheet-discount-row">
                         <span>🎉 {couponApplied.message}</span>
-                        <span>−{couponApplied.discount_amount.toFixed(2)} {currency}</span>
+                        <span>−{formatFixed(couponApplied.discount_amount)} {currency}</span>
                       </div>
                       <div className="sheet-final-total">
                         <span>{t('Total', 'الإجمالي')}</span>
-                        <span>{finalTotal.toFixed(2)} {currency}</span>
+                        <span>{formatFixed(finalTotal)} {currency}</span>
                       </div>
                     </>
                   )}
@@ -836,7 +837,7 @@ export default function Menu() {
                       {couponChecking ? '…' : couponApplied ? t('✕ Remove', '✕ إزالة') : t('Apply', 'تطبيق')}
                     </button>
                   </div>
-                  {couponApplied && <p className="coupon-success">🎉 {couponApplied.message} — {t('saving', 'وفّرت')} <span>{couponApplied.discount_amount.toFixed(2)} {currency}</span></p>}
+                  {couponApplied && <p className="coupon-success">🎉 {couponApplied.message} — {t('saving', 'وفّرت')} <span>{formatFixed(couponApplied.discount_amount)} {currency}</span></p>}
                   {couponError && <p className="coupon-error">{couponError}</p>}
                 </div>
 
@@ -862,7 +863,7 @@ export default function Menu() {
                     <button type="button" className="btn-order" onClick={handlePlaceOrder} disabled={submitting}>
                       {submitting
                         ? t('Submitting…', 'جارٍ الإرسال…')
-                        : t(`Send to Cashier · ${finalTotal.toFixed(2)} ${currency}`, `إرسال للكاشير · ${finalTotal.toFixed(2)} ${currency}`)}
+                        : t(`Send to Cashier · ${formatFixed(finalTotal)} ${currency}`, `إرسال للكاشير · ${formatFixed(finalTotal)} ${currency}`)}
                     </button>
                   )}
                 </div>

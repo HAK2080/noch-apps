@@ -5,6 +5,8 @@
 // Callers should pass any value through `round` before arithmetic and
 // `format` for display/printing.
 
+import { formatFixed } from '../../../lib/numbers'
+
 export const DP = 2
 
 export function round(n) {
@@ -17,7 +19,7 @@ export function round(n) {
 }
 
 export function format(n) {
-  return round(n).toFixed(DP)
+  return formatFixed(round(n), DP, '0.00')
 }
 
 export function formatLYD(n) {
