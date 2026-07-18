@@ -37,7 +37,8 @@ const insightStyle = {
 const fmtLyd = (value) => `${Number(value || 0).toLocaleString('en-GB', { maximumFractionDigits: 2 })} LYD`
 const fmtDate = (value) => value ? new Date(value).toLocaleDateString('en-GB') : '-'
 
-function MetricCard({ icon: Icon, label, value, sub, tone = 'text-white' }) {
+function MetricCard({ icon, label, value, sub, tone = 'text-white' }) {
+  const MetricIcon = icon
   return (
     <div className="card !p-4">
       <div className="flex items-start justify-between gap-3">
@@ -46,7 +47,7 @@ function MetricCard({ icon: Icon, label, value, sub, tone = 'text-white' }) {
           <p className={`text-xl font-bold mt-1 ${tone}`}>{value}</p>
           {sub && <p className="text-noch-muted text-xs mt-1">{sub}</p>}
         </div>
-        <Icon size={18} className={tone} />
+        <MetricIcon size={18} className={tone} />
       </div>
     </div>
   )
@@ -80,6 +81,7 @@ export default function Report() {
   const { t, lang } = useLanguage()
   const { profile } = useAuth()
   const [periodDays, setPeriodDays] = useState(7)
+  const [branchId, setBranchId] = useState('')
   const [stats, setStats] = useState(null)
   const [tasks, setTasks] = useState([])
   const [report, setReport] = useState(null)
@@ -94,7 +96,7 @@ export default function Report() {
         getTaskStats(),
         getTasks(),
         getLastReport(),
-        getManagementReport({ days }),
+        getManagementReport({ days, branchId: branchId || null }),
       ])
       setStats(taskStats)
       setTasks(allTasks)
@@ -111,7 +113,7 @@ export default function Report() {
   useEffect(() => {
     load(periodDays)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodDays])
+  }, [periodDays, branchId])
 
   const staffBreakdown = useMemo(() => tasks.reduce((acc, task) => {
     const assignee = task.assignee || task.assignees?.[0]?.assignee
@@ -128,11 +130,13 @@ export default function Report() {
     const m = report?.metrics || {}
     const lines = [
       `Noch management report (${report?.period?.from} to ${report?.period?.to})`,
+      `Scope: ${report?.scope?.branchName || 'All branches'}`,
       `Net sales: ${fmtLyd(m.revenue)} from ${m.orders || 0} orders`,
       m.revenueAdjustments < 0 ? `Adjustments/refunds: ${fmtLyd(Math.abs(m.revenueAdjustments))}` : null,
       `Average ticket: ${fmtLyd(m.averageTicket)}`,
-      `Expenses: ${fmtLyd(m.expenses)}`,
-      `Net after expenses: ${fmtLyd(m.netAfterExpenses)}`,
+      `Operating expenses: ${fmtLyd(m.operatingExpenses)}`,
+      `CapEx/prepaid excluded from net: ${fmtLyd((m.capitalExpenses || 0) + (m.prepaidExpenses || 0))}`,
+      `Net after operating expenses: ${fmtLyd(m.netAfterExpenses)}`,
       `Low stock: ${m.lowStockCount || 0} items`,
       `WhatsApp failures: ${m.whatsappFailed || 0}`,
       `Tasks: ${stats?.pending || 0} pending, ${stats?.overdue || 0} overdue`,
@@ -176,6 +180,10 @@ export default function Report() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <select value={branchId} onChange={e => setBranchId(e.target.value)} className="input py-2 text-sm">
+            <option value="">All branches</option>
+            {report?.branches?.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
           <div className="flex rounded-lg border border-noch-border bg-noch-card p-1">
             {periods.map(period => (
               <button
@@ -205,8 +213,8 @@ export default function Report() {
           <div className={`grid gap-3 md:grid-cols-2 xl:grid-cols-4 ${refreshing ? 'opacity-60' : ''}`}>
             <MetricCard icon={ShoppingBag} label={`Net Sales (${selectedPeriodLabel})`} value={fmtLyd(m.revenue)} sub={salesSub} tone="text-noch-green" />
             <MetricCard icon={TrendIcon} label="Sales Trend" value={m.revenueChangePct == null ? 'No prior period' : `${m.revenueChangePct.toFixed(1)}%`} sub="vs previous period" tone={trendTone} />
-            <MetricCard icon={Receipt} label={`Expenses (${selectedPeriodLabel})`} value={fmtLyd(m.expenses)} sub={`${fmtLyd(m.approvedUnpaidExpenses)} approved unpaid`} tone="text-yellow-300" />
-            <MetricCard icon={CheckCircle2} label="Net After Expenses" value={fmtLyd(m.netAfterExpenses)} sub={`Avg ticket ${fmtLyd(m.averageTicket)}`} tone={m.netAfterExpenses >= 0 ? 'text-white' : 'text-red-400'} />
+            <MetricCard icon={Receipt} label={`Operating expenses (${selectedPeriodLabel})`} value={fmtLyd(m.operatingExpenses)} sub={`${fmtLyd((m.capitalExpenses || 0) + (m.prepaidExpenses || 0))} CapEx/prepaid excluded`} tone="text-yellow-300" />
+            <MetricCard icon={CheckCircle2} label="Net After Operating Expenses" value={fmtLyd(m.netAfterExpenses)} sub={`${report?.scope?.branchName || 'All branches'} · Avg ticket ${fmtLyd(m.averageTicket)}`} tone={m.netAfterExpenses >= 0 ? 'text-white' : 'text-red-400'} />
           </div>
 
           <div className={`grid gap-3 md:grid-cols-2 xl:grid-cols-4 ${refreshing ? 'opacity-60' : ''}`}>

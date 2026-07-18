@@ -85,6 +85,7 @@ const LoyaltySpinWheel = lazy(() => import('./modules/loyalty/pages/LoyaltySpinW
 const LoyaltyFeedback  = lazy(() => import('./modules/loyalty/pages/LoyaltyFeedback'))
 
 const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
+const SnapReceipt      = lazy(() => import('./pages/snap/SnapReceipt'))
 
 // Experience OS — Phase 1-10
 const InventoryIntelligence = lazy(() => import('./pages/inventory/InventoryIntelligence'))
@@ -124,7 +125,6 @@ function LegacyContentBusinessRedirect() {
 
 function OwnerRoute({ children }) {
   const { isOwner, loading } = useAuth()
-  const { t } = useLanguage()
   if (loading) return null
   if (!isOwner) return <Navigate to="/my-tasks" replace />
   return children
@@ -213,6 +213,10 @@ export default function App() {
 
         <Route path="/expenses/*" element={
           <ProtectedRoute><PermissionRoute feature="expenses"><ExpensesPage /></PermissionRoute></ProtectedRoute>
+        } />
+
+        <Route path="/snap" element={
+          <ProtectedRoute><PermissionRoute feature="expenses"><SnapReceipt /></PermissionRoute></ProtectedRoute>
         } />
 
         {/* Content Studio 2.0 (Noch 4.0) */}

@@ -14,7 +14,11 @@ const PRESETS = [
 import { businessToday } from '../../pos/lib/pos-supabase'
 
 // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
-function ymd(d) { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
+function ymd(value) {
+  if (typeof value === 'string') return value.slice(0, 10)
+  const p = n => String(n).padStart(2, '0')
+  return `${value.getFullYear()}-${p(value.getMonth() + 1)}-${p(value.getDate())}`
+}
 // Presets are BUSINESS days (5 AM → 5 AM): before 5 AM, "Today" still means
 // the evening's trading day that is wrapping up.
 function rangeFor(preset) {

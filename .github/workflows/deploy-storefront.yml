@@ -1,0 +1,46 @@
+name: Deploy noch.cloud storefront
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'apps/storefront/**'
+      - 'deploy.py'
+      - '.github/workflows/deploy-storefront.yml'
+
+concurrency:
+  group: storefront-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/storefront/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet paramiko
+      - name: Write application environment
+        working-directory: apps/storefront
+        env:
+          APP_ENV: ${{ secrets.NOCH_STOREFRONT_ENV }}
+        run: printf '%s\n' "$APP_ENV" > .env
+      - name: Write deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+      - name: Build and deploy
+        env:
+          NOCH_DEPLOY_SSH_KEY_PATH: /home/runner/.ssh/deploy_key
+        run: python deploy.py storefront

@@ -38,6 +38,19 @@ export async function getPnL({ branchId = null, from, to, netOfRefunds = false }
   return data || {}
 }
 
+export async function listProductsMissingCost(branchId = null) {
+  let query = supabase
+    .from('pos_products')
+    .select('id, name, name_ar, branch_id, price')
+    .eq('is_active', true)
+    .or('cost_lyd.is.null,cost_lyd.lte.0')
+    .order('name')
+  if (branchId) query = query.eq('branch_id', branchId)
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
 // The executive summary's single read interface. Keep branch health rules
 // here so every future summary surface uses the same definition.
 export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {

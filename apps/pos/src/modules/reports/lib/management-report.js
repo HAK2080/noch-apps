@@ -17,7 +17,7 @@ const safeRows = async (query, fallback = []) => {
   }
 }
 
-export async function getManagementReport({ days = 7 } = {}) {
+export async function getManagementReport({ days = 7, branchId = null } = {}) {
   const periodDays = Number(days) || 7
   const to = new Date()
   const from = new Date(to)
@@ -37,27 +37,30 @@ export async function getManagementReport({ days = 7 } = {}) {
   const fromDate = localDateKey(from)
   const toDate = localDateKey(to)
 
-  const [orders, prevOrders, expenses, stock, customers, outbox] = await Promise.all([
-    safeRows(
-      supabase
-        .from('pos_orders')
-        .select('id, total, subtotal, discount_amount, status, payment_method, created_at, loyalty_customer_id')
-        .eq('status', 'completed')
-        .gte('created_at', fromIso)
-        .lte('created_at', toIso)
-    ),
-    safeRows(
-      supabase
-        .from('pos_orders')
-        .select('id, total, status, created_at')
-        .eq('status', 'completed')
-        .gte('created_at', prevFromIso)
-        .lte('created_at', prevToIso)
-    ),
+  let ordersQuery = supabase
+    .from('pos_orders')
+    .select('id, total, subtotal, discount_amount, status, payment_method, created_at, loyalty_customer_id')
+    .eq('status', 'completed')
+    .gte('created_at', fromIso)
+    .lte('created_at', toIso)
+  let previousOrdersQuery = supabase
+    .from('pos_orders')
+    .select('id, total, status, created_at')
+    .eq('status', 'completed')
+    .gte('created_at', prevFromIso)
+    .lte('created_at', prevToIso)
+  if (branchId) {
+    ordersQuery = ordersQuery.eq('branch_id', branchId)
+    previousOrdersQuery = previousOrdersQuery.eq('branch_id', branchId)
+  }
+
+  const [orders, prevOrders, allExpenses, stock, customers, outbox, branches] = await Promise.all([
+    safeRows(ordersQuery),
+    safeRows(previousOrdersQuery),
     safeRows(
       supabase
         .from('expenses')
-        .select('id, amount, amount_lyd, exchange_rate_to_lyd, status, expense_date, paid_at, vendor, description')
+        .select('id, amount, amount_lyd, exchange_rate_to_lyd, status, expense_date, paid_at, vendor, description, cost_centers(pos_branch_id), expense_categories(name, finance_class)')
         .gte('expense_date', fromDate)
         .lte('expense_date', toDate)
     ),
@@ -77,7 +80,12 @@ export async function getManagementReport({ days = 7 } = {}) {
         .lte('created_at', toIso)
         .order('created_at', { ascending: false })
     ),
+    safeRows(supabase.from('pos_branches').select('id, name').eq('is_active', true).order('name')),
   ])
+
+  const expenses = branchId
+    ? allExpenses.filter(row => row.cost_centers?.pos_branch_id === branchId)
+    : allExpenses
 
   const money = (value) => Number(value || 0)
   const expenseAmount = (row) => money(row.amount_lyd ?? (money(row.amount) * money(row.exchange_rate_to_lyd || 1)))
@@ -87,6 +95,10 @@ export async function getManagementReport({ days = 7 } = {}) {
   const prevRevenue = prevOrders.reduce((sum, row) => sum + money(row.total), 0)
   const expenseRows = expenses.filter(row => row.status !== 'rejected')
   const expenseTotal = expenseRows.reduce((sum, row) => sum + expenseAmount(row), 0)
+  const opexRows = expenseRows.filter(row => (row.expense_categories?.finance_class || 'opex') === 'opex')
+  const capexRows = expenseRows.filter(row => row.expense_categories?.finance_class === 'capex')
+  const prepaidRows = expenseRows.filter(row => row.expense_categories?.finance_class === 'prepaid')
+  const operatingExpenses = opexRows.reduce((sum, row) => sum + expenseAmount(row), 0)
   const paidExpenses = expenses.filter(row => row.status === 'paid')
   const approvedUnpaidExpenses = expenses.filter(row => row.status === 'approved' && !row.paid_at)
   const lowStock = stock.filter(row => money(row.min_threshold) > 0 && money(row.qty_available) < money(row.min_threshold))
@@ -121,6 +133,11 @@ export async function getManagementReport({ days = 7 } = {}) {
 
   return {
     period: { days: periodDays, from: fromDate, to: toDate },
+    scope: {
+      branchId,
+      branchName: branchId ? branches.find(branch => branch.id === branchId)?.name || 'Selected branch' : 'All branches',
+    },
+    branches,
     metrics: {
       revenue,
       grossRevenue,
@@ -130,9 +147,12 @@ export async function getManagementReport({ days = 7 } = {}) {
       orders: orders.length,
       averageTicket: orders.length ? revenue / orders.length : 0,
       expenses: expenseTotal,
+      operatingExpenses,
+      capitalExpenses: capexRows.reduce((sum, row) => sum + expenseAmount(row), 0),
+      prepaidExpenses: prepaidRows.reduce((sum, row) => sum + expenseAmount(row), 0),
       paidExpenses: paidExpenses.reduce((sum, row) => sum + expenseAmount(row), 0),
       approvedUnpaidExpenses: approvedUnpaidExpenses.reduce((sum, row) => sum + expenseAmount(row), 0),
-      netAfterExpenses: revenue - expenseTotal,
+      netAfterExpenses: revenue - operatingExpenses,
       lowStockCount: lowStock.length,
       outOfStockCount: outOfStock.length,
       loyaltyCustomers: customers.length,
