@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ShoppingCart, Plus, X, Check, Loader2, Package } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
@@ -28,6 +29,7 @@ function StatusBadge({ status }) {
 }
 
 export default function ProcurementOrders() {
+  const [searchParams] = useSearchParams()
   const { profile } = useAuth()
   const [orders, setOrders] = useState([])
   const [ingredients, setIngredients] = useState([])
@@ -60,6 +62,17 @@ export default function ProcurementOrders() {
 
   useEffect(() => { loadData() }, [])
 
+  useEffect(() => {
+    const ingredientId = searchParams.get('ingredient')
+    if (!ingredientId) return
+    setForm(current => ({
+      ...current,
+      ingredient_id: ingredientId,
+      quantity_ordered: searchParams.get('qty') || current.quantity_ordered,
+    }))
+    setShowAddModal(true)
+  }, [searchParams])
+
   async function loadData() {
     try {
       setLoading(true)
@@ -71,7 +84,7 @@ export default function ProcurementOrders() {
       setOrders(orderData || [])
       setIngredients(ingredientData || [])
       setStock(stockData || [])
-    } catch (err) {
+    } catch {
       toast.error('Failed to load procurement data')
     } finally {
       setLoading(false)

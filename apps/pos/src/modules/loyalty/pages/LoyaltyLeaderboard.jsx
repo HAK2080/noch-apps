@@ -5,6 +5,7 @@ import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
 import BackButton from '../../../components/shared/BackButton'
 import { supabase } from '../../../lib/supabase'
+import { getLoyaltyStaffLeaderboard } from '../lib/loyalty-supabase'
 import toast from 'react-hot-toast'
 
 const TIER_COLORS = {
@@ -19,12 +20,18 @@ export default function LoyaltyLeaderboard() {
   const [customers, setCustomers] = useState([])
   const [period, setPeriod] = useState('alltime') // alltime | month
   const [loading, setLoading] = useState(true)
+  const [mode, setMode] = useState('customers')
+  const [staff, setStaff] = useState([])
 
-  useEffect(() => { load() }, [period])
+  useEffect(() => { load() }, [period, mode])
 
   const load = async () => {
     setLoading(true)
     try {
+      if (mode === 'staff') {
+        setStaff(await getLoyaltyStaffLeaderboard(period === 'month' ? 30 : 3650))
+        return
+      }
       let query = supabase
         .from('loyalty_customers')
         .select('id, full_name, total_stamps, current_stamps, total_visits, tier, last_visit_at, nochi_state')
@@ -50,6 +57,7 @@ export default function LoyaltyLeaderboard() {
 
   const medals = ['🥇', '🥈', '🥉']
 
+  // eslint-disable-next-line no-unused-vars
   const nochiEmoji = {
     happy: '😊', tired: '😴', sick: '🤒', sad: '😢', dead: null
   }
@@ -71,6 +79,11 @@ export default function LoyaltyLeaderboard() {
           </div>
         </div>
 
+        <div className="flex gap-2 mb-3">
+          <button onClick={() => setMode('customers')} className={`px-4 py-2 rounded-xl text-sm ${mode === 'customers' ? 'bg-noch-green text-noch-dark' : 'bg-noch-card border border-noch-border text-noch-muted'}`}>Customer leaderboard</button>
+          <button onClick={() => setMode('staff')} className={`px-4 py-2 rounded-xl text-sm ${mode === 'staff' ? 'bg-noch-green text-noch-dark' : 'bg-noch-card border border-noch-border text-noch-muted'}`}>Staff impact</button>
+        </div>
+
         {/* Period toggle */}
         <div className="flex gap-2 mb-6">
           {['alltime', 'month'].map(p => (
@@ -83,6 +96,19 @@ export default function LoyaltyLeaderboard() {
 
         {loading ? (
           <p className="text-noch-muted text-center py-12">Loading...</p>
+        ) : mode === 'staff' ? (
+          <div className="space-y-2">
+            {staff.length === 0 ? <div className="card text-center py-12 text-noch-muted">No staff loyalty activity in this period.</div> : staff.map((person, index) => (
+              <div key={person.profile_id} className="card flex items-center gap-3">
+                <div className="w-9 text-center text-lg">{index < 3 ? medals[index] : `#${index + 1}`}</div>
+                <div className="flex-1">
+                  <p className="text-white font-medium">{person.full_name}</p>
+                  <p className="text-noch-muted text-xs">{person.signups} signups · {person.stamps} stamps</p>
+                </div>
+                <p className="text-noch-green font-bold">{person.total_actions}</p>
+              </div>
+            ))}
+          </div>
         ) : customers.length === 0 ? (
           <div className="card text-center py-12">
             <Trophy size={40} className="text-noch-muted mx-auto mb-3" />

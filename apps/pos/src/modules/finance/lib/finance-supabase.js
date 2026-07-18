@@ -38,6 +38,17 @@ export async function getPnL({ branchId = null, from, to, netOfRefunds = false }
   return data || {}
 }
 
+export async function updateCanonicalCurrencyRate(currency, rate) {
+  const { error } = await supabase.from('currency_rates').upsert({
+    currency: String(currency).toUpperCase(),
+    rate_to_lyd: Number(rate),
+    source: 'finance',
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'currency' })
+  if (error) throw error
+  return getFinanceSettings()
+}
+
 export async function listProductsMissingCost(branchId = null) {
   let query = supabase
     .from('pos_products')

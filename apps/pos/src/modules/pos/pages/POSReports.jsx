@@ -17,6 +17,7 @@ import {
   businessToday, businessDayWindow,
 } from '../lib/pos-supabase'
 import Layout from '../../../components/Layout'
+import BusinessRangePicker from '../../../components/shared/BusinessRangePicker'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
@@ -381,7 +382,11 @@ export default function POSReports() {
         </div>
 
         {/* Range presets */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
+        <div className="mb-3">
+          <BusinessRangePicker presets={PRESETS} value={{ preset, from: fromDate, to: toDate }} onChange={next => setRange({ preset: next.preset, fromDate: next.from, toDate: next.to })} />
+        </div>
+        {/* eslint-disable-next-line no-constant-binary-expression */}
+        {false && <><div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
           {PRESETS.map(p => (
             <button
               key={p.key}
@@ -419,6 +424,8 @@ export default function POSReports() {
             </div>
           </div>
         )}
+
+        </>}
 
         {loading ? <p className="text-noch-muted text-center py-12">Loading…</p> : (
           <>

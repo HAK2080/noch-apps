@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Monitor, Send, Check, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -207,6 +208,7 @@ function StatusBadge({ status }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Vestaboard() {
+  const navigate = useNavigate()
   const { isOwner } = useAuth()
   const { lang } = useLanguage()
   const [messages, setMessages] = useState([])
@@ -219,7 +221,7 @@ export default function Vestaboard() {
   const boardRef = useRef(null)
 
   const load = async () => {
-    try { setMessages(await getVestaboardMessages()) } catch {}
+    try { setMessages(await getVestaboardMessages()) } catch { setMessages([]) }
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -377,6 +379,7 @@ export default function Vestaboard() {
               {lang === 'ar' ? 'أرسل رسالة للشاشة في المقهى' : 'Send a message to the café board'}
             </p>
           </div>
+          {isOwner && <button onClick={() => navigate('/vestaboard/channels')} className="btn-primary ms-auto flex items-center gap-2"><Monitor size={14} /> Noch Channels</button>}
         </div>
 
         {/* ── Cheeky customer greeting test ── */}

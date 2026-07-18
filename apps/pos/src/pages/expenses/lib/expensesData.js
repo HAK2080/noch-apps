@@ -6,7 +6,7 @@ export const fmt = (n, currency = 'LYD') =>
   `${Number(n || 0).toLocaleString('en', { maximumFractionDigits: 2 })} ${currency}`
 
 // Fall back to amount when amount_lyd wasn't populated (older records)
-export const amtLyd = (e) => e.amount_lyd ?? (e.amount * (e.exchange_rate_to_lyd || 1)) ?? 0
+export const amtLyd = (e) => e.amount_lyd ?? ((e.amount || 0) * (e.exchange_rate_to_lyd || 1))
 
 // ── DB helpers ──────────────────────────────────────────────
 export async function loadCostCenters() {
@@ -18,7 +18,7 @@ export async function loadCategories() {
   return data || []
 }
 export async function loadRates() {
-  const { data } = await supabase.from('cc_exchange_rates').select('*').order('currency')
+  const { data } = await supabase.from('currency_rates').select('*').order('currency')
   return data || []
 }
 export async function loadExpenses(filter = {}) {

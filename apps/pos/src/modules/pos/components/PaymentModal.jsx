@@ -1,12 +1,12 @@
 // PaymentModal.jsx — Payment collection modal
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
+import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike, Phone, Loader2 } from 'lucide-react'
 // Scanners are heavy (@zxing/html5-qrcode). Lazy so the eager POSTerminal
 // import chain doesn't drag them into the cold bundle.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 const QRScanner      = lazy(() => import('./QRScanner'))
-import { lookupLoyaltyQR } from '../../loyalty/lib/loyalty-supabase'
+import { lookupLoyaltyQR, lookupOrCreateLoyaltyCustomer } from '../../loyalty/lib/loyalty-supabase'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 
@@ -53,6 +53,8 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
   const [showScanner, setShowScanner] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [loyaltyCustomer, setLoyaltyCustomer] = useState(initialLoyalty || null)
+  const [loyaltyPhone, setLoyaltyPhone] = useState('')
+  const [linkingPhone, setLinkingPhone] = useState(false)
 
   const changeDue = method === 'cash'
     ? Math.max(0, parseFloat(cashTendered || 0) - total)
@@ -101,7 +103,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
       } else {
         toast.error('QR code not recognized')
       }
-    } catch (err) {
+    } catch {
       toast.error('Could not look up loyalty card')
     }
   }
@@ -110,6 +112,20 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
     setShowScanner(false)
     // QR contains customer ID or phone
     setLoyaltyCustomer({ id: result, name: 'Loyalty Customer' })
+  }
+
+  const handlePhoneAttach = async () => {
+    if (loyaltyPhone.replace(/\D/g, '').length < 7) return toast.error('Enter at least 7 phone digits')
+    setLinkingPhone(true)
+    try {
+      const customer = await lookupOrCreateLoyaltyCustomer(loyaltyPhone)
+      setLoyaltyCustomer(customer)
+      toast.success(`Loyalty linked: ${customer.full_name}`)
+    } catch (err) {
+      toast.error(err.message || 'Could not attach loyalty customer')
+    } finally {
+      setLinkingPhone(false)
+    }
   }
 
   return (
@@ -253,13 +269,31 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setShowQRScanner(true)}
-                  className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
-                >
-                  <QrCode size={14} />
-                  {t('posScanLoyalty')}
-                </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
+                      <input
+                        inputMode="tel"
+                        value={loyaltyPhone}
+                        onChange={e => setLoyaltyPhone(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handlePhoneAttach() } }}
+                        placeholder="Phone — find or create member"
+                        className="input w-full pl-9 text-sm"
+                      />
+                    </div>
+                    <button onClick={handlePhoneAttach} disabled={linkingPhone} className="btn-secondary px-3">
+                      {linkingPhone ? <Loader2 size={14} className="animate-spin" /> : 'Attach'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowQRScanner(true)}
+                    className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
+                  >
+                    <QrCode size={14} />
+                    {t('posScanLoyalty')}
+                  </button>
+                </div>
               )}
             </div>
 

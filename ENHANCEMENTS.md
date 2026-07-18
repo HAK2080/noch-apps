@@ -202,3 +202,35 @@ Replicating the Vestaboard+ feature set for free:
 5. Loyalty auto-stamp P0 (§7) + batch mark-paid (§6)
 6. Port Receipt Snap PWA into `apps/pos`
 7. P2 backlog: shared RangePicker, FX unification, theoretical stock, consolidation
+
+## 12. Completion update (2026-07-18)
+
+The actionable register is now implemented and deployed:
+
+- ✅ One `BusinessRangePicker` module now drives Sales, POS Reports, Sessions,
+  and Finance period selection with the 5 AM business-day cutoff.
+- ✅ `currency_rates` is the canonical FX table and updater. Expense settings,
+  Cost Calculator, and Finance USD reference all use or synchronize from it.
+- ✅ Inventory shows counted stock, recipe-derived consumption, theoretical
+  stock, stale-count status, and variance when a new count is submitted.
+  Low theoretical stock links directly to a prefilled procurement order.
+- ✅ Accounting already had the correct safe resolution: an owner-controlled
+  auto-post switch, manual force-sync, and an inert-until-enabled nightly cron.
+- ✅ Legacy Analytics routes now resolve to Finance and the duplicate Overview
+  tab is retired; Finance remains the deep-dive reporting surface.
+- ✅ Checkout supports phone-digit find/create, then awards stamps server-side
+  once per order. Receipts show stamp progress and Passport QR; Loyalty shows
+  attach rate, repeat-visit rate, and customer/staff leaderboards.
+- ✅ Win-back automation reads `winback_after_days` and `winback_auto_send`
+  from Loyalty Settings instead of a hardcoded 30-day window.
+- ✅ The 5:05 AM Tripoli close job reports gross, tender mix, refunds,
+  week-over-week change, top products, stamps, and snapped receipts to enabled
+  Telegram subscriptions. An owner Telegram chat ID must be linked before it
+  has a recipient.
+- ✅ Noch Channels is live at `/vestaboard/channels`: channel toggles, cadence,
+  time windows, priority, custom messages, weather, sales, loyalty, and quote
+  composers enqueue through the existing approved-message bridge every 15 min.
+
+Deliberately retained rather than duplicated: GL lifecycle controls, the
+existing notification outbox, procurement/payables reconciliation views, and
+the existing customer-facing loyalty/feedback flows.

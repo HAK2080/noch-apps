@@ -31,7 +31,7 @@ export default function SettingsTab({ onMetaChanged }) {
     const [ccs, cats, rs, bs] = await Promise.all([
       supabase.from('cost_centers').select('*').order('id').then(r => r.data || []),
       supabase.from('expense_categories').select('*').order('name').then(r => r.data || []),
-      supabase.from('cc_exchange_rates').select('*').order('currency').then(r => r.data || []),
+      supabase.from('currency_rates').select('*').order('currency').then(r => r.data || []),
       supabase.from('pos_branches').select('id,name').eq('is_active', true).order('name').then(r => r.data || []),
     ])
     setCostCenters(ccs)
@@ -54,7 +54,7 @@ export default function SettingsTab({ onMetaChanged }) {
     setSaving(true)
     try {
       for (const [currency, rate] of Object.entries(editRate)) {
-        await supabase.from('cc_exchange_rates')
+        await supabase.from('currency_rates')
           .upsert({ currency, rate_to_lyd: parseFloat(rate), updated_at: new Date().toISOString() }, { onConflict: 'currency' })
       }
       toast.success('Exchange rates saved')

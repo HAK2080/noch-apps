@@ -46,7 +46,6 @@ const StockManager     = lazy(() => import('./pages/inventory/StockManager'))
 const ProcurementOrders= lazy(() => import('./pages/inventory/ProcurementOrders'))
 const Suppliers        = lazy(() => import('./pages/inventory/Suppliers'))
 const StockCheckAll    = lazy(() => import('./pages/StockCheckAll'))
-const BusinessAnalytics= lazy(() => import('./pages/BusinessAnalytics'))
 const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
 const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
 
@@ -65,6 +64,7 @@ const TableQRGenerator = lazy(() => import('./pages/TableQRGenerator'))
 const IdeasBoard       = lazy(() => import('./pages/ideas/IdeasBoard'))
 const IdeasCategories  = lazy(() => import('./pages/ideas/IdeasCategories'))
 const Vestaboard       = lazy(() => import('./pages/Vestaboard'))
+const VestaboardChannels = lazy(() => import('./pages/VestaboardChannels'))
 
 const AccountingDashboard = lazy(() => import('./modules/accounting/AccountingDashboard'))
 
@@ -255,7 +255,7 @@ export default function App() {
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
         <Route path="/finance" element={<ProtectedRoute><PermissionRoute feature="finance"><FinanceDashboard /></PermissionRoute></ProtectedRoute>} />
         <Route path="/marketing" element={<ProtectedRoute><PermissionRoute feature="marketing"><MarketingDashboard /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/analytics-legacy" element={<ProtectedRoute><PermissionRoute feature="finance"><BusinessAnalytics /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/analytics-legacy" element={<Navigate to="/finance" replace />} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
@@ -282,6 +282,7 @@ export default function App() {
 
         {/* Vestaboard */}
         <Route path="/vestaboard" element={<ProtectedRoute><Vestaboard /></ProtectedRoute>} />
+        <Route path="/vestaboard/channels" element={<ProtectedRoute><OwnerRoute><VestaboardChannels /></OwnerRoute></ProtectedRoute>} />
 
         {/* Accounting — chart of accounts + double-entry GL (accountant/owner) */}
         <Route path="/accounting"       element={<ProtectedRoute><PermissionRoute feature="accounting"><AccountingDashboard /></PermissionRoute></ProtectedRoute>} />

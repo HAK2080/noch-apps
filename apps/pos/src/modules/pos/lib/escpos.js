@@ -346,6 +346,9 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
   if (order.loyalty_stamps_awarded > 0) {
     pushCmd(CMD.ALIGN_CENTER)
     pushLine(`* ${order.loyalty_stamps_awarded} loyalty stamp${order.loyalty_stamps_awarded > 1 ? 's' : ''} awarded *`)
+    if (loyaltyCustomer?.current_stamps != null) {
+      pushLine(`Nochi Pass: ${loyaltyCustomer.current_stamps}/9 stamps`)
+    }
     pushCmd(CMD.ALIGN_LEFT)
   }
 
@@ -356,7 +359,12 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
   // Feedback QR — the single QR on every receipt (replaces the old loyalty
   // passport QR here, per owner preference). Works for guests too.
   const fbBranch = order.branch_id || branch?.id
-  if (fbBranch) {
+  if (loyaltyCustomer?.passport_token) {
+    pushLine()
+    bytes.push(...separator('-'))
+    pushLine('SCAN FOR YOUR NOCHI PASS')
+    bytes.push(...qrCodeBytes(`https://noch.cloud/passport/?t=${loyaltyCustomer.passport_token}`, 4))
+  } else if (fbBranch) {
     const oid = String(order.id || '')
     const orderParam = oid && !oid.startsWith('offline-') ? `?order=${oid}&source=receipt` : '?source=receipt'
     const feedbackUrl = `https://apps.noch.cloud/feedback/${fbBranch}${orderParam}`
@@ -384,7 +392,7 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
 // big customer name so the barista can read the slip from across the
 // bar at a glance. Modifiers indent under each drink so it's clear
 // which "less sugar" belongs to which cup.
-export async function printDrinkTicketDirect(order, items, branch, opts = {}) {
+export async function printDrinkTicketDirect(order, items, branch) {
   if (!isPrinterConnected()) throw new Error('Printer not connected')
 
   const bytes = []
@@ -398,7 +406,7 @@ export async function printDrinkTicketDirect(order, items, branch, opts = {}) {
   // Extract trailing digits so "#0042" reads clearly even if the full
   // order number is "NHA-20260515-0042".
   const orderNumStr = String(order.order_number || '')
-  const shortNum = (orderNumStr.match(/(\d+)\s*$/) || [, orderNumStr])[1] || orderNumStr
+  const shortNum = (orderNumStr.match(/(\d+)\s*$/) || [null, orderNumStr])[1] || orderNumStr
 
   const customerName = sanitiseHeader(order.customer_name) || 'Walk-in'
   const paymentMethod = (order.payment_method || '').toUpperCase()
