@@ -427,6 +427,5 @@ export async function listBranches() {
     .eq('is_active', true)
     .order('name')
   if (error) throw error
-  // Filter out Bloom for v1 per finance plan.
-  return (data || []).filter(b => !/^bloom/i.test(b.name))
+  return data || []
 }
