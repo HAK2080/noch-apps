@@ -42,7 +42,7 @@ acc_accounts                   chart of accounts
   code                        text  -- '4000', '5100', etc.
   name                        text
   type                        text  -- 'asset'|'liability'|'equity'|'income'|'expense'
-  parent_id                   uuid  -- for tree (Cash > Cash on Hand > Hay Al-Andalus)
+  parent_id                   uuid  -- for tree (Cash > Cash on Hand > Noch - City Walk)
   branch_scoped               bool  -- true = one row per branch
   is_active                   bool
 

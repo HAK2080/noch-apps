@@ -141,7 +141,7 @@ Presto orders fire-and-forget; if Presto rejects later (rider cancels) there is 
 
 🟡 **G5.** **`offline_orders` keyPath** is `local_id` (auto-increment in IndexedDB). Different devices have independent counters — no cross-device collision risk because sync happens on each device, but if a user wipes IDB then re-installs PWA, history is lost.
 
-🟢 **G6.** Branch code derivation returns the first letters of words. "Noch Hay Al-Andalus" → "NHA"; "Noch Gallery Mall" → "NGM"; "Bloom Abu Nawas" → "BAN". The stable branch IDs remain the source of truth; names are display labels.
+🟢 **G6.** Branch code derivation returns the first letters of words. "Noch - City Walk" → "NCW"; "Noch - Gallery Mall" → "NGM"; "Bloom" → "B". The stable branch IDs remain the source of truth; names are display labels.
 
 ## H. Other notable correctness items
 

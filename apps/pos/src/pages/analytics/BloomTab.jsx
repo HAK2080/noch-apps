@@ -1,6 +1,6 @@
-// BloomTab.jsx — Bloomly Odoo data view for Bloom Abu Nawas branch
+// BloomTab.jsx — Bloomly Odoo data view for the Bloom branch
 
-import { useState, useEffect } from 'react'
+import { createElement, useState, useEffect } from 'react'
 import { RefreshCw, TrendingUp, ShoppingBag, Receipt, Users, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -10,11 +10,11 @@ const PERIODS = [
   { id: '90', label: '90 days' },
 ]
 
-function StatCard({ icon: Icon, label, value, color = 'text-noch-green', sub }) {
+function StatCard({ icon, label, value, color = 'text-noch-green', sub }) {
   return (
     <div className="bg-noch-card border border-noch-border rounded-xl p-5 flex flex-col gap-2">
       <div className="flex items-center gap-2 text-noch-muted text-xs uppercase tracking-wide">
-        <Icon size={13} className={color} />
+        {createElement(icon, { size: 13, className: color })}
         {label}
       </div>
       <div className={`text-2xl font-bold tabular-nums ${color}`}>{value}</div>
@@ -40,7 +40,7 @@ export default function BloomTab() {
         { data: branchRow },
         { data: syncLog },
       ] = await Promise.all([
-        supabase.from('pos_branches').select('id').eq('name', 'Bloom Abu Nawas').maybeSingle(),
+        supabase.from('pos_branches').select('id').eq('name', 'Bloom').maybeSingle(),
         supabase.from('bloom_sync_log').select('*').order('synced_at', { ascending: false }).limit(1).maybeSingle(),
       ])
 
@@ -109,7 +109,7 @@ export default function BloomTab() {
         <div className="flex items-center gap-3">
           <div className="text-xl">☕</div>
           <div>
-            <h2 className="text-white font-semibold">Bloom Abu Nawas</h2>
+            <h2 className="text-white font-semibold">Bloom</h2>
             <p className="text-noch-muted text-xs">Data synced from Bloomly Odoo POS</p>
           </div>
         </div>
