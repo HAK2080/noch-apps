@@ -6,10 +6,36 @@
 // Secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and one sender —
 //   TWILIO_MESSAGING_SERVICE_SID (recommended for templates) or TWILIO_WHATSAPP_NUMBER.
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+async function requireAuthorizedCaller(req: Request): Promise<Response | null> {
+  const authHeader = req.headers.get('Authorization') || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token) return json({ error: 'missing Authorization' }, 401)
+  if (SERVICE_KEY && token === SERVICE_KEY) return null
+
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  })
+  const { data: { user }, error: userError } = await userClient.auth.getUser()
+  if (userError || !user) return json({ error: 'invalid token' }, 401)
+
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY)
+  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
+  if (!['owner', 'supervisor', 'staff'].includes(profile?.role)) {
+    return json({ error: 'forbidden' }, 403)
+  }
+  return null
 }
 
 // Approved WhatsApp template name → Twilio Content SID (HX…).
@@ -34,6 +60,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const authError = await requireAuthorizedCaller(req)
+    if (authError) return authError
+
     // Accepts either:
     //   - free-form: { to, message, mediaUrl? }                  (24h session window)
     //   - template:  { to, contentSid, contentVariables? }       (proactive, approved)

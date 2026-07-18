@@ -588,6 +588,7 @@ export default function Menu() {
         p_branch_id: branchId, p_customer_name: name, p_customer_phone: phone,
         p_payment_method: 'pickup', p_items: items,
         p_table_number: tableNumber || null, p_lat: gps.lat, p_lng: gps.lng,
+        p_coupon_code: couponApplied?.code || null,
       })
       if (rpcErr) throw rpcErr
       if (data?.error === 'on_site_required') {

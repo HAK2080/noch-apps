@@ -1,5 +1,5 @@
 [functions.cs-extract-concept]
-verify_jwt = false
+verify_jwt = true
 
 # send-whatsapp must require a valid JWT — it spends real Twilio balance, so it
 # must never be publicly callable.
@@ -7,16 +7,16 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.cs-evaluate-draft]
-verify_jwt = false
+verify_jwt = true
 
 [functions.auto-research]
-verify_jwt = false
+verify_jwt = true
 
 [functions.analyze-brand]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-content]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-sales-data]
 verify_jwt = false
@@ -35,6 +35,7 @@ verify_jwt = false
 
 [functions.whatsapp-cron]
 verify_jwt = false
+# This machine-only function performs its own service-role/cron-secret check.
 
 [functions.ops-generate-instances]
 verify_jwt = false

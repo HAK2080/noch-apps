@@ -6,6 +6,7 @@
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const CRON_SECRET = Deno.env.get('WHATSAPP_CRON_SECRET') || ''
 
 const sbHeaders = {
   'Content-Type': 'application/json',
@@ -92,6 +93,13 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok')
 
   try {
+    const authHeader = req.headers.get('Authorization') || ''
+    const isServiceCall = SERVICE_KEY && authHeader === `Bearer ${SERVICE_KEY}`
+    const isCronCall = CRON_SECRET && req.headers.get('x-cron-secret') === CRON_SECRET
+    if (!isServiceCall && !isCronCall) {
+      return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    }
+
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
     const onlyTriggers: string[] | null = Array.isArray(body.triggers) ? body.triggers : null
     const include = (t: string) => !onlyTriggers || onlyTriggers.includes(t)

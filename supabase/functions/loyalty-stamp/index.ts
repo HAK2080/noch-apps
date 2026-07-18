@@ -1,9 +1,11 @@
 // loyalty-stamp: Award a stamp to a customer by QR token or direct ID
 // Called by: app QR scan, or Odoo POS webhook
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
 const headers = { 'Content-Type': 'application/json' }
 const sbHeaders = {
@@ -35,10 +37,33 @@ async function sbRpc(fn: string, args: unknown) {
   return res.json()
 }
 
+async function requireAuthorizedCaller(req: Request): Promise<Response | null> {
+  const authHeader = req.headers.get('Authorization') || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token) return new Response(JSON.stringify({ error: 'missing Authorization' }), { status: 401, headers })
+  if (SERVICE_KEY && token === SERVICE_KEY) return null
+
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  })
+  const { data: { user }, error: userError } = await userClient.auth.getUser()
+  if (userError || !user) return new Response(JSON.stringify({ error: 'invalid token' }), { status: 401, headers })
+
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY)
+  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
+  if (!['owner', 'supervisor', 'staff'].includes(profile?.role)) {
+    return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers })
+  }
+  return null
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } })
 
   try {
+    const authError = await requireAuthorizedCaller(req)
+    if (authError) return authError
+
     const body = await req.json()
     const { customer_id, qr_token, awarded_by } = body
 
