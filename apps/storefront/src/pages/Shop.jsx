@@ -16,6 +16,7 @@ export default function Shop({ lang = 'en' }) {
         .select('id,name,name_ar,price,description,image_url,category_id,visible_on_website,is_active')
         .eq('visible_on_website', true)
         .eq('is_active', true)
+        .not('is_sold_out', 'is', true) // hide POS long-press sold-out items
         .order('name'),
       supabase.from('pos_categories')
         .select('id,name,name_ar')

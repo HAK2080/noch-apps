@@ -41,6 +41,7 @@ export default function Menu() {
             .select('id,name,name_ar,price,description,menu_description,menu_description_ar,show_description_on_website,visible_on_website,category_id')
             .eq('is_active', true)
             .eq('visible_on_customer_menu', true)
+            .not('is_sold_out', 'is', true) // hide POS long-press sold-out items
             .order('name'),
         ])
 

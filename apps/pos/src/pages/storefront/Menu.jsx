@@ -478,6 +478,7 @@ export default function Menu() {
           .select('*')
           .eq('is_active', true)
           .eq('visible_on_customer_menu', true)
+          .not('is_sold_out', 'is', true) // hide POS long-press sold-out items
           .or(`visible_branch_ids.cs.{${id}},branch_id.eq.${id},branch_id.is.null`)
           .order('menu_sort').order('name'),
       ])
