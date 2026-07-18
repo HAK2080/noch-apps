@@ -84,4 +84,9 @@ test.describe('Staff — route audit (Mohamed)', () => {
     // Should redirect to /my-tasks
     expect(page.url()).not.toContain('/login');
   });
+
+  test('finance permission check resolves instead of leaving a blank page', async ({ page }) => {
+    await page.goto('/finance');
+    await expect(page).toHaveURL(/\/my-tasks$/, { timeout: 10000 });
+  });
 });

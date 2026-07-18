@@ -156,6 +156,12 @@ test.describe('Owner — route audit', () => {
     await page.waitForTimeout(2000);
   });
 
+  test('finance page renders instead of going blank', async ({ page }) => {
+    await page.goto('/finance');
+    await expect(page).toHaveURL(/\/finance$/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Finance' })).toBeVisible({ timeout: 10000 });
+  });
+
   // ── Loyalty ───────────────────────────────────────────────────────────────
 
   test('loyalty dashboard loads', async ({ page }) => {

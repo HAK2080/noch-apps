@@ -30,8 +30,14 @@ nginx_conf = """server {
     listen 80;
     root /usr/share/nginx/html;
     index index.html;
+    location = /sw.js {
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        add_header Service-Worker-Allowed "/" always;
+        add_header Access-Control-Allow-Origin "*" always;
+    }
     location / {
         try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
     }
     location ~* \\.(js|css|png|svg|jpg|ico|woff2?|ttf|otf)$ {
         expires 1y;
@@ -39,7 +45,7 @@ nginx_conf = """server {
         add_header Access-Control-Allow-Origin "*";
     }
     gzip on;
-    gzip_types text/html text/css application/javascript application/json image/svg+xml;
+    gzip_types text/css application/javascript application/json image/svg+xml;
 }
 """
 run("mkdir compose dir", "mkdir -p /docker/apps-site")

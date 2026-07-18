@@ -116,9 +116,6 @@ def upload(target_key: str):
     remote = cfg["remote"]
     print(f"[3/4] Uploading to {remote}...")
 
-    # Clear only build outputs; keep siblings on the host.
-    ssh.exec_command(f"rm -rf {remote}/assets {remote}/index.html")[1].read()
-
     def upload_dir(local, rem):
         try:
             sftp.stat(rem)
@@ -127,26 +124,49 @@ def upload(target_key: str):
         for item in os.listdir(local):
             lp = os.path.join(local, item)
             rp = f"{rem}/{item}"
+            # Publish the HTML entry point only after every referenced asset is
+            # present. Replacing it early can leave the SPA blank mid-deploy.
+            if rem == remote and item == "index.html":
+                continue
             if os.path.isdir(lp):
                 upload_dir(lp, rp)
             else:
+                # Hashed build assets are immutable. Skip an existing file with
+                # the same size so routine deploys upload only new chunks.
+                if rem.startswith(f"{remote}/assets"):
+                    try:
+                        if sftp.stat(rp).st_size == os.path.getsize(lp):
+                            continue
+                    except FileNotFoundError:
+                        pass
                 sftp.put(lp, rp)
 
     upload_dir(str(cfg["dist"]), remote)
+    pending_index = f"{remote}/index.html.next"
+    sftp.put(str(cfg["dist"] / "index.html"), pending_index)
     sftp.close()
 
-    print("[4/4] Verifying...")
-    stdin, stdout, _ = ssh.exec_command(
-        f"ls {remote}/assets/index-*.js 2>/dev/null | head -1"
-    )
-    deployed_js = stdout.read().decode().strip()
-    ssh.close()
+    # Same-filesystem rename is atomic. Keep old hashed assets so clients with
+    # an older service worker can still finish loading while they update.
+    _, stdout, stderr = ssh.exec_command(f"mv -f {pending_index} {remote}/index.html")
+    stdout.read()
+    move_error = stderr.read().decode().strip()
+    if move_error:
+        ssh.close()
+        raise RuntimeError(f"Could not publish index.html: {move_error}")
 
+    print("[4/4] Verifying...")
     local_html = (cfg["dist"] / "index.html").read_text()
     m = re.search(r'/assets/(index-[^"]+\.js)', local_html)
     expected_js = m.group(1) if m else None
 
-    if expected_js and expected_js in deployed_js:
+    _, stdout, _ = ssh.exec_command(
+        f"test -f {remote}/assets/{expected_js} && printf present" if expected_js else "printf missing"
+    )
+    deployed_js = stdout.read().decode().strip()
+    ssh.close()
+
+    if expected_js and deployed_js == "present":
         print(f"OK Deployed. {expected_js} is live at {remote}")
         print(f"   Verify in browser: {cfg['verify']}  (hard refresh: Ctrl+Shift+R)")
     else:

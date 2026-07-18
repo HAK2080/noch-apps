@@ -15,17 +15,26 @@ const PermissionsContext = createContext({
 })
 
 export function PermissionsProvider({ children }) {
-  const { profile } = useAuth()
+  const { profile, loading: authLoading } = useAuth()
   const [permissions, setPermissions] = useState({})
   const [loading, setLoading] = useState(true)
 
   const isOwner = profile?.role === 'owner'
 
   useEffect(() => {
+    // AuthProvider may have a user before its profile request completes. Keep
+    // permission-gated routes waiting during that gap instead of treating the
+    // missing profile as a confirmed lack of access and redirecting away.
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
     if (!profile) {
+      setPermissions({})
       setLoading(false)
       return
     }
+    setLoading(true)
     if (isOwner) {
       setPermissions({ all: { can_access: true, can_edit: true } })
       setLoading(false)
@@ -33,10 +42,12 @@ export function PermissionsProvider({ children }) {
     }
     const load = async () => {
       try {
-        const { data } = await supabase
-          .from('role_permissions')
-          .select('*')
-          .eq('role', profile.role)
+        const query = supabase.from('role_permissions').select('*').eq('role', profile.role)
+        const timeout = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Permission check timed out')), 8000)
+        })
+        const { data, error } = await Promise.race([query, timeout])
+        if (error) throw error
         const map = {}
         data?.forEach(p => { map[p.feature] = { can_access: p.can_access, can_edit: p.can_edit } })
         setPermissions(map)
@@ -47,7 +58,7 @@ export function PermissionsProvider({ children }) {
       }
     }
     load()
-  }, [profile?.id, profile?.role, isOwner])
+  }, [authLoading, profile, isOwner])
 
   const hasAccess = (feature) => {
     if (isOwner || !!permissions?.all?.can_access) return true

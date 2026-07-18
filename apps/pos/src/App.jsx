@@ -135,7 +135,11 @@ function OwnerRoute({ children }) {
 // Owner always passes (PermissionsContext short-circuits).
 function PermissionRoute({ feature, children }) {
   const { hasAccess, loading, isOwner } = usePermissions()
-  if (loading) return null
+  if (loading) return (
+    <div className="min-h-screen bg-noch-dark flex items-center justify-center">
+      <p className="text-noch-muted">Loading permissions…</p>
+    </div>
+  )
   if (isOwner || hasAccess(feature)) return children
   return <Navigate to="/my-tasks" replace />
 }

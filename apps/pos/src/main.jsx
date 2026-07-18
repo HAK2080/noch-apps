@@ -11,7 +11,7 @@ import { ThemeProvider } from './contexts/ThemeContext.jsx'
 // Register PWA service worker (production only)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {})
   })
 }
 
