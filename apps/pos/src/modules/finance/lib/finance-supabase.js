@@ -73,7 +73,7 @@ export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
 
   const rows = await Promise.all(branches.map(async branch => ({
     ...branch,
-    ...summarizePnl(await getPnL({ branchId: branch.id, from, to, netOfRefunds }), settings),
+    ...summarizePnl(await getPnL({ branchId: branch.id, from, to, netOfRefunds }), settings, branch),
   })))
 
   return {
@@ -83,12 +83,15 @@ export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
   }
 }
 
-function summarizePnl(pnl = {}, settings = {}) {
+function summarizePnl(pnl = {}, settings = {}, branch = {}) {
   const revenue = Number(pnl.revenue_net || 0)
   const cogs = Number(pnl.cogs || 0)
   const labor = Number(pnl.labor || 0)
+  const opex = Number(pnl.opex || 0)
   const net = Number(pnl.net_contribution || 0)
   const prime = Number(pnl.prime_cost || 0)
+  const operationalStatus = branch.operational_status || 'operating'
+  const isPreOpening = operationalStatus === 'pre_opening'
   const primeRatio = revenue > 0 ? prime / revenue : null
   const cogsRatio = revenue > 0 ? cogs / revenue : null
   const laborRatio = revenue > 0 ? labor / revenue : null
@@ -99,12 +102,14 @@ function summarizePnl(pnl = {}, settings = {}) {
   )
   const reasons = []
 
-  if (revenue <= 0) reasons.push('No sales data')
+  if (isPreOpening) reasons.push('Pre-opening: spend is shown separately')
+  else if (revenue <= 0) reasons.push('No sales data')
   if (revenue > 0 && cogs === 0) reasons.push('COGS missing')
   if (revenue > 0 && labor === 0) reasons.push('Labor missing')
 
   let status = 'healthy'
-  if (revenue <= 0) status = 'no_data'
+  if (isPreOpening) status = 'pre_opening'
+  else if (revenue <= 0) status = 'no_data'
   else if (primeStatus === STATUS.BAD || net < 0) status = 'at_risk'
   else if (primeStatus === STATUS.EDGE || reasons.length) status = 'watch'
 
@@ -112,12 +117,14 @@ function summarizePnl(pnl = {}, settings = {}) {
     revenue,
     cogs,
     labor,
+    opex,
     prime,
     net,
     primeRatio,
     cogsRatio,
     laborRatio,
     primeStatus,
+    operationalStatus,
     status,
     reasons,
   }
@@ -416,7 +423,7 @@ export async function updateBankTransactionCategory(id, category) {
 export async function listBranches() {
   const { data, error } = await supabase
     .from('pos_branches')
-    .select('id, name, name_ar, is_active')
+    .select('id, name, name_ar, is_active, operational_status')
     .eq('is_active', true)
     .order('name')
   if (error) throw error
