@@ -30,6 +30,13 @@ function ymd(d) {
   return `${y}-${m}-${day}`
 }
 
+function formatAmount(value) {
+  return Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
 const PRESETS = [
   { key: 'today', label: 'Today',    days: 0 },
   { key: 'week',  label: 'Week',     days: 6 },
@@ -413,13 +420,13 @@ export default function POSReports() {
           <>
             {/* KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <StatCard label="Gross sales" value={`${totals.gross.toFixed(2)} LYD`} sub={`${totals.orders} orders`} icon={TrendingUp} />
-              <StatCard label="Cash" value={`${totals.cash.toFixed(2)}`} icon={ShoppingCart} color="text-yellow-400" />
-              <StatCard label="Card" value={`${totals.card.toFixed(2)}`} icon={ShoppingCart} color="text-blue-400" />
-              <StatCard label="Presto" value={`${totals.presto.toFixed(2)}`} icon={ShoppingCart} color="text-purple-400" />
-              <StatCard label="Discounts" value={`${totals.discounts.toFixed(2)}`} color="text-yellow-400" />
-              <StatCard label="Cancelled" value={`${totals.voided.toFixed(2)}`} color="text-red-400" />
-              <StatCard label="Avg ticket" value={totals.orders ? `${(totals.gross / totals.orders).toFixed(2)}` : '—'} />
+              <StatCard label="Gross sales" value={`${formatAmount(totals.gross)} LYD`} sub={`${totals.orders.toLocaleString('en-US')} orders`} icon={TrendingUp} />
+              <StatCard label="Cash" value={formatAmount(totals.cash)} icon={ShoppingCart} color="text-yellow-400" />
+              <StatCard label="Card" value={formatAmount(totals.card)} icon={ShoppingCart} color="text-blue-400" />
+              <StatCard label="Presto" value={formatAmount(totals.presto)} icon={ShoppingCart} color="text-purple-400" />
+              <StatCard label="Discounts" value={formatAmount(totals.discounts)} color="text-yellow-400" />
+              <StatCard label="Cancelled" value={formatAmount(totals.voided)} color="text-red-400" />
+              <StatCard label="Avg ticket" value={totals.orders ? formatAmount(totals.gross / totals.orders) : '—'} />
               <StatCard label="Days" value={daily.length} />
             </div>
 
@@ -446,10 +453,10 @@ export default function POSReports() {
                         <tr key={d.day} className="border-t border-noch-border/40">
                           <td className="py-1 text-white">{d.day}</td>
                           <td className="py-1 text-right text-white">{d.orders}</td>
-                          <td className="py-1 text-right text-noch-green">{Number(d.gross || 0).toFixed(2)}</td>
-                          <td className="py-1 text-right text-yellow-400">{Number(d.cash_sales || 0).toFixed(2)}</td>
-                          <td className="py-1 text-right text-blue-400">{Number(d.card_sales || 0).toFixed(2)}</td>
-                          <td className="py-1 text-right text-purple-400">{Number(d.presto_sales || 0).toFixed(2)}</td>
+                          <td className="py-1 text-right text-noch-green">{formatAmount(d.gross)}</td>
+                          <td className="py-1 text-right text-yellow-400">{formatAmount(d.cash_sales)}</td>
+                          <td className="py-1 text-right text-blue-400">{formatAmount(d.card_sales)}</td>
+                          <td className="py-1 text-right text-purple-400">{formatAmount(d.presto_sales)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -675,7 +682,7 @@ export default function POSReports() {
                     <div key={b.user_id || 'unknown'} className="flex justify-between text-sm border-b border-noch-border/40 last:border-0 py-1.5">
                       <span className="text-white">{b.full_name || 'Unattributed'}</span>
                       <span className="text-noch-muted text-xs ml-2 shrink-0">
-                        {b.orders} orders · <span className="text-noch-green">{Number(b.revenue).toFixed(2)}</span>
+                        {Number(b.orders || 0).toLocaleString('en-US')} orders · <span className="text-noch-green">{formatAmount(b.revenue)}</span>
                       </span>
                     </div>
                   ))}

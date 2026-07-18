@@ -288,6 +288,18 @@ export async function listShifts(branchId, { limit = 30, fromIso, toIso } = {}) 
   return data || []
 }
 
+// Refunds are deducted from shift revenue but legacy payment buckets remain
+// gross. The sessions report applies these to the cash leg so the totals
+// reconcile to net revenue.
+export async function getShiftRefundTotals(shiftIds = []) {
+  if (!shiftIds.length) return {}
+  const { data, error } = await supabase.rpc('pos_shift_refund_totals', {
+    p_shift_ids: shiftIds,
+  })
+  if (error) throw error
+  return Object.fromEntries((data || []).map(row => [row.shift_id, Number(row.refunded_total) || 0]))
+}
+
 export async function openShift(branchId, openingCash, userId) {
   const { data, error } = await supabase
     .from('pos_shifts')
@@ -575,16 +587,6 @@ export async function getShiftSummary(shiftId) {
 // ============================================================
 // ORDERS
 // ============================================================
-
-// Generate branch code from name
-function getBranchCode(branchName) {
-  return branchName
-    .split(' ')
-    .filter(w => /[A-Za-z]/.test(w))
-    .map(w => w[0].toUpperCase())
-    .join('')
-    .slice(0, 3) || 'POS'
-}
 
 // createPOSOrder is now a thin wrapper around the create_pos_order RPC.
 // The RPC is atomic, idempotent (via idempotency_key), and uses atomic
