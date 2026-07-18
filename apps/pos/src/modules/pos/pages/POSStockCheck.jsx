@@ -508,7 +508,8 @@ export default function POSStockCheck() {
         assigned_to: rem.assigned_user_id,
         created_by: user.id,
         priority: 'high',
-        due_date: today.toISOString().slice(0, 10),
+        // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+        due_date: (() => { const p = n => String(n).padStart(2, '0'); return `${today.getFullYear()}-${p(today.getMonth() + 1)}-${p(today.getDate())}` })(),
         is_group: false,
         has_attachments: false,
       })

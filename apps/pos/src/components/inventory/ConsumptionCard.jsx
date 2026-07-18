@@ -18,7 +18,8 @@ export default function ConsumptionCard({ ingredient }) {
     setLoading(true)
     const end = new Date()
     const start = new Date(+end - days * 86400000)
-    const toDate = d => d.toISOString().split('T')[0]
+    // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
+    const toDate = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
     supabase.rpc('get_ingredient_consumption', {
       p_ingredient_name: ingredient,
       p_start_date: toDate(start),

@@ -133,7 +133,7 @@ export default function POSInventory() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${branch?.name || 'inventory'}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `${branch?.name || 'inventory'}-${(() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

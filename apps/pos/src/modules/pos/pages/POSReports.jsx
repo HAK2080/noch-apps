@@ -14,12 +14,21 @@ import {
 import {
   getPOSBranch,
   getDailySalesRange, getProductDemandLines, getSalesByBarista,
+  businessToday, businessDayWindow,
 } from '../lib/pos-supabase'
 import Layout from '../../../components/Layout'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
-function ymd(d) { return d.toISOString().slice(0, 10) }
+// LOCAL date formatting — never toISOString() here: Libya is UTC+2, so
+// converting local midnight to UTC shifts the date to the previous day
+// (this exact bug made "Today" report 3 days of sales).
+function ymd(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 const PRESETS = [
   { key: 'today', label: 'Today',    days: 0 },
@@ -36,9 +45,11 @@ const DAY_MODE_OPTIONS = [
 
 const WEEKEND_DAYS = new Set([5, 6])
 
+// Presets are BUSINESS days (5 AM → 5 AM): before 5 AM, "Today" still means
+// the evening's trading day that is wrapping up.
 function presetRange(preset) {
-  const to = new Date(); to.setHours(23, 59, 59, 999)
-  const from = new Date(); from.setHours(0, 0, 0, 0)
+  const to = businessToday()
+  const from = businessToday()
   if (preset === 'today') return { from, to }
   const meta = PRESETS.find(p => p.key === preset)
   from.setDate(from.getDate() - (meta?.days ?? 0))
@@ -231,10 +242,13 @@ export default function POSReports() {
     let cancelled = false
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    const fromIso = new Date(`${fromDate}T00:00:00`).toISOString()
-    const toIso   = new Date(`${toDate}T23:59:59.999`).toISOString()
+    // Timestamp filters (order lines, barista): business-day boundaries
+    // (5 AM → 5 AM) so they match the daily view's buckets exactly.
+    const { fromIso, toIso } = businessDayWindow(fromDate, toDate)
     Promise.all([
-      getDailySalesRange(branchId, fromIso, toIso),
+      // Daily view filters on a DATE column — pass the plain local date strings,
+      // NOT the UTC ISO strings (slicing those shifted the range a day back).
+      getDailySalesRange(branchId, fromDate, toDate),
       getProductDemandLines(branchId, fromIso, toIso),
       getSalesByBarista(branchId, fromIso, toIso),
     ])

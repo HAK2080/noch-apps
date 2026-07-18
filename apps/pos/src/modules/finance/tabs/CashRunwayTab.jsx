@@ -201,7 +201,8 @@ function RatesEdit({ settings, onCancel, onSave }) {
       <span className="text-noch-muted text-xs">LYD per USD</span>
       <button onClick={() => onSave({
         usd_reference_rate_lyd: Number(v) || null,
-        usd_reference_rate_set_at: new Date().toISOString().slice(0, 10),
+        // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+        usd_reference_rate_set_at: (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })(),
       })} className="btn-primary text-xs ml-2">Save</button>
       <button onClick={onCancel} className="btn-secondary text-xs">Cancel</button>
     </div>

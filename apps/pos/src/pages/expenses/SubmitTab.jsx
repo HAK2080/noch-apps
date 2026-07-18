@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 import { fmt, getOwnerSetting, setOwnerSetting, uploadReceipt } from './lib/expensesData'
 
 export default function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onSubmitted }) {
-  const today = new Date().toISOString().slice(0, 10)
+  // local date, not UTC — toISOString() defaulted expense_date to yesterday before 2 AM (Libya UTC+2)
+  const today = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
   const [form, setForm] = useState({
     cost_center_id: '', category_id: '', amount: '', currency: 'LYD',
     vendor: '', description: '', expense_date: today, paid_by: 'Business',

@@ -89,9 +89,11 @@ function pick(row, kind) {
   }
   return ''
 }
+// Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
+const localYmd = (d = new Date()) => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 function parseDate(s) {
   s = (s || '').toString().trim()
-  if (!s) return new Date().toISOString().slice(0, 10)
+  if (!s) return localYmd()
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
   const m = s.match(/(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/)
   if (m) {
@@ -103,8 +105,8 @@ function parseDate(s) {
   const ar = s.replace(/[٠-٩]/g, ch => String('٠١٢٣٤٥٦٧٨٩'.indexOf(ch)))
   if (ar !== s) return parseDate(ar)
   const d = new Date(s)
-  if (Number.isFinite(d.getTime())) return d.toISOString().slice(0, 10)
-  return new Date().toISOString().slice(0, 10)
+  if (Number.isFinite(d.getTime())) return localYmd(d)
+  return localYmd()
 }
 function num(s) {
   if (s == null) return 0

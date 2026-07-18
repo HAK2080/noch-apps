@@ -13,7 +13,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Clock, CheckCircle2, DollarSign, CreditCard, Bike, Package, Lock } from 'lucide-react'
-import { getPOSBranch, listShifts } from '../lib/pos-supabase'
+import { getPOSBranch, listShifts, businessToday, businessDayWindow, localYmd } from '../lib/pos-supabase'
 import { getServedBy } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
 import { usePermissions } from '../../../contexts/PermissionsContext'
@@ -57,13 +57,33 @@ export default function POSSessions() {
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Date range (business days, 5 AM → 5 AM). Default: last 30 days.
+  const RANGE_PRESETS = [
+    { key: 'today', label: 'Today', days: 0 },
+    { key: '7d',    label: '7 days', days: 6 },
+    { key: '30d',   label: '30 days', days: 29 },
+  ]
+  const [range, setRange] = useState(() => {
+    const to = businessToday()
+    const from = businessToday(); from.setDate(from.getDate() - 29)
+    return { preset: '30d', fromDate: localYmd(from), toDate: localYmd(to) }
+  })
+  const choosePreset = (p) => {
+    if (p === 'custom') { setRange(r => ({ ...r, preset: 'custom' })); return }
+    const meta = RANGE_PRESETS.find(x => x.key === p)
+    const to = businessToday()
+    const from = businessToday(); from.setDate(from.getDate() - (meta?.days ?? 0))
+    setRange({ preset: p, fromDate: localYmd(from), toDate: localYmd(to) })
+  }
+
   const load = async () => {
     if (!allowed) { setLoading(false); return }   // guard: don't even fetch
     setLoading(true)
     try {
+      const { fromIso, toIso } = businessDayWindow(range.fromDate, range.toDate)
       const [b, list] = await Promise.all([
         getPOSBranch(branchId),
-        listShifts(branchId, { limit: 60 }),
+        listShifts(branchId, { limit: 500, fromIso, toIso }),
       ])
       setBranch(b)
       setShifts(list)
@@ -74,7 +94,7 @@ export default function POSSessions() {
     }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load() }, [branchId, allowed])
+  useEffect(() => { load() }, [branchId, allowed, range.fromDate, range.toDate])
 
   // Hard block: staff / limited_staff land here → "Access denied" card.
   if (!allowed) {
@@ -114,15 +134,57 @@ export default function POSSessions() {
           </button>
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl">Sessions</h1>
-            <p className="text-noch-muted text-sm">{branch?.name} · last {shifts.length} shifts</p>
+            <p className="text-noch-muted text-sm">{branch?.name} · {range.fromDate} → {range.toDate} · {shifts.length} shifts</p>
           </div>
           <button onClick={load} className="btn-secondary text-sm px-3 py-1">Refresh</button>
+        </div>
+
+        {/* Date range (business days: 5 AM → 5 AM, so late-night sales stay with the evening) */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {RANGE_PRESETS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => choosePreset(p.key)}
+              className={`text-sm px-3 py-1.5 rounded-lg border ${
+                range.preset === p.key
+                  ? 'bg-noch-green/15 border-noch-green/50 text-noch-green'
+                  : 'border-noch-border text-noch-muted hover:text-white'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+          <button
+            onClick={() => choosePreset('custom')}
+            className={`text-sm px-3 py-1.5 rounded-lg border ${
+              range.preset === 'custom'
+                ? 'bg-noch-green/15 border-noch-green/50 text-noch-green'
+                : 'border-noch-border text-noch-muted hover:text-white'
+            }`}
+          >
+            Custom
+          </button>
+          {range.preset === 'custom' && (
+            <>
+              <input
+                type="date" value={range.fromDate}
+                onChange={e => setRange(r => ({ ...r, fromDate: e.target.value }))}
+                className="input text-sm py-1.5"
+              />
+              <span className="text-noch-muted text-sm">→</span>
+              <input
+                type="date" value={range.toDate}
+                onChange={e => setRange(r => ({ ...r, toDate: e.target.value }))}
+                className="input text-sm py-1.5"
+              />
+            </>
+          )}
         </div>
 
         {/* Top-level totals across the visible window */}
         {!loading && shifts.length > 0 && (
           <div className="card p-4 mb-4">
-            <p className="text-noch-muted text-xs mb-2">Across the last {shifts.length} sessions</p>
+            <p className="text-noch-muted text-xs mb-2">Across {shifts.length} sessions ({range.fromDate} → {range.toDate})</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Revenue</p>

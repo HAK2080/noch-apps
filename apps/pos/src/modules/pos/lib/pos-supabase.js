@@ -273,11 +273,15 @@ export async function getOpenShift(branchId) {
 
 // List recent shifts for a branch, newest first.
 // Default: 30 most recent (about a month). Used by the Sessions page.
-export async function listShifts(branchId, { limit = 30 } = {}) {
-  const { data, error } = await supabase
+// Optional fromIso/toIso filter opened_at (use businessDayWindow for ranges).
+export async function listShifts(branchId, { limit = 30, fromIso, toIso } = {}) {
+  let q = supabase
     .from('pos_shifts')
     .select('*')
     .eq('branch_id', branchId)
+  if (fromIso) q = q.gte('opened_at', fromIso)
+  if (toIso) q = q.lte('opened_at', toIso)
+  const { data, error } = await q
     .order('opened_at', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -420,13 +424,42 @@ export async function getSalesByBarista(branchId, fromIso, toIso) {
   if (error) throw error
   return data || []
 }
-export async function getDailySalesRange(branchId, fromIso, toIso) {
+// ── Business day (trading day) helpers ──────────────────────────────
+// The cafes trade 9 AM → ~1 AM next day. A "business day" runs 5 AM → 5 AM
+// local (Africa/Tripoli), so post-midnight sales belong to the evening's
+// trading day. MUST stay in sync with the pos_sales_daily view
+// (migration 20260717120000_business_day_sales.sql).
+export const BUSINESS_DAY_CUTOFF_H = 5
+const pad2 = n => String(n).padStart(2, '0')
+export function localYmd(d = new Date()) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+// "Today" as a business day: before 5 AM this returns yesterday's date,
+// because the previous evening's trading is still the current business day.
+export function businessToday() {
+  return new Date(Date.now() - BUSINESS_DAY_CUTOFF_H * 3600e3)
+}
+// Timestamp window covering business days fromYmd..toYmd inclusive:
+// [from 05:00 local → to+1day 04:59:59.999 local], as UTC ISO strings.
+// Use for created_at/opened_at filters so they match the daily view's buckets.
+export function businessDayWindow(fromYmd, toYmd) {
+  const from = new Date(`${fromYmd}T00:00:00`)
+  from.setHours(BUSINESS_DAY_CUTOFF_H, 0, 0, 0)
+  const to = new Date(`${toYmd}T00:00:00`)
+  to.setDate(to.getDate() + 1)
+  to.setHours(BUSINESS_DAY_CUTOFF_H, 0, 0, 0)
+  return { fromIso: from.toISOString(), toIso: new Date(to.getTime() - 1).toISOString() }
+}
+
+// fromDate/toDate: plain 'YYYY-MM-DD' LOCAL date strings (the view's `day`
+// column is a business day — 5 AM to 5 AM, see helpers above).
+export async function getDailySalesRange(branchId, fromDate, toDate) {
   const { data, error } = await supabase
     .from('pos_sales_daily')
     .select('*')
     .eq('branch_id', branchId)
-    .gte('day', fromIso.slice(0, 10))
-    .lte('day', toIso.slice(0, 10))
+    .gte('day', String(fromDate).slice(0, 10))
+    .lte('day', String(toDate).slice(0, 10))
     .order('day', { ascending: true })
   if (error) throw error
   return data || []

@@ -110,7 +110,8 @@ function FilterChip({ k, active, onClick, count }) {
 
 function ReviewForm({ onClose, onSaved }) {
   const [f, setF] = useState({
-    source: 'google', author_name: '', rating: 5, text: '', sentiment: 'positive', posted_at: new Date().toISOString().slice(0, 10),
+    // posted_at: local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+    source: 'google', author_name: '', rating: 5, text: '', sentiment: 'positive', posted_at: (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })(),
   })
   const set = (k, v) => setF(s => ({ ...s, [k]: v }))
   const submit = async () => {

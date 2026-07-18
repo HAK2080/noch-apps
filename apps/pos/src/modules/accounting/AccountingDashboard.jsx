@@ -19,7 +19,8 @@ import {
 } from './lib/accounting-supabase'
 import toast from 'react-hot-toast'
 
-const ymd = d => d.toISOString().slice(0, 10)
+// Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
+const ymd = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 const TODAY = ymd(new Date())
 const MONTH_AGO = ymd(new Date(Date.now() - 30 * 86400000))
 

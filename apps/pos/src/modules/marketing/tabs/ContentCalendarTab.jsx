@@ -45,12 +45,15 @@ export default function ContentCalendarTab() {
     return d
   }, [weekStart])
 
+  // Local date, not UTC — toISOString() bucketed late-night posts on the wrong day (Libya UTC+2)
+  const ymd = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
+
   const postsByDay = useMemo(() => {
     const m = {}
     for (const p of posts) {
       const t = p.scheduled_at || p.published_at
       if (!t) continue
-      const k = new Date(t).toISOString().slice(0, 10)
+      const k = ymd(new Date(t))
       if (!m[k]) m[k] = []
       m[k].push(p)
     }
@@ -77,9 +80,9 @@ export default function ContentCalendarTab() {
       {loading ? <p className="text-noch-muted text-center py-12">Loading…</p> : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2">
           {days.map(d => {
-            const k = d.toISOString().slice(0, 10)
+            const k = ymd(d)
             const day = postsByDay[k] || []
-            const isToday = k === new Date().toISOString().slice(0, 10)
+            const isToday = k === ymd(new Date())
             return (
               <div key={k} className={`card p-2 min-h-[120px] ${isToday ? 'border-noch-green/50' : ''}`}>
                 <p className="text-noch-muted text-[10px] uppercase mb-1">{d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}</p>

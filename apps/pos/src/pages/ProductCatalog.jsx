@@ -542,8 +542,9 @@ export default function ProductCatalog() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10) })
-  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10))
+  // local dates, not UTC (toISOString shifts a day back in Libya UTC+2)
+  const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
+  const [dateTo, setDateTo] = useState(() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
 

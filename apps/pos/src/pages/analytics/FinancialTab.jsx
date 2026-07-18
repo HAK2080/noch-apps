@@ -25,7 +25,9 @@ function PLRow({ label, value, bold, indent, color, borderTop }) {
 const COST_TYPES = ['Rent', 'Utilities', 'Labor/Salaries', 'Vendor Bill', 'Supplies', 'Marketing', 'Maintenance', 'Other']
 
 function AddExpenseModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ cost_type: 'Rent', amount: '', period_start: new Date().toISOString().slice(0, 10), period_end: new Date().toISOString().slice(0, 10), notes: '' })
+  // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+  const todayLocal = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
+  const [form, setForm] = useState({ cost_type: 'Rent', amount: '', period_start: todayLocal, period_end: todayLocal, notes: '' })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -164,7 +166,8 @@ export default function FinancialTab() {
   async function loadExpenses() {
     setExpensesLoading(true)
     const months = PERIODS.find(p => p.id === period)?.months || 1
-    const since = new Date(Date.now() - months * 30 * 86400000).toISOString().slice(0, 10)
+    // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+    const since = (() => { const d = new Date(Date.now() - months * 30 * 86400000), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
     const { data } = await supabase.from('operating_costs')
       .select('id,cost_type,amount,period_start,notes,source')
       .gte('period_start', since)
@@ -199,7 +202,7 @@ export default function FinancialTab() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `noch-pl-${period}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `noch-pl-${period}-${(() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

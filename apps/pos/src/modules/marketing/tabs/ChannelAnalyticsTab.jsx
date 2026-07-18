@@ -133,7 +133,8 @@ function Metric({ label, curr, prev, pct, dp = 0 }) {
 function SnapshotFormModal({ channel, onClose, onSaved }) {
   const meta = CHANNELS.find(c => c.key === channel)
   const [form, setForm] = useState({
-    snapshot_date: new Date().toISOString().slice(0, 10),
+    // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+    snapshot_date: (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })(),
     account_label: '',
     followers: '', reach: '', profile_visits: '', link_clicks: '', impressions: '', engagement_rate: '',
     review_count: '', avg_rating: '', direction_requests: '', phone_calls: '',

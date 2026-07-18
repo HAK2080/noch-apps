@@ -86,7 +86,8 @@ export default function Tasks() {
     }
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+  const today = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
 
   const statusLabel = {
     all: lang === 'ar' ? 'الكل' : 'All',

@@ -283,7 +283,9 @@ export async function producePendingOrderEvents() {
 
 // Urgent overdue tasks
 export async function produceOverdueTaskEvents() {
-  const today = new Date().toISOString().split('T')[0]
+  // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+  const d = new Date(), p = n => String(n).padStart(2, '0')
+  const today = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
   const { data: tasks } = await supabase
     .from('tasks')
     .select('id, title, due_date, priority, status')

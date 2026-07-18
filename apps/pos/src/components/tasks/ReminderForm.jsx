@@ -123,7 +123,7 @@ export default function ReminderForm({ taskId, telegramChatId, reminders, onRemi
                 type="date"
                 className="input text-sm"
                 value={form.specificDate}
-                min={new Date().toISOString().split('T')[0]}
+                min={(() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()}
                 onChange={e => set('specificDate', e.target.value)}
               />
             </div>

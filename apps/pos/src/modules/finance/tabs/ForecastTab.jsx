@@ -6,8 +6,10 @@ import { runForecast, listScenarios, saveScenario, listBranches } from '../lib/f
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
-function nDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
-const TODAY = new Date().toISOString().slice(0, 10)
+// Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
+const ymd = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
+function nDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return ymd(d) }
+const TODAY = ymd(new Date())
 
 export default function ForecastTab() {
   const [branches, setBranches] = useState([])

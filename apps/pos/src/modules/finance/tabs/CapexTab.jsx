@@ -105,7 +105,8 @@ function CapexFormModal({ branches, initial, onClose, onSave }) {
   const [f, setF] = useState({
     name: initial?.name || '',
     vendor: initial?.vendor || '',
-    acquired_at: initial?.acquired_at || new Date().toISOString().slice(0, 10),
+    // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+    acquired_at: initial?.acquired_at || (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })(),
     cost_lyd: initial?.cost_lyd ?? '',
     expected_life_months: initial?.expected_life_months ?? 60,
     expected_monthly_contribution_lyd: initial?.expected_monthly_contribution_lyd ?? '',

@@ -113,13 +113,17 @@ export async function getPendingApprovals() {
   return data || []
 }
 
+// Local date string (YYYY-MM-DD) — NOT UTC: toISOString() shifts dates back a
+// day in Libya (UTC+2), which made "today"/overdue checks wrong before 2 AM.
+const localYmd = (d = new Date()) => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
+
 export async function getTaskStats() {
   const { data, error } = await supabase
     .from('tasks')
     .select('status, due_date')
   if (error) throw error
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = localYmd()
   return {
     total: data.length,
     pending: data.filter(t => t.status === 'pending').length,
@@ -134,7 +138,7 @@ export async function getTaskStats() {
 // ============================================================
 
 export async function getDashboardAlerts() {
-  const today = new Date().toISOString().split('T')[0]
+  const today = localYmd()
 
   const [tasksRes, stockRes, ordersRes] = await Promise.allSettled([
     // All non-done tasks with due dates or urgent priority
@@ -261,7 +265,7 @@ export async function logReport(recipientPhone, summary) {
   // week_start is unique — upsert so re-sending the same week updates the timestamp
   const weekStart = new Date()
   weekStart.setDate(weekStart.getDate() - weekStart.getDay()) // Sunday
-  const weekStartStr = weekStart.toISOString().split('T')[0]
+  const weekStartStr = localYmd(weekStart)
 
   const { data, error } = await supabase
     .from('report_logs')
@@ -348,9 +352,9 @@ export async function deleteReminder(id) {
 
 export function formatDueDate(dateStr, t) {
   if (!dateStr) return t('noDate')
-  const today = new Date().toISOString().split('T')[0]
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const today = localYmd()
+  const tomorrow = localYmd(new Date(Date.now() + 86400000))
+  const yesterday = localYmd(new Date(Date.now() - 86400000))
   if (dateStr === today) return t('today')
   if (dateStr === tomorrow) return t('tomorrow')
   if (dateStr === yesterday) return t('yesterday')
@@ -360,7 +364,7 @@ export function formatDueDate(dateStr, t) {
 export function isOverdue(task) {
   if (task.status === 'done') return false
   if (!task.due_date) return false
-  const today = new Date().toISOString().split('T')[0]
+  const today = localYmd()
   return task.due_date < today
 }
 

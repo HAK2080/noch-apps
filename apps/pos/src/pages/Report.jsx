@@ -29,7 +29,8 @@ export default function Report() {
     const key = task.assignee.id
     if (!acc[key]) acc[key] = { name: task.assignee.full_name, pending: 0, in_progress: 0, done: 0, overdue: 0 }
     acc[key][task.status]++
-    const today = new Date().toISOString().split('T')[0]
+    // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+    const today = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
     if (task.status !== 'done' && task.due_date && task.due_date < today) acc[key].overdue++
     return acc
   }, {})

@@ -9,7 +9,9 @@ import toast from 'react-hot-toast'
 
 const CATS = ['rent','utilities','marketing','supplies','maintenance','wages_one_off','professional_fees','licenses','bank_fees','other_opex','capex']
 
-function firstOfMonth(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10) }
+// Local date, not UTC — toISOString() turned "1st of month 00:00" into the
+// previous month's last day (Libya UTC+2), skewing the whole variance period.
+function firstOfMonth(d = new Date()) { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-01` }
 
 export default function VarianceTab({ readOnly = false }) {
   const [branches, setBranches] = useState([])

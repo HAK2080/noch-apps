@@ -177,7 +177,9 @@ export async function ackRestockAlert(alertId, profileId = null) {
 export async function completionRateLast7Days() {
   const since = new Date()
   since.setDate(since.getDate() - 6)
-  const sinceStr = since.toISOString().slice(0, 10)
+  // local date, not UTC (toISOString shifts a day back in Libya UTC+2)
+  const p = n => String(n).padStart(2, '0')
+  const sinceStr = `${since.getFullYear()}-${p(since.getMonth() + 1)}-${p(since.getDate())}`
   const { data, error } = await supabase
     .from('ops_task_instances')
     .select('status, template:ops_task_templates(shift_window_id, window:ops_shift_windows(name_en, name_ar))')

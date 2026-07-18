@@ -20,7 +20,8 @@ function defaultPeriod() {
   const to = new Date(); to.setHours(23, 59, 59, 999)
   const from = new Date(); from.setHours(0, 0, 0, 0)
   from.setDate(from.getDate() - 6)
-  const ymd = (d) => d.toISOString().slice(0, 10)
+  // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
+  const ymd = (d) => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
   return { preset: '7d', from: ymd(from), to: ymd(to) }
 }
 
