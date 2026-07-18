@@ -12,12 +12,14 @@ import { ExternalLink, Receipt, TrendingDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { lyd } from '../lib/thresholds'
 import PeriodSelector from '../components/PeriodSelector'
+import { businessToday } from '../../pos/lib/pos-supabase'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
 
 function defaultPeriod() {
-  const to = new Date(); to.setHours(23, 59, 59, 999)
-  const from = new Date(); from.setHours(0, 0, 0, 0)
+  // Business days (5 AM → 5 AM): before 5 AM, "today" is still the evening's trading day
+  const to = businessToday(); to.setHours(23, 59, 59, 999)
+  const from = businessToday(); from.setHours(0, 0, 0, 0)
   from.setDate(from.getDate() - 29)
   // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
   const ymd = (d) => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }

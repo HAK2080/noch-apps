@@ -11,11 +11,15 @@ const PRESETS = [
   { key: '90d',   label: '90d',    days: 89 },
 ]
 
+import { businessToday } from '../../pos/lib/pos-supabase'
+
 // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
 function ymd(d) { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
+// Presets are BUSINESS days (5 AM → 5 AM): before 5 AM, "Today" still means
+// the evening's trading day that is wrapping up.
 function rangeFor(preset) {
-  const to = new Date(); to.setHours(23, 59, 59, 999)
-  const from = new Date(); from.setHours(0, 0, 0, 0)
+  const to = businessToday(); to.setHours(23, 59, 59, 999)
+  const from = businessToday(); from.setHours(0, 0, 0, 0)
   if (preset === 'today') return { from, to }
   const meta = PRESETS.find(p => p.key === preset)
   from.setDate(from.getDate() - (meta?.days ?? 6))

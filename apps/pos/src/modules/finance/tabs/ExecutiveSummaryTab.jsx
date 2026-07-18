@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import { getExecutiveSummary, getLiquiditySummary } from '../lib/finance-supabase'
+import { businessToday } from '../../pos/lib/pos-supabase'
 import { lyd, pct } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
@@ -14,7 +15,9 @@ function defaultPeriod() {
 }
 
 function completedRange(preset) {
-  const now = new Date()
+  // Business "now" (5 AM cutoff) so completed-period math ignores the
+  // post-midnight tail of the current trading day.
+  const now = businessToday()
   const to = new Date(now)
   const from = new Date(now)
   if (preset === '30d') {

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { TrendingUp } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import KPICard from '../components/KPICard'
+import { businessToday } from '../../pos/lib/pos-supabase'
 import { getPnL, getFinanceSettings, listBranches } from '../lib/finance-supabase'
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
@@ -17,8 +18,9 @@ import toast from 'react-hot-toast'
 // "Loading…" before reaching the JSX that mounts PeriodSelector, leaving
 // /finance hung forever.
 function defaultPeriod() {
-  const to = new Date(); to.setHours(23, 59, 59, 999)
-  const from = new Date(); from.setHours(0, 0, 0, 0)
+  // Business days (5 AM → 5 AM): before 5 AM, "today" is still the evening's trading day
+  const to = businessToday(); to.setHours(23, 59, 59, 999)
+  const from = businessToday(); from.setHours(0, 0, 0, 0)
   from.setDate(from.getDate() - 6)
   // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
   const ymd = (d) => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
