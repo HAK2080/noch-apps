@@ -1,9 +1,9 @@
-// accounting-supabase.js — all GL data access (chart of accounts, journals,
+// accounting-supabase.js - all GL data access (chart of accounts, journals,
 // ledger, trial balance, statements, posting). Mirrors finance-supabase.js.
 
 import { supabase } from '../../../lib/supabase'
 
-// ── Settings ────────────────────────────────────────────────────────────
+// Settings
 export async function getGlSettings() {
   const { data, error } = await supabase.from('gl_settings').select('*').eq('id', 'default').maybeSingle()
   if (error) {
@@ -20,7 +20,7 @@ export async function updateGlSettings(updates) {
   return data
 }
 
-// ── Chart of accounts ───────────────────────────────────────────────────
+// Chart of accounts
 export async function listAccounts({ activeOnly = false } = {}) {
   let q = supabase.from('gl_accounts').select('*').order('code')
   if (activeOnly) q = q.eq('is_active', true)
@@ -44,7 +44,7 @@ export async function deactivateAccount(id) {
   if (error) throw error
 }
 
-// ── Account map ─────────────────────────────────────────────────────────
+// Account map
 export async function listAccountMap() {
   const { data, error } = await supabase.from('gl_account_map').select('*, account:gl_accounts(code, name_en, name_ar)').order('key')
   if (error) return []
@@ -55,7 +55,7 @@ export async function setAccountMap(key, accountId) {
   if (error) throw error
 }
 
-// ── Journal batches + lines ─────────────────────────────────────────────
+// Journal batches + lines
 export async function listBatches({ from, to, branchId = null, sourceType = null } = {}) {
   let q = supabase.from('gl_journal_batches')
     .select('*, branch:pos_branches(name)')
@@ -84,7 +84,7 @@ export async function createManualJournal({ journal_date, branch_id = null, memo
   const td = lines.reduce((s, l) => s + Number(l.debit_lyd || 0), 0)
   const tc = lines.reduce((s, l) => s + Number(l.credit_lyd || 0), 0)
   if (Math.round(td * 100) !== Math.round(tc * 100)) {
-    throw new Error(`Not balanced — debit ${td.toFixed(2)} ≠ credit ${tc.toFixed(2)}`)
+    throw new Error(`Not balanced - debit ${td.toFixed(2)} != credit ${tc.toFixed(2)}`)
   }
   if (td === 0) throw new Error('Journal has no amounts')
 
@@ -96,20 +96,46 @@ export async function createManualJournal({ journal_date, branch_id = null, memo
   const rows = lines
     .filter(l => Number(l.debit_lyd || 0) > 0 || Number(l.credit_lyd || 0) > 0)
     .map((l, i) => ({
-      batch_id: batch.id, account_id: l.account_id, branch_id,
-      line_no: i + 1, debit_lyd: Number(l.debit_lyd || 0), credit_lyd: Number(l.credit_lyd || 0),
+      batch_id: batch.id,
+      account_id: l.account_id,
+      branch_id,
+      line_no: i + 1,
+      debit_lyd: Number(l.debit_lyd || 0),
+      credit_lyd: Number(l.credit_lyd || 0),
       memo: l.memo || null,
     }))
   const { error: le } = await supabase.from('gl_journal_lines').insert(rows)
-  if (le) { await supabase.from('gl_journal_batches').delete().eq('id', batch.id); throw le }
+  if (le) {
+    await supabase.from('gl_journal_batches').delete().eq('id', batch.id)
+    throw le
+  }
 
   const { data: posted, error: pe } = await supabase.from('gl_journal_batches')
     .update({ status: 'posted' }).eq('id', batch.id).select().single()
-  if (pe) throw pe   // trigger raises if unbalanced
+  if (pe) throw pe
   return posted
 }
 
-// ── Posting RPCs ────────────────────────────────────────────────────────
+export async function voidGlBatch(batchId, reason = '') {
+  const { data, error } = await supabase.rpc('void_gl_batch', { p_batch_id: batchId, p_reason: reason || null })
+  if (error) throw error
+  return data
+}
+
+export async function replaceManualJournal({ old_batch_id, journal_date, branch_id = null, memo, lines, reason = '' }) {
+  const { data, error } = await supabase.rpc('replace_manual_journal', {
+    p_old_batch_id: old_batch_id,
+    p_journal_date: journal_date,
+    p_branch_id: branch_id,
+    p_memo: memo,
+    p_lines: lines,
+    p_reason: reason || null,
+  })
+  if (error) throw error
+  return data
+}
+
+// Posting RPCs
 export async function postSalesDay(date, branchId) {
   const { data, error } = await supabase.rpc('gl_post_sales_day', { p_date: date, p_branch: branchId })
   if (error) throw error
@@ -126,14 +152,19 @@ export async function postOpeningBalances(entries, asOf) {
   return data
 }
 
-// ── Reports ─────────────────────────────────────────────────────────────
+// Reports
 export async function trialBalance(asOf, branchId = null) {
   const { data, error } = await supabase.rpc('gl_trial_balance', { p_as_of: asOf, p_branch: branchId })
   if (error) throw error
   return data || []
 }
 export async function accountLedger(accountId, from, to, branchId = null) {
-  const { data, error } = await supabase.rpc('gl_account_ledger', { p_account_id: accountId, p_from: from, p_to: to, p_branch: branchId })
+  const { data, error } = await supabase.rpc('gl_account_ledger', {
+    p_account_id: accountId,
+    p_from: from,
+    p_to: to,
+    p_branch: branchId,
+  })
   if (error) throw error
   return data || []
 }
@@ -147,8 +178,36 @@ export async function incomeStatement(from, to, branchId = null) {
   if (error) throw error
   return data || []
 }
+export async function statementLines(from, to, branchId = null) {
+  const { data, error } = await supabase.rpc('gl_statement_lines', { p_from: from, p_to: to, p_branch: branchId })
+  if (error) throw error
+  return data || []
+}
+export async function apAging(asOf, branchId = null) {
+  const { data, error } = await supabase.rpc('gl_ap_aging', { p_as_of: asOf, p_branch: branchId })
+  if (error) throw error
+  return data || []
+}
+export async function supplierStatement(supplierName, asOf, branchId = null) {
+  const { data, error } = await supabase.rpc('gl_supplier_statement', {
+    p_supplier_name: supplierName,
+    p_as_of: asOf,
+    p_branch: branchId,
+  })
+  if (error) throw error
+  return data || []
+}
+export async function cashFlowStatement(from, to, branchId = null) {
+  const { data, error } = await supabase.rpc('gl_cash_flow_statement', {
+    p_from: from,
+    p_to: to,
+    p_branch: branchId,
+  })
+  if (error) throw error
+  return data || []
+}
 
-// ── Branches (reuse) ────────────────────────────────────────────────────
+// Branches (reuse)
 export async function listBranches() {
   const { data, error } = await supabase.from('pos_branches').select('id, name').eq('is_active', true).order('name')
   if (error) return []
