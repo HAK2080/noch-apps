@@ -112,6 +112,56 @@ Legend: ✅ verified correct · 🔧 fixed during audit · 🔴 bug/open · 🟠
 - 🟠 P2 — Dashboard KPI: **attach rate** (% orders with loyalty_customer_id),
   repeat-visit rate — not member count.
 
+## 8. Module verdicts (audit opinion, 2026-07-18)
+
+| Module | Grade | Verdict |
+|---|---|---|
+| POS terminal | **A−** | Best-engineered part: idempotent offline sync, atomic stock+shift, void reversal, PIN + rate limiting. Leave it alone. |
+| Sales reporting | **B+** (was F) | Was lying ("Today" = 3 days); trustworthy after fixes once deployed. Split tiles = last honesty gap. |
+| Expenses | **B+** | Good schema + approvals; Receipt Snap solves capture. Payment end of the pipeline has no workflow. |
+| Finance | **B−** | Strong math engine, ungoverned inputs (product costs, refunds toggle, 3 FX sources). |
+| Inventory | **C+** | Retail stock solid; ingredient counts stale → noise not signal. |
+| Accounting (GL) | **C** | Correct double-entry, probably unused (draft limbo). Make it real or park it. |
+| Loyalty | **B+ build / D outcome** | Great engine, not connected to checkout — <1% of orders. |
+| Tasks/Staff | **B** | Works, used daily. |
+| Content/Marketing | **C+** | Most sprawl per unit of value (3 overlapping systems). |
+
+Overall: capability outran integration, data discipline, and cleanup — not a
+missing-features problem.
+
+## 9. Overlaps (consolidation targets)
+
+- Five reporting surfaces (POS Reports / Sales / Finance / Accounting /
+  Management Report + analytics-legacy) answering the same question.
+- Two expense tables (`expense_entries` + `expenses`) UNIONed inside finance_pnl —
+  one should absorb the other.
+- Two content systems (legacy /content + Content Studio 2.0) + marketing module.
+- Three FX sources; two category taxonomies; two branch identity systems
+  (cost centers vs pos_branches).
+- Three "intelligence/alerts" implementations (businessEvents, Loyalty
+  Intelligence, Inventory Intelligence).
+- Four date-range pickers; duplicated badge components; old `backend/` codebase
+  still in the repo beside `apps/`.
+
+## 10. Missing pieces (highest leverage first)
+
+1. **5 AM auto-close report to Telegram** — per-branch gross/cash/card, vs last
+   week, top products, stamps, expenses snapped. Replaces daily dashboard-checking;
+   all plumbing (Telegram, business-day boundary, daily view) already exists.
+2. **Checkout as the integration hub** — a completed sale should fire loyalty
+   stamp + recipe-based ingredient depletion + real COGS. Today only retail
+   stock updates.
+3. **Data-quality governance** — products-missing-cost check, stale-stock-count
+   detector, FX-rates-last-updated indicator; the system should police its inputs.
+4. **Payment/settlement workflow** — approve → pay → reconcile against BankTab.
+5. **Tests, error monitoring, backups** — none exist; smoke tests + Sentry +
+   scheduled DB dump would transform risk.
+6. **Staff scheduling/rota** — labor is measured (clock-ins) but never planned;
+   demand forecast exists but doesn't drive the roster.
+7. **One truth branch + boring deploys** — prerequisite for everything above.
+
+Top three by leverage: **branch merge, checkout-as-hub, 5 AM close report.**
+
 ## Suggested execution order
 
 1. Merge perf ↔ refactor (after in-flight session commits) → single truth branch
