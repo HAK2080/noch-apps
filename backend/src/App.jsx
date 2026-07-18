@@ -68,6 +68,9 @@ import MyCard from './modules/loyalty/customer/MyCard'
 
 import ExpensesPage from './pages/expenses/ExpensesPage'
 
+// Receipt Snap — Noch 5.0 (photo-only expense submission PWA)
+import SnapReceipt from './pages/snap/SnapReceipt'
+
 // Storefront (Public)
 import Menu from './pages/storefront/Menu'
 import Checkout from './pages/storefront/Checkout'
@@ -147,6 +150,11 @@ export default function App() {
 
         <Route path="/expenses/*" element={
           <ProtectedRoute><ExpensesPage /></ProtectedRoute>
+        } />
+
+        {/* Receipt Snap — Noch 5.0 (staff, camera-first) */}
+        <Route path="/snap" element={
+          <ProtectedRoute><SnapReceipt /></ProtectedRoute>
         } />
 
         {/* Content Studio 2.0 (Noch 4.0) */}
