@@ -162,6 +162,37 @@ missing-features problem.
 
 Top three by leverage: **branch merge, checkout-as-hub, 5 AM close report.**
 
+## 11. Vestaboard+ replica — "Noch Channels" (proposed, $0/yr)
+
+Current state: Vestaboard integration is manual-only (admin types → queue → send).
+No automation feeds it. Code already supports BOTH cloud R/W API (paid key) and
+the FREE Local API (`VITE_VESTABOARD_HOST`) — cloud app can't reach LAN, so a
+POS terminal (always on, same Wi-Fi) should act as the send bridge.
+
+Hardware constraint (due diligence): 64-flap charset — UPPERCASE A–Z, 0–9,
+basic punctuation, 8 color chips. **No Arabic / lowercase / emoji.** Content
+must be English/transliterated; colors via the `characters` 6×22 grid mode
+(the existing 132-char truncation = 6×22).
+
+Replicating the Vestaboard+ feature set for free:
+- **Channels table** `vestaboard_channels`: type, enabled, cadence, time
+  windows, priority → the "playlist" scheduler.
+- **vestaboard-cron edge function** (15–30 min): picks due channel, composes
+  message, enqueues into existing `vestaboard_messages`, bridge sends.
+- Channel lineup (all free): English jokes/quotes/trivia batch-generated on
+  Gemini free tier; Open-Meteo Tripoli weather (color-bar design); English RSS
+  news; football-data.org scores; USD→LYD from own `cc_exchange_rates`; prayer
+  times (Aladhan API — numeric + EN labels render fine); optional Spotify
+  now-playing (free API).
+- **Noch-native channels Vestaboard+ can't sell**: today's special, new product,
+  sold-out notices, loyalty reward shoutouts ("MABROUK SARA!"), order
+  milestones, weekly leaderboard star, staff birthdays.
+- Admin: "Channels" tab on the existing Vestaboard page — toggles, cadence,
+  6×22 preview; manual messages jump the queue.
+- Savings: Vestaboard+ subscription + (via Local API bridge) the R/W cloud key.
+- Bonus: a wall-TV web page with CSS split-flap animation can mirror the same
+  queue for the branch without a physical board.
+
 ## Suggested execution order
 
 1. Merge perf ↔ refactor (after in-flight session commits) → single truth branch
