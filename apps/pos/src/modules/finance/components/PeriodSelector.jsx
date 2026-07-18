@@ -11,7 +11,8 @@ const PRESETS = [
   { key: '90d',   label: '90d',    days: 89 },
 ]
 
-function ymd(d) { return d.toISOString().slice(0, 10) }
+// Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
+function ymd(d) { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 function rangeFor(preset) {
   const to = new Date(); to.setHours(23, 59, 59, 999)
   const from = new Date(); from.setHours(0, 0, 0, 0)
@@ -21,10 +22,10 @@ function rangeFor(preset) {
   return { from, to }
 }
 
-export default function PeriodSelector({ value, onChange, defaultPreset = '7d' }) {
+export default function PeriodSelector({ value, onChange, defaultPreset = '7d', labels = {}, rangeOverrides = {} }) {
   // Keep preset + dates in one state object so a preset click updates both atomically.
   const initial = (() => {
-    const r = rangeFor(defaultPreset)
+    const r = rangeOverrides[defaultPreset] || rangeFor(defaultPreset)
     return { preset: defaultPreset, from: ymd(r.from), to: ymd(r.to) }
   })()
   const [range, setRange] = useState(value || initial)
@@ -49,7 +50,7 @@ export default function PeriodSelector({ value, onChange, defaultPreset = '7d' }
 
   const choosePreset = (p) => {
     if (p === 'custom') return apply({ ...range, preset: 'custom' })
-    const r = rangeFor(p)
+    const r = rangeOverrides[p] || rangeFor(p)
     apply({ preset: p, from: ymd(r.from), to: ymd(r.to) })
   }
 
@@ -65,7 +66,7 @@ export default function PeriodSelector({ value, onChange, defaultPreset = '7d' }
                 ? 'bg-noch-green/10 border-noch-green/50 text-noch-green'
                 : 'border-noch-border text-noch-muted hover:text-white'
             }`}
-          >{p.label}</button>
+          >{labels[p.key] || p.label}</button>
         ))}
         <button
           onClick={() => choosePreset('custom')}

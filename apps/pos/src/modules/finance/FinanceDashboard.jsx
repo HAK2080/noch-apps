@@ -22,6 +22,7 @@ import RecipeLinkerTab from './tabs/RecipeLinkerTab'
 import VarianceTab from './tabs/VarianceTab'
 import CapexTab from './tabs/CapexTab'
 import ForecastTab from './tabs/ForecastTab'
+import ExecutiveSummaryTab from './tabs/ExecutiveSummaryTab'
 
 // Legacy tabs from /analytics — kept under "Overview" pill so previous
 // dashboards aren't lost.
@@ -33,6 +34,7 @@ import IntelligenceTab from '../../pages/analytics/IntelligenceTab'
 //   edit → requires finance can_edit (bank import, cost mapping, capex,
 //          forecast scenarios, AI insights)
 const TABS = [
+  { id: 'summary',      label: 'Executive summary', icon: BarChart3,  level: 'view' },
   { id: 'pnl',         label: 'Daily P&L',          icon: TrendingUp, level: 'view' },
   { id: 'menu',        label: 'Menu profit',        icon: Coffee,     level: 'view' },
   { id: 'cash',        label: 'Cash & runway',      icon: Wallet,     level: 'view' },
@@ -49,7 +51,7 @@ const TABS = [
 
 export default function FinanceDashboard() {
   const can = usePermission()
-  const [tab, setTab] = useState('pnl')
+  const [tab, setTab] = useState('summary')
 
   // readOnly: has finance view access but not edit — hide all edit affordances.
   const readOnly = !can('finance', 'edit')
@@ -87,6 +89,7 @@ export default function FinanceDashboard() {
             <p className="text-noch-muted text-sm">You don't have permission to view Finance.</p>
           </div>
         }>
+          {activeTab === 'summary'  && <ExecutiveSummaryTab />}
           {activeTab === 'pnl'      && <DailyPnLTab readOnly={readOnly} />}
           {activeTab === 'menu'     && <MenuProfitabilityTab readOnly={readOnly} />}
           {activeTab === 'cash'     && <CashRunwayTab readOnly={readOnly} />}

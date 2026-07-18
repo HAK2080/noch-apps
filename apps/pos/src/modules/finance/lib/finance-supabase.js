@@ -2,6 +2,7 @@
 // Reads from migrations 20260508010000_finance_mvp.sql.
 
 import { supabase } from '../../../lib/supabase'
+import { STATUS, statusForRatio } from './thresholds'
 
 // ── Settings (singleton row id='default') ──────────────────────────────
 export async function getFinanceSettings() {
@@ -35,6 +36,108 @@ export async function getPnL({ branchId = null, from, to, netOfRefunds = false }
   })
   if (error) throw error
   return data || {}
+}
+
+// The executive summary's single read interface. Keep branch health rules
+// here so every future summary surface uses the same definition.
+export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
+  const [branches, settings, totalPnl] = await Promise.all([
+    listBranches(),
+    getFinanceSettings(),
+    getPnL({ from, to, netOfRefunds }),
+  ])
+
+  const rows = await Promise.all(branches.map(async branch => ({
+    ...branch,
+    ...summarizePnl(await getPnL({ branchId: branch.id, from, to, netOfRefunds }), settings),
+  })))
+
+  return {
+    settings,
+    total: summarizePnl(totalPnl, settings),
+    branches: rows,
+  }
+}
+
+function summarizePnl(pnl = {}, settings = {}) {
+  const revenue = Number(pnl.revenue_net || 0)
+  const cogs = Number(pnl.cogs || 0)
+  const labor = Number(pnl.labor || 0)
+  const net = Number(pnl.net_contribution || 0)
+  const prime = Number(pnl.prime_cost || 0)
+  const primeRatio = revenue > 0 ? prime / revenue : null
+  const cogsRatio = revenue > 0 ? cogs / revenue : null
+  const laborRatio = revenue > 0 ? labor / revenue : null
+  const primeStatus = statusForRatio(
+    primeRatio,
+    Number(settings.prime_cost_min_pct ?? 55),
+    Number(settings.prime_cost_max_pct ?? 65),
+  )
+  const reasons = []
+
+  if (revenue <= 0) reasons.push('No sales data')
+  if (revenue > 0 && cogs === 0) reasons.push('COGS missing')
+  if (revenue > 0 && labor === 0) reasons.push('Labor missing')
+
+  let status = 'healthy'
+  if (revenue <= 0) status = 'no_data'
+  else if (primeStatus === STATUS.BAD || net < 0) status = 'at_risk'
+  else if (primeStatus === STATUS.EDGE || reasons.length) status = 'watch'
+
+  return {
+    revenue,
+    cogs,
+    labor,
+    prime,
+    net,
+    primeRatio,
+    cogsRatio,
+    laborRatio,
+    primeStatus,
+    status,
+    reasons,
+  }
+}
+
+// Current liquidity snapshot. Bank balance is taken from the latest imported
+// statement balance per account; without that balance we do not invent one
+// from transaction movements alone.
+export async function getLiquiditySummary() {
+  const [runwayResult, bankResult, settingsResult] = await Promise.allSettled([
+    getCashRunway(null),
+    listBankTransactions({}),
+    getFinanceSettings(),
+  ])
+  const runway = runwayResult.status === 'fulfilled' ? runwayResult.value : {}
+  const transactions = bankResult.status === 'fulfilled' ? bankResult.value : []
+  const settings = settingsResult.status === 'fulfilled' ? settingsResult.value : {}
+  const latestByAccount = new Map()
+
+  for (const row of transactions) {
+    if (row.balance_after_lyd == null) continue
+    const current = latestByAccount.get(row.account_label)
+    if (!current || String(row.posted_at) > String(current.posted_at)) latestByAccount.set(row.account_label, row)
+  }
+
+  const accounts = [...latestByAccount.entries()].map(([name, row]) => ({
+    name,
+    balance: Number(row.balance_after_lyd),
+    updatedAt: row.posted_at,
+  }))
+  const bankBalance = accounts.length ? accounts.reduce((sum, account) => sum + account.balance, 0) : null
+  const cashOnHand = Number(runway.cash_on_hand_lyd || 0)
+
+  return {
+    cashOnHand,
+    bankBalance,
+    totalLiquidity: bankBalance == null ? null : cashOnHand + bankBalance,
+    runwayWeeks: runway.runway_weeks == null ? null : Number(runway.runway_weeks),
+    upcoming30dOutflows: Number(runway.upcoming_30d_outflows_lyd || 0),
+    cashUpdatedAt: settings.cash_on_hand_set_at || null,
+    bankAccounts: accounts,
+    bankUpdatedAt: accounts.map(a => a.updatedAt).sort().at(-1) || null,
+    bankImported: bankResult.status === 'fulfilled',
+  }
 }
 
 // ── Variance vs budget ──────────────────────────────────────────────
