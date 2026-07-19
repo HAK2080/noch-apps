@@ -16,6 +16,7 @@ import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../contexts/PermissionsContext'
 import Layout from '../components/Layout'
+import BusinessRangePicker from '../components/shared/BusinessRangePicker'
 
 const PRESETS = [
   { key: 'today', label: 'Today', days: 0 },
@@ -109,7 +110,11 @@ export default function Sales() {
         {canViewSessions && (
           <>
             {/* Range presets */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="mb-4">
+              <BusinessRangePicker presets={PRESETS} value={{ preset: range.preset, from: range.fromDate, to: range.toDate }} onChange={next => setRange({ preset: next.preset, fromDate: next.from, toDate: next.to })} />
+            </div>
+            {/* eslint-disable-next-line no-constant-binary-expression */}
+            {false && <div className="flex flex-wrap items-center gap-2 mb-4">
               {PRESETS.map(p => (
                 <button
                   key={p.key}
@@ -148,7 +153,7 @@ export default function Sales() {
                   />
                 </>
               )}
-            </div>
+            </div>}
 
             {/* Grand total across branches */}
             <div className="card p-4 mb-4">

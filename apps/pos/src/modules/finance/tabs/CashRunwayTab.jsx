@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Wallet, AlertTriangle, Edit2, Save, X } from 'lucide-react'
-import { getCashRunway, getFinanceSettings, updateFinanceSettings } from '../lib/finance-supabase'
+import { getCashRunway, getFinanceSettings, updateFinanceSettings, updateCanonicalCurrencyRate } from '../lib/finance-supabase'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
@@ -39,7 +39,9 @@ export default function CashRunwayTab({ readOnly = false }) {
 
   const save = async (updates) => {
     try {
-      const next = await updateFinanceSettings(updates)
+      const next = Object.prototype.hasOwnProperty.call(updates, 'usd_reference_rate_lyd')
+        ? await updateCanonicalCurrencyRate('USD', updates.usd_reference_rate_lyd)
+        : await updateFinanceSettings(updates)
       setSettings(next)
       toast.success('Saved')
       setEditing(null)

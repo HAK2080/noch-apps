@@ -6,7 +6,7 @@
   "description": "Customer-facing landing for noch.cloud (Hub + Menu + Shop + Loyalty). Sibling of apps/pos in the monorepo.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/precompile.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

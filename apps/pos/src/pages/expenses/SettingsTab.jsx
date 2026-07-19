@@ -8,6 +8,7 @@ export default function SettingsTab({ onMetaChanged }) {
   const [costCenters, setCostCenters] = useState([])
   const [categories, setCategories] = useState([])
   const [rates, setRates] = useState([])
+  const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [editRate, setEditRate] = useState({})
   const [saving, setSaving] = useState(false)
@@ -25,22 +26,24 @@ export default function SettingsTab({ onMetaChanged }) {
   const [editCcName, setEditCcName] = useState('')
   const [confirmDelCc, setConfirmDelCc] = useState(null)
 
-  useEffect(() => { load() }, [])
-
   async function load() {
     setLoading(true)
-    const [ccs, cats, rs] = await Promise.all([
+    const [ccs, cats, rs, bs] = await Promise.all([
       supabase.from('cost_centers').select('*').order('id').then(r => r.data || []),
       supabase.from('expense_categories').select('*').order('name').then(r => r.data || []),
-      supabase.from('cc_exchange_rates').select('*').order('currency').then(r => r.data || []),
+      supabase.from('currency_rates').select('*').order('currency').then(r => r.data || []),
+      supabase.from('pos_branches').select('id,name').eq('is_active', true).order('name').then(r => r.data || []),
     ])
     setCostCenters(ccs)
     setCategories(cats)
     setRates(rs)
+    setBranches(bs)
     const rateMap = {}; rs.forEach(r => { rateMap[r.currency] = r.rate_to_lyd })
     setEditRate(rateMap)
     setLoading(false)
   }
+
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/set-state-in-effect
 
   function refreshAll() {
     load()
@@ -51,7 +54,7 @@ export default function SettingsTab({ onMetaChanged }) {
     setSaving(true)
     try {
       for (const [currency, rate] of Object.entries(editRate)) {
-        await supabase.from('cc_exchange_rates')
+        await supabase.from('currency_rates')
           .upsert({ currency, rate_to_lyd: parseFloat(rate), updated_at: new Date().toISOString() }, { onConflict: 'currency' })
       }
       toast.success('Exchange rates saved')
@@ -84,6 +87,12 @@ export default function SettingsTab({ onMetaChanged }) {
     toast.success('Category removed')
     refreshAll()
   }
+  async function setCategoryFinanceClass(id, financeClass) {
+    const { error } = await supabase.from('expense_categories').update({ finance_class: financeClass }).eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Finance classification saved')
+    refreshAll()
+  }
 
   // Cost Centers
   async function addCostCenter() {
@@ -109,6 +118,12 @@ export default function SettingsTab({ onMetaChanged }) {
     if (error) { toast.error('Cannot delete — cost center may be in use by existing expenses'); return }
     setConfirmDelCc(null)
     toast.success('Cost center removed')
+    refreshAll()
+  }
+  async function setCostCenterBranch(id, posBranchId) {
+    const { error } = await supabase.from('cost_centers').update({ pos_branch_id: posBranchId || null }).eq('id', id)
+    if (error) { toast.error(error.message); return }
+    toast.success('Branch mapping saved')
     refreshAll()
   }
 
@@ -140,6 +155,17 @@ export default function SettingsTab({ onMetaChanged }) {
               ) : (
                 <>
                   <span className="text-sm text-white flex-1">{cat.name}</span>
+                  <select
+                    value={cat.finance_class || 'opex'}
+                    onChange={e => setCategoryFinanceClass(cat.id, e.target.value)}
+                    className="input py-1 text-xs"
+                    aria-label={`Finance classification for ${cat.name}`}
+                  >
+                    <option value="opex">Operating expense</option>
+                    <option value="capex">Capital expense</option>
+                    <option value="prepaid">Prepaid</option>
+                    <option value="exclude">Exclude</option>
+                  </select>
                   <button onClick={() => { setEditingCat(cat.id); setEditCatName(cat.name) }} className="text-xs text-noch-muted hover:text-white px-2 py-1">Rename</button>
                   <button onClick={() => setConfirmDelCat(cat.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Remove</button>
                 </>
@@ -182,6 +208,15 @@ export default function SettingsTab({ onMetaChanged }) {
               ) : (
                 <>
                   <span className="text-sm text-white flex-1">{cc.name}</span>
+                  <select
+                    value={cc.pos_branch_id || ''}
+                    onChange={e => setCostCenterBranch(cc.id, e.target.value)}
+                    className="input py-1 text-xs max-w-48"
+                    aria-label={`POS branch for ${cc.name}`}
+                  >
+                    <option value="">No POS branch</option>
+                    {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                  </select>
                   <button onClick={() => { setEditingCc(cc.id); setEditCcName(cc.name) }} className="text-xs text-noch-muted hover:text-white px-2 py-1">Rename</button>
                   <button onClick={() => setConfirmDelCc(cc.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Remove</button>
                 </>

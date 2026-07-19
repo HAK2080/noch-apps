@@ -1,49 +1,95 @@
 # Noch Apps
 
-Monorepo for Noch — café management platform (Tripoli, Libya).
+Monorepo for **Noch**, a multi-branch café management system (Tripoli, Libya).
+Two React + Vite single-page apps share one Supabase backend and a single
+root `.env`.
 
-## Structure
+| App | Folder | Domain | Audience |
+|---|---|---|---|
+| **POS + dashboard** | [`apps/pos/`](apps/pos) | `apps.noch.cloud` | Staff (POS, inventory, finance, loyalty, …) + customers (menu/checkout pages) |
+| **Storefront** | [`apps/storefront/`](apps/storefront) | `noch.cloud` | Customers (Hub, Menu, Shop, Loyalty landing) |
 
-| App | Serves | What it is |
-|---|---|---|
-| `apps/pos/` | **apps.noch.cloud** | Admin + POS SPA (React/Vite): tasks, POS terminal, sales reports, finance, accounting, loyalty (Nochi), inventory, expenses, content studio, marketing, ops |
-| `apps/storefront/` | **noch.cloud** | Customer storefront: menu, online shop, loyalty passport |
-| `supabase/` | — | Migrations + edge functions (project `kxqjasdvoohiexedtfqw`) |
-
-`apps/pos` modules: pos, finance, accounting, loyalty, contentStudio, costCalculator, marketing, ops.
-
-## Deploy
-
-```bash
-python deploy.py apps         # build + upload apps.noch.cloud
-python deploy.py storefront   # build + upload noch.cloud
-python deploy.py both
+```
+Noch_apps_June_2026/
+├── apps/
+│   ├── pos/           ← apps.noch.cloud (POS + dashboard SPA)
+│   └── storefront/    ← noch.cloud (customer landing)
+├── packages/
+│   └── shared/        ← reserved for shared assets/utils (currently a scaffold)
+├── supabase/          ← one database; migrations + edge functions for both apps
+├── docs/              ← living docs (see docs/PAGES.md for the route map)
+├── deploy.py          ← builds + uploads each app to the VPS
+└── .env               ← single source of truth; both apps read it (gitignored)
 ```
 
-Edge functions: `supabase functions deploy <name>` (CLI is linked to the project).
-SQL migrations are applied manually (SQL editor) — files in `supabase/migrations/` are the record.
+## Stack
 
-> ⚠️ The GitHub Actions workflows (`deploy-admin.yml` / `deploy-storefront.yml`) still
-> target the OLD `backend/`+`storefront/` layout on `master`. Production deploys from
-> THIS branch's layout via `deploy.py`. Do not push this layout's changes to `master`
-> expecting CI to deploy them — and do not let CI deploy `master` over production.
+- **Frontend:** React + Vite (POS uses React 19; the storefront landing
+  loads React from a CDN — see [`apps/storefront`](apps/storefront)).
+- **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions),
+  project ref `kxqjasdvoohiexedtfqw`.
+- **Hosting:** a single VPS running nginx behind Traefik. `deploy.py`
+  uploads each app's `dist/` over SFTP.
 
-## Conventions that keep the data correct
+## Develop
 
-- **Business day = 5 AM → 5 AM Africa/Tripoli.** Cafés trade 9 AM to ~1 AM, so
-  post-midnight sales belong to the evening's trading day. Enforced in the
-  `pos_sales_daily` view (migration `20260717120000_business_day_sales.sql`) and in
-  `businessToday()` / `businessDayWindow()` in `apps/pos/src/modules/pos/lib/pos-supabase.js`.
-  Every sales/finance screen must use these helpers for date ranges.
-- **Never derive a local date via `toISOString()`** — Libya is UTC+2; that shifts the
-  date to the previous day before 2 AM (this bug once made "Today" report 3 days
-  of sales). Format dates from local components (see `localYmd()`).
-- Long-press on a product in the POS terminal toggles `is_sold_out`: shaded for
-  staff, hidden from the customer menu and online store.
+Both apps read the **root `.env`** (each `vite.config.js` sets
+`envDir: '../..'`). Don't create per-app env files.
 
-## Receipt Snap (Noch 5.0)
+```bash
+cd apps/pos        # or apps/storefront
+npm install
+npm run dev            # POS: dev server against the PRODUCTION db — be careful
+npm run dev:staging    # POS only: dev server against the staging db (safe)
+```
 
-Photo-only expense submission for staff — Telegram bot (@noch_bot) + installable
-PWA. Edge functions `expense-snap` + `telegram-webhook`; extraction chain
-Gemini (free) → Claude → manual. See `RECEIPT_SNAP_SETUP.md` on branch
-`claude/file-inspection-9df8a8` (frontend port to `apps/pos` pending).
+See [`DEV-WORKFLOW.md`](DEV-WORKFLOW.md) for the staging setup and the
+day-to-day loop.
+
+## Build & deploy
+
+Deployment is handled by [`deploy.py`](deploy.py) (requires Python +
+`paramiko`). It builds the app and uploads `dist/` to the VPS.
+
+```bash
+python deploy.py apps         # build + deploy apps.noch.cloud
+python deploy.py storefront   # build + deploy noch.cloud
+python deploy.py both         # both, in order
+python deploy.py apps --no-build   # upload an existing dist/ without rebuilding
+```
+
+- The POS build (`apps/pos`) code-splits routes and vendor chunks for a
+  light initial load; see [`apps/pos/vite.config.js`](apps/pos/vite.config.js).
+- The storefront build (`apps/storefront`) runs a precompile step
+  ([`scripts/precompile.mjs`](apps/storefront/scripts/precompile.mjs)) that
+  transpiles its app ahead of time so the browser doesn't ship/run a JSX
+  transpiler at runtime.
+
+`git push` only saves code to GitHub — it does **not** deploy. Deploys go
+through `deploy.py`.
+
+## Database
+
+One Supabase project backs both apps. SQL migrations live in
+[`supabase/migrations/`](supabase/migrations) and edge functions in
+[`supabase/functions/`](supabase/functions).
+
+> ⚠️ **Migration drift:** the local `supabase/migrations/` folder and the
+> live database have diverged (many local files are unapplied; some applied
+> migrations have no local file). **Do not run `supabase db push`** against
+> production — it would try to apply every unpushed local migration. Apply a
+> single new migration via the Supabase dashboard SQL editor (or a targeted
+> `psql -f`) instead. See [`DEV-WORKFLOW.md`](DEV-WORKFLOW.md).
+
+## Performance harnesses
+
+Repeatable perf tooling lives in [`apps/pos/perf/`](apps/pos/perf):
+`measure.mjs` (warm route-transition timings), `cold-load.mjs` (eager-JS
+audit), `verify-content.mjs`, plus the storefront variants. Each is a
+standalone Playwright script run against a `vite preview` server.
+
+## Docs
+
+[`docs/PAGES.md`](docs/PAGES.md) is the page/route inventory and the first
+place to look when asked about "a page." Dated files (audits, changelogs,
+`*-shipped` reports, QA summaries) are point-in-time records, not living docs.

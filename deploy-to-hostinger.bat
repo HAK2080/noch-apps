@@ -6,7 +6,11 @@ setlocal enabledelayedexpansion
 
 set HOST=72.60.203.107
 set USER=root
-set PASS=9@hW@s3UWL@Z#9uIUlnp
+if "%NOCH_DEPLOY_PASSWORD%"=="" (
+  echo Set NOCH_DEPLOY_PASSWORD before running this script.
+  exit /b 2
+)
+set PASS=%NOCH_DEPLOY_PASSWORD%
 set TARGET=/var/www/html
 
 echo.

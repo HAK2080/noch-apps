@@ -26,7 +26,6 @@ import ExecutiveSummaryTab from './tabs/ExecutiveSummaryTab'
 
 // Legacy tabs from /analytics — kept under "Overview" pill so previous
 // dashboards aren't lost.
-import OverviewTab from '../../pages/analytics/OverviewTab'
 import IntelligenceTab from '../../pages/analytics/IntelligenceTab'
 
 // Tab levels (keyed on the 'finance' feature in Manage Roles):
@@ -45,7 +44,6 @@ const TABS = [
   { id: 'variance',    label: 'Variance',           icon: Target,     level: 'view' },
   { id: 'capex',       label: 'CapEx',              icon: Wrench,     level: 'edit' },
   { id: 'forecast',    label: 'Forecast',           icon: TrendingUp, level: 'edit' },
-  { id: 'overview',    label: 'Overview (legacy)',  icon: BarChart3,  level: 'view' },
   { id: 'ai',          label: 'AI insights',        icon: BarChart3,  level: 'edit' },
 ]
 
@@ -100,7 +98,6 @@ export default function FinanceDashboard() {
           {activeTab === 'variance' && <VarianceTab readOnly={readOnly} />}
           {activeTab === 'capex'    && <CapexTab />}
           {activeTab === 'forecast' && <ForecastTab />}
-          {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'ai'       && (
             <ProtectedFeature feature="finance" action="edit" fallback={
               <div className="bg-noch-card border border-noch-border rounded-xl p-16 text-center">

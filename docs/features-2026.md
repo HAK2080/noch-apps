@@ -179,7 +179,7 @@ See §M.
 **Goal:** future franchisees see their own data only; HQ sees all. **Why now:** RLS is permissive today. **Complexity:** M. **Dependencies:** the `staff_branches` scaffolding from earlier audit fix.
 
 ### G4. Branch comparison dashboard
-**Goal:** side-by-side branch metrics — Hay Alandlous vs Jaraba vs Bloom. **Why now:** owner has 3 branches now. **Complexity:** S–M. **Dependencies:** existing `pos_sales_daily` view already does this.
+**Goal:** side-by-side branch metrics — Noch - City Walk vs Noch - Gallery Mall vs Bloom. **Why now:** owner has 3 branches now. **Complexity:** S–M. **Dependencies:** existing `pos_sales_daily` view already does this.
 
 ### G5. Multi-currency consolidation
 **Goal:** Bloom in a different currency? Roll up to LYD with locked rates. **Why now:** future-proofing. **Complexity:** M.

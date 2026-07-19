@@ -32,7 +32,7 @@ SUPABASE_URL = "https://kxqjasdvoohiexedtfqw.supabase.co"
 import os
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
-BLOOM_BRANCH_NAME = "Bloom Abu Nawas"
+BLOOM_BRANCH_NAME = "Bloom"
 
 # ─── ODOO CLIENT ───────────────────────────────────────────────────────────────
 
@@ -341,7 +341,7 @@ def main():
         print("\nAuthenticating with Odoo...")
         odoo.authenticate()
 
-        print("Fetching Bloom Abu Nawas branch ID from Supabase...")
+        print("Fetching Bloom branch ID from Supabase...")
         branch_id = supabase.get_branch_id(BLOOM_BRANCH_NAME)
         print(f"  Branch ID: {branch_id}")
 

@@ -18,6 +18,9 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
   const [editModal, setEditModal] = useState(null) // expense object
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
+  const [selectedPaid, setSelectedPaid] = useState([])
+  const [paymentAccount, setPaymentAccount] = useState('cash')
+  const [payingBatch, setPayingBatch] = useState(false)
 
   useEffect(() => { load() }, [refreshKey])
 
@@ -43,6 +46,32 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
       load()
     } catch (err) { toast.error(err.message) }
     setActing(null)
+  }
+
+  async function markPaid(expenseIds) {
+    setPayingBatch(true)
+    try {
+      const { error } = await supabase.rpc('mark_expenses_paid_batch', {
+        p_expense_ids: expenseIds,
+        p_payment_account_key: paymentAccount,
+        p_paid_at: new Date().toLocaleDateString('en-CA'),
+        p_reference: null,
+        p_notes: expenseIds.length > 1 ? 'Batch settlement from Expenses' : null,
+      })
+      if (error) throw error
+      toast.success(`${expenseIds.length} expense${expenseIds.length === 1 ? '' : 's'} marked paid from ${paymentAccount}`)
+      setSelectedPaid([])
+      onAction()
+      await load()
+    } catch (err) {
+      toast.error(err.message || 'Could not mark expenses paid')
+    } finally {
+      setPayingBatch(false)
+    }
+  }
+
+  const togglePaidSelection = (id) => {
+    setSelectedPaid(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
   }
 
   async function confirmNote() {
@@ -120,6 +149,24 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
         ))}
       </div>
 
+      {isOwner && tab === 'all' && expenses.some(exp => exp.status === 'approved' && !exp.paid_at) && (
+        <div className="card !p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+          <p className="text-sm text-white flex-1">{selectedPaid.length} approved expense{selectedPaid.length === 1 ? '' : 's'} selected</p>
+          <select value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)} className="input py-2 text-sm">
+            <option value="cash">Cash account</option>
+            <option value="bank">Bank account</option>
+          </select>
+          <button
+            onClick={() => markPaid(selectedPaid)}
+            disabled={!selectedPaid.length || payingBatch}
+            className="btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {payingBatch ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />}
+            Mark selected paid
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12 text-noch-muted">
           <Loader2 size={20} className="animate-spin mr-2" /> Loading…
@@ -136,6 +183,14 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {isOwner && tab === 'all' && exp.status === 'approved' && !exp.paid_at && (
+                      <input
+                        type="checkbox"
+                        checked={selectedPaid.includes(exp.id)}
+                        onChange={() => togglePaidSelection(exp.id)}
+                        aria-label={`Select ${exp.vendor || exp.description || 'expense'} for payment`}
+                      />
+                    )}
                     <span className="text-white font-semibold">{fmt(exp.amount, exp.currency)}</span>
                     {exp.currency !== 'LYD' && <span className="text-noch-muted text-xs">≈ {fmt(exp.amount_lyd)}</span>}
                     <StatusBadge status={exp.status} />
@@ -179,7 +234,7 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
                 </div>
               )}
               {exp.status === 'approved' && isOwner && (
-                <button onClick={() => act(exp.id, 'paid')} disabled={acting === exp.id}
+                <button onClick={() => markPaid([exp.id])} disabled={payingBatch}
                   className="w-full bg-blue-400/10 text-blue-400 border border-blue-400/20 rounded-lg py-2 text-xs font-medium hover:bg-blue-400/20 flex items-center justify-center gap-1 disabled:opacity-50">
                   <Wallet size={13} /> Mark as Paid
                 </button>

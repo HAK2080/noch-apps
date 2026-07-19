@@ -1,0 +1,17 @@
+{
+  "name": "Noch Snap — فاتورة نوش",
+  "short_name": "Noch Snap",
+  "description": "Snap a receipt photo — done.",
+  "start_url": "/snap",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#101014",
+  "theme_color": "#101014",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/snap-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/snap-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

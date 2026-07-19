@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  BookOpen, ListTree, NotebookPen, Scale, FileBarChart, Settings as Cog, Plus, Save, Trash2, X, AlertTriangle,
+  BookOpen, ListTree, NotebookPen, Scale, FileBarChart, Settings as Cog, Plus, Save, Trash2, X, AlertTriangle, Wallet,
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useLanguage } from '../../contexts/LanguageContext'
@@ -15,7 +15,9 @@ import {
   getGlSettings, updateGlSettings,
   listAccounts, upsertAccount, deactivateAccount, listAccountMap, setAccountMap,
   listBatches, getBatchLines, createManualJournal, syncPeriod, postOpeningBalances,
-  trialBalance, accountLedger, balanceSheet, incomeStatement, listBranches,
+  trialBalance, accountLedger, balanceSheet, incomeStatement, statementLines, cashFlowStatement,
+  listBranches, apAging, supplierStatement,
+  replaceManualJournal, voidGlBatch,
 } from './lib/accounting-supabase'
 import toast from 'react-hot-toast'
 
@@ -34,6 +36,7 @@ export default function AccountingDashboard() {
   useEffect(() => { listBranches().then(setBranches) }, [])
 
   const TABS = [
+    { id: 'payables', label: ar ? 'حسابات الموردين' : 'Payables', icon: Wallet },
     { id: 'coa',     label: ar ? 'شجرة الحسابات' : 'Chart of accounts', icon: ListTree },
     { id: 'journal', label: ar ? 'دفتر اليومية' : 'Journal',            icon: NotebookPen },
     { id: 'ledger',  label: ar ? 'دفتر الأستاذ' : 'Ledger',             icon: BookOpen },
@@ -61,6 +64,7 @@ export default function AccountingDashboard() {
           ))}
         </div>
 
+        {tab === 'payables' && <PayablesTab ar={ar} branches={branches} />}
         {tab === 'coa'      && <ChartOfAccountsTab ar={ar} canEdit={canManageChart} />}
         {tab === 'journal'  && <JournalTab ar={ar} branches={branches} canPost={isOwner || canEdit('accounting')} />}
         {tab === 'ledger'   && <LedgerTab ar={ar} branches={branches} />}
@@ -152,6 +156,7 @@ function JournalTab({ ar, branches, canPost }) {
   const [expanded, setExpanded] = useState(null)
   const [lines, setLines] = useState([])
   const [creating, setCreating] = useState(false)
+  const [correcting, setCorrecting] = useState(null)
   const [syncing, setSyncing] = useState(false)
 
   const reload = () => listBatches({ from, to, branchId }).then(setBatches)
@@ -168,6 +173,25 @@ function JournalTab({ ar, branches, canPost }) {
     try { const r = await syncPeriod({ from, to, branchId, force: true }); toast.success(`${r.sales_batches ?? 0} + ${r.expense_batches ?? 0} ${ar ? 'قيود' : 'batches'}`); reload() }
     catch (e) { toast.error(e.message || 'Sync failed') }
     finally { setSyncing(false) }
+  }
+
+  const startCorrection = async (batch) => {
+    const batchLines = await getBatchLines(batch.id)
+    setCorrecting({
+      batch,
+      lines: batchLines.map(l => ({
+        account_id: l.account_id,
+        debit_lyd: Number(l.debit_lyd || 0) || '',
+        credit_lyd: Number(l.credit_lyd || 0) || '',
+        memo: l.memo || '',
+      })),
+    })
+  }
+
+  const voidBatch = async (batch) => {
+    const reason = prompt(ar ? 'سبب إلغاء القيد؟' : 'Reason for voiding this journal?') || ''
+    try { await voidGlBatch(batch.id, reason); toast.success(ar ? 'تم إلغاء القيد' : 'Journal voided'); reload() }
+    catch (e) { toast.error(e.message || 'Void failed') }
   }
 
   return (
@@ -187,6 +211,16 @@ function JournalTab({ ar, branches, canPost }) {
       </div>
 
       {creating && <ManualJournalForm ar={ar} branches={branches} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); reload() }} />}
+      {correcting && (
+        <ManualJournalForm
+          ar={ar}
+          branches={branches}
+          initialBatch={correcting.batch}
+          initialLines={correcting.lines}
+          onClose={() => setCorrecting(null)}
+          onSaved={() => { setCorrecting(null); reload() }}
+        />
+      )}
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
@@ -204,7 +238,19 @@ function JournalTab({ ar, branches, canPost }) {
                 <tr key={b.id} onClick={() => toggle(b)} className="border-t border-noch-border/40 cursor-pointer hover:bg-noch-dark/40">
                   <td className="py-1.5 text-white whitespace-nowrap">{b.journal_date}</td>
                   <td className="py-1.5 text-noch-muted">{b.source_type}</td>
-                  <td className="py-1.5 text-noch-muted truncate max-w-[220px]">{b.memo}</td>
+                  <td className="py-1.5 text-noch-muted truncate max-w-[220px]">
+                    {b.memo}
+                    {canPost && ['manual','journal_correction'].includes(b.source_type) && b.status === 'posted' && (
+                      <span className="ms-2 inline-flex gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); startCorrection(b) }} className="text-noch-green hover:underline text-xs">
+                          {ar ? 'تصحيح' : 'Correct'}
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); voidBatch(b) }} className="text-red-400 hover:underline text-xs">
+                          {ar ? 'إلغاء' : 'Void'}
+                        </button>
+                      </span>
+                    )}
+                  </td>
                   <td className="py-1.5 text-noch-muted">{b.branch?.name || '—'}</td>
                   <td className="py-1.5 text-right font-mono text-white">{lyd(b.total_debit)}</td>
                   <td className="py-1.5 text-right font-mono text-white">{lyd(b.total_credit)}</td>
@@ -228,13 +274,15 @@ function JournalTab({ ar, branches, canPost }) {
   )
 }
 
-function ManualJournalForm({ ar, branches, onClose, onSaved }) {
-  const [date, setDate] = useState(TODAY)
-  const [branchId, setBranchId] = useState(null)
-  const [memo, setMemo] = useState('')
+function ManualJournalForm({ ar, branches, onClose, onSaved, initialBatch = null, initialLines = null }) {
+  const isCorrection = !!initialBatch
+  const [date, setDate] = useState(initialBatch?.journal_date || TODAY)
+  const [branchId, setBranchId] = useState(initialBatch?.branch_id || null)
+  const [memo, setMemo] = useState(initialBatch?.memo || '')
   const [accounts, setAccounts] = useState([])
-  const [lines, setLines] = useState([{ account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }, { account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }])
+  const [lines, setLines] = useState(initialLines?.length ? initialLines : [{ account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }, { account_id: '', debit_lyd: '', credit_lyd: '', memo: '' }])
   const [saving, setSaving] = useState(false)
+  const [reason, setReason] = useState('')
   useEffect(() => { listAccounts({ activeOnly: true }).then(a => setAccounts(a.filter(x => x.is_postable))) }, [])
 
   const td = lines.reduce((s, l) => s + Number(l.debit_lyd || 0), 0)
@@ -245,8 +293,15 @@ function ManualJournalForm({ ar, branches, onClose, onSaved }) {
   const save = async () => {
     setSaving(true)
     try {
-      await createManualJournal({ journal_date: date, branch_id: branchId, memo, lines: lines.filter(l => l.account_id) })
-      toast.success(ar ? 'تم ترحيل القيد' : 'Posted'); onSaved()
+      const payload = { journal_date: date, branch_id: branchId, memo, lines: lines.filter(l => l.account_id) }
+      if (isCorrection) {
+        await replaceManualJournal({ old_batch_id: initialBatch.id, ...payload, reason })
+        toast.success('Journal corrected')
+      } else {
+        await createManualJournal(payload)
+        toast.success('Posted')
+      }
+      onSaved()
     } catch (e) { toast.error(e.message || 'Failed') } finally { setSaving(false) }
   }
 
@@ -254,7 +309,7 @@ function ManualJournalForm({ ar, branches, onClose, onSaved }) {
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-2xl p-5 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-white font-bold">{ar ? 'قيد يومية يدوي' : 'Manual journal entry'}</h2>
+          <h2 className="text-white font-bold">{isCorrection ? 'Correct journal entry' : 'Manual journal entry'}</h2>
           <button onClick={onClose}><X className="text-noch-muted" size={18}/></button>
         </div>
         <div className="flex flex-wrap gap-2 mb-3">
@@ -265,6 +320,9 @@ function ManualJournalForm({ ar, branches, onClose, onSaved }) {
           </select>
           <input className="input text-sm flex-1" placeholder={ar ? 'البيان' : 'Memo'} value={memo} onChange={e => setMemo(e.target.value)} />
         </div>
+        {isCorrection && (
+          <input className="input text-sm w-full mb-3" placeholder="Correction reason" value={reason} onChange={e => setReason(e.target.value)} />
+        )}
         <table className="w-full text-sm mb-2">
           <thead className="text-noch-muted text-xs"><tr><th className="text-left">{ar ? 'الحساب' : 'Account'}</th><th className="text-right w-28">{ar ? 'مدين' : 'Debit'}</th><th className="text-right w-28">{ar ? 'دائن' : 'Credit'}</th></tr></thead>
           <tbody>
@@ -415,7 +473,15 @@ function ReportsTab({ ar, branches }) {
   const [branchId, setBranchId] = useState(null)
   const [bs, setBs] = useState([])
   const [is, setIs] = useState([])
-  useEffect(() => { balanceSheet(to, branchId).then(setBs); incomeStatement(from, to, branchId).then(setIs) }, [from, to, branchId])
+  const [cf, setCf] = useState([])
+  const [lines, setLines] = useState([])
+  const [lineFilter, setLineFilter] = useState('all')
+  useEffect(() => {
+    balanceSheet(to, branchId).then(setBs)
+    incomeStatement(from, to, branchId).then(setIs)
+    cashFlowStatement(from, to, branchId).then(setCf)
+    statementLines(from, to, branchId).then(setLines)
+  }, [from, to, branchId])
 
   const group = (rows, types) => rows.filter(r => types.includes(r.section))
   const sum = rows => rows.reduce((s, r) => s + Number(r.amount ?? r.balance ?? 0), 0)
@@ -432,6 +498,8 @@ function ReportsTab({ ar, branches }) {
   )
   const revenue = group(is, ['revenue']), cogs = group(is, ['cogs']), expenses = group(is, ['expense'])
   const netProfit = sum(revenue) - sum(cogs) - sum(expenses)
+  const netCashFlow = cf.reduce((total, row) => total + Number(row.net_lyd || 0), 0)
+  const filteredLines = lineFilter === 'all' ? lines : lines.filter(row => row.section === lineFilter)
 
   return (
     <div className="flex flex-col gap-3">
@@ -443,8 +511,21 @@ function ReportsTab({ ar, branches }) {
           <option value="">{ar ? 'كل الفروع' : 'All branches'}</option>
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        <select value={lineFilter} onChange={e => setLineFilter(e.target.value)} className="input py-1 px-2 text-xs ms-auto">
+          <option value="all">{ar ? 'ظƒظ„ ط§ظ„ط¨ظ†ظˆط¯' : 'All statement lines'}</option>
+          <option value="revenue">{ar ? 'ط¥ظٹط±ط§ط¯' : 'Revenue'}</option>
+          <option value="cogs">{ar ? 'طھظƒظ„ظپط© ظ…ط¨ظٹط¹ط§طھ' : 'COGS'}</option>
+          <option value="expense">{ar ? 'ظ…طµط±ظˆظپ' : 'Expense'}</option>
+        </select>
+        <span className="no-print">
+          <ExportButtons onCsv={() => downloadCsv(
+            `statements_${from}_${to}`,
+            ['Section', 'Code', 'Account', 'Amount'],
+            filteredLines.map(row => [row.section, row.code, ar ? row.name_ar : row.name_en, Number(row.amount || 0).toFixed(2)]),
+          )} />
+        </span>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card">
           <h2 className="text-white font-semibold mb-3">{ar ? 'قائمة الدخل' : 'Income statement'}</h2>
           <Section title={ar ? 'الإيرادات' : 'Revenue'} rows={revenue} valueKey="amount" />
@@ -461,12 +542,251 @@ function ReportsTab({ ar, branches }) {
           <Section title={ar ? 'الالتزامات' : 'Liabilities'} rows={group(bs, ['liability'])} valueKey="balance" />
           <Section title={ar ? 'حقوق الملكية' : 'Equity'} rows={group(bs, ['equity'])} valueKey="balance" />
         </div>
+        <div className="card">
+          <h2 className="text-white font-semibold mb-3">Cash flow statement</h2>
+          {cf.length === 0 ? (
+            <p className="text-noch-muted text-xs italic">-</p>
+          ) : cf.map(row => (
+            <div key={row.source_type} className="flex justify-between text-sm py-0.5">
+              <span className="text-white">{row.line_label}</span>
+              <span className={`font-mono ${Number(row.net_lyd || 0) >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                {lyd(row.net_lyd)}
+              </span>
+            </div>
+          ))}
+          <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
+            <span className="text-white">Net cash movement</span>
+            <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
 // ── Settings ────────────────────────────────────────────────────────────
+function PayablesTab({ ar, branches }) {
+  const [asOf, setAsOf] = useState(TODAY)
+  const [branchId, setBranchId] = useState(null)
+  const [rows, setRows] = useState([])
+  const [supplier, setSupplier] = useState('')
+  const [statement, setStatement] = useState([])
+  const [cf, setCf] = useState([])
+  const [lines, setLines] = useState([])
+
+  const Section = ({ title, rows: sectionRows, valueKey }) => (
+    <div className="mb-3">
+      <h3 className="text-noch-muted text-xs font-bold uppercase tracking-wider mb-1">{title}</h3>
+      {sectionRows.length === 0 ? <p className="text-noch-muted text-xs italic">â€”</p> : sectionRows.map(r => (
+        <div key={`${title}-${r.code || r.event_date}`} className="flex justify-between text-sm py-0.5">
+          <span className="text-white">{r.code ? `${r.code} آ· ${ar ? r.name_ar : r.name_en}` : (r.memo || r.event_type || 'Line')}</span>
+          <span className="font-mono text-noch-muted">{lyd(r[valueKey])}</span>
+        </div>
+      ))}
+    </div>
+  )
+  const netCashFlow = cf.reduce((sum, row) => sum + Number(row.net_lyd || 0), 0)
+
+  useEffect(() => {
+    let cancelled = false
+    apAging(asOf, branchId)
+      .then(data => {
+        if (cancelled) return
+        setRows(data || [])
+        const defaultSupplier = (data || []).find(r => Number(r.outstanding_amount_lyd || 0) > 0)?.supplier_name || data?.[0]?.supplier_name || ''
+        setSupplier(prev => prev || defaultSupplier)
+      })
+      .catch(err => toast.error(err.message || 'Failed to load payables'))
+    return () => { cancelled = true }
+  }, [asOf, branchId])
+
+  useEffect(() => {
+    if (!supplier) { setStatement([]); return }
+    let cancelled = false
+    supplierStatement(supplier, asOf, branchId)
+      .then(data => { if (!cancelled) setStatement(data || []) })
+      .catch(err => toast.error(err.message || 'Failed to load supplier statement'))
+    return () => { cancelled = true }
+  }, [supplier, asOf, branchId])
+
+  useEffect(() => {
+    let cancelled = false
+    const from = ymd(new Date(new Date(asOf).getTime() - 30 * 86400000))
+    cashFlowStatement(from, asOf, branchId)
+      .then(data => { if (!cancelled) setCf(data || []) })
+      .catch(err => toast.error(err.message || 'Failed to load cash flow statement'))
+    statementLines(from, asOf, branchId)
+      .then(data => { if (!cancelled) setLines(data || []) })
+      .catch(err => toast.error(err.message || 'Failed to load statement lines'))
+    return () => { cancelled = true }
+  }, [asOf, branchId])
+
+  const openRows = rows.filter(r => Number(r.outstanding_amount_lyd || 0) > 0)
+  const totalOpen = openRows.reduce((sum, row) => sum + Number(row.outstanding_amount_lyd || 0), 0)
+  const overdue = openRows
+    .filter(r => Number(r.days_past_due || 0) > 0)
+    .reduce((sum, row) => sum + Number(row.outstanding_amount_lyd || 0), 0)
+  const suppliers = [...new Set(rows.map(r => r.supplier_name).filter(Boolean))]
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="date" value={asOf} onChange={e => setAsOf(e.target.value)} className="input py-1 px-2 text-xs" />
+        <select value={branchId || ''} onChange={e => setBranchId(e.target.value || null)} className="input py-1 px-2 text-xs">
+          <option value="">{ar ? 'كل الفروع' : 'All branches'}</option>
+          {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <span className="ms-auto">
+          <ExportButtons onCsv={() => downloadCsv(
+            `payables_${asOf}`,
+            ['Supplier', 'Invoice', 'Due date', 'Outstanding', 'Days past due', 'Status', 'Payment status'],
+            rows.map(r => [
+              r.supplier_name,
+              r.invoice_no || '',
+              r.due_date || r.invoice_date || '',
+              Number(r.outstanding_amount_lyd || 0).toFixed(2),
+              r.days_past_due || 0,
+              r.status,
+              r.payment_status,
+            ]),
+          )} />
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Open AP</p>
+          <p className="text-white text-lg font-bold">{lyd(totalOpen)}</p>
+        </div>
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Overdue</p>
+          <p className="text-red-400 text-lg font-bold">{lyd(overdue)}</p>
+        </div>
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Unpaid invoices</p>
+          <p className="text-white text-lg font-bold">{openRows.length}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-4">
+        <div className="card overflow-x-auto">
+          <h2 className="text-white font-semibold mb-3">{ar ? 'فواتير الموردين' : 'Supplier invoices'}</h2>
+          <table className="w-full text-xs">
+            <thead className="text-noch-muted">
+              <tr>
+                <th className="text-left py-1 pr-2">Supplier</th>
+                <th className="text-left py-1 pr-2">Invoice</th>
+                <th className="text-left py-1 pr-2">Due</th>
+                <th className="text-right py-1 pr-2">Outstanding</th>
+                <th className="text-right py-1 pr-2">Days</th>
+                <th className="text-left py-1">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.order_id} className="border-t border-noch-border/40">
+                  <td className="py-1.5 pr-2 text-white">{r.supplier_name}</td>
+                  <td className="py-1.5 pr-2 text-noch-muted">{r.invoice_no || '-'}</td>
+                  <td className="py-1.5 pr-2 text-noch-muted">{r.due_date || r.invoice_date || '-'}</td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-white">{lyd(r.outstanding_amount_lyd)}</td>
+                  <td className="py-1.5 pr-2 text-right font-mono text-noch-muted">{r.days_past_due || 0}</td>
+                  <td className="py-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      r.payment_status === 'paid'
+                        ? 'bg-noch-green/10 text-noch-green'
+                        : Number(r.days_past_due || 0) > 30
+                          ? 'bg-red-500/10 text-red-400'
+                          : 'bg-yellow-500/10 text-yellow-300'
+                    }`}>
+                      {r.payment_status === 'paid' ? 'paid' : r.aging_bucket}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-noch-muted">No supplier invoices found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-white font-semibold">{ar ? 'كشف المورد' : 'Supplier statement'}</h2>
+            <select value={supplier} onChange={e => setSupplier(e.target.value)} className="input py-1 px-2 text-xs max-w-[14rem]">
+              <option value="">{ar ? 'اختر مورداً' : 'Select supplier'}</option>
+              {suppliers.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+          {supplier ? (
+            <div className="space-y-2">
+              {statement.map((row, idx) => (
+                <div key={`${row.event_date}-${row.event_type}-${idx}`} className="rounded-xl border border-noch-border/50 bg-noch-dark/30 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-white text-sm font-medium">{row.event_type === 'invoice' ? 'Invoice' : 'Payment'}</p>
+                    <p className="text-noch-muted text-xs">{row.event_date}</p>
+                  </div>
+                  <p className="text-noch-muted text-xs mt-0.5">{row.invoice_no || '-'} · {row.memo || '-'}</p>
+                  <div className="flex items-center justify-between mt-2 text-xs font-mono">
+                    <span className="text-noch-green">Dr {lyd(row.debit_lyd)}</span>
+                    <span className="text-blue-300">Cr {lyd(row.credit_lyd)}</span>
+                    <span className="text-white">Bal {lyd(row.running_balance_lyd)}</span>
+                  </div>
+                </div>
+              ))}
+              {statement.length === 0 && <p className="text-noch-muted text-sm">No statement activity for this supplier.</p>}
+            </div>
+          ) : (
+            <p className="text-noch-muted text-sm">Select a supplier to inspect invoice and payment history.</p>
+          )}
+        </div>
+        <div className="card">
+          <h2 className="text-white font-semibold mb-3">Cash flow statement</h2>
+          {cf.length === 0 ? (
+            <p className="text-noch-muted text-xs italic">-</p>
+          ) : cf.map(row => (
+            <div key={row.source_type} className="flex justify-between text-sm py-0.5">
+              <span className="text-white">{row.line_label}</span>
+              <span className={`font-mono ${Number(row.net_lyd || 0) >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                {lyd(row.net_lyd)}
+              </span>
+            </div>
+          ))}
+          <div className="flex justify-between border-t border-noch-border pt-2 mt-1 font-bold">
+            <span className="text-white">Net cash movement</span>
+            <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
+          </div>
+        </div>
+      </div>
+      <div className="card overflow-x-auto">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h2 className="text-white font-semibold">{ar ? 'تفصيل الربح والخسائر' : 'P&L drill-down'}</h2>
+          <span className="text-noch-muted text-xs">{lines.length} lines</span>
+        </div>
+        <table className="w-full text-xs">
+          <thead className="text-noch-muted">
+            <tr>
+              <th className="text-left py-1 pr-2">Section</th>
+              <th className="text-left py-1 pr-2">Code</th>
+              <th className="text-left py-1 pr-2">Account</th>
+              <th className="text-right py-1">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map(row => (
+              <tr key={`${row.section}-${row.account_id}`} className="border-t border-noch-border/40">
+                <td className="py-1.5 pr-2 text-noch-muted uppercase">{row.section}</td>
+                <td className="py-1.5 pr-2 text-white font-mono">{row.code}</td>
+                <td className="py-1.5 pr-2 text-white">{ar ? row.name_ar : row.name_en}</td>
+                <td className="py-1.5 text-right font-mono text-white">{lyd(row.amount)}</td>
+              </tr>
+            ))}
+            {lines.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-noch-muted">{ar ? 'لا توجد بنود لهذه الفترة.' : 'No statement lines for this period.'}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function SettingsTab({ ar, canEdit }) {
   const [settings, setSettings] = useState(null)
   const [map, setMap] = useState([])

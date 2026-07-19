@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { formatCurrency } from '../../lib/numbers'
 import './styles/OrderConfirmation.css'
 
 export default function OrderConfirmation() {
@@ -43,7 +44,7 @@ export default function OrderConfirmation() {
 
           <div className="detail-row">
             <span>Total Amount:</span>
-            <strong>{total?.toFixed(2)} LYD</strong>
+            <strong>{formatCurrency(total || 0)}</strong>
           </div>
 
           <div className="detail-row">

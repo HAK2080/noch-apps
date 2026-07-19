@@ -22,7 +22,14 @@ export default defineConfig({
           if (id.includes('react-dom') || id.match(/[\\/]react[\\/]/)) return 'vendor-react'
           if (id.includes('@supabase'))               return 'vendor-supabase'
           if (id.includes('lucide-react'))            return 'vendor-icons'
-          if (id.includes('@zxing') || id.includes('html5-qrcode') || id.includes('qrcode')) return 'vendor-scanner'
+          // Camera scanners are heavy (~750 KB) and only needed when a
+          // scanner opens — keep them in their own lazy chunk.
+          if (id.includes('@zxing') || id.includes('html5-qrcode')) return 'vendor-scanner'
+          // The `qrcode` generator is tiny but eagerly imported by
+          // ReceiptModal (on the eager POSTerminal path). Keep it OUT of
+          // vendor-scanner so it doesn't drag the camera libs onto the
+          // critical path. NOTE: this check must come AFTER html5-qrcode.
+          if (id.match(/[\\/]qrcode[\\/]/)) return 'vendor-qrcode'
           if (id.includes('@anthropic-ai'))           return 'vendor-anthropic'
         },
       },

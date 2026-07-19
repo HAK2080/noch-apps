@@ -47,6 +47,7 @@ const STATUS = {
   watch: { label: 'Watch', className: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/30' },
   at_risk: { label: 'At risk', className: 'text-red-300 bg-red-500/10 border-red-500/30' },
   no_data: { label: 'No data', className: 'text-noch-muted bg-noch-card border-noch-border' },
+  pre_opening: { label: 'Pre-opening', className: 'text-blue-300 bg-blue-500/10 border-blue-500/30' },
 }
 
 export default function ExecutiveSummaryTab() {
@@ -82,7 +83,7 @@ export default function ExecutiveSummaryTab() {
     acc[row.status] = (acc[row.status] || 0) + 1
     return acc
   }, {})
-  const attentionRows = rows.filter(row => row.status !== 'healthy')
+  const attentionRows = rows.filter(row => !['healthy', 'pre_opening'].includes(row.status))
 
   return (
     <div className="flex flex-col gap-4">
@@ -120,6 +121,7 @@ export default function ExecutiveSummaryTab() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Stream title="Profitability">
           <Metric label="Revenue" value={lyd(total?.revenue)} />
+          <Metric label="COGS" value={lyd(total?.cogs)} />
           <Metric label="Net contribution" value={lyd(total?.net)} />
           <Metric label="Prime cost" value={pct(total?.primeRatio)} />
         </Stream>
@@ -140,17 +142,19 @@ export default function ExecutiveSummaryTab() {
         <div className="px-4 py-3 border-b border-noch-border flex items-center justify-between">
           <p className="text-white text-sm font-semibold">Branch status</p>
           <p className="text-noch-muted text-xs">
-            {statusCounts.healthy || 0} healthy · {(statusCounts.watch || 0) + (statusCounts.at_risk || 0)} to review
+            {statusCounts.healthy || 0} healthy · {statusCounts.pre_opening || 0} pre-opening · {(statusCounts.watch || 0) + (statusCounts.at_risk || 0)} to review
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[680px]">
+          <table className="w-full text-sm min-w-[900px]">
             <thead>
               <tr className="text-left text-noch-muted text-[10px] uppercase tracking-wide border-b border-noch-border">
                 <th className="px-4 py-2.5 font-medium">Branch</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
                 <th className="px-4 py-2.5 font-medium text-right">Revenue</th>
+                <th className="px-4 py-2.5 font-medium text-right">COGS</th>
                 <th className="px-4 py-2.5 font-medium text-right">Prime cost</th>
+                <th className="px-4 py-2.5 font-medium text-right">Operating expenses</th>
                 <th className="px-4 py-2.5 font-medium text-right">Net contribution</th>
               </tr>
             </thead>
@@ -214,8 +218,12 @@ function BranchRow({ row }) {
         </span>
       </td>
       <td className="px-4 py-3 text-right text-white font-mono">{lyd(row.revenue)}</td>
+      <td className="px-4 py-3 text-right text-white font-mono">{lyd(row.cogs)}</td>
       <td className="px-4 py-3 text-right text-white font-mono">{pct(row.primeRatio)}</td>
-      <td className={`px-4 py-3 text-right font-mono ${row.net < 0 ? 'text-red-300' : 'text-white'}`}>{lyd(row.net)}</td>
+      <td className="px-4 py-3 text-right text-white font-mono">{lyd(row.opex)}</td>
+      <td className={`px-4 py-3 text-right font-mono ${row.status === 'pre_opening' ? 'text-noch-muted' : row.net < 0 ? 'text-red-300' : 'text-white'}`}>
+        {row.status === 'pre_opening' ? '—' : lyd(row.net)}
+      </td>
     </tr>
   )
 }

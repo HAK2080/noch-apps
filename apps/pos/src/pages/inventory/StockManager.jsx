@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Package, Search, Upload, Plus, Camera, Globe, X, Check, Loader2, Wrench,
   ArrowRightLeft, Sparkles, LayoutGrid, List, Archive, ArchiveRestore } from 'lucide-react'
 import Layout from '../../components/Layout'
@@ -55,6 +56,7 @@ function urgencyRank(item) {
 }
 
 export default function StockManager() {
+  const navigate = useNavigate()
   const { profile } = useAuth()
   const isOwner = profile?.role === 'owner'
   const fileInputRef = useRef(null)
@@ -62,6 +64,7 @@ export default function StockManager() {
 
   const [stock, setStock] = useState([])
   const [ingredients, setIngredients] = useState([])
+  const [theoretical, setTheoretical] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -98,9 +101,14 @@ export default function StockManager() {
   async function loadData() {
     try {
       setLoading(true)
-      const [stockData, ingredientData] = await Promise.all([getStock(), getIngredientsForCost()])
+      const [stockData, ingredientData, theoreticalResult] = await Promise.all([
+        getStock(),
+        getIngredientsForCost(),
+        supabase.rpc('inventory_theoretical_status'),
+      ])
       setStock(stockData || [])
       setIngredients(ingredientData || [])
+      setTheoretical(Object.fromEntries((theoreticalResult.data || []).map(row => [row.ingredient_id, row])))
     } catch { toast.error('Failed to load stock data') }
     finally { setLoading(false) }
   }
@@ -144,7 +152,10 @@ export default function StockManager() {
       qty_available: s?.qty_available ?? 0,
       unit: s?.unit || ing.base_unit,
       min_threshold: s?.min_threshold ?? 0,
-      last_manual_count_at: s?.last_manual_count_at ?? null,
+      theoretical_qty: theoretical[ing.id]?.theoretical_qty ?? s?.qty_available ?? 0,
+      consumed_since_count: theoretical[ing.id]?.consumed_since_count ?? 0,
+      count_is_stale: theoretical[ing.id]?.count_is_stale ?? true,
+      last_manual_count_at: theoretical[ing.id]?.last_counted_at ?? s?.last_manual_count_at ?? null,
       hasStock: !!s,
     }
   })
@@ -195,7 +206,15 @@ export default function StockManager() {
       const newQty = parseFloat(updateQty)
       if (isNaN(newQty) || newQty < 0) { toast.error('Invalid quantity'); return }
       const unitChanged = updateUnit && updateUnit !== updateModal.unit
-      if (!updateModal.hasStock || unitChanged) {
+      if (updateType === 'manual_count') {
+        const { error } = await supabase.rpc('record_stock_count', {
+          p_ingredient_id: updateModal.ingredientId,
+          p_counted_qty: newQty,
+          p_unit: updateUnit || updateModal.unit,
+          p_notes: updateNotes || null,
+        })
+        if (error) throw error
+      } else if (!updateModal.hasStock || unitChanged) {
         await upsertStock(updateModal.ingredientId, newQty, updateUnit || updateModal.unit, updateModal.min_threshold || 0)
         if (updateModal.hasStock) {
           await supabase.from('stock_logs').insert({
@@ -357,6 +376,12 @@ export default function StockManager() {
         <p className="text-noch-muted text-xs">
           {item.last_manual_count_at ? `Counted ${relativeTime(item.last_manual_count_at)}` : <span className="opacity-50">Never manually counted</span>}
         </p>
+        {item.track_type !== 'equipment' && (
+          <div className={`rounded-lg px-3 py-2 text-xs border ${item.count_is_stale ? 'border-yellow-500/30 bg-yellow-500/5' : 'border-noch-border bg-noch-dark'}`}>
+            <div className="flex justify-between"><span className="text-noch-muted">Theoretical now</span><b className="text-white">{smartQty(item.theoretical_qty, item.unit).value} {smartQty(item.theoretical_qty, item.unit).unit}</b></div>
+            <div className="flex justify-between mt-1"><span className="text-noch-muted">Recipe usage since count</span><span className="text-yellow-300">-{smartQty(item.consumed_since_count, item.unit).value} {smartQty(item.consumed_since_count, item.unit).unit}</span></div>
+          </div>
+        )}
 
         {isOwner && !!item.bulk_cost && (
           <div className="text-xs text-noch-muted">Cost: {item.bulk_cost} LYD / {item.bulk_qty} {item.bulk_unit}</div>
@@ -382,6 +407,11 @@ export default function StockManager() {
             <button onClick={() => openUpdateModal(item, true)} className="border border-noch-border text-noch-muted rounded-lg px-3 py-1.5 text-xs font-medium hover:text-white hover:border-white/30 transition-colors">
               Count
             </button>
+            {item.min_threshold > 0 && item.theoretical_qty <= item.min_threshold && (
+              <button onClick={() => navigate(`/inventory/procurement?ingredient=${item.id}&qty=${Math.max(item.min_threshold - item.theoretical_qty, 0)}`)} className="border border-yellow-500/30 text-yellow-300 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-yellow-500/10">
+                Create order
+              </button>
+            )}
             {isOwner && (
               <>
                 <button onClick={() => { setSupplierModal(item.id); setSupplierName(item.supplier_name || ''); setSupplierContact(item.supplier_contact || '') }} className="text-noch-muted hover:text-white text-xs px-2 py-1.5 rounded-lg hover:bg-noch-border transition-colors">Supplier</button>

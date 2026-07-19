@@ -127,13 +127,20 @@ Deno.serve(async (req) => {
     }
 
     if (include('lapsed')) {
-      const recipients = await rpc<Recipient[]>('whatsapp_lapsed_recipients', { p_days: 30 })
+      const settingsResponse = await fetch(`${SUPABASE_URL}/rest/v1/loyalty_settings?select=winback_after_days,winback_auto_send&limit=1`, { headers: sbHeaders })
+      const settings = settingsResponse.ok ? (await settingsResponse.json())?.[0] : null
+      const winbackDays = Number(settings?.winback_after_days || 14)
+      if (settings?.winback_auto_send === false) {
+        summary.push({ trigger: 'lapsed', skipped: 'disabled_in_loyalty_settings' })
+      } else {
+      const recipients = await rpc<Recipient[]>('whatsapp_lapsed_recipients', { p_days: winbackDays })
       summary.push(await fireBatch(
         'lapsed',
         'loyalty_lapsed_checkin',
         recipients,
-        (r) => ({ '1': r.full_name, '2': String(r.days_since ?? 30) }),
+        (r) => ({ '1': r.full_name, '2': String(r.days_since ?? winbackDays) }),
       ))
+      }
     }
 
     if (include('streak')) {

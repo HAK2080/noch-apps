@@ -1,14 +1,15 @@
 // PaymentModal.jsx — Payment collection modal
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike } from 'lucide-react'
+import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike, Phone, Loader2 } from 'lucide-react'
 // Scanners are heavy (@zxing/html5-qrcode). Lazy so the eager POSTerminal
 // import chain doesn't drag them into the cold bundle.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 const QRScanner      = lazy(() => import('./QRScanner'))
-import { lookupLoyaltyQR } from '../../loyalty/lib/loyalty-supabase'
+import { lookupLoyaltyQR, lookupOrCreateLoyaltyCustomer } from '../../loyalty/lib/loyalty-supabase'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
+import { format } from '../lib/money'
 
 // Local-only POS translation — see CartPanel for rationale.
 const posT = (key, lang) =>
@@ -53,6 +54,8 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
   const [showScanner, setShowScanner] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [loyaltyCustomer, setLoyaltyCustomer] = useState(initialLoyalty || null)
+  const [loyaltyPhone, setLoyaltyPhone] = useState('')
+  const [linkingPhone, setLinkingPhone] = useState(false)
 
   const changeDue = method === 'cash'
     ? Math.max(0, parseFloat(cashTendered || 0) - total)
@@ -101,7 +104,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
       } else {
         toast.error('QR code not recognized')
       }
-    } catch (err) {
+    } catch {
       toast.error('Could not look up loyalty card')
     }
   }
@@ -110,6 +113,20 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
     setShowScanner(false)
     // QR contains customer ID or phone
     setLoyaltyCustomer({ id: result, name: 'Loyalty Customer' })
+  }
+
+  const handlePhoneAttach = async () => {
+    if (loyaltyPhone.replace(/\D/g, '').length < 7) return toast.error('Enter at least 7 phone digits')
+    setLinkingPhone(true)
+    try {
+      const customer = await lookupOrCreateLoyaltyCustomer(loyaltyPhone)
+      setLoyaltyCustomer(customer)
+      toast.success(`Loyalty linked: ${customer.full_name}`)
+    } catch (err) {
+      toast.error(err.message || 'Could not attach loyalty customer')
+    } finally {
+      setLinkingPhone(false)
+    }
   }
 
   return (
@@ -137,7 +154,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
               <h2 className="text-white font-bold text-xl">{t('posPayment')}</h2>
-              <p className="text-noch-green text-2xl font-bold mt-1">{total.toFixed(2)} LYD</p>
+              <p className="text-noch-green text-2xl font-bold mt-1">{format(total)} LYD</p>
             </div>
             <button onClick={onClose} className="text-noch-muted hover:text-white p-1">
               <X size={20} />
@@ -173,12 +190,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
               <div>
                 <p className="text-noch-muted text-sm mb-2">{t('posCashTendered')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
-                  <span className="text-white text-2xl font-bold">{parseFloat(cashTendered || 0).toFixed(2)} LYD</span>
+                  <span className="text-white text-2xl font-bold">{format(cashTendered || 0)} LYD</span>
                 </div>
                 {changeDue > 0 && (
                   <div className="flex justify-between items-center mt-3 bg-noch-green/10 border border-noch-green/20 rounded-xl px-4 py-3">
                     <span className="text-noch-green font-medium">{t('posChangeDue')}</span>
-                    <span className="text-noch-green font-bold text-xl">{changeDue.toFixed(2)} LYD</span>
+                    <span className="text-noch-green font-bold text-xl">{format(changeDue)} LYD</span>
                   </div>
                 )}
                 {/* Quick amounts — big tappable buttons, shown first */}
@@ -208,7 +225,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 <p className="text-white font-semibold mb-1">{t('posVerifoneHint')}</p>
                 <p className="text-noch-muted text-sm mb-4">{t('posVerifoneSub')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(total)} LYD</p>
                 </div>
               </div>
             )}
@@ -218,12 +235,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
               <div>
                 <p className="text-noch-muted text-sm mb-2">{t('posCardAmount')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
-                  <span className="text-white text-2xl font-bold">{parseFloat(cardAmount || 0).toFixed(2)} LYD</span>
+                  <span className="text-white text-2xl font-bold">{format(cardAmount || 0)} LYD</span>
                 </div>
                 {splitValid && (
                   <div className="flex justify-between items-center mt-2 bg-noch-card border border-noch-border rounded-xl px-4 py-2">
                     <span className="text-noch-muted text-sm">{t('posCashRemaining')}</span>
-                    <span className="text-white font-semibold">{splitCash.toFixed(2)} LYD</span>
+                    <span className="text-white font-semibold">{format(splitCash)} LYD</span>
                   </div>
                 )}
                 <Numpad value={cardAmount} onChange={setCardAmount} />
@@ -238,7 +255,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 <p className="text-noch-muted text-sm mb-1">{t('posPrestoSub')}</p>
                 <p className="text-yellow-400 text-xs mb-4">{t('posPrestoNote')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{total.toFixed(2)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(total)} LYD</p>
                 </div>
               </div>
             )}
@@ -253,13 +270,31 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setShowQRScanner(true)}
-                  className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
-                >
-                  <QrCode size={14} />
-                  {t('posScanLoyalty')}
-                </button>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
+                      <input
+                        inputMode="tel"
+                        value={loyaltyPhone}
+                        onChange={e => setLoyaltyPhone(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handlePhoneAttach() } }}
+                        placeholder="Phone — find or create member"
+                        className="input w-full pl-9 text-sm"
+                      />
+                    </div>
+                    <button onClick={handlePhoneAttach} disabled={linkingPhone} className="btn-secondary px-3">
+                      {linkingPhone ? <Loader2 size={14} className="animate-spin" /> : 'Attach'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowQRScanner(true)}
+                    className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
+                  >
+                    <QrCode size={14} />
+                    {t('posScanLoyalty')}
+                  </button>
+                </div>
               )}
             </div>
 

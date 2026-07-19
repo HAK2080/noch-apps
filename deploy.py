@@ -40,11 +40,16 @@ except ImportError:
     print("paramiko not installed. Run: pip install paramiko")
     sys.exit(1)
 
-HOST = "72.60.203.107"
-USER = "root"
-PASS = "9@hW@s3UWL@Z#9uIUlnp"
+HOST = os.environ.get("NOCH_DEPLOY_HOST", "72.60.203.107")
+USER = os.environ.get("NOCH_DEPLOY_USER", "root")
+PASS = os.environ.get("NOCH_DEPLOY_PASSWORD")
+KEY_PATH = os.environ.get("NOCH_DEPLOY_SSH_KEY_PATH") or os.environ.get("DEPLOY_SSH_KEY_PATH")
 
 HERE = Path(__file__).resolve().parent
+
+if not PASS and not KEY_PATH:
+    print("Set NOCH_DEPLOY_PASSWORD or NOCH_DEPLOY_SSH_KEY_PATH before deploying.")
+    sys.exit(2)
 
 # ── Targets ─────────────────────────────────────────────────────────────
 TARGETS = {
@@ -55,6 +60,7 @@ TARGETS = {
         "remote":     "/var/www/apps",
         "verify":     "https://apps.noch.cloud/index.html",
         "stamp_sw":   True,
+        "required_env": ("VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"),
     },
     "storefront": {
         "label":      "noch.cloud (Storefront)",
@@ -63,6 +69,7 @@ TARGETS = {
         "remote":     "/var/www/html",
         "verify":     "https://noch.cloud/index.html",
         "stamp_sw":   False,
+        "required_env": (),
     },
 }
 
@@ -91,6 +98,12 @@ def stamp_sw_cache(dist: Path):
 
 def build(target_key: str):
     cfg = TARGETS[target_key]
+    missing_env = [name for name in cfg["required_env"] if not os.environ.get(name)]
+    if missing_env:
+        sys.exit(
+            f"Build stopped for {target_key}: missing required environment "
+            f"variables: {', '.join(missing_env)}"
+        )
     print(f"[1/4] Building {cfg['label']}...")
     result = subprocess.run(
         ["npm", "run", "build"],
@@ -110,7 +123,12 @@ def upload(target_key: str):
     print(f"[2/4] Connecting to {HOST} for {cfg['label']}...")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(HOST, username=USER, password=PASS, timeout=15)
+    connect_args = {"hostname": HOST, "username": USER, "timeout": 15}
+    if KEY_PATH:
+        connect_args["key_filename"] = KEY_PATH
+    else:
+        connect_args["password"] = PASS
+    ssh.connect(**connect_args)
     sftp = ssh.open_sftp()
 
     remote = cfg["remote"]

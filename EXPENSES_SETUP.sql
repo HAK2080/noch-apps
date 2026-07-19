@@ -14,9 +14,9 @@ create table if not exists cost_centers (
 
 insert into cost_centers (code, name) values
   ('CC00', 'CEO (HAK)'),
-  ('CC01', 'Noch City Walk'),
-  ('CC02', 'Noch Galaria Mall'),
-  ('CC03', 'Bloom Abu Nawas'),
+  ('CC01', 'Noch - City Walk'),
+  ('CC02', 'Noch - Gallery Mall'),
+  ('CC03', 'Bloom'),
   ('CC99', 'MD (Ahmed Kashada)')
 on conflict (code) do nothing;
 

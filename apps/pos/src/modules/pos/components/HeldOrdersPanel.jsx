@@ -4,6 +4,7 @@
 
 import { PauseCircle, X, Trash2, RotateCcw } from 'lucide-react'
 import { translations } from '../../../lib/i18n'
+import { format } from '../lib/money'
 
 const t = (key, lang) =>
   translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
@@ -45,7 +46,7 @@ export default function HeldOrdersPanel({ heldOrders = [], onResume, onCancel, o
                   </span>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="text-white font-semibold">{Number(order.total || 0).toFixed(2)} LYD</span>
+                  <span className="text-white font-semibold">{format(order.total || 0)} LYD</span>
                   <span className="text-noch-muted text-xs">
                     {order.held_at
                       ? new Date(order.held_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

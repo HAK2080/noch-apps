@@ -139,7 +139,7 @@ Default is **LYD** everywhere:
 5. **`/analytics` page (BusinessAnalytics).** Does the operator currently use it? If yes, what's broken about it / what does it not answer? (Drives the decision: extend vs replace.)
 6. **`rates` table.** Is FX populated and trusted? Or is the cost calculator entering ingredient costs already-converted to LYD?
 7. **Hourly wage data.** Is wage info currently tracked anywhere off-app (Sheets/Whatsapp/notes)? What's the typical structure (hourly rate? monthly salary? mixed?)? This shapes the shift-log schema.
-8. **Multi-branch.** Three branches seeded (`Noch Hay Alandlous`, `Noch Jaraba`, `Bloom Abu Nawas`). Brief says "Bloom is out for v1." Should the dashboard hard-filter Bloom out, or include a "branch selector" with Bloom toggleable? Most likely the latter.
+8. **Multi-branch.** Three branches are active (`Noch - City Walk`, `Noch - Gallery Mall`, `Bloom`). All three appear in shared branch selectors and branch-aware reporting.
 9. **Cash balance** — owner-entered, or imported from bank? If the bank export comes weekly, how do we treat the days between?
 10. **Suppliers** — two migrations define `suppliers`. Which one is on the live DB right now?
 

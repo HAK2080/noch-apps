@@ -3,11 +3,11 @@
 // Renders 8 KPI cards with target-band threshold colours.
 
 import { useEffect, useMemo, useState } from 'react'
-import { TrendingUp } from 'lucide-react'
+import { AlertTriangle, TrendingUp } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import KPICard from '../components/KPICard'
 import { businessToday } from '../../pos/lib/pos-supabase'
-import { getPnL, getFinanceSettings, listBranches } from '../lib/finance-supabase'
+import { getPnL, getFinanceSettings, listBranches, listProductsMissingCost } from '../lib/finance-supabase'
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
@@ -31,16 +31,23 @@ export default function DailyPnLTab() {
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState(null) // null = all
   const [period, setPeriod] = useState(defaultPeriod)
-  const [netOfRefunds, setNetOfRefunds] = useState(false)
+  const [netOfRefunds, setNetOfRefunds] = useState(true)
   const [pnl, setPnl] = useState(null)
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [missingCosts, setMissingCosts] = useState([])
 
   useEffect(() => {
     Promise.all([listBranches(), getFinanceSettings()])
       .then(([bs, s]) => { setBranches(bs); setSettings(s) })
       .catch(err => toast.error(err.message || 'Failed to load setup'))
   }, [])
+
+  useEffect(() => {
+    listProductsMissingCost(branchId)
+      .then(setMissingCosts)
+      .catch(err => toast.error(err.message || 'Failed to check product costs'))
+  }, [branchId])
 
   const [loadError, setLoadError] = useState(null)
   useEffect(() => {
@@ -191,6 +198,18 @@ export default function DailyPnLTab() {
       </div>
 
       {/* Hint when COGS is zero (means no recipe links) */}
+      {missingCosts.length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-yellow-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">{missingCosts.length} active product{missingCosts.length === 1 ? '' : 's'} missing cost</p>
+              <p className="text-xs text-yellow-200/80 mt-1">COGS and margin are understated until these are completed in Cost mapping.</p>
+              <p className="text-xs mt-2 text-white">{missingCosts.slice(0, 8).map(product => product.name || product.name_ar).join(', ')}{missingCosts.length > 8 ? `, +${missingCosts.length - 8} more` : ''}</p>
+            </div>
+          </div>
+        </div>
+      )}
       {k.rev > 0 && k.cogs === 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-yellow-300 text-sm">
           COGS is 0 — set per-product cost in the <strong>Cost mapping</strong> tab so the Menu Profitability Matrix and Prime Cost reflect reality.

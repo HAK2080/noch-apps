@@ -24,7 +24,10 @@ export async function getLoyaltySettings() {
 }
 
 export async function updateLoyaltySettings(settings) {
-  const { id, created_at, ...updates } = settings
+  const { id } = settings
+  const updates = { ...settings }
+  delete updates.id
+  delete updates.created_at
   const { data, error } = await supabase
     .from('loyalty_settings')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -228,6 +231,24 @@ export async function lookupLoyaltyQR(qrToken) {
     .single()
   if (error) throw error
   return data?.customer || null
+}
+
+export async function lookupOrCreateLoyaltyCustomer(phone) {
+  const { data, error } = await supabase.rpc('lookup_or_create_loyalty_customer', { p_phone: phone })
+  if (error) throw error
+  return data
+}
+
+export async function getLoyaltyCheckoutMetrics(days = 30) {
+  const { data, error } = await supabase.rpc('loyalty_checkout_metrics', { p_days: days })
+  if (error) throw error
+  return data
+}
+
+export async function getLoyaltyStaffLeaderboard(days = 30) {
+  const { data, error } = await supabase.rpc('loyalty_staff_leaderboard', { p_days: days })
+  if (error) throw error
+  return data || []
 }
 
 export async function generateLoyaltyQR() {

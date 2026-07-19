@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users, Star, Gift, TrendingUp, AlertTriangle, RefreshCw, MessageSquare, Trophy, Sparkles } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
-import { getLoyaltyStats, getLoyaltyCustomers } from '../lib/loyalty-supabase'
+import { getLoyaltyStats, getLoyaltyCustomers, getLoyaltyCheckoutMetrics } from '../lib/loyalty-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
@@ -15,6 +15,7 @@ export default function LoyaltyDashboard() {
   const { profile } = useAuth()
   const [stats, setStats] = useState(null)
   const [atRisk, setAtRisk] = useState([])
+  const [outcomes, setOutcomes] = useState(null)
   const [loading, setLoading] = useState(true)
   const [runningNochiDay, setRunningNochiDay] = useState(false)
   const [notSetup, setNotSetup] = useState(false)
@@ -24,14 +25,16 @@ export default function LoyaltyDashboard() {
     setLoading(true)
     setNotSetup(false)
     try {
-      const [s, customers] = await Promise.all([
+      const [s, customers, checkoutOutcomes] = await Promise.all([
         getLoyaltyStats(),
         getLoyaltyCustomers({ nochi_state: ['sad', 'tired', 'deathbed', 'dead'] }),
+        getLoyaltyCheckoutMetrics(30),
       ])
       // null stats = migration not run yet
       if (s === null) { setNotSetup(true); return }
       setStats(s)
       setAtRisk((customers || []).slice(0, 5))
+      setOutcomes(checkoutOutcomes)
     } catch (err) {
       // Network failure or other real error
       toast.error(lang === 'ar' ? 'خطأ في الاتصال' : 'Connection error')
@@ -142,7 +145,7 @@ export default function LoyaltyDashboard() {
       ) : (
         <>
           {/* Stat Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             {statCards.map((s, i) => (
               <div key={i} className="card flex flex-col gap-1">
                 <s.icon size={18} className={s.color} />
@@ -150,6 +153,16 @@ export default function LoyaltyDashboard() {
                 <p className="text-xs text-noch-muted">{s.label}</p>
               </div>
             ))}
+            <div className="card flex flex-col gap-1">
+              <TrendingUp size={18} className="text-purple-400" />
+              <p className="text-2xl font-bold text-purple-400">{outcomes?.attach_rate ?? 0}%</p>
+              <p className="text-xs text-noch-muted">{ar ? 'ربط الولاء (30 يوم)' : 'Checkout attach rate (30d)'}</p>
+            </div>
+            <div className="card flex flex-col gap-1">
+              <RefreshCw size={18} className="text-cyan-400" />
+              <p className="text-2xl font-bold text-cyan-400">{outcomes?.repeat_visit_rate ?? 0}%</p>
+              <p className="text-xs text-noch-muted">{ar ? 'زيارات متكررة (30 يوم)' : 'Repeat visit rate (30d)'}</p>
+            </div>
           </div>
 
           {/* Nochi Alert Panel */}

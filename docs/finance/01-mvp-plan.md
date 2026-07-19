@@ -15,7 +15,7 @@
 `/analytics` becomes `/finance`. The existing `BusinessAnalytics.jsx` stays (it's the closest thing to v1 today), but it gets:
 - **Renamed** to `FinanceDashboard.jsx`.
 - **Restructured tabs**: Overview · Daily P&L · Menu Profitability · Cash & Runway · Expenses · Shifts · Bank.
-- The old "Bloom" tab is removed (Bloom is out of v1 per brief; Bloom is also out of this repo's deploys after the recent monorepo merge).
+- The old standalone "Bloom" analytics tab is removed; Bloom is included as a regular active branch in the Finance branch selectors and summaries.
 - The old "BusinessLines" tab is removed (vestigial, no clear consumer).
 - Existing tabs (`OverviewTab`, `BranchTab`, `CategoryTab`, `FinancialTab`, `IntelligenceTab`) are kept as components and reorganised under the new top-level tabs.
 
@@ -424,7 +424,7 @@ After this migration, `expense_entries`, `bank_transactions`, `finance_settings`
 
 **[D] Daily P&L Tab** (default tab on `/finance`)
 - **Period selector** (Today / 7d / 30d / 90d / Custom). Default: 7d.
-- **Branch selector** (All / Hay Alandlous / Jaraba). Bloom hidden.
+- **Branch selector** (All / Noch - City Walk / Noch - Gallery Mall / Bloom).
 - KPI grid (4 cards top row, 4 below) — every card has `actual / target band / status badge`:
   1. Revenue (net) · target n/a · just shown
   2. COGS · target 25–32% of revenue
@@ -519,7 +519,7 @@ The Day-1 set is the foundation; without these the headline screen has nothing t
 ## 6. Open assumptions (called out so you can correct before code lands)
 
 1. **Hourly wage data lives on `profiles.hourly_rate_lyd`.** If wages are hidden from staff (likely yes — RLS on profiles needs to gate this), I'll add an explicit `wages` policy. (Today `profiles` is broadly readable per the audit; will tighten.)
-2. **Active branches for v1** = "Noch Hay Alandlous" + "Noch Jaraba". Bloom row stays in DB but the FinanceDashboard branch selector hides it.
+2. **Active branches** = "Noch - City Walk", "Noch - Gallery Mall", and "Bloom". All active branches appear in the FinanceDashboard branch selector.
 3. **Monthly OpEx defaults** are entered once via Settings; they're not auto-posted as `expense_entries` rows. They're a Cash & Runway "upcoming outflows" hint only, not a P&L line. (If you'd rather they auto-post each month, say so — I'll add a cron RPC.)
 4. **Receipt photos** go to a new Supabase Storage bucket `expense-receipts`, owner-only access. ~50 MB ceiling; receipts are usually <1 MB each.
 5. **Existing `business_metrics`, `sales_transactions`, `sales_uploads` tables** are explicitly **not consumed** by the Finance MVP. They stay in the schema for now (no destructive migration). A future cleanup can drop them.

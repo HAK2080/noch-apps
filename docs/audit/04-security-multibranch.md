@@ -56,7 +56,7 @@ This is the single largest risk in the audit. **All authorization is currently c
 
 🟠 **C1.** Branch ID lives in the URL (`/pos/:branchId`). There's no verification that the logged-in user is associated with that branch. A user can deep-link `/pos/<other-branch-uuid>` and ring up sales there.
 
-🟠 **C2.** Profiles do not have a `branch_id` (or `assigned_branches[]`) column referenced anywhere in the audited POS module. There is **no concept** of "this barista works at Hay Alandlous." Multi-branch scaling needs this.
+🟠 **C2.** Profiles do not have a `branch_id` (or `assigned_branches[]`) column referenced anywhere in the audited POS module. There is **no concept** of "this barista works at Noch - City Walk." Multi-branch scaling needs this.
 
 🟠 **C3.** Shifts are branch-scoped at the row level, but RLS doesn't enforce it. A shift opened by user X at Branch A can be closed by user Y from Branch B.
 

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { AlertTriangle, Ban } from 'lucide-react'
+import { format } from '../lib/money'
 
 const LONG_PRESS_MS = 500
 
@@ -216,7 +217,7 @@ function ProductGrid({
                 </div>
                 <div className="flex items-baseline justify-between gap-1 mt-1">
                   <span className="text-white font-bold text-base sm:text-lg leading-none">
-                    {parseFloat(product.price).toFixed(2)}
+                    {format(product.price)}
                   </span>
                   <span className="text-noch-muted text-[10px] uppercase tracking-wide">LYD</span>
                 </div>

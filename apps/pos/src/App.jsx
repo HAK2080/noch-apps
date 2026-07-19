@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 import { usePermissions } from './contexts/PermissionsContext'
@@ -39,12 +39,6 @@ const RecipeDetail     = lazy(() => import('./pages/RecipeDetail'))
 const CostCalculator   = lazy(() => import('./pages/CostCalculator'))
 
 const ContentStudio2   = lazy(() => import('./modules/contentStudio'))
-const ContentStudio    = lazy(() => import('./pages/content/ContentStudio'))
-const Studio           = lazy(() => import('./pages/content/Studio'))
-const BrandSetup       = lazy(() => import('./pages/content/BrandSetup'))
-const BrandDetail      = lazy(() => import('./pages/content/BrandDetail'))
-const ReviewQueue      = lazy(() => import('./pages/content/ReviewQueue'))
-const IdeaBank         = lazy(() => import('./pages/content/IdeaBank'))
 
 const ProductCatalog   = lazy(() => import('./pages/ProductCatalog'))
 const InventoryHub     = lazy(() => import('./pages/InventoryHub'))
@@ -52,7 +46,6 @@ const StockManager     = lazy(() => import('./pages/inventory/StockManager'))
 const ProcurementOrders= lazy(() => import('./pages/inventory/ProcurementOrders'))
 const Suppliers        = lazy(() => import('./pages/inventory/Suppliers'))
 const StockCheckAll    = lazy(() => import('./pages/StockCheckAll'))
-const BusinessAnalytics= lazy(() => import('./pages/BusinessAnalytics'))
 const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
 const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
 
@@ -71,6 +64,7 @@ const TableQRGenerator = lazy(() => import('./pages/TableQRGenerator'))
 const IdeasBoard       = lazy(() => import('./pages/ideas/IdeasBoard'))
 const IdeasCategories  = lazy(() => import('./pages/ideas/IdeasCategories'))
 const Vestaboard       = lazy(() => import('./pages/Vestaboard'))
+const VestaboardChannels = lazy(() => import('./pages/VestaboardChannels'))
 
 const AccountingDashboard = lazy(() => import('./modules/accounting/AccountingDashboard'))
 
@@ -91,6 +85,7 @@ const LoyaltySpinWheel = lazy(() => import('./modules/loyalty/pages/LoyaltySpinW
 const LoyaltyFeedback  = lazy(() => import('./modules/loyalty/pages/LoyaltyFeedback'))
 
 const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
+const SnapReceipt      = lazy(() => import('./pages/snap/SnapReceipt'))
 
 // Experience OS — Phase 1-10
 const InventoryIntelligence = lazy(() => import('./pages/inventory/InventoryIntelligence'))
@@ -123,9 +118,13 @@ function KioskEntry() {
   return <POSHome />
 }
 
+function LegacyContentBusinessRedirect() {
+  const { id } = useParams()
+  return <Navigate to={id ? `/content-studio/businesses/${id}` : '/content-studio/businesses'} replace />
+}
+
 function OwnerRoute({ children }) {
   const { isOwner, loading } = useAuth()
-  const { t } = useLanguage()
   if (loading) return null
   if (!isOwner) return <Navigate to="/my-tasks" replace />
   return children
@@ -216,38 +215,28 @@ export default function App() {
           <ProtectedRoute><PermissionRoute feature="expenses"><ExpensesPage /></PermissionRoute></ProtectedRoute>
         } />
 
+        <Route path="/snap" element={
+          <ProtectedRoute><PermissionRoute feature="expenses"><SnapReceipt /></PermissionRoute></ProtectedRoute>
+        } />
+
         {/* Content Studio 2.0 (Noch 4.0) */}
         <Route path="/content-studio/*" element={
           <ProtectedRoute><OwnerRoute><ContentStudio2 /></OwnerRoute></ProtectedRoute>
         } />
 
-        {/* Content Studio (legacy) */}
-        <Route path="/content" element={
-          <ProtectedRoute><OwnerRoute><ContentStudio /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/studio" element={
-          <ProtectedRoute><OwnerRoute><Studio /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/brand/setup" element={
-          <ProtectedRoute><OwnerRoute><BrandSetup /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/brands/new" element={
-          <ProtectedRoute><OwnerRoute><BrandSetup /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/brand/:id" element={
-          <ProtectedRoute><OwnerRoute><BrandDetail /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/review" element={
-          <ProtectedRoute><OwnerRoute><ReviewQueue /></OwnerRoute></ProtectedRoute>
-        } />
-        <Route path="/content/ideas" element={
-          <ProtectedRoute><OwnerRoute><IdeaBank /></OwnerRoute></ProtectedRoute>
-        } />
+        {/* Content Studio legacy routes redirect to v2. */}
+        <Route path="/content" element={<Navigate to="/content-studio" replace />} />
+        <Route path="/content/studio" element={<Navigate to="/content-studio" replace />} />
+        <Route path="/content/brand/setup" element={<Navigate to="/content-studio/businesses/new" replace />} />
+        <Route path="/content/brands/new" element={<Navigate to="/content-studio/businesses/new" replace />} />
+        <Route path="/content/brand/:id" element={<LegacyContentBusinessRedirect />} />
+        <Route path="/content/review" element={<Navigate to="/content-studio/drafts" replace />} />
+        <Route path="/content/ideas" element={<Navigate to="/content-studio/concepts" replace />} />
         {/* Legacy routes — redirect to new studio */}
-        <Route path="/content/create" element={<Navigate to="/content/studio" replace />} />
-        <Route path="/content/research" element={<Navigate to="/content" replace />} />
-        <Route path="/content/calendar" element={<Navigate to="/content" replace />} />
-        <Route path="/content/experiments" element={<Navigate to="/content" replace />} />
+        <Route path="/content/create" element={<Navigate to="/content-studio" replace />} />
+        <Route path="/content/research" element={<Navigate to="/content-studio/inspiration" replace />} />
+        <Route path="/content/calendar" element={<Navigate to="/content-studio/campaigns" replace />} />
+        <Route path="/content/experiments" element={<Navigate to="/content-studio/signals" replace />} />
 
         {/* Product Catalog — staff get read-only via in-page gating */}
         <Route path="/products" element={
@@ -266,7 +255,7 @@ export default function App() {
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
         <Route path="/finance" element={<ProtectedRoute><PermissionRoute feature="finance"><FinanceDashboard /></PermissionRoute></ProtectedRoute>} />
         <Route path="/marketing" element={<ProtectedRoute><PermissionRoute feature="marketing"><MarketingDashboard /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/analytics-legacy" element={<ProtectedRoute><PermissionRoute feature="finance"><BusinessAnalytics /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/analytics-legacy" element={<Navigate to="/finance" replace />} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
@@ -293,6 +282,7 @@ export default function App() {
 
         {/* Vestaboard */}
         <Route path="/vestaboard" element={<ProtectedRoute><Vestaboard /></ProtectedRoute>} />
+        <Route path="/vestaboard/channels" element={<ProtectedRoute><OwnerRoute><VestaboardChannels /></OwnerRoute></ProtectedRoute>} />
 
         {/* Accounting — chart of accounts + double-entry GL (accountant/owner) */}
         <Route path="/accounting"       element={<ProtectedRoute><PermissionRoute feature="accounting"><AccountingDashboard /></PermissionRoute></ProtectedRoute>} />
