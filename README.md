@@ -104,6 +104,20 @@ a full-system audit with file:line evidence for every known defect.
 
 ## Change log
 
+### 2026-07-19 — Payroll runs, staff loans, GL posting, cost allocation
+- Migration `20260719130000_payroll_runs_and_loans.sql`: monthly payroll
+  runs (generate draft from profile salaries + adjustments + loan
+  repayments → owner completes). Completion posts GL: Dr 6600 wages /
+  Cr 2100 wages payable. `finance_pnl` uses run totals for completed
+  months (prorated estimate otherwise; adjustments leg skips completed
+  months to avoid double counting).
+- Finance → Payroll tab: generate/edit/complete runs, staff loans CRUD.
+- Same day (parallel session): derive hourly rate from salary
+  (`20260719110000`), shared-services cost allocation
+  (`20260719120000` + Allocations tab), `create-staff` edge function.
+- Migration `20260719100000` APPLIED to the live DB this day (salary
+  proration verified: 10,500 LYD/mo → 2,709.68 for Jul 12–19).
+
 ### 2026-07-19 — Payroll capture + prepaid expense amortization
 - Migration `20260719100000_payroll_and_prepaid_amortization.sql`:
   monthly salaries now flow into the P&L labor leg (day-exact proration;
@@ -158,9 +172,10 @@ From the audit's P0 list (full evidence in the audit doc):
 ### Pending ops (do these on the server / dashboard)
 - **Apply migrations to the live DB** (app dashboard SQL editor, one at a
   time — see the drift warning above): `20260718160000`,
-  `20260718180500`–`180700`, `20260718190000`–`190200`, `20260719100000`,
-  plus the branch's `20260718170000`–`182000`. Verify which of the ~20
-  branch migrations are already applied before running any.
+  `20260718180500`–`180700`, `20260718190000`–`190200`, ~~`20260719100000`~~
+  (applied 2026-07-19), `20260719110000`, `20260719120000`,
+  `20260719130000`, plus the branch's `20260718170000`–`182000`. Verify
+  which are already applied before running any.
 - **Set `WHATSAPP_CRON_SECRET`** and re-schedule the pg_cron job with the
   `x-cron-secret` header — until then the nightly WhatsApp run gets 403.
 - **Set `TELEGRAM_WEBHOOK_SECRET`** and re-register the webhook (GET the
