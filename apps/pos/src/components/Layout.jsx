@@ -1,5 +1,6 @@
-import { NavLink, useNavigate } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
+import { useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown, Command, Inbox, LogOut, Plus, Search } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePermissions } from '../contexts/PermissionsContext'
@@ -15,23 +16,18 @@ function NavItem({ to, icon: Icon, label, end }) {
       to={to}
       end={end}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-150 text-sm font-medium relative
+        `group relative flex items-center gap-2.5 px-2.5 py-1.5 rounded-md transition-colors duration-150 text-[13px]
         ${isActive
-          ? 'text-white'
-          : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+          ? 'bg-white/[0.09] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]'
+          : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.045]'
         }`
       }
     >
       {({ isActive }) => (
         <>
-          {isActive && (
-            <span
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
-              style={{ background: 'linear-gradient(180deg, #4ADE80, #22C55E)' }}
-            />
-          )}
-          <Icon size={16} style={{ color: isActive ? '#4ADE80' : undefined }} />
-          <span>{label}</span>
+          {isActive && <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-noch-green" />}
+          <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? 'text-noch-green' : 'text-zinc-600 group-hover:text-zinc-400'} />
+          <span className="truncate">{label}</span>
         </>
       )}
     </NavLink>
@@ -42,6 +38,8 @@ export default function Layout({ children }) {
   const { profile, signOut } = useAuth()
   const { t, lang } = useLanguage()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchOpen, setSearchOpen] = useState(false)
   const ar = lang === 'ar'
 
   const handleSignOut = async () => {
@@ -49,15 +47,9 @@ export default function Layout({ children }) {
     navigate('/login')
   }
 
-  // Nav from the features registry (src/lib/features.js).
-  // Owner: every item except hideForOwner. Non-owner: fallbackRoles (the old
-  // hardcoded behavior, zero-regression) PLUS anything granted via Manage
-  // Roles. While permissions load, only fallbackRoles render (no flash).
   const role = profile?.role
   const isOwner = role === 'owner'
   const { hasAccess, canEdit, loading: permsLoading } = usePermissions()
-  // Ops Checklist module ships disabled. Nav entries flagged
-  // requiresOpsEnabled are filtered out when ops_settings.module_enabled = false.
   const { moduleEnabled: opsEnabled } = useOpsSettings()
   const opsManager = isOwner || canEdit('ops')
 
@@ -71,15 +63,12 @@ export default function Layout({ children }) {
     return !!(item.feature && hasAccess(item.feature))
   }
 
-  const navLabel = (item) =>
-    item.labelKey ? t(item.labelKey) : (ar ? item.labelAr : item.labelEn)
+  const navLabel = (item) => item.labelKey ? t(item.labelKey) : (ar ? item.labelAr : item.labelEn)
 
-  // Resolve items, then drop group headers that have no visible children.
   const navItems = []
   let pendingGroup = null
   for (const item of NAV_ITEMS) {
     if (item.type === 'group') {
-      // Skip group headers tied to the disabled Ops module entirely.
       if (item.requiresOpsEnabled && !opsEnabled) { pendingGroup = null; continue }
       pendingGroup = item
       continue
@@ -91,176 +80,132 @@ export default function Layout({ children }) {
     }
     navItems.push({ to: item.to, icon: item.icon, label: navLabel(item), end: item.end })
   }
-  const navLinkItems = navItems.filter(i => i.type !== 'group')
+  const navLinkItems = navItems.filter(item => item.type !== 'group')
 
   const initials = profile?.full_name
     ?.split(' ')
-    .map(w => w[0])
+    .map(word => word[0])
     .slice(0, 2)
     .join('')
     .toUpperCase() || '?'
 
+  const pageLabel = navLinkItems.find(item => item.to === location.pathname)?.label || 'Workspace'
+
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--bg)' }}>
-      {/* Sidebar — desktop */}
-      <aside
-        className="hidden md:flex flex-col w-56 fixed h-full border-r"
-        style={{
-          background: 'linear-gradient(180deg, #0F1013 0%, #09090B 100%)',
-          borderColor: 'var(--border)',
-        }}
-      >
-        {/* Logo */}
-        <div className="px-5 pt-6 pb-5">
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #4ADE80, #22C55E)', boxShadow: '0 0 8px rgba(74,222,128,0.5)' }}
-            />
-            <h1
-              className="font-bold text-lg tracking-tight text-white"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}
-            >
-              noch<span style={{ color: '#4ADE80' }}>.apps</span>
-            </h1>
+    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)]">
+      <aside className="hidden md:flex md:w-[248px] fixed inset-y-0 flex-col border-r border-white/[0.07] bg-[#0b0b0d]">
+        <div className="px-3 pt-3">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/[0.05]"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-green-300 to-emerald-600 text-[13px] font-bold text-[#06120a] shadow-[0_0_16px_rgba(74,222,128,0.18)]">n</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-semibold tracking-[-0.01em] text-zinc-100">noch.apps</span>
+              <span className="block truncate text-[10px] text-zinc-600">{t('appTagline')}</span>
+            </span>
+            <ChevronDown size={14} className="text-zinc-600" />
+          </button>
+
+          <div className="mt-3 flex gap-1">
+            <button onClick={() => setSearchOpen(true)} className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-white/[0.07] bg-white/[0.035] px-2.5 py-1.5 text-left text-[12px] text-zinc-500 transition-colors hover:border-white/[0.14] hover:text-zinc-300">
+              <Search size={13} />
+              <span className="flex-1">Search</span>
+              <span className="flex items-center gap-0.5 text-[10px] text-zinc-700"><Command size={10} /> K</span>
+            </button>
+            <button onClick={() => navigate('/tasks')} aria-label="Create task" className="flex h-[30px] w-[30px] items-center justify-center rounded-md bg-noch-green text-[#07120a] transition-all hover:brightness-110">
+              <Plus size={15} strokeWidth={2.5} />
+            </button>
           </div>
-          <p className="text-xs mt-1 ms-4" style={{ color: 'var(--muted)' }}>
-            {t('appTagline')} <span style={{ color: 'rgba(74,222,128,0.4)' }}>v4.4.0</span>
-          </p>
         </div>
 
-        {/* Divider */}
-        <div className="mx-4 h-px" style={{ background: 'var(--border)' }} />
-
-        {/* Nav */}
-        <nav className="flex flex-col gap-0.5 flex-1 px-3 py-3 overflow-y-auto">
-          {navItems.map((item, idx) => (
-            item.type === 'group' ? (
-              <div
-                key={`g-${idx}`}
-                className="px-3 pt-4 pb-1 text-[10px] font-bold tracking-[0.12em]"
-                style={{ color: 'var(--muted)' }}
-              >
-                {item.label}
-              </div>
-            ) : (
-              <NavItem key={item.to} {...item} />
-            )
-          ))}
+        <nav className="mt-3 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
+          <div className="mb-1 flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-zinc-500">
+            <Inbox size={14} className="text-zinc-600" />
+            <span>Inbox</span>
+            <span className="ml-auto text-[10px] text-zinc-700">0</span>
+          </div>
+          {navItems.map((item, index) => item.type === 'group' ? (
+            <div key={`g-${index}`} className="px-2.5 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-700">{item.label}</div>
+          ) : <NavItem key={item.to} {...item} />)}
         </nav>
 
-        {/* Divider */}
-        <div className="mx-4 h-px" style={{ background: 'var(--border)' }} />
-
-        {/* Bottom */}
-        <div className="p-4 flex flex-col gap-2">
-          {/* User */}
-          <div className="flex items-center gap-2.5 px-2 py-2">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, rgba(74,222,128,0.2), rgba(34,197,94,0.1))',
-                border: '1px solid rgba(74,222,128,0.2)',
-                color: '#4ADE80',
-                fontFamily: "'Space Grotesk', sans-serif",
-              }}
-            >
-              {initials}
+        <div className="border-t border-white/[0.07] px-3 py-3">
+          <div className="mb-2 flex items-center gap-2 rounded-md px-2 py-1.5">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-green-400/20 bg-green-400/10 text-[10px] font-semibold text-noch-green">{initials}</div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-medium text-zinc-200">{profile?.full_name}</p>
+              <p className="truncate text-[10px] capitalize text-zinc-600">{profile?.role === 'owner' ? t('owner') : t('staffMember')}</p>
             </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-white truncate leading-none">{profile?.full_name}</p>
-              <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--muted)' }}>
-                {profile?.role === 'owner' ? t('owner') : t('staffMember')}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 ps-1 mb-1">
             <OpsPersistentBadge />
           </div>
-          <LanguageToggle className="justify-start" />
-          <ThemeToggle />
-
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all duration-150"
-            style={{ color: 'var(--muted)' }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = '#F87171'
-              e.currentTarget.style.background = 'rgba(239,68,68,0.08)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--muted)'
-              e.currentTarget.style.background = 'transparent'
-            }}
-          >
-            <LogOut size={15} />
-            <span>{t('logout')}</span>
-          </button>
+          <div className="flex items-center justify-between gap-1 px-1">
+            <LanguageToggle className="justify-start" />
+            <ThemeToggle />
+            <button onClick={handleSignOut} aria-label={t('logout')} className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /></button>
+          </div>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 min-w-0 md:ms-56 pb-20 md:pb-0">
-        {/* Mobile header */}
-        <header
-          className="md:hidden flex items-center justify-between px-4 py-3 border-b sticky top-0 z-10"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: '#4ADE80', boxShadow: '0 0 6px rgba(74,222,128,0.6)' }}
-            />
-            <h1
-              className="font-bold text-lg text-white"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.03em' }}
-            >
-              noch<span style={{ color: '#4ADE80' }}>.apps</span>
-            </h1>
+      <main className="min-w-0 flex-1 pb-20 md:ms-[248px] md:pb-0">
+        <header className="sticky top-0 z-10 hidden h-12 items-center justify-between border-b border-white/[0.07] bg-[#0b0b0d]/90 px-6 backdrop-blur md:flex">
+          <div className="flex items-center gap-2 text-[12px]">
+            <span className="text-zinc-600">noch.apps</span>
+            <span className="text-zinc-800">/</span>
+            <span className="text-zinc-300">{pageLabel}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <OpsPersistentBadge />
-            <LanguageToggle />
-            <button
-              onClick={handleSignOut}
-              className="p-1.5 rounded-lg transition-colors"
-              style={{ color: 'var(--muted)' }}
-            >
-              <LogOut size={17} />
-            </button>
+          <div className="flex items-center gap-3 text-[11px] text-zinc-600">
+            <span className="hidden lg:inline">All systems operational</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-noch-green shadow-[0_0_8px_rgba(74,222,128,0.7)]" />
           </div>
         </header>
 
-        <div className="p-4 md:p-6">
-          {children}
-        </div>
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.07] bg-[#0b0b0d]/95 px-4 py-3 backdrop-blur md:hidden">
+          <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-noch-green text-xs font-bold text-[#07120a]">n</span>
+            <span className="text-sm font-semibold text-zinc-100">noch.apps</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSearchOpen(true)} aria-label="Search" className="rounded-md p-1.5 text-zinc-500"><Search size={17} /></button>
+            <OpsPersistentBadge />
+            <LanguageToggle />
+            <button onClick={handleSignOut} aria-label={t('logout')} className="rounded-md p-1.5 text-zinc-500"><LogOut size={17} /></button>
+          </div>
+        </header>
+
+        <div className="p-4 md:p-6 lg:p-8">{children}</div>
       </main>
 
-      {/* Bottom nav — mobile */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 flex items-center justify-around px-2 py-2 z-10 overflow-x-auto border-t"
-        style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-      >
-        {navLinkItems.map(item => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all whitespace-nowrap text-xs font-medium
-              ${isActive ? 'text-noch-green' : 'text-zinc-500'}`
-            }
-          >
-            <item.icon size={19} />
+      <nav className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-around overflow-x-auto border-t border-white/[0.08] bg-[#0b0b0d]/95 px-1 py-2 backdrop-blur md:hidden">
+        {navLinkItems.slice(0, 5).map(item => (
+          <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `flex min-w-[58px] flex-col items-center gap-0.5 rounded-md px-2 py-1 text-[10px] ${isActive ? 'text-noch-green' : 'text-zinc-600'}`}>
+            <item.icon size={17} />
             <span>{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      {/* Ops Checklist reminder popup. Self-gates on module_enabled and
-          renders nothing when no pending tasks. Mounted at Layout level so
-          chromeless POS terminal never shows it during a transaction. */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-4 pt-[12vh]" onClick={() => setSearchOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-label="Search workspace" className="w-full max-w-lg overflow-hidden rounded-xl border border-white/[0.12] bg-[#151518] shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3">
+              <Search size={16} className="text-zinc-500" />
+              <span className="text-sm text-zinc-300">Search workspace</span>
+              <button onClick={() => setSearchOpen(false)} className="ml-auto text-xs text-zinc-600 hover:text-zinc-300">Esc</button>
+            </div>
+            <div className="p-2">
+              {navLinkItems.slice(0, 10).map(item => (
+                <button key={item.to} onClick={() => { setSearchOpen(false); navigate(item.to) }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100">
+                  <item.icon size={15} className="text-zinc-600" />
+                  <span>{item.label}</span>
+                  <span className="ml-auto text-[10px] text-zinc-700">{item.to}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <OpsReminderPopup />
     </div>
   )

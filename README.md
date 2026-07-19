@@ -104,6 +104,23 @@ a full-system audit with file:line evidence for every known defect.
 
 ## Change log
 
+### 2026-07-19 — Payroll capture + prepaid expense amortization
+- Migration `20260719100000_payroll_and_prepaid_amortization.sql`:
+  monthly salaries now flow into the P&L labor leg (day-exact proration;
+  branch allocation by shift-hours share, else consolidated-only). One pay
+  path per person: `monthly_salary > 0` → salary path, else hourly path.
+- New `labor_adjustments` table (overtime / bonus / deduction) with entry UI
+  in Finance → Shifts; hours-based OT already existed (enable it in the
+  Shifts tab settings: 8h/day, 1.5×).
+- Prepaid expenses: `expenses.coverage_months` + `coverage_start`; the
+  expense form has a "Prepaid — spread over months" block and `finance_pnl`
+  recognizes the cost day-exact across the coverage window (e.g. 6-month
+  rent now spreads over 6 months instead of one).
+- Finance drill-down modal: labor splits into Hourly / Salaries /
+  Adjustments in the net waterfall and prime-cost views.
+- GL intentionally unchanged (cash-basis); prepaid-asset GL accounting is
+  future work.
+
 ### 2026-07-19 — Finance drill-downs deployed (`0e2b29a`, live)
 - Clicking **Revenue / COGS / Net contribution / Prime cost** (cards or
   branch-table cells) opens a period- and branch-scoped breakdown:
@@ -141,9 +158,9 @@ From the audit's P0 list (full evidence in the audit doc):
 ### Pending ops (do these on the server / dashboard)
 - **Apply migrations to the live DB** (app dashboard SQL editor, one at a
   time — see the drift warning above): `20260718160000`,
-  `20260718180500`–`180700`, `20260718190000`–`190200`, plus the branch's
-  `20260718170000`–`182000`. Verify which of the ~20 branch migrations are
-  already applied before running any.
+  `20260718180500`–`180700`, `20260718190000`–`190200`, `20260719100000`,
+  plus the branch's `20260718170000`–`182000`. Verify which of the ~20
+  branch migrations are already applied before running any.
 - **Set `WHATSAPP_CRON_SECRET`** and re-schedule the pg_cron job with the
   `x-cron-secret` header — until then the nightly WhatsApp run gets 403.
 - **Set `TELEGRAM_WEBHOOK_SECRET`** and re-register the webhook (GET the

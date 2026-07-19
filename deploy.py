@@ -47,6 +47,25 @@ KEY_PATH = os.environ.get("NOCH_DEPLOY_SSH_KEY_PATH") or os.environ.get("DEPLOY_
 
 HERE = Path(__file__).resolve().parent
 
+
+def load_repo_env(path: Path):
+    """Load local deployment values without overriding explicit environment variables."""
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip()
+        if value[:1] == value[-1:] and value[:1] in ('"', "'"):
+            value = value[1:-1]
+        os.environ.setdefault(name, value)
+
+
+load_repo_env(HERE / ".env")
+
 if not PASS and not KEY_PATH:
     print("Set NOCH_DEPLOY_PASSWORD or NOCH_DEPLOY_SSH_KEY_PATH before deploying.")
     sys.exit(2)

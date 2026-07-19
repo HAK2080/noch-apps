@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { fmt, getOwnerSetting, setOwnerSetting, uploadReceipt } from './lib/expensesData'
 
-export default function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onSubmitted }) {
+export default function SubmitTab({ user, isOwner, costCenters, categories, rates, onSubmitted }) {
   // local date, not UTC — toISOString() defaulted expense_date to yesterday before 2 AM (Libya UTC+2)
   const today = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
   const [form, setForm] = useState({
@@ -16,6 +16,9 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
   const [receiptPreview, setReceiptPreview] = useState(null)
   const [saving, setSaving] = useState(false)
   const [autoApprove, setAutoApprove] = useState(false)
+  const [prepaid, setPrepaid] = useState(false)
+  const [coverageMonths, setCoverageMonths] = useState(2)
+  const [coverageStart, setCoverageStart] = useState('')
   const fileRef = useRef()
 
   useEffect(() => {
@@ -60,6 +63,10 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
         receipt_url,
         expense_date: form.expense_date,
         status: isAutoApproved ? 'approved' : 'pending',
+        ...(prepaid ? {
+          coverage_months: Math.min(24, Math.max(2, parseInt(coverageMonths, 10) || 2)),
+          coverage_start: coverageStart || form.expense_date,
+        } : {}),
       }).select().single()
       if (error) throw error
       if (isAutoApproved) {
@@ -74,6 +81,9 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
       setForm({ cost_center_id: '', category_id: '', amount: '', currency: 'LYD', vendor: '', description: '', expense_date: today, paid_by: 'Business' })
       setReceiptFile(null)
       setReceiptPreview(null)
+      setPrepaid(false)
+      setCoverageMonths(2)
+      setCoverageStart('')
       onSubmitted()
     } catch (err) {
       toast.error(err.message || 'Failed to submit expense')
@@ -162,6 +172,30 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
           ≈ {fmt(amountLyd)} at {selectedRate} LYD/{form.currency}
         </p>
       )}
+
+      {/* Prepaid — spread cost over months */}
+      <div className="bg-noch-dark/50 border border-noch-border rounded-xl px-4 py-3">
+        <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+          <input type="checkbox" checked={prepaid} onChange={e => setPrepaid(e.target.checked)} />
+          Prepaid — spread cost over months
+        </label>
+        {prepaid && (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Months (2–24)</label>
+              <input type="number" min="2" max="24" step="1" value={coverageMonths}
+                onChange={e => setCoverageMonths(e.target.value)}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+            </div>
+            <div>
+              <label className="text-xs text-noch-muted mb-1 block">Coverage starts</label>
+              <input type="date" value={coverageStart || form.expense_date}
+                onChange={e => setCoverageStart(e.target.value)}
+                className="w-full bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Source of payment */}
       <div>

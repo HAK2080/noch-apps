@@ -2,7 +2,7 @@
 // owner sets each staff's hourly rate + overtime/extra-day pay settings.
 
 import { useEffect, useState } from 'react'
-import { Clock, Edit2, Save, X, DollarSign, Timer } from 'lucide-react'
+import { Clock, Edit2, Save, X, DollarSign, Timer, Plus, Trash2, ClipboardList } from 'lucide-react'
 import { listShiftLabor, updateAttendee, setHourlyRate, listBranches, getFinanceSettings, updateFinanceSettings } from '../lib/finance-supabase'
 import { supabase } from '../../../lib/supabase'
 import { lyd } from '../lib/thresholds'
@@ -129,6 +129,9 @@ export default function ShiftsTab({ readOnly = false }) {
       {!readOnly && settings && (
         <PayrollSettingsCard settings={settings} onSaved={(next) => { setSettings(next); reload() }} />
       )}
+
+      {/* Labor adjustments — overtime, bonuses & deductions (this month) */}
+      <AdjustmentsCard staff={staff} readOnly={readOnly} />
 
       {/* Shift attendance list */}
       <div className="card overflow-x-auto">
@@ -303,6 +306,127 @@ function PayrollSettingsCard({ settings, onSaved }) {
           <Save size={12} /> {saving ? 'Saving…' : 'Save payroll settings'}
         </button>
       </div>
+    </div>
+  )
+}
+
+// Labor adjustments card — one-off overtime / bonus / deduction amounts that
+// feed finance_pnl.labor_adjustments. Consolidated across branches (branch_id
+// left null, no picker). Shows the current month's entries.
+function AdjustmentsCard({ staff, readOnly }) {
+  const monthStart = `${TODAY.slice(0, 7)}-01`
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ profile_id: '', kind: 'overtime', amount: '', adjustment_date: TODAY, note: '' })
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const nameOf = (id) => staff.find(p => p.id === id)?.full_name || 'Staff'
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('labor_adjustments')
+        .select('id, profile_id, kind, amount_lyd, adjustment_date, note')
+        .gte('adjustment_date', monthStart)
+        .order('adjustment_date', { ascending: false })
+      if (error) throw error
+      setItems(data || [])
+    } catch (err) { toast.error(err.message || 'Failed to load adjustments') }
+    finally { setLoading(false) }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [])
+
+  const add = async () => {
+    if (!form.profile_id) { toast.error('Select a staff member'); return }
+    const amount = parseFloat(form.amount)
+    if (!form.amount || isNaN(amount) || amount <= 0) { toast.error('Enter a valid amount'); return }
+    setSaving(true)
+    try {
+      const { data: { user } = {} } = await supabase.auth.getUser()
+      const { error } = await supabase.from('labor_adjustments').insert({
+        profile_id: form.profile_id,
+        branch_id: null,
+        kind: form.kind,
+        amount_lyd: amount,
+        adjustment_date: form.adjustment_date || TODAY,
+        note: form.note || null,
+        created_by: user?.id || null,
+      })
+      if (error) throw error
+      toast.success('Adjustment added')
+      setForm({ profile_id: '', kind: 'overtime', amount: '', adjustment_date: TODAY, note: '' })
+      load()
+    } catch (err) { toast.error(err.message || 'Failed to add adjustment') }
+    finally { setSaving(false) }
+  }
+
+  const remove = async (id) => {
+    if (!window.confirm('Delete this adjustment?')) return
+    try {
+      const { error } = await supabase.from('labor_adjustments').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Adjustment deleted')
+      load()
+    } catch (err) { toast.error(err.message || 'Delete failed') }
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center gap-2 mb-3">
+        <ClipboardList size={14} className="text-noch-green" />
+        <h3 className="text-white text-sm font-semibold">Adjustments</h3>
+        <span className="text-noch-muted text-[11px]">this month · all branches · feeds labor cost in P&amp;L</span>
+      </div>
+
+      {!readOnly && (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
+          <select value={form.profile_id} onChange={e => set('profile_id', e.target.value)} className="input py-1 px-2 text-xs md:col-span-2">
+            <option value="">Select staff…</option>
+            {staff.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </select>
+          <select value={form.kind} onChange={e => set('kind', e.target.value)} className="input py-1 px-2 text-xs">
+            <option value="overtime">Overtime</option>
+            <option value="bonus">Bonus</option>
+            <option value="deduction">Deduction</option>
+          </select>
+          <input type="number" min="0" step="0.01" placeholder="Amount (LYD)"
+            value={form.amount} onChange={e => set('amount', e.target.value)} className="input py-1 px-2 text-xs" />
+          <input type="date" value={form.adjustment_date} onChange={e => set('adjustment_date', e.target.value)} className="input py-1 px-2 text-xs" />
+          <input type="text" placeholder="Note (optional)"
+            value={form.note} onChange={e => set('note', e.target.value)} className="input py-1 px-2 text-xs" />
+          <button onClick={add} disabled={saving}
+            className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5 col-span-2 md:col-span-6 md:justify-self-end">
+            <Plus size={12} /> {saving ? 'Adding…' : 'Add adjustment'}
+          </button>
+        </div>
+      )}
+
+      {loading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
+        <p className="text-noch-muted text-sm py-2">No adjustments this month.</p>
+      ) : (
+        <div className="flex flex-col">
+          {items.map(a => {
+            const isDeduction = a.kind === 'deduction'
+            return (
+              <div key={a.id} className="flex items-center gap-3 border-t border-noch-border/40 py-1.5 text-xs">
+                <span className="text-white truncate min-w-0">{nameOf(a.profile_id)}</span>
+                <span className="text-noch-muted capitalize shrink-0">{a.kind}</span>
+                <span className={`font-mono shrink-0 ${isDeduction ? 'text-red-300' : 'text-noch-green'}`}>
+                  {isDeduction ? '−' : '+'}{lyd(a.amount_lyd)}
+                </span>
+                <span className="text-noch-muted shrink-0">{a.adjustment_date}</span>
+                <span className="text-noch-muted truncate flex-1">{a.note || ''}</span>
+                {!readOnly && (
+                  <button onClick={() => remove(a.id)} className="text-noch-muted hover:text-red-300 shrink-0"><Trash2 size={11} /></button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

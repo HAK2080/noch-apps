@@ -29,11 +29,11 @@
     --accent-dim: #22C55E;
     --accent-glow: rgba(74, 222, 128, 0.10);
     --accent-border: rgba(74, 222, 128, 0.20);
-    --bg: #09090B;
-    --surface: #0F1013;
-    --card: #131318;
-    --border: #1E2030;
-    --border-bright: #2D3050;
+    --bg: #0B0B0D;
+    --surface: #101012;
+    --card: #151518;
+    --border: #242427;
+    --border-bright: #38383F;
     --text: #F4F4F5;
     --muted: #71717A;
   }
@@ -100,7 +100,7 @@
 
 @layer components {
   .btn-primary {
-    @apply relative inline-flex items-center justify-center gap-2 font-semibold px-4 py-2 rounded-xl transition-all duration-200 text-sm;
+    @apply relative inline-flex items-center justify-center gap-2 font-semibold px-4 py-2 rounded-md transition-all duration-200 text-sm;
     background: linear-gradient(135deg, #4ADE80 0%, #22C55E 100%);
     color: #09090B;
     box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
@@ -116,7 +116,7 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 font-medium px-4 py-2 rounded-xl transition-all duration-200 text-sm;
+    @apply inline-flex items-center justify-center gap-2 font-medium px-4 py-2 rounded-md transition-all duration-200 text-sm;
     background: var(--card);
     border: 1px solid var(--border-bright);
     color: var(--text);
@@ -128,7 +128,7 @@
   }
 
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 font-medium px-4 py-2 rounded-xl transition-all duration-200 text-sm;
+    @apply inline-flex items-center justify-center gap-2 font-medium px-4 py-2 rounded-md transition-all duration-200 text-sm;
     background: rgba(239, 68, 68, 0.08);
     border: 1px solid rgba(239, 68, 68, 0.25);
     color: #F87171;
@@ -138,7 +138,7 @@
   }
 
   .card {
-    @apply rounded-2xl p-4;
+    @apply rounded-xl p-4;
     background: var(--card);
     border: 1px solid var(--border);
     box-shadow: 0 1px 3px rgba(0,0,0,0.4);
@@ -150,7 +150,7 @@
   }
 
   .input {
-    @apply w-full rounded-xl px-4 py-2.5 text-sm transition-all duration-200;
+    @apply w-full rounded-md px-4 py-2.5 text-sm transition-all duration-200;
     background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text);

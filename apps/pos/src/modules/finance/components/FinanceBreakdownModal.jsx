@@ -289,15 +289,30 @@ function LaborMissingNote({ children }) {
   )
 }
 
+// New finance_pnl fields split labor into hourly / salaries / adjustments.
+// Older RPC responses don't include them — has=false keeps the UI unchanged.
+function laborSplit(pnl) {
+  const hourly = pnl?.labor_hourly
+  const salary = pnl?.labor_salary
+  const adjustments = pnl?.labor_adjustments
+  return {
+    hourly: Number(hourly || 0),
+    salary: Number(salary || 0),
+    adjustments: Number(adjustments || 0),
+    has: hourly != null || salary != null || adjustments != null,
+  }
+}
+
 function NetSection({ pnl, isCompanyScope }) {
   const revenue = Number(pnl?.revenue_net || 0)
   const cogs = Number(pnl?.cogs || 0)
   const cogsBase = Number(pnl?.cogs_base || 0)
   const cogsModifiers = Number(pnl?.cogs_modifiers || 0)
   const labor = Number(pnl?.labor || 0)
+  const split = laborSplit(pnl)
   const opex = Number(pnl?.opex || 0)
   const net = Number(pnl?.net_contribution || 0)
-  const laborMissing = labor === 0 && revenue > 0
+  const laborMissing = labor === 0 && revenue > 0 && split.hourly === 0 && split.salary === 0 && split.adjustments === 0
 
   if (revenue === 0 && cogs === 0 && labor === 0 && opex === 0) {
     return <EmptyState>No P&L data for this period.</EmptyState>
@@ -311,6 +326,13 @@ function NetSection({ pnl, isCompanyScope }) {
         <WaterfallRow label="Base products" amount={lyd(cogsBase)} indent />
         <WaterfallRow label="Modifiers" amount={lyd(cogsModifiers)} indent />
         <WaterfallRow label="− Labor" amount={lyd(labor)} />
+        {split.has && (
+          <>
+            <WaterfallRow label="Hourly" amount={lyd(split.hourly)} indent />
+            <WaterfallRow label="Salaries" amount={lyd(split.salary)} indent />
+            <WaterfallRow label="Adjustments" amount={lyd(split.adjustments)} indent />
+          </>
+        )}
         {laborMissing && <LaborMissingNote>Labor missing — shift hourly rates not set.</LaborMissingNote>}
         <WaterfallRow label="− Operating expenses" amount={lyd(opex)} />
         <WaterfallRow label="= Net contribution" amount={lyd(net)} bold negative={net < 0} />
@@ -335,18 +357,24 @@ function PrimeSection({ pnl, settings }) {
   const revenue = Number(pnl?.revenue_net || 0)
   const cogs = Number(pnl?.cogs || 0)
   const labor = Number(pnl?.labor || 0)
+  const split = laborSplit(pnl)
   const prime = Number(pnl?.prime_cost || 0)
   const minPct = Number(settings.prime_cost_min_pct ?? 55)
   const maxPct = Number(settings.prime_cost_max_pct ?? 65)
   const ratio = revenue > 0 ? prime / revenue : null
   const status = statusForRatio(ratio, minPct, maxPct)
-  const laborMissing = labor === 0 && revenue > 0
+  const laborMissing = labor === 0 && revenue > 0 && split.hourly === 0 && split.salary === 0 && split.adjustments === 0
 
   if (revenue === 0 && cogs === 0 && labor === 0) return <EmptyState>No prime cost data for this period.</EmptyState>
 
   const rows = [
     { label: 'COGS', amount: cogs },
     { label: 'Labor', amount: labor },
+  ]
+  const laborSubRows = [
+    { label: 'Hourly', amount: split.hourly },
+    { label: 'Salaries', amount: split.salary },
+    { label: 'Adjustments', amount: split.adjustments },
   ]
 
   return (
@@ -357,6 +385,14 @@ function PrimeSection({ pnl, settings }) {
             <p className="text-white text-sm">{row.label}</p>
             <p className="font-mono text-white text-sm">
               {lyd(row.amount)} <span className="text-noch-muted text-xs">({revenue > 0 ? pct(row.amount / revenue) : '—'})</span>
+            </p>
+          </div>
+        ))}
+        {split.has && laborSubRows.map(row => (
+          <div key={row.label} className="flex items-center justify-between px-4 py-2 border-b border-noch-border/70">
+            <p className="pl-4 text-noch-muted text-xs">{row.label}</p>
+            <p className="font-mono text-noch-muted text-xs">
+              {lyd(row.amount)} <span>({revenue > 0 ? pct(row.amount / revenue) : '—'})</span>
             </p>
           </div>
         ))}
