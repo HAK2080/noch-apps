@@ -81,16 +81,20 @@ export default function DailyPnLTab() {
     if (!pnl) return null
     const rev = Number(pnl.revenue_net || 0)
     const cogs = Number(pnl.cogs || 0)
-    const labor = Number(pnl.labor || 0)
-    const opex = Number(pnl.opex || 0)
+    const laborTotal = Number(pnl.labor || 0)
+    const labor = Number(pnl.labor_direct ?? laborTotal)
+    const opexTotal = Number(pnl.opex || 0)
+    const opex = Number(pnl.opex_direct ?? opexTotal)
+    const shared = Number(pnl.shared_costs_allocated || 0)
     const prime = Number(pnl.prime_cost || 0)
     const net = Number(pnl.net_contribution || 0)
+    const netBeforeShared = Number(pnl.net_contribution_before_shared ?? (rev - cogs - labor - opex))
     const cogsR  = rev > 0 ? cogs / rev   : null
     const laborR = rev > 0 ? labor / rev  : null
     const primeR = rev > 0 ? prime / rev  : null
     const netR   = rev > 0 ? net / rev    : null
     const grossR = rev > 0 ? (rev - cogs) / rev : null
-    return { rev, cogs, labor, opex, prime, net, cogsR, laborR, primeR, netR, grossR, orders: pnl.orders }
+    return { rev, cogs, labor, laborTotal, opex, opexTotal, shared, prime, net, netBeforeShared, cogsR, laborR, primeR, netR, grossR, orders: pnl.orders }
   }, [pnl])
 
   if (loadError && !pnl) {
@@ -144,10 +148,12 @@ export default function DailyPnLTab() {
               ['Discounts', Number(pnl.discounts || 0).toFixed(2), ''],
               ['Refunds', Number(pnl.refunds || 0).toFixed(2), ''],
               ['COGS', k.cogs.toFixed(2), k.cogsR != null ? (k.cogsR * 100).toFixed(1) + '%' : ''],
-              ['Labor', k.labor.toFixed(2), k.laborR != null ? (k.laborR * 100).toFixed(1) + '%' : ''],
+              ['Direct labor', k.labor.toFixed(2), k.laborR != null ? (k.laborR * 100).toFixed(1) + '%' : ''],
               ['Prime cost', k.prime.toFixed(2), k.primeR != null ? (k.primeR * 100).toFixed(1) + '%' : ''],
-              ['Other OpEx', k.opex.toFixed(2), ''],
-              ['Net contribution', k.net.toFixed(2), k.netR != null ? (k.netR * 100).toFixed(1) + '%' : ''],
+              ['Direct OpEx', k.opex.toFixed(2), ''],
+              ['Shared costs allocated', k.shared.toFixed(2), ''],
+              ['Contribution before shared', k.netBeforeShared.toFixed(2), ''],
+              ['Fully loaded profit', k.net.toFixed(2), k.netR != null ? (k.netR * 100).toFixed(1) + '%' : ''],
               ['Orders', k.orders, ''],
               ['Period', `${period.from} to ${period.to}`, ''],
               ['Branch', branchId ? (branches.find(b => b.id === branchId)?.name || branchId) : 'All branches', ''],
@@ -181,15 +187,17 @@ export default function DailyPnLTab() {
           sub={lyd(k.cogs)}
         />
         <KPICard
-          label="Labor"
+          label="Direct Labor"
           value={pct(k.laborR, 1)}
           ratio={k.laborR}
           status={laborStat}
           bandLabel={`Target ${settings.labor_cost_min_pct}–${settings.labor_cost_max_pct}%`}
           sub={lyd(k.labor)}
         />
-        <KPICard label="Other OpEx" value={lyd(k.opex)} />
-        <KPICard label="Net contribution" value={lyd(k.net)} sub={pct(k.netR, 1)} />
+        <KPICard label="Direct OpEx" value={lyd(k.opex)} />
+        <KPICard label="Shared costs allocated" value={lyd(k.shared)} sub="Included in fully loaded profit" />
+        <KPICard label="Contribution before shared" value={lyd(k.netBeforeShared)} />
+        <KPICard label="Fully loaded profit" value={lyd(k.net)} sub={pct(k.netR, 1)} />
         <KPICard label="Gross margin" value={pct(k.grossR, 1)} />
         <KPICard
           label="Avg ticket"

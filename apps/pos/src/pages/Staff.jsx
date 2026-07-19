@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Send, CheckSquare, Trash2, X, RefreshCw, UserCheck, Share2, Pencil, Save, Bell, Eye, EyeOff, Shield, Link as LinkIcon } from 'lucide-react'
+import { Plus, Send, CheckSquare, Trash2, X, RefreshCw, UserCheck, Share2, Pencil, Save, Eye, EyeOff, Shield, Link as LinkIcon, History, RotateCcw, ArrowUpDown, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { getAllTeamMembers, createStaffProfile, deleteProfile, updateProfile, setPIN } from '../lib/profiles'
+import { getAllTeamMembers, updateProfile, setPIN } from '../lib/profiles'
 import { getTasks } from '../lib/tasks'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePermission } from '../lib/usePermission'
@@ -19,7 +19,7 @@ const ROLE_COLORS = {
   limited_staff: 'text-noch-muted bg-noch-muted/10 border-noch-muted/30',
 }
 
-function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditRole, fromRequest }) {
+function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose, canSeeSalaries, canEditRole, fromRequest }) {
   const isEdit = !!staff?.id
   const isApproval = !!fromRequest
   const [form, setForm] = useState(isEdit ? {
@@ -28,10 +28,14 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
     phone: staff.phone || '',
     photo_url: staff.photo_url || '',
     monthly_salary: staff.monthly_salary || '',
-    hourly_rate: staff.hourly_rate || '',
+    monthly_hours: staff.monthly_hours || 208,
+    payroll_cost_center_id: staff.payroll_cost_center_id || '',
+    hourly_rate: staff.hourly_rate ?? staff.hourly_rate_lyd ?? '',
     employment_type: staff.employment_type || 'full_time',
     start_date: staff.start_date || '',
-    pin_code: staff.pin_code || '',
+    // PINs are stored as hashes. Never preload one into an edit form;
+    // leaving this blank keeps the employee's existing POS PIN unchanged.
+    pin_code: '',
     department: staff.department || '',
     branch_id: staff.branch_id || '',
     role: staff.role || 'staff',
@@ -40,7 +44,7 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
     overtime_exempt: staff.overtime_exempt === true,
   } : {
     full_name: fromRequest?.full_name || '', telegram_chat_id: '', phone: fromRequest?.phone || '', photo_url: '',
-    monthly_salary: '', hourly_rate: '', employment_type: 'full_time',
+    monthly_salary: '', monthly_hours: 208, payroll_cost_center_id: '', hourly_rate: '', employment_type: 'full_time',
     start_date: '', pin_code: '', department: '', branch_id: '', role: 'staff', is_active: true,
     days_off: [], overtime_exempt: false,
   })
@@ -57,7 +61,6 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
     { value: 'accountant',    label: 'Accountant' },
     { value: 'staff',         label: 'Staff' },
     { value: 'limited_staff', label: 'Limited Staff' },
-    { value: 'data_entry',    label: 'Data Entry' },
   ]
   const [saving, setSaving] = useState(false)
   const [showPin, setShowPin] = useState(false)
@@ -74,6 +77,10 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
   const photoRef = useRef(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const monthlySalary = Number(form.monthly_salary) || 0
+  const monthlyHours = Number(form.monthly_hours) || 208
+  const hasMonthlySalary = monthlySalary > 0
+  const calculatedHourlyRate = hasMonthlySalary ? monthlySalary / monthlyHours : null
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0]
@@ -105,7 +112,7 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
       })
       if (error) {
         let msg = error.message
-        try { const b = await error.context?.json(); msg = b?.error || msg } catch {}
+        try { const b = await error.context?.json(); msg = b?.error || msg } catch { /* use SDK message */ }
         throw new Error(msg)
       }
       if (data?.error) throw new Error(data.error)
@@ -120,6 +127,13 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
 
   const handleSave = async () => {
     if (!form.full_name.trim()) { toast.error('Name required'); return }
+    if (!isEdit && !isApproval && email.trim() && provisionMode === 'password' && password.length < 6) {
+      toast.error('Password must be at least 6 characters'); return
+    }
+    const pinValue = form.pin_code.trim()
+    if (pinValue && !/^\d{4,6}$/.test(pinValue)) {
+      toast.error('PIN must be 4 to 6 digits'); return
+    }
     setSaving(true)
     try {
       const payload = {
@@ -135,8 +149,15 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
         is_active: form.is_active,
       }
       if (canSeeSalaries) {
-        payload.monthly_salary = form.monthly_salary ? parseFloat(form.monthly_salary) : null
-        payload.hourly_rate = form.hourly_rate ? parseFloat(form.hourly_rate) : null
+        const hourlyRate = hasMonthlySalary
+          ? Number(calculatedHourlyRate.toFixed(2))
+          : (form.hourly_rate ? parseFloat(form.hourly_rate) : null)
+        payload.monthly_salary = hasMonthlySalary ? monthlySalary : null
+        payload.monthly_hours = monthlyHours
+        payload.payroll_cost_center_id = form.payroll_cost_center_id || null
+        // Keep the legacy profile field and the Finance shift-cost field in sync.
+        payload.hourly_rate = hourlyRate
+        payload.hourly_rate_lyd = hourlyRate
         payload.days_off = form.days_off?.length ? form.days_off : null
         payload.overtime_exempt = !!form.overtime_exempt
       }
@@ -148,8 +169,7 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
         if (email.trim()) payload.email = email.trim()
         await updateProfile(staff.id, payload)
         // PIN must go through the RPC (hashing + salt) — updateProfile strips it
-        const pinValue = form.pin_code.trim()
-        if (pinValue && /^\d{4,6}$/.test(pinValue)) {
+        if (pinValue) {
           await setPIN(staff.id, pinValue)
         }
       } else if (isApproval) {
@@ -158,14 +178,50 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
         })
         if (error || data?.error) {
           let msg = data?.error || error?.message
-          try { const b = await error?.context?.json(); msg = b?.error || msg } catch {}
+          try { const b = await error?.context?.json(); msg = b?.error || msg } catch { /* use SDK message */ }
           throw new Error(msg)
         }
+        if (pinValue && data?.profile_id) {
+          try { await setPIN(data.profile_id, pinValue) }
+          catch { toast.error('Employee approved, but the POS PIN could not be saved') }
+        }
       } else {
-        toast.error('Direct staff add is disabled. Have them submit /staff/request-access.')
-        setSaving(false); return
+        const profile = { ...payload }
+        delete profile.pin_code
+        const accountMode = email.trim() ? provisionMode : 'none'
+        const { data, error } = await supabase.functions.invoke('create-staff', {
+          body: {
+            email: email.trim() || undefined,
+            password: accountMode === 'password' ? password : undefined,
+            mode: accountMode,
+            profile,
+            redirectTo: `${window.location.origin}/login`,
+          },
+        })
+        if (error || data?.error) {
+          let msg = data?.error || error?.message
+          try { const b = await error?.context?.json(); msg = b?.error || msg } catch { /* use SDK message */ }
+          throw new Error(msg)
+        }
+        if (pinValue && data?.profile_id) {
+          try { await setPIN(data.profile_id, pinValue) }
+          catch { toast.error('Employee created, but the POS PIN could not be saved') }
+        }
+        if (sendWhatsAppInvite && form.phone) {
+          const phone = form.phone.replace(/\D/g, '')
+          const message = `Welcome to Noch, ${form.full_name.trim()}!\n\nSign in: ${window.location.origin}/login\nTelegram tasks: https://t.me/Noch_bot`
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
+        }
       }
-      toast.success(isEdit ? 'Updated' : 'Staff approved — invite email sent')
+      toast.success(isEdit
+        ? 'Updated'
+        : isApproval
+          ? 'Staff approved — invite email sent'
+          : !email.trim()
+            ? 'Employee created — payroll and PIN are ready'
+            : provisionMode === 'invite'
+            ? 'Employee created — invite email sent'
+            : 'Employee created and ready to sign in')
       onSave()
     } catch (err) {
       toast.error(err.message || 'Save failed')
@@ -248,7 +304,11 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
               <label className="label">Branch</label>
               <select className="input" value={form.branch_id} onChange={e => set('branch_id', e.target.value)}>
                 <option value="">No branch assigned</option>
-                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {branches.map(b => (
+                  <option key={b.id} value={b.id} disabled={b.is_active === false}>
+                    {b.name}{b.is_active === false ? ' (Closed)' : ''}
+                  </option>
+                ))}
               </select>
             </div>
           )}
@@ -266,15 +326,47 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
           {/* Salaries — only if canSeeSalaries */}
           {canSeeSalaries && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="label">Monthly Salary (LYD)</label>
                   <input className="input" type="number" value={form.monthly_salary} onChange={e => set('monthly_salary', e.target.value)} placeholder="2500" min="0" step="0.01" />
                 </div>
                 <div>
-                  <label className="label">Hourly Rate (LYD)</label>
-                  <input className="input" type="number" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} placeholder="15" min="0" step="0.01" />
+                  <label className="label">Monthly Hours</label>
+                  <input className="input" type="number" value={form.monthly_hours} onChange={e => set('monthly_hours', e.target.value)} min="1" max="744" step="0.5" />
                 </div>
+                <div>
+                  <label className="label">Hourly Rate (LYD)</label>
+                  {hasMonthlySalary ? (
+                    <div className="input flex items-center bg-noch-green/5 border-noch-green/30 text-noch-green font-semibold">
+                      {calculatedHourlyRate.toFixed(2)} <span className="ml-1 text-[11px] font-normal text-noch-muted">calculated</span>
+                    </div>
+                  ) : (
+                    <input className="input" type="number" value={form.hourly_rate} onChange={e => set('hourly_rate', e.target.value)} placeholder="15" min="0" step="0.01" />
+                  )}
+                </div>
+              </div>
+              <p className="text-noch-muted text-[11px] -mt-1">
+                {hasMonthlySalary
+                  ? `Calculated as ${monthlySalary.toFixed(2)} LYD ÷ ${monthlyHours} hrs. This rate is used for shift display and overtime; the monthly salary is counted once in P&L.`
+                  : 'Leave monthly salary blank for hourly-paid staff.'}
+              </p>
+
+              <div>
+                <label className="label">Payroll Allocation</label>
+                <select
+                  className="input"
+                  value={form.payroll_cost_center_id}
+                  onChange={e => set('payroll_cost_center_id', e.target.value)}
+                >
+                  <option value="">Branch / shift activity</option>
+                  {payrollCostCenters.map(costCenter => (
+                    <option key={costCenter.id} value={costCenter.id}>{costCenter.name}</option>
+                  ))}
+                </select>
+                <p className="text-noch-muted text-[11px] mt-1">
+                  Use Shared Services for owner and management payroll used across branches. Store employees should remain on branch / shift activity.
+                </p>
               </div>
 
               {/* Payroll: scheduled days off + overtime exemption.
@@ -329,7 +421,7 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
                 {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            <p className="text-xs text-noch-muted mt-1">4-6 digit PIN for POS terminal login</p>
+            <p className="text-xs text-noch-muted mt-1">Leave blank to keep the current PIN. Enter 4-6 digits only when changing it.</p>
           </div>
 
           {/* Login account management — only on Edit */}
@@ -416,9 +508,9 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
           )}
           {!isEdit && !isApproval && (
             <div className="border border-noch-border rounded-xl p-3 space-y-3 bg-noch-dark/40">
-              <p className="text-xs text-noch-muted uppercase tracking-wider font-semibold">Login Credentials</p>
+              <p className="text-xs text-noch-muted uppercase tracking-wider font-semibold">Login Credentials <span className="normal-case font-normal">(optional)</span></p>
               <div>
-                <label className="label">Email *</label>
+                <label className="label">Email</label>
                 <input
                   type="email"
                   className="input"
@@ -426,57 +518,62 @@ function StaffModal({ staff, branches, onSave, onClose, canSeeSalaries, canEditR
                   onChange={e => setEmail(e.target.value)}
                   placeholder="staff@noch.ly"
                   autoComplete="off"
-                  required
                 />
               </div>
-              <div>
-                <label className="label">Account Setup</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setProvisionMode('password')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${provisionMode === 'password' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
-                  >
-                    Set Password Now
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setProvisionMode('invite')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${provisionMode === 'invite' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
-                  >
-                    Email Invite Link
-                  </button>
-                </div>
-              </div>
-              {provisionMode === 'password' && (
-                <div>
-                  <label className="label">Password * <span className="text-noch-muted font-normal">(min 6 chars)</span></label>
-                  <div className="flex gap-2">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className="input flex-1 font-mono"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      minLength={6}
-                      autoComplete="new-password"
-                      placeholder="At least 6 characters"
-                    />
-                    <button type="button" onClick={() => setShowPassword(p => !p)} className="px-3 text-noch-muted hover:text-white">
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPassword(Math.random().toString(36).slice(2, 10))}
-                      className="px-3 text-xs text-noch-green border border-noch-green/30 rounded-lg hover:bg-noch-green/10"
-                      title="Generate random password"
-                    >
-                      Gen
-                    </button>
+              {email.trim() ? (
+                <>
+                  <div>
+                    <label className="label">Account Setup</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setProvisionMode('password')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${provisionMode === 'password' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
+                      >
+                        Set Password Now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProvisionMode('invite')}
+                        className={`flex-1 px-3 py-2 rounded-lg text-xs border transition-colors ${provisionMode === 'invite' ? 'bg-noch-green/10 border-noch-green text-noch-green' : 'border-noch-border text-noch-muted hover:text-white'}`}
+                      >
+                        Email Invite Link
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-              {provisionMode === 'invite' && (
-                <p className="text-xs text-noch-muted">Staff will receive an email with a link to set their own password.</p>
+                  {provisionMode === 'password' && (
+                    <div>
+                      <label className="label">Password * <span className="text-noch-muted font-normal">(min 6 chars)</span></label>
+                      <div className="flex gap-2">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          className="input flex-1 font-mono"
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          minLength={6}
+                          autoComplete="new-password"
+                          placeholder="At least 6 characters"
+                        />
+                        <button type="button" onClick={() => setShowPassword(p => !p)} className="px-3 text-noch-muted hover:text-white">
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPassword(Math.random().toString(36).slice(2, 10))}
+                          className="px-3 text-xs text-noch-green border border-noch-green/30 rounded-lg hover:bg-noch-green/10"
+                          title="Generate random password"
+                        >
+                          Gen
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {provisionMode === 'invite' && (
+                    <p className="text-xs text-noch-muted">Staff will receive an email with a link to set their own password.</p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-noch-muted">No email needed for payroll, shifts, or POS PIN access. Add one later to enable web login.</p>
               )}
             </div>
           )}
@@ -534,12 +631,17 @@ export default function Staff() {
   const [staff, setStaff] = useState([])
   const [tasks, setTasks] = useState([])
   const [branches, setBranches] = useState([])
+  const [payrollCostCenters, setPayrollCostCenters] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState(null)
+  const [addingStaff, setAddingStaff] = useState(false)
   const [editingStaff, setEditingStaff] = useState(null)
   const [pendingRequests, setPendingRequests] = useState([])
   const [approvingRequest, setApprovingRequest] = useState(null)
   const [rejectingId, setRejectingId] = useState(null)
+  const [showFormerStaff, setShowFormerStaff] = useState(false)
+  const [staffSort, setStaffSort] = useState('name')
+  const [reactivatingId, setReactivatingId] = useState(null)
 
   // Telegram scanner
   const [scanning, setScanning] = useState(false)
@@ -563,12 +665,14 @@ export default function Staff() {
     Promise.all([
       getAllTeamMembers(),
       getTasks(),
-      supabase.from('pos_branches').select('id, name').eq('is_active', true),
+      supabase.from('pos_branches').select('id, name, is_active').order('name'),
+      supabase.from('cost_centers').select('id,name,scope').eq('scope', 'shared').order('name'),
     ])
-      .then(([s, t, branchRes]) => {
+      .then(([s, t, branchRes, costCenterRes]) => {
         setStaff(s)
         setTasks(t)
         setBranches(branchRes.data || [])
+        setPayrollCostCenters(costCenterRes.data || [])
       })
       .catch(() => toast.error(t('error')))
       .finally(() => setLoading(false))
@@ -608,9 +712,26 @@ export default function Staff() {
       if (error) throw error
       setStaff(prev => prev.map(s => s.id === deleteId ? { ...s, is_active: false } : s))
       setDeleteId(null)
-      toast.success('Staff member deactivated')
+      toast.success('Employee moved to former employees')
     } catch (err) {
       toast.error(err?.message || t('error'))
+    }
+  }
+
+  const handleReactivate = async (id) => {
+    setReactivatingId(id)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: true })
+        .eq('id', id)
+      if (error) throw error
+      setStaff(prev => prev.map(s => s.id === id ? { ...s, is_active: true } : s))
+      toast.success('Employee reactivated')
+    } catch (err) {
+      toast.error(err?.message || t('error'))
+    } finally {
+      setReactivatingId(null)
     }
   }
 
@@ -658,13 +779,101 @@ export default function Staff() {
   }
 
   const getRoleName = (s) => s.role || 'staff'
-  const getRole = (s) => ({ name: s.role || 'staff' })
+  const getBranchName = (s) => branches.find(b => b.id === s.branch_id)?.name || 'No location'
+  const getEmployeeTitle = (s) => s.department || getRoleName(s).replace('_', ' ')
+  const compareText = (a, b) => String(a || '').localeCompare(
+    String(b || ''),
+    lang === 'ar' ? 'ar' : 'en',
+    { sensitivity: 'base' },
+  )
+  const sortEmployees = (employees) => [...employees].sort((a, b) => {
+    let comparison = 0
+    if (staffSort === 'title') comparison = compareText(getEmployeeTitle(a), getEmployeeTitle(b))
+    if (staffSort === 'location') {
+      const aHasLocation = branches.some(branch => branch.id === a.branch_id)
+      const bHasLocation = branches.some(branch => branch.id === b.branch_id)
+      if (aHasLocation !== bHasLocation) return aHasLocation ? -1 : 1
+      comparison = compareText(getBranchName(a), getBranchName(b))
+    }
+    return comparison || compareText(a.full_name, b.full_name)
+  })
+  const activeStaff = sortEmployees(staff.filter(s => s.is_active !== false))
+  const formerStaff = [...staff]
+    .filter(s => s.is_active === false)
+    .sort((a, b) => compareText(a.full_name, b.full_name))
+  const staffByLocation = activeStaff.reduce((groups, employee) => {
+    const location = getBranchName(employee)
+    if (!groups[location]) groups[location] = []
+    groups[location].push(employee)
+    return groups
+  }, {})
+
+  const renderStaffCard = (employee) => {
+    const open = openTaskCount(employee.id)
+    const roleName = getRoleName(employee)
+    const location = getBranchName(employee)
+    return (
+      <div key={employee.id} className="card flex items-center gap-3">
+        {employee.photo_url ? (
+          <img src={employee.photo_url} alt={employee.full_name} className="w-11 h-11 rounded-full object-cover border-2 border-noch-green/20" />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-noch-green/10 border border-noch-green/20 flex items-center justify-center text-noch-green font-bold text-lg flex-shrink-0">
+            {employee.full_name.charAt(0)}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-semibold truncate">{employee.full_name}</p>
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ROLE_COLORS[roleName] || 'text-noch-muted bg-noch-border border-noch-border'}`}>
+              {roleName.replace('_', ' ')}
+            </span>
+            {employee.department && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-noch-border border border-noch-border text-noch-muted">
+                {employee.department}
+              </span>
+            )}
+            <span className="text-[10px] text-noch-muted flex items-center gap-1">
+              <MapPin size={10} /> {location}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-noch-muted mt-1.5">
+            {employee.telegram_chat_id ? (
+              <span className="flex items-center gap-1 text-noch-green">
+                <UserCheck size={11} /> Telegram linked
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-yellow-500/70">
+                <Send size={11} /> Not linked
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <CheckSquare size={11} />
+              <span className={open > 0 ? 'text-yellow-400' : 'text-noch-muted'}>
+                {open} {t('openTasks')}
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={() => setEditingStaff(employee)} className="text-noch-muted hover:text-noch-green transition-colors p-1" title="Edit">
+            <Pencil size={14} />
+          </button>
+          <button onClick={() => setDeleteId(employee.id)} className="text-noch-muted hover:text-red-400 transition-colors p-1" title="Move to former employees">
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-white font-bold text-xl">{t('staff')}</h1>
         <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setAddingStaff(true)} className="btn-primary flex items-center gap-2">
+            <Plus size={15} /> Add employee
+          </button>
           {canManageRoles && (
             <button onClick={() => navigate('/staff/roles')} className="btn-secondary flex items-center gap-2">
               <Shield size={15} /> Manage Roles
@@ -737,7 +946,7 @@ export default function Staff() {
                     </div>
                     <select className="input text-xs py-1" defaultValue="" onChange={e => e.target.value && assignChatId(e.target.value, u.chat_id)} disabled={assigning !== null}>
                       <option value="">— Assign to —</option>
-                      {staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                      {activeStaff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
                     </select>
                   </div>
                 )
@@ -791,76 +1000,128 @@ export default function Staff() {
         </div>
       )}
 
-      {/* Staff list */}
+      {!loading && staff.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-white font-semibold">Current employees</h2>
+            <p className="text-xs text-noch-muted mt-0.5">{activeStaff.length} active team members</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 rounded-xl border border-noch-border bg-noch-dark px-3">
+              <ArrowUpDown size={13} className="text-noch-muted" />
+              <label htmlFor="staff-sort" className="text-xs text-noch-muted whitespace-nowrap">Sort by</label>
+              <select
+                id="staff-sort"
+                value={staffSort}
+                onChange={e => setStaffSort(e.target.value)}
+                className="bg-transparent text-white text-xs py-2.5 outline-none"
+              >
+                <option value="name">Name</option>
+                <option value="title">Title</option>
+                <option value="location">Location</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFormerStaff(value => !value)}
+              disabled={formerStaff.length === 0}
+              className={`text-xs flex items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-colors disabled:opacity-40 ${showFormerStaff ? 'text-white border-noch-green/40 bg-noch-green/10' : 'text-noch-muted border-noch-border hover:text-white'}`}
+            >
+              <History size={14} /> Former employees ({formerStaff.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showFormerStaff && formerStaff.length > 0 && (
+        <section className="card mb-6 border-noch-border bg-noch-dark/40">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-white font-semibold flex items-center gap-2">
+                <History size={16} className="text-noch-muted" /> Former employees
+              </h2>
+              <p className="text-xs text-noch-muted mt-1">Historical records stay here and can be reactivated at any time.</p>
+            </div>
+            <button onClick={() => setShowFormerStaff(false)} className="text-noch-muted hover:text-white" title="Close history">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="divide-y divide-noch-border">
+            {formerStaff.map(employee => (
+              <div key={employee.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                {employee.photo_url ? (
+                  <img src={employee.photo_url} alt={employee.full_name} className="w-9 h-9 rounded-full object-cover grayscale" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-noch-border flex items-center justify-center text-noch-muted font-semibold">
+                    {employee.full_name.charAt(0)}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{employee.full_name}</p>
+                  <p className="text-noch-muted text-xs truncate">
+                    {getEmployeeTitle(employee)} · {getBranchName(employee)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingStaff(employee)}
+                  className="text-xs text-noch-muted hover:text-white px-2 py-1.5"
+                >
+                  View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReactivate(employee.id)}
+                  disabled={reactivatingId === employee.id}
+                  className="text-xs flex items-center gap-1.5 text-noch-green border border-noch-green/30 bg-noch-green/10 px-3 py-1.5 rounded-lg hover:bg-noch-green/20 disabled:opacity-50"
+                >
+                  <RotateCcw size={12} /> {reactivatingId === employee.id ? 'Restoring...' : 'Reactivate'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Current staff list */}
       {loading ? (
         <p className="text-noch-muted text-center py-16">{t('loading')}</p>
-      ) : staff.length === 0 ? (
-        <EmptyState icon="👥" title={t('noStaff')} />
+      ) : activeStaff.length === 0 ? (
+        <EmptyState icon="👥" title="No active employees" />
+      ) : staffSort === 'location' ? (
+        <div className="space-y-6">
+          {Object.entries(staffByLocation).map(([location, employees]) => (
+            <section key={location}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <MapPin size={14} className="text-noch-green" />
+                <h3 className="text-sm text-white font-semibold">{location}</h3>
+                <span className="text-[10px] text-noch-muted bg-noch-border px-2 py-0.5 rounded-full">{employees.length}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {employees.map(renderStaffCard)}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {staff.map(s => {
-            const open = openTaskCount(s.id)
-            const role = getRole(s)
-            const roleName = getRoleName(s)
-            return (
-              <div key={s.id} className={`card flex items-center gap-3 ${!s.is_active ? 'opacity-60' : ''}`}>
-                <div className="relative">
-                  {s.photo_url ? (
-                    <img src={s.photo_url} alt={s.full_name} className="w-11 h-11 rounded-full object-cover border-2 border-noch-green/20" />
-                  ) : (
-                    <div className="w-11 h-11 rounded-full bg-noch-green/10 border border-noch-green/20 flex items-center justify-center text-noch-green font-bold text-lg flex-shrink-0">
-                      {s.full_name.charAt(0)}
-                    </div>
-                  )}
-                  {!s.is_active && (
-                    <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-noch-dark" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-white font-semibold truncate">{s.full_name}</p>
-                    {!s.is_active && <span className="text-[9px] px-1.5 py-0.5 bg-red-500/10 text-red-400 rounded-full border border-red-500/30">Inactive</span>}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap mt-1">
-                    {roleName && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${ROLE_COLORS[roleName] || 'text-noch-muted bg-noch-border border-noch-border'}`}>
-                        {roleName.replace('_', ' ')}
-                      </span>
-                    )}
-                    {s.department && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-noch-border border border-noch-border text-noch-muted">{s.department}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-noch-muted mt-0.5">
-                    {s.telegram_chat_id ? (
-                      <span className="flex items-center gap-1 text-noch-green">
-                        <UserCheck size={11} /> Telegram linked
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-yellow-500/70">
-                        <Send size={11} /> Not linked
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1">
-                      <CheckSquare size={11} />
-                      <span className={open > 0 ? 'text-yellow-400' : 'text-noch-muted'}>
-                        {open} {t('openTasks')}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => setEditingStaff(s)} className="text-noch-muted hover:text-noch-green transition-colors p-1" title="Edit">
-                    <Pencil size={14} />
-                  </button>
-                  <button onClick={() => setDeleteId(s.id)} className="text-noch-muted hover:text-red-400 transition-colors p-1">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+          {activeStaff.map(renderStaffCard)}
         </div>
+      )}
+
+      {addingStaff && (
+        <StaffModal
+          staff={null}
+          branches={branches}
+          payrollCostCenters={payrollCostCenters}
+          canSeeSalaries={canSeeSalaries}
+          canEditRole={canEditRole}
+          onSave={() => {
+            setAddingStaff(false)
+            getAllTeamMembers().then(setStaff).catch(() => {})
+          }}
+          onClose={() => setAddingStaff(false)}
+        />
       )}
 
       {/* Approve request — opens modal with request prefilled */}
@@ -868,6 +1129,7 @@ export default function Staff() {
         <StaffModal
           staff={null}
           branches={branches}
+          payrollCostCenters={payrollCostCenters}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
           fromRequest={approvingRequest}
@@ -885,6 +1147,7 @@ export default function Staff() {
         <StaffModal
           staff={editingStaff}
           branches={branches}
+          payrollCostCenters={payrollCostCenters}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
           onSave={() => {
@@ -897,8 +1160,8 @@ export default function Staff() {
 
       {deleteId && (
         <ConfirmModal
-          message="This will deactivate the staff member. They will no longer appear on POS or be able to log in. All their order history is preserved."
-          confirmLabel="Deactivate"
+          message="Move this employee to Former employees? They will no longer appear in the active team or be able to log in. Their history is preserved and they can be reactivated later."
+          confirmLabel="Move to history"
           onConfirm={handleDelete}
           onCancel={() => setDeleteId(null)}
         />

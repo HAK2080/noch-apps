@@ -99,7 +99,7 @@ export default function SettingsTab({ onMetaChanged }) {
     const id = newCcId.trim().toUpperCase()
     const name = newCcName.trim()
     if (!id || !name) { toast.error('Both code and name required'); return }
-    const { error } = await supabase.from('cost_centers').insert({ id, name })
+    const { error } = await supabase.from('cost_centers').insert({ id, name, scope: 'unallocated' })
     if (error) { toast.error(error.message); return }
     setNewCcId(''); setNewCcName('')
     toast.success('Cost center added')
@@ -121,7 +121,10 @@ export default function SettingsTab({ onMetaChanged }) {
     refreshAll()
   }
   async function setCostCenterBranch(id, posBranchId) {
-    const { error } = await supabase.from('cost_centers').update({ pos_branch_id: posBranchId || null }).eq('id', id)
+    const { error } = await supabase.from('cost_centers').update({
+      pos_branch_id: posBranchId || null,
+      scope: posBranchId ? 'direct' : 'unallocated',
+    }).eq('id', id)
     if (error) { toast.error(error.message); return }
     toast.success('Branch mapping saved')
     refreshAll()
@@ -207,18 +210,27 @@ export default function SettingsTab({ onMetaChanged }) {
                 </>
               ) : (
                 <>
-                  <span className="text-sm text-white flex-1">{cc.name}</span>
-                  <select
-                    value={cc.pos_branch_id || ''}
-                    onChange={e => setCostCenterBranch(cc.id, e.target.value)}
-                    className="input py-1 text-xs max-w-48"
-                    aria-label={`POS branch for ${cc.name}`}
-                  >
-                    <option value="">No POS branch</option>
-                    {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                  </select>
-                  <button onClick={() => { setEditingCc(cc.id); setEditCcName(cc.name) }} className="text-xs text-noch-muted hover:text-white px-2 py-1">Rename</button>
-                  <button onClick={() => setConfirmDelCc(cc.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Remove</button>
+                  <span className="text-sm text-white flex-1 flex items-center gap-2">
+                    {cc.name}
+                    {cc.scope === 'shared' && <span className="text-[10px] text-noch-green border border-noch-green/30 bg-noch-green/10 rounded-full px-2 py-0.5">Shared</span>}
+                  </span>
+                  {cc.scope === 'shared' ? (
+                    <span className="text-xs text-noch-muted px-2">Allocated in Finance</span>
+                  ) : (
+                    <>
+                      <select
+                        value={cc.pos_branch_id || ''}
+                        onChange={e => setCostCenterBranch(cc.id, e.target.value)}
+                        className="input py-1 text-xs max-w-48"
+                        aria-label={`POS branch for ${cc.name}`}
+                      >
+                        <option value="">No POS branch</option>
+                        {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                      </select>
+                      <button onClick={() => { setEditingCc(cc.id); setEditCcName(cc.name) }} className="text-xs text-noch-muted hover:text-white px-2 py-1">Rename</button>
+                      <button onClick={() => setConfirmDelCc(cc.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Remove</button>
+                    </>
+                  )}
                 </>
               )}
             </div>

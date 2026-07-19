@@ -86,8 +86,12 @@ export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
 function summarizePnl(pnl = {}, settings = {}, branch = {}) {
   const revenue = Number(pnl.revenue_net || 0)
   const cogs = Number(pnl.cogs || 0)
-  const labor = Number(pnl.labor || 0)
-  const opex = Number(pnl.opex || 0)
+  const laborTotal = Number(pnl.labor || 0)
+  const labor = Number(pnl.labor_direct ?? laborTotal)
+  const opexTotal = Number(pnl.opex || 0)
+  const opex = Number(pnl.opex_direct ?? opexTotal)
+  const sharedCosts = Number(pnl.shared_costs_allocated || 0)
+  const netBeforeShared = Number(pnl.net_contribution_before_shared ?? (revenue - cogs - labor - opex))
   const net = Number(pnl.net_contribution || 0)
   const prime = Number(pnl.prime_cost || 0)
   const operationalStatus = branch.operational_status || 'operating'
@@ -117,7 +121,11 @@ function summarizePnl(pnl = {}, settings = {}, branch = {}) {
     revenue,
     cogs,
     labor,
+    laborTotal,
     opex,
+    opexTotal,
+    sharedCosts,
+    netBeforeShared,
     prime,
     net,
     primeRatio,
@@ -426,6 +434,97 @@ export async function listBranches() {
     .select('id, name, name_ar, is_active, operational_status')
     .eq('is_active', true)
     .order('name')
+  if (error) throw error
+  return data || []
+}
+
+// ── Payroll (runs, items, staff loans) ──────────────────────────────
+export async function listPayrollRuns(limit = 12) {
+  const { data, error } = await supabase
+    .from('payroll_runs')
+    .select('*')
+    .order('period_month', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+export async function getPayrollRunItems(runId) {
+  const { data, error } = await supabase
+    .from('payroll_run_items')
+    .select('*')
+    .eq('run_id', runId)
+  if (error) throw error
+  return data || []
+}
+
+export async function updatePayrollRunItem(id, updates) {
+  const { data, error } = await supabase
+    .from('payroll_run_items')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function generatePayrollRun(periodMonth) {
+  const { data, error } = await supabase.rpc('payroll_generate_run', { p_month: periodMonth })
+  if (error) throw error
+  return data
+}
+
+export async function completePayrollRun(runId) {
+  const { data, error } = await supabase.rpc('payroll_complete_run', { p_run_id: runId })
+  if (error) throw error
+  return data
+}
+
+export async function deletePayrollRun(runId) {
+  const { data, error } = await supabase.rpc('payroll_delete_run', { p_run_id: runId })
+  if (error) throw error
+  return data
+}
+
+export async function listStaffLoans() {
+  const { data, error } = await supabase
+    .from('staff_loans')
+    .select('*')
+    .order('start_month', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function createStaffLoan(row) {
+  const { data, error } = await supabase
+    .from('staff_loans')
+    .insert(row)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function cancelStaffLoan(id) {
+  const { data, error } = await supabase
+    .from('staff_loans')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// Loan repayments booked in completed runs — used for est. remaining balance.
+export async function listLoanRepayments(runIds) {
+  if (!runIds?.length) return []
+  const { data, error } = await supabase
+    .from('payroll_run_items')
+    .select('profile_id, loan_repayment_lyd')
+    .in('run_id', runIds)
+    .gt('loan_repayment_lyd', 0)
   if (error) throw error
   return data || []
 }

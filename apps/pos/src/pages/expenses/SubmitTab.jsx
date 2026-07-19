@@ -125,7 +125,7 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
             className="w-full bg-noch-dark border border-noch-border rounded-xl pl-9 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50 appearance-none">
             <option value="">Select cost center…</option>
             {costCenters.map(cc => (
-              <option key={cc.id} value={cc.id}>{cc.id} — {cc.name}</option>
+              <option key={cc.id} value={cc.id}>{cc.id} — {cc.name}{cc.scope === 'shared' ? ' (allocated across branches)' : ''}</option>
             ))}
           </select>
           <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-noch-muted pointer-events-none" />

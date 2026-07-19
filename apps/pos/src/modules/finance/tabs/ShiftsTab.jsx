@@ -37,7 +37,7 @@ export default function ShiftsTab({ readOnly = false }) {
     try {
       const [list, st, bs, fs] = await Promise.all([
         listShiftLabor({ branchId, from, to }),
-        supabase.from('profiles').select('id, full_name, hourly_rate_lyd, photo_url, role').eq('is_active', true).order('full_name'),
+        supabase.from('profiles').select('id, full_name, hourly_rate_lyd, monthly_salary, monthly_hours, photo_url, role').eq('is_active', true).order('full_name'),
         listBranches(),
         getFinanceSettings(),
       ])
@@ -93,18 +93,27 @@ export default function ShiftsTab({ readOnly = false }) {
         <ExportButtons onCsv={exportCsv} />
       </div>
 
-      {/* Staff hourly rates */}
+      {/* Staff pay rates */}
       <div className="card">
         <div className="flex items-center gap-2 mb-3">
           <DollarSign size={14} className="text-noch-green"/>
-          <h3 className="text-white text-sm font-semibold">Hourly rates</h3>
-          <span className="text-noch-muted text-[11px]">applied to all shifts unless overridden per-shift</span>
+          <h3 className="text-white text-sm font-semibold">Staff pay rates</h3>
+          <span className="text-noch-muted text-[11px]">monthly salary calculates the hourly rate used for shifts and overtime</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {staff.map(p => (
+          {staff.map(p => {
+            const monthlySalary = Number(p.monthly_salary || 0)
+            const monthlyHours = Number(p.monthly_hours || 208)
+            const hasMonthlySalary = monthlySalary > 0
+            return (
             <div key={p.id} className="flex items-center justify-between bg-noch-dark/50 rounded-lg px-3 py-2 text-sm">
-              <span className="text-white truncate">{p.full_name}</span>
-              {editingStaff === p.id ? (
+              <div className="min-w-0">
+                <span className="block text-white truncate">{p.full_name}</span>
+                {hasMonthlySalary && <span className="block text-[10px] text-noch-muted">{monthlySalary.toFixed(2)} LYD/mo ÷ {monthlyHours} hrs</span>}
+              </div>
+              {hasMonthlySalary ? (
+                <span className="shrink-0 text-noch-green text-xs">{Number(p.hourly_rate_lyd || monthlySalary / monthlyHours).toFixed(2)} LYD/hr</span>
+              ) : editingStaff === p.id ? (
                 <RateEdit defaultVal={p.hourly_rate_lyd}
                   onCancel={() => setEditingStaff(null)}
                   onSave={async (v) => {
@@ -121,7 +130,7 @@ export default function ShiftsTab({ readOnly = false }) {
                 </button>
               )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
