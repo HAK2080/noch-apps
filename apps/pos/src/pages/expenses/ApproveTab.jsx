@@ -10,6 +10,8 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
   const [expenses, setExpenses] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('pending')
+  const [ccFilter, setCcFilter] = useState('all')
+  const [catFilter, setCatFilter] = useState('all')
   const [noteModal, setNoteModal] = useState(null)
   const [note, setNote] = useState('')
   const [acting, setActing] = useState(null)
@@ -137,9 +139,15 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
 
   const setE = (k, v) => setEditForm(f => ({ ...f, [k]: v }))
 
+  // Client-side filters on top of the loaded rows (ids from the costCenters/categories props)
+  const filtered = expenses.filter(e =>
+    (ccFilter === 'all' || String(e.cost_center_id) === ccFilter) &&
+    (catFilter === 'all' || String(e.category_id) === catFilter)
+  )
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap items-center">
         {['pending', 'all'].map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition-colors
@@ -147,9 +155,23 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
             {t === 'pending' ? 'Needs Action' : 'All Expenses'}
           </button>
         ))}
+        <select value={ccFilter} onChange={e => setCcFilter(e.target.value)} className="input py-1.5 text-xs">
+          <option value="all">All cost centres</option>
+          {costCenters.map(cc => <option key={cc.id} value={String(cc.id)}>{cc.id} — {cc.name}</option>)}
+        </select>
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="input py-1.5 text-xs">
+          <option value="all">All categories</option>
+          {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+        </select>
+        {(ccFilter !== 'all' || catFilter !== 'all') && (
+          <button onClick={() => { setCcFilter('all'); setCatFilter('all') }}
+            className="text-noch-muted text-xs hover:text-white">
+            Clear filters
+          </button>
+        )}
       </div>
 
-      {isOwner && tab === 'all' && expenses.some(exp => exp.status === 'approved' && !exp.paid_at) && (
+      {isOwner && tab === 'all' && filtered.some(exp => exp.status === 'approved' && !exp.paid_at) && (
         <div className="card !p-3 flex flex-col sm:flex-row sm:items-center gap-3">
           <p className="text-sm text-white flex-1">{selectedPaid.length} approved expense{selectedPaid.length === 1 ? '' : 's'} selected</p>
           <select value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)} className="input py-2 text-sm">
@@ -176,9 +198,17 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
           <CheckCircle2 size={32} className="mx-auto mb-2 text-noch-green opacity-50" />
           {tab === 'pending' ? 'No pending expenses — inbox zero 🎉' : 'No expenses yet'}
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-noch-muted">
+          No expenses match the selected filters
+          <button onClick={() => { setCcFilter('all'); setCatFilter('all') }}
+            className="block mx-auto mt-2 text-noch-green text-xs hover:underline">
+            Clear filters
+          </button>
+        </div>
       ) : (
         <div className="space-y-3">
-          {expenses.map(exp => (
+          {filtered.map(exp => (
             <div key={exp.id} className="bg-noch-card border border-noch-border rounded-xl p-4">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1 min-w-0">

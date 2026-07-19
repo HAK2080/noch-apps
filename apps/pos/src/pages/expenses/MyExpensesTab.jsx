@@ -5,26 +5,52 @@ import toast from 'react-hot-toast'
 import { fmt, amtLyd, loadExpenses, loadApprovals, deleteExpense } from './lib/expensesData'
 import StatusBadge from './StatusBadge'
 
+// Local YYYY-MM-DD bounds — expense_date is a date column, string compare works
+function periodRange(p) {
+  const pad = n => String(n).padStart(2, '0')
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const now = new Date()
+  if (p === 'month') return { from: ymd(new Date(now.getFullYear(), now.getMonth(), 1)), to: ymd(now) }
+  if (p === 'lastmonth') {
+    return {
+      from: ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      to: ymd(new Date(now.getFullYear(), now.getMonth(), 0)),
+    }
+  }
+  if (p === '30d') {
+    const from = new Date(now)
+    from.setDate(from.getDate() - 29)
+    return { from: ymd(from), to: ymd(now) }
+  }
+  return null
+}
+
 export default function MyExpensesTab({ userId, refreshKey }) {
   const [expenses, setExpenses] = useState([])
   const [approvals, setApprovals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [periodFilter, setPeriodFilter] = useState('all')
+  const [ccFilter, setCcFilter] = useState('all')
+  const [catFilter, setCatFilter] = useState('all')
   const [deleting, setDeleting] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
-  useEffect(() => { load() }, [userId, refreshKey])
-
-  async function load() {
-    setLoading(true)
-    const data = await loadExpenses({ userId })
-    setExpenses(data)
-    if (data.length) {
-      const appr = await loadApprovals(data.map(e => e.id))
-      setApprovals(appr)
-    }
-    setLoading(false)
-  }
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const data = await loadExpenses({ userId })
+      if (cancelled) return
+      setExpenses(data)
+      if (data.length) {
+        const appr = await loadApprovals(data.map(e => e.id))
+        if (!cancelled) setApprovals(appr)
+      }
+      if (!cancelled) setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [userId, refreshKey, reloadKey])
 
   async function handleDelete(id) {
     setDeleting(id)
@@ -32,12 +58,22 @@ export default function MyExpensesTab({ userId, refreshKey }) {
       await deleteExpense(id)
       toast.success('Expense removed')
       setConfirmDelete(null)
-      load()
+      setReloadKey(k => k + 1)
     } catch (err) { toast.error(err.message) }
     setDeleting(null)
   }
 
-  const filtered = filter === 'all' ? expenses : expenses.filter(e => e.status === filter)
+  // Filter options derive from the user's own loaded rows — no extra queries
+  const ccOptions = [...new Set(expenses.map(e => e.cost_centers?.name).filter(Boolean))].sort()
+  const catOptions = [...new Set(expenses.map(e => e.expense_categories?.name).filter(Boolean))].sort()
+  const range = periodRange(periodFilter)
+
+  const filtered = expenses.filter(e =>
+    (filter === 'all' || e.status === filter) &&
+    (ccFilter === 'all' || e.cost_centers?.name === ccFilter) &&
+    (catFilter === 'all' || e.expense_categories?.name === catFilter) &&
+    (!range || (e.expense_date >= range.from && e.expense_date <= range.to))
+  )
   const totalLyd = filtered.reduce((s, e) => s + amtLyd(e), 0)
 
   return (
@@ -51,6 +87,30 @@ export default function MyExpensesTab({ userId, refreshKey }) {
             {s === 'all' ? `All (${expenses.length})` : `${s} (${expenses.filter(e => e.status === s).length})`}
           </button>
         ))}
+      </div>
+
+      {/* Period / cost centre / category filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={periodFilter} onChange={e => setPeriodFilter(e.target.value)} className="input py-1.5 text-xs">
+          <option value="all">All time</option>
+          <option value="month">This month</option>
+          <option value="lastmonth">Last month</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+        <select value={ccFilter} onChange={e => setCcFilter(e.target.value)} className="input py-1.5 text-xs">
+          <option value="all">All cost centres</option>
+          {ccOptions.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={catFilter} onChange={e => setCatFilter(e.target.value)} className="input py-1.5 text-xs">
+          <option value="all">All categories</option>
+          {catOptions.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {(periodFilter !== 'all' || ccFilter !== 'all' || catFilter !== 'all') && (
+          <button onClick={() => { setPeriodFilter('all'); setCcFilter('all'); setCatFilter('all') }}
+            className="text-noch-muted text-xs hover:text-white">
+            Clear filters
+          </button>
+        )}
       </div>
 
       {loading ? (

@@ -46,30 +46,50 @@ const STATUS_STYLE = {
 export default function ExpensesTab() {
   const [period, setPeriod] = useState(defaultPeriod)
   const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loadedKey, setLoadedKey] = useState(null)
+  const [ccFilter, setCcFilter] = useState('all')
+  const [catFilter, setCatFilter] = useState('all')
+
+  const periodKey = period ? `${period.from}_${period.to}` : null
+  // Derived, not set in the effect: loading until the fetch for this period lands
+  const loading = loadedKey !== periodKey
 
   useEffect(() => {
     if (!period) return
     let cancelled = false
-    setLoading(true)
     loadApprovedExpenses({ from: period.from, to: period.to })
-      .then(d => { if (!cancelled) setRows(d) })
-      .catch(err => toast.error(err.message || 'Failed to load expenses'))
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .then(d => { if (!cancelled) { setRows(d); setLoadedKey(`${period.from}_${period.to}`) } })
+      .catch(err => {
+        toast.error(err.message || 'Failed to load expenses')
+        if (!cancelled) setLoadedKey(`${period.from}_${period.to}`)
+      })
     return () => { cancelled = true }
   }, [period?.from, period?.to])
 
-  const total = useMemo(() => rows.reduce((s, r) => s + Number(r.amount_lyd || 0), 0), [rows])
+  // Filter options derive from the loaded rows — no extra queries needed
+  const ccOptions = useMemo(() => [...new Set(rows.map(r => r.cost_centers?.name).filter(Boolean))].sort(), [rows])
+  const catOptions = useMemo(() => [...new Set(rows.map(r => r.expense_categories?.name).filter(Boolean))].sort(), [rows])
+
+  // A selection can outlive the period that offered it — fall back to "all"
+  const ccActive = ccFilter !== 'all' && !ccOptions.includes(ccFilter) ? 'all' : ccFilter
+  const catActive = catFilter !== 'all' && !catOptions.includes(catFilter) ? 'all' : catFilter
+
+  const filtered = useMemo(() => rows.filter(r =>
+    (ccActive === 'all' || r.cost_centers?.name === ccActive) &&
+    (catActive === 'all' || r.expense_categories?.name === catActive)
+  ), [rows, ccActive, catActive])
+
+  const total = useMemo(() => filtered.reduce((s, r) => s + Number(r.amount_lyd || 0), 0), [filtered])
 
   // Group by category
   const byCategory = useMemo(() => {
     const m = {}
-    for (const r of rows) {
+    for (const r of filtered) {
       const key = r.expense_categories?.name || 'Uncategorised'
       m[key] = (m[key] || 0) + Number(r.amount_lyd || 0)
     }
     return Object.entries(m).sort((a, b) => b[1] - a[1])
-  }, [rows])
+  }, [filtered])
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,7 +104,7 @@ export default function ExpensesTab() {
         <div className="flex items-center gap-3">
           <ExportButtons onCsv={() => downloadCsv(`expenses_${period.from}_${period.to}`,
             ['Date', 'Category', 'Cost centre', 'Vendor / note', 'Amount (LYD)', 'Status', 'Paid by'],
-            rows.map(r => [
+            filtered.map(r => [
               r.expense_date,
               r.expense_categories?.name || '',
               r.cost_centers?.name || '',
@@ -102,7 +122,29 @@ export default function ExpensesTab() {
         </div>
       </div>
 
-      <PeriodSelector value={period} onChange={setPeriod} />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1"><PeriodSelector value={period} onChange={setPeriod} /></div>
+        <div className="flex items-center gap-2">
+          <label className="text-noch-muted text-xs whitespace-nowrap">Cost centre</label>
+          <select value={ccActive} onChange={e => setCcFilter(e.target.value)} className="input py-2 text-sm">
+            <option value="all">All cost centres</option>
+            {ccOptions.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-noch-muted text-xs whitespace-nowrap">Category</label>
+          <select value={catActive} onChange={e => setCatFilter(e.target.value)} className="input py-2 text-sm">
+            <option value="all">All categories</option>
+            {catOptions.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        {(ccActive !== 'all' || catActive !== 'all') && (
+          <button onClick={() => { setCcFilter('all'); setCatFilter('all') }}
+            className="text-noch-muted text-xs hover:text-white whitespace-nowrap">
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -112,7 +154,7 @@ export default function ExpensesTab() {
         </div>
         <div className="card">
           <p className="text-noch-muted text-xs mb-1">Entries</p>
-          <p className="text-white text-xl font-bold">{rows.length}</p>
+          <p className="text-white text-xl font-bold">{filtered.length}</p>
         </div>
         <div className="card col-span-2 sm:col-span-1">
           <p className="text-noch-muted text-xs mb-1 flex items-center gap-1"><TrendingDown size={11}/> Top category</p>
@@ -163,6 +205,15 @@ export default function ExpensesTab() {
             <ExternalLink size={11} /> Submit or approve expenses
           </a>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="card text-center py-10">
+          <Receipt size={32} className="mx-auto text-noch-muted mb-2 opacity-30" />
+          <p className="text-noch-muted text-sm">No expenses match the selected filters.</p>
+          <button onClick={() => { setCcFilter('all'); setCatFilter('all') }}
+            className="text-noch-green text-xs mt-2 hover:underline">
+            Clear filters
+          </button>
+        </div>
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-xs">
@@ -177,7 +228,7 @@ export default function ExpensesTab() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
+              {filtered.map(r => (
                 <tr key={r.id} className="border-t border-noch-border/40">
                   <td className="py-1.5 pr-2 text-noch-muted whitespace-nowrap">{r.expense_date}</td>
                   <td className="py-1.5 pr-2 text-white">{r.expense_categories?.name || '—'}</td>
