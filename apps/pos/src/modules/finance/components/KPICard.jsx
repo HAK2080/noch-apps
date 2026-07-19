@@ -18,12 +18,16 @@ export default function KPICard({
   bandLabel,        // optional "target 25–32%" text
   sub,              // optional small caption under value
   emphasis = false, // bigger card (used for Prime Cost)
+  onClick,          // optional — makes the card a drill-down trigger
 }) {
   const eff = status || (ratio != null ? STATUS.NEUTRAL : STATUS.NEUTRAL)
   const bg  = STATUS_BG[eff] || STATUS_BG.neutral
   const txt = STATUS_CLASS[eff] || STATUS_CLASS.neutral
   return (
-    <div className={`rounded-xl border p-3 ${bg} ${emphasis ? 'sm:col-span-2 sm:row-span-2' : ''}`}>
+    <div
+      className={`rounded-xl border p-3 ${bg} ${emphasis ? 'sm:col-span-2 sm:row-span-2' : ''} ${onClick ? 'cursor-pointer hover:border-noch-green/50 transition-colors' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between mb-1">
         <span className="text-noch-muted text-[11px] uppercase tracking-wide">{label}</span>
         <span className={`w-2 h-2 rounded-full ${DOT[eff] || DOT.neutral}`} />

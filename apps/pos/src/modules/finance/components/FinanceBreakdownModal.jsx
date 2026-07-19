@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getMenuMatrix, getPnL } from '../lib/finance-supabase'
+import { getMenuMatrix, getOpexBreakdown, getPnL } from '../lib/finance-supabase'
 import { lyd, pct, statusForRatio, STATUS_CLASS } from '../lib/thresholds'
 
-// Drill-down for the executive summary metrics. Scoped to a period and,
-// optionally, one branch. All kinds read finance_pnl; 'cogs' and 'revenue'
-// also read finance_menu_matrix for the per-product table. The matrix only
+// Drill-down for the executive summary and daily P&L metrics. Scoped to a
+// period and, optionally, one branch. All kinds read finance_pnl; 'cogs' and
+// 'revenue' also read finance_menu_matrix for the per-product table, and
+// 'opex' reads the expenses table for the per-category table. The matrix only
 // covers base products (no modifiers, discounts, or refunds), so its total
 // is reconciled against the P&L figure rather than assumed equal.
 const TITLES = {
@@ -14,6 +15,8 @@ const TITLES = {
   revenue: 'Revenue breakdown',
   net: 'Net contribution breakdown',
   prime: 'Prime cost breakdown',
+  labor: 'Direct labor breakdown',
+  opex: 'Direct OpEx breakdown',
 }
 
 const NEEDS_MATRIX = { cogs: true, revenue: true }
@@ -21,6 +24,7 @@ const NEEDS_MATRIX = { cogs: true, revenue: true }
 export default function FinanceBreakdownModal({ kind, branchId = null, branchName = null, from, to, netOfRefunds = false, settings = {}, onClose }) {
   const [pnl, setPnl] = useState(null)
   const [matrix, setMatrix] = useState(null)
+  const [opexRows, setOpexRows] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -28,13 +32,15 @@ export default function FinanceBreakdownModal({ kind, branchId = null, branchNam
     const load = async () => {
       setLoading(true)
       try {
-        const [pnlData, matrixData] = await Promise.all([
+        const [pnlData, matrixData, opexData] = await Promise.all([
           getPnL({ branchId, from, to, netOfRefunds }),
           NEEDS_MATRIX[kind] ? getMenuMatrix({ branchId, from, to }) : Promise.resolve(null),
+          kind === 'opex' ? getOpexBreakdown({ branchId, from, to }) : Promise.resolve(null),
         ])
         if (cancelled) return
         setPnl(pnlData)
         setMatrix(matrixData)
+        setOpexRows(opexData)
       } catch (err) {
         if (!cancelled) {
           toast.error(err.message || 'Failed to load breakdown')
@@ -71,6 +77,10 @@ export default function FinanceBreakdownModal({ kind, branchId = null, branchNam
           <RevenueSection pnl={pnl} matrix={matrix} netOfRefunds={netOfRefunds} />
         ) : kind === 'net' ? (
           <NetSection pnl={pnl} isCompanyScope={!branchId} />
+        ) : kind === 'labor' ? (
+          <LaborSection pnl={pnl} />
+        ) : kind === 'opex' ? (
+          <OpexSection pnl={pnl} rows={opexRows} />
         ) : (
           <PrimeSection pnl={pnl} settings={settings} />
         )}
@@ -412,6 +422,133 @@ function PrimeSection({ pnl, settings }) {
 
       <p className="text-noch-muted text-[11px] mt-2">
         Prime cost = COGS + labor. Ratios are against net revenue.
+      </p>
+    </>
+  )
+}
+
+// Direct labor drill-down: hourly / salaries / adjustments split with
+// amounts and % of revenue, reusing the same laborSplit helper as the
+// net and prime sections.
+function LaborSection({ pnl }) {
+  const revenue = Number(pnl?.revenue_net || 0)
+  const labor = Number(pnl?.labor || 0)
+  const split = laborSplit(pnl)
+  const laborMissing = labor === 0 && revenue > 0 && split.hourly === 0 && split.salary === 0 && split.adjustments === 0
+
+  if (revenue === 0 && labor === 0) return <EmptyState>No labor data for this period.</EmptyState>
+
+  const rows = [
+    { label: 'Hourly', amount: split.hourly },
+    { label: 'Salaries', amount: split.salary },
+    { label: 'Adjustments', amount: split.adjustments },
+  ]
+
+  return (
+    <>
+      <div className="border border-noch-border rounded-xl overflow-hidden">
+        {rows.map(row => (
+          <div key={row.label} className="flex items-center justify-between px-4 py-2.5 border-b border-noch-border/70">
+            <p className="text-white text-sm">{row.label}</p>
+            <p className="font-mono text-white text-sm">
+              {lyd(row.amount)} <span className="text-noch-muted text-xs">({revenue > 0 ? pct(row.amount / revenue) : '—'})</span>
+            </p>
+          </div>
+        ))}
+        {laborMissing && <LaborMissingNote>Labor missing — shift hourly rates not set.</LaborMissingNote>}
+        <div className="flex items-center justify-between px-4 py-3 bg-noch-card">
+          <p className="text-white font-semibold">Total labor</p>
+          <p className="font-mono text-white font-bold text-lg">
+            {lyd(labor)} <span className="text-noch-muted text-xs">({revenue > 0 ? pct(labor / revenue) : '—'})</span>
+          </p>
+        </div>
+      </div>
+
+      <p className="text-noch-muted text-[11px] mt-2">
+        Labor = hourly shifts + prorated salaries + adjustments. Ratios are against net revenue.
+      </p>
+    </>
+  )
+}
+
+// Direct OpEx drill-down: approved/paid expenses grouped by category for the
+// period/branch. The categorized sum rarely equals pnl.opex exactly — the P&L
+// also includes legacy expense_entries rows and prepaid amortization — so the
+// difference is shown as a "Legacy entries" row to keep the total reconciled.
+function OpexSection({ pnl, rows }) {
+  const pnlOpex = Number(pnl?.opex || 0)
+  const byCategory = new Map()
+  for (const row of rows || []) {
+    const name = row.expense_categories?.name || 'Uncategorised'
+    byCategory.set(name, (byCategory.get(name) || 0) + Number(row.amount_lyd || 0))
+  }
+  const items = [...byCategory.entries()]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount)
+  const categorizedTotal = items.reduce((sum, row) => sum + row.amount, 0)
+  const legacy = pnlOpex - categorizedTotal
+  const hasLegacy = Math.abs(legacy) > 0.01
+
+  if (items.length === 0 && pnlOpex === 0) return <EmptyState>No operating expenses for this period.</EmptyState>
+
+  return (
+    <>
+      <div className="border border-noch-border rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="overflow-y-auto flex-1">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-noch-card">
+              <tr className="text-left text-noch-muted text-[10px] uppercase tracking-wide border-b border-noch-border">
+                <th className="px-4 py-2.5 font-medium">Category</th>
+                <th className="px-4 py-2.5 font-medium text-right">Amount</th>
+                <th className="px-4 py-2.5 font-medium text-right">% of total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(row => (
+                <tr key={row.name} className="border-b border-noch-border/70 last:border-0">
+                  <td className="px-4 py-2.5 text-white">{row.name}</td>
+                  <td className="px-4 py-2.5 text-right text-white font-mono">{lyd(row.amount)}</td>
+                  <td className="px-4 py-2.5 text-right text-noch-muted font-mono">
+                    {pnlOpex > 0 ? pct(row.amount / pnlOpex) : '—'}
+                  </td>
+                </tr>
+              ))}
+              {hasLegacy && (
+                <tr className="border-b border-noch-border/70 last:border-0">
+                  <td className="px-4 py-2.5 text-noch-muted italic">Legacy entries</td>
+                  <td className="px-4 py-2.5 text-right text-noch-muted font-mono">{lyd(legacy)}</td>
+                  <td className="px-4 py-2.5 text-right text-noch-muted font-mono">
+                    {pnlOpex > 0 ? pct(legacy / pnlOpex) : '—'}
+                  </td>
+                </tr>
+              )}
+              {items.length === 0 && !hasLegacy && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center text-noch-muted text-sm">
+                    No categorized expenses for this period.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-noch-border text-white font-semibold">
+                <td className="px-4 py-2.5">Total</td>
+                <td className="px-4 py-2.5 text-right font-mono">{lyd(pnlOpex)}</td>
+                <td className="px-4 py-2.5" />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {hasLegacy && (
+        <p className="text-noch-muted text-xs mt-3">
+          Categorized expenses total <b className="text-white">{lyd(categorizedTotal)}</b> vs P&L OpEx <b className="text-white">{lyd(pnlOpex)}</b> —
+          the difference is legacy expense entries and prepaid amortization, which are not broken out by category.
+        </p>
+      )}
+      <p className="text-noch-muted text-[11px] mt-2">
+        Approved and paid expenses by expense_date. Percentages are against total P&L operating expenses.
       </p>
     </>
   )

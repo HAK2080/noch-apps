@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, TrendingUp } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import KPICard from '../components/KPICard'
+import FinanceBreakdownModal from '../components/FinanceBreakdownModal'
 import { businessToday } from '../../pos/lib/pos-supabase'
 import { getPnL, getFinanceSettings, listBranches, listProductsMissingCost } from '../lib/finance-supabase'
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
@@ -36,6 +37,7 @@ export default function DailyPnLTab() {
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [missingCosts, setMissingCosts] = useState([])
+  const [breakdown, setBreakdown] = useState(null) // 'prime' | 'revenue' | 'cogs' | 'labor' | 'opex' | 'net'
 
   useEffect(() => {
     Promise.all([listBranches(), getFinanceSettings()])
@@ -170,6 +172,7 @@ export default function DailyPnLTab() {
           status={primeStat}
           bandLabel={`Target ${settings.prime_cost_min_pct}–${settings.prime_cost_max_pct}%`}
           sub={lyd(k.prime)}
+          onClick={() => setBreakdown('prime')}
           emphasis
         />
         <KPICard
@@ -177,6 +180,7 @@ export default function DailyPnLTab() {
           value={lyd(k.rev)}
           status={STATUS.NEUTRAL}
           sub={`-${lyd(pnl.discounts || 0)} disc`}
+          onClick={() => setBreakdown('revenue')}
         />
         <KPICard
           label="COGS"
@@ -185,6 +189,7 @@ export default function DailyPnLTab() {
           status={cogsStat}
           bandLabel={`Target ${settings.food_cost_min_pct}–${settings.food_cost_max_pct}%`}
           sub={lyd(k.cogs)}
+          onClick={() => setBreakdown('cogs')}
         />
         <KPICard
           label="Direct Labor"
@@ -193,11 +198,12 @@ export default function DailyPnLTab() {
           status={laborStat}
           bandLabel={`Target ${settings.labor_cost_min_pct}–${settings.labor_cost_max_pct}%`}
           sub={lyd(k.labor)}
+          onClick={() => setBreakdown('labor')}
         />
-        <KPICard label="Direct OpEx" value={lyd(k.opex)} />
+        <KPICard label="Direct OpEx" value={lyd(k.opex)} onClick={() => setBreakdown('opex')} />
         <KPICard label="Shared costs allocated" value={lyd(k.shared)} sub="Included in fully loaded profit" />
-        <KPICard label="Contribution before shared" value={lyd(k.netBeforeShared)} />
-        <KPICard label="Fully loaded profit" value={lyd(k.net)} sub={pct(k.netR, 1)} />
+        <KPICard label="Contribution before shared" value={lyd(k.netBeforeShared)} onClick={() => setBreakdown('net')} />
+        <KPICard label="Fully loaded profit" value={lyd(k.net)} sub={pct(k.netR, 1)} onClick={() => setBreakdown('net')} />
         <KPICard label="Gross margin" value={pct(k.grossR, 1)} />
         <KPICard
           label="Avg ticket"
@@ -228,6 +234,18 @@ export default function DailyPnLTab() {
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 text-yellow-300 text-sm">
           Labor cost is 0 — set hourly rates on staff and clock attendees in/out via the <strong>Shifts</strong> tab.
         </div>
+      )}
+      {breakdown && (
+        <FinanceBreakdownModal
+          kind={breakdown}
+          branchId={branchId}
+          branchName={branchId ? branches.find(b => b.id === branchId)?.name || null : null}
+          from={period.from}
+          to={period.to}
+          netOfRefunds={netOfRefunds}
+          settings={settings}
+          onClose={() => setBreakdown(null)}
+        />
       )}
     </div>
   )

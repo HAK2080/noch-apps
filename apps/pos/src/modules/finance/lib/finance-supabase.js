@@ -38,6 +38,21 @@ export async function getPnL({ branchId = null, from, to, netOfRefunds = false }
   return data || {}
 }
 
+// OpEx drill-down: approved/paid expenses in the period with their category
+// and cost center. Mirrors the finance_pnl branch filter (branch comes via
+// cost_centers.pos_branch_id) but not its prepaid amortization or the legacy
+// expense_entries leg, so callers reconcile the sum against pnl.opex.
+export async function getOpexBreakdown({ branchId = null, from, to }) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('id, expense_date, amount_lyd, status, expense_categories(name), cost_centers(pos_branch_id)')
+    .in('status', ['approved', 'paid'])
+    .gte('expense_date', from)
+    .lte('expense_date', to)
+  if (error) throw error
+  return (data || []).filter(row => !branchId || row.cost_centers?.pos_branch_id === branchId)
+}
+
 export async function updateCanonicalCurrencyRate(currency, rate) {
   const { error } = await supabase.from('currency_rates').upsert({
     currency: String(currency).toUpperCase(),

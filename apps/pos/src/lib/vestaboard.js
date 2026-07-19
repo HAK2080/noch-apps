@@ -11,6 +11,27 @@ import { supabase } from './supabase'
 
 const VB_HOST  = import.meta.env.VITE_VESTABOARD_HOST  || null
 const VB_KEY   = import.meta.env.VITE_VESTABOARD_API_KEY || null
+const CUSTOMER_GREETING_SETTING = 'vestaboard_customer_greetings_enabled'
+
+export async function getCustomerGreetingEnabled() {
+  const { data, error } = await supabase
+    .from('owner_settings')
+    .select('value')
+    .eq('key', CUSTOMER_GREETING_SETTING)
+    .maybeSingle()
+  if (error) throw error
+  return data?.value !== false
+}
+
+export async function setCustomerGreetingEnabled(enabled) {
+  const { error } = await supabase.from('owner_settings').upsert({
+    key: CUSTOMER_GREETING_SETTING,
+    value: !!enabled,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'key' })
+  if (error) throw error
+  return !!enabled
+}
 
 export async function sendVestaboard(message) {
   // ── Local LAN API ──────────────────────────────────────────────
@@ -29,7 +50,7 @@ export async function sendVestaboard(message) {
       try {
         const body = await resp.json()
         if (body?.message) errMsg = body.message
-      } catch {}
+      } catch { /* Keep the HTTP status when the response is not JSON. */ }
       throw new Error(errMsg)
     }
     return { success: true }
@@ -67,13 +88,13 @@ export async function sendVestaboard(message) {
         } catch {
           if (text) errMsg = `${resp.status}: ${text.slice(0, 120)}`
         }
-      } catch {}
+      } catch { /* Keep the HTTP status when the response body is unreadable. */ }
       throw new Error(errMsg)
     }
     try {
       const body = await resp.json()
       console.log('[Vestaboard] success body:', body)
-    } catch {}
+    } catch { /* A successful response does not have to include JSON. */ }
     return { success: true }
   }
 
@@ -230,7 +251,7 @@ export async function sendVestaboardCharacters(grid) {
       } catch {
         if (text) errMsg = `${resp.status}: ${text.slice(0, 120)}`
       }
-    } catch {}
+    } catch { /* Keep the HTTP status when the response body is unreadable. */ }
     throw new Error(errMsg)
   }
   return { success: true }
@@ -257,27 +278,6 @@ function sanitizeName(raw) {
     .trim()
     .toUpperCase()
     .slice(0, 16)
-}
-
-// Center a string within a row width by padding both sides.
-function pad(line, width = VB_COLS) {
-  const t = (line || '').slice(0, width)
-  const total = width - t.length
-  const left = Math.floor(total / 2)
-  const right = total - left
-  return ' '.repeat(left) + t + ' '.repeat(right)
-}
-
-// Build a 6×22 frame from variable-length lines. Pads top/bottom with
-// blanks so the visual centre lands roughly on row 3.
-function frame(lines) {
-  const padded = lines.map(l => pad(l))
-  while (padded.length < VB_ROWS) {
-    // Pad to 6 rows, vertically centring the existing block
-    if (padded.length < VB_ROWS - (VB_ROWS - padded.length)) padded.unshift(pad(''))
-    else padded.push(pad(''))
-  }
-  return padded.slice(0, VB_ROWS).join('\n')
 }
 
 // Each template is a fn(name) → 3-line string array. Kept to ≤ 3 visible
@@ -335,6 +335,9 @@ let _greetingRefreshTimerId = null
 // so the stripes actually render in colour. The plain-text API used
 // previously stripped all colour codes.
 export async function sendCustomerGreeting(customerName, opts = {}) {
+  if (!opts.force && !await getCustomerGreetingEnabled()) {
+    return { skipped: true, reason: 'disabled' }
+  }
   const name = sanitizeName(customerName)
   if (!name) return { skipped: true, reason: 'no_name' }
   const idx = pickTemplateIndex(opts.seed)

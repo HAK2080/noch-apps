@@ -12,6 +12,8 @@ import {
   markVestaboardSent,
   sendVestaboard,
   sendCustomerGreeting,
+  getCustomerGreetingEnabled,
+  setCustomerGreetingEnabled,
   VB_ROWS,
   VB_COLS,
   VB_MAX_CHARS,
@@ -214,6 +216,9 @@ export default function Vestaboard() {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [greetingsEnabled, setGreetingsEnabled] = useState(true)
+  const [greetingSettingLoading, setGreetingSettingLoading] = useState(true)
+  const [greetingSettingSaving, setGreetingSettingSaving] = useState(false)
 
   // Board state
   const [board, setBoard] = useState(emptyBoard)
@@ -224,7 +229,13 @@ export default function Vestaboard() {
     try { setMessages(await getVestaboardMessages()) } catch { setMessages([]) }
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    getCustomerGreetingEnabled()
+      .then(setGreetingsEnabled)
+      .catch(err => toast.error(`Could not load greeting setting: ${err.message}`))
+      .finally(() => setGreetingSettingLoading(false))
+  }, [])
 
   // Advance cursor by one cell
   const advanceCursor = useCallback((r, c) => {
@@ -356,11 +367,26 @@ export default function Vestaboard() {
   const [testName, setTestName] = useState('AHMED')
   const handleTestGreeting = async () => {
     try {
-      const r = await sendCustomerGreeting(testName)
+      const r = await sendCustomerGreeting(testName, { force: true })
       if (r?.simulated) toast('Vestaboard not configured — set VITE_VESTABOARD_API_KEY in .env', { icon: '⚙️' })
       else toast.success(`Test greeting sent for "${testName}"`)
     } catch (err) {
       toast.error(`Greeting failed: ${err.message}`)
+    }
+  }
+
+  const handleGreetingToggle = async () => {
+    if (!isOwner || greetingSettingLoading || greetingSettingSaving) return
+    const next = !greetingsEnabled
+    setGreetingSettingSaving(true)
+    try {
+      await setCustomerGreetingEnabled(next)
+      setGreetingsEnabled(next)
+      toast.success(`Automatic greetings ${next ? 'turned on' : 'turned off'}`)
+    } catch (err) {
+      toast.error(`Could not update greeting setting: ${err.message}`)
+    } finally {
+      setGreetingSettingSaving(false)
     }
   }
 
@@ -384,10 +410,33 @@ export default function Vestaboard() {
 
         {/* ── Cheeky customer greeting test ── */}
         <div className="card mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-white font-semibold text-sm">Customer greeting test</h2>
-            <span className="text-noch-muted text-xs">Fires automatically on every order with a name</span>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-white font-semibold text-sm">Automatic customer greetings</h2>
+              <span className="text-noch-muted text-xs">
+                {greetingsEnabled ? 'Fires on every order with a customer name' : 'Order-triggered greetings are paused'}
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={greetingsEnabled}
+              onClick={handleGreetingToggle}
+              disabled={!isOwner || greetingSettingLoading || greetingSettingSaving}
+              className={`inline-flex items-center gap-2 rounded-full border px-2 py-1.5 transition-colors ${
+                greetingsEnabled
+                  ? 'border-noch-green/50 bg-noch-green/10 text-noch-green'
+                  : 'border-noch-border bg-noch-dark text-noch-muted'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+              title={isOwner ? 'Toggle automatic customer greetings' : 'Only owners can change this setting'}
+            >
+              <span className={`relative h-5 w-9 rounded-full transition-colors ${greetingsEnabled ? 'bg-noch-green' : 'bg-noch-border'}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${greetingsEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </span>
+              <span className="min-w-7 text-left text-xs font-semibold">{greetingSettingLoading ? '…' : greetingsEnabled ? 'On' : 'Off'}</span>
+            </button>
           </div>
+          <h3 className="text-white font-semibold text-sm mb-2">Test greeting</h3>
           <div className="flex gap-2 items-center">
             <input
               type="text"
