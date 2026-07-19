@@ -160,6 +160,9 @@ test.describe('Owner — route audit', () => {
     await page.goto('/finance');
     await expect(page).toHaveURL(/\/finance$/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: 'Finance' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Business health by branch')).toBeVisible({ timeout: 10000 });
+    expect(consoleErrors.filter(error => error.includes('getFullYear')).join('\n'))
+      .toBe('', 'Finance executive summary must not crash while formatting its date range');
   });
 
   // ── Loyalty ───────────────────────────────────────────────────────────────
