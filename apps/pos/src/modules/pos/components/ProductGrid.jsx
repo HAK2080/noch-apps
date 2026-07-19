@@ -61,7 +61,7 @@ function ProductGrid({
     p.track_inventory && Number.isFinite(parseFloat(p.stock_qty)) && parseFloat(p.stock_qty) <= 0
   const isUnavailable = (p) => p.is_sold_out || (blockOutOfStock && isOutOfStock(p))
 
-  // Long-press
+  // Long-press opens the product stock receiver in the terminal.
   const longPressTimer = useRef(null)
   const longPressFired = useRef(false)
   const startPress = (product) => {
@@ -215,11 +215,20 @@ function ProductGrid({
                     </p>
                   )}
                 </div>
-                <div className="flex items-baseline justify-between gap-1 mt-1">
-                  <span className="text-white font-bold text-base sm:text-lg leading-none">
-                    {format(product.price)}
-                  </span>
-                  <span className="text-noch-muted text-[10px] uppercase tracking-wide">LYD</span>
+                <div className="flex items-end justify-between gap-2 mt-1">
+                  <div className="flex items-baseline gap-1 min-w-0">
+                    <span className="text-white font-bold text-base sm:text-lg leading-none">
+                      {format(product.price)}
+                    </span>
+                    <span className="text-noch-muted text-[10px] uppercase tracking-wide">LYD</span>
+                  </div>
+                  {product.track_inventory && (
+                    <span className={`text-[10px] font-semibold tabular-nums shrink-0 ${
+                      isOutOfStock(product) ? 'text-red-400' : isLowStock(product) ? 'text-yellow-400' : 'text-noch-green'
+                    }`}>
+                      Qty {Number(product.stock_qty || 0).toFixed(0)}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>

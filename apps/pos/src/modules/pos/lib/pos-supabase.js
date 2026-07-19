@@ -723,6 +723,22 @@ export async function updateProductStock(productId, newQty) {
   return data
 }
 
+export async function receiveProductStock(productId, quantity, actorProfileId = null) {
+  const sourceRef = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? `pos:${crypto.randomUUID()}`
+    : `pos:${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+  const { data, error } = await supabase.rpc('receive_pos_product_stock', {
+    p_product_id: productId,
+    p_quantity: Number(quantity),
+    p_source: 'pos',
+    p_source_ref: sourceRef,
+    p_actor_profile_id: actorProfileId,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function createInventoryMovement(data) {
   const { data: result, error } = await supabase
     .from('pos_inventory_movements')

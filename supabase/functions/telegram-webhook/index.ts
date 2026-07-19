@@ -9,6 +9,12 @@
 //
 // Required secrets: TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
+import {
+  detectStockLanguage,
+  findStockProductCandidates,
+  parseStockReceiptMessage,
+} from '../_shared/stock-command.js'
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -33,7 +39,52 @@ async function sbPost(table: string, payload: Record<string, unknown>) {
     headers: SB_HEADERS,
     body: JSON.stringify(payload),
   })
-  return r.json()
+  const data = await r.json()
+  if (!r.ok) throw new Error(data?.message || data?.error || `Could not insert ${table}`)
+  return data
+}
+async function sbPatch(path: string, payload: Record<string, unknown>) {
+  const r = await fetch(SB_URL + '/rest/v1/' + path, {
+    method: 'PATCH',
+    headers: SB_HEADERS,
+    body: JSON.stringify(payload),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data?.message || data?.error || 'Could not update database record')
+  return data
+}
+async function sbDelete(path: string) {
+  const r = await fetch(SB_URL + '/rest/v1/' + path, {
+    method: 'DELETE',
+    headers: SB_HEADERS,
+  })
+  if (r.status === 204) return []
+  const data = await r.json()
+  if (!r.ok) throw new Error(data?.message || data?.error || 'Could not delete database record')
+  return data
+}
+async function sbUpsert(table: string, onConflict: string, payload: Record<string, unknown>) {
+  const r = await fetch(
+    SB_URL + '/rest/v1/' + table + '?on_conflict=' + encodeURIComponent(onConflict),
+    {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(payload),
+    },
+  )
+  const data = await r.json()
+  if (!r.ok) throw new Error(data?.message || data?.error || `Could not save ${table}`)
+  return data
+}
+async function sbRpc(name: string, payload: Record<string, unknown>) {
+  const r = await fetch(SB_URL + '/rest/v1/rpc/' + name, {
+    method: 'POST',
+    headers: SB_HEADERS,
+    body: JSON.stringify(payload),
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(data?.message || data?.error || 'Database operation failed')
+  return data
 }
 
 // ── Telegram API helpers ────────────────────────────────────
@@ -156,11 +207,389 @@ async function sendBranchButtons(
   })
 }
 
+// ── Product stock receiving ────────────────────────────────────────────────
+const STOCK_BUTTON = '📦 استلام مخزون / Receive Stock'
+
+function stockMenu() {
+  return {
+    keyboard: [[{ text: STOCK_BUTTON }]],
+    resize_keyboard: true,
+    is_persistent: true,
+  }
+}
+
+function isStockButton(text: string) {
+  const normalized = text.trim().toLowerCase()
+  return normalized === STOCK_BUTTON.toLowerCase()
+    || normalized === 'استلام مخزون'
+    || normalized === 'receive stock'
+    || normalized === '/stock'
+}
+
+function stockText(language: 'ar' | 'en', key: string) {
+  const copy = {
+    ar: {
+      prompt: 'اكتب الكمية واسم المنتج، مثال:\n20 تيراميسو',
+      unlinked: 'حسابك غير مربوط بالنظام. تواصل مع الإدارة لربط تيليغرام.',
+      inactive: 'حساب الموظف غير نشط.',
+      noBranch: 'لا يوجد فرع محدد لحسابك. اطلب من الإدارة تحديد الفرع أولاً.',
+      badQuantity: 'اكتب كمية أكبر من صفر مع اسم المنتج، مثال: 20 تيراميسو',
+      badProduct: 'اكتب الكمية واسم المنتج، مثال: 20 تيراميسو',
+      notFound: 'لم أجد هذا المنتج في قائمة هذا الفرع. جرّب الاسم الظاهر في الـ POS.',
+      choose: 'وجدت أكثر من منتج. اختر المنتج الصحيح:',
+      confirm: 'تأكيد استلام المخزون',
+      product: 'المنتج',
+      quantity: 'الكمية المستلمة',
+      current: 'المخزون الحالي',
+      newStock: 'المخزون الجديد',
+      confirmButton: '✅ تأكيد',
+      cancelButton: '❌ إلغاء',
+      cancelled: 'تم إلغاء العملية.',
+      expired: 'انتهت صلاحية الطلب. اضغط «استلام مخزون» وابدأ من جديد.',
+      completed: 'تم تحديث المخزون بنجاح ✅',
+      alreadyCompleted: 'تم تسجيل هذه الكمية مسبقاً ✅',
+      failed: 'تعذر تحديث المخزون. حاول مرة أخرى أو تواصل مع الإدارة.',
+    },
+    en: {
+      prompt: 'Type the quantity and product name, for example:\n20 tiramisu',
+      unlinked: 'Your Telegram account is not linked. Ask management to link it first.',
+      inactive: 'Your employee account is inactive.',
+      noBranch: 'No branch is assigned to your account. Ask management to assign one first.',
+      badQuantity: 'Enter a quantity greater than zero and a product name, for example: 20 tiramisu',
+      badProduct: 'Enter the quantity and product name, for example: 20 tiramisu',
+      notFound: 'I could not find that product at your branch. Try the name shown in the POS.',
+      choose: 'I found more than one product. Choose the correct one:',
+      confirm: 'Confirm stock received',
+      product: 'Product',
+      quantity: 'Quantity received',
+      current: 'Current stock',
+      newStock: 'New stock',
+      confirmButton: '✅ Confirm',
+      cancelButton: '❌ Cancel',
+      cancelled: 'Stock update cancelled.',
+      expired: 'This request expired. Tap “Receive Stock” and start again.',
+      completed: 'Stock updated successfully ✅',
+      alreadyCompleted: 'This stock receipt was already recorded ✅',
+      failed: 'Could not update stock. Try again or contact management.',
+    },
+  }
+  const selected = copy[language] as Record<string, string>
+  return selected[key] || key
+}
+
+function displayProduct(product: Record<string, unknown>, language: 'ar' | 'en') {
+  if (language === 'ar') return String(product.name_ar || product.name || '')
+  return String(product.name || product.name_ar || '')
+}
+
+function formatStockQty(value: unknown) {
+  const quantity = Number(value) || 0
+  return Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+async function linkedStockProfile(chatId: string) {
+  const profiles = await sbGet(
+    'profiles?select=id,full_name,branch_id,is_active&telegram_chat_id=eq.'
+    + encodeURIComponent(chatId) + '&limit=1',
+  )
+  return Array.isArray(profiles) && profiles.length ? profiles[0] : null
+}
+
+async function startStockSession(botToken: string, msg: TgMessage, requestedLanguage?: 'ar' | 'en') {
+  const chatId = String(msg.chat.id)
+  const language = requestedLanguage || detectStockLanguage(msg.text || '')
+  const profile = await linkedStockProfile(chatId)
+
+  if (!profile) {
+    await tg(botToken, 'sendMessage', {
+      chat_id: chatId,
+      text: stockText(language, 'unlinked'),
+      reply_markup: stockMenu(),
+    })
+    return Response.json({ ok: true, ignored: true, reason: 'unlinked stock reporter' }, { headers: CORS })
+  }
+  if (profile.is_active === false) {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'inactive'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, ignored: true, reason: 'inactive stock reporter' }, { headers: CORS })
+  }
+  if (!profile.branch_id) {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'noBranch'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, ignored: true, reason: 'stock reporter has no branch' }, { headers: CORS })
+  }
+
+  await sbUpsert('telegram_stock_sessions', 'telegram_chat_id', {
+    telegram_chat_id: chatId,
+    profile_id: profile.id,
+    branch_id: profile.branch_id,
+    language,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    updated_at: new Date().toISOString(),
+  })
+
+  await tg(botToken, 'sendMessage', {
+    chat_id: chatId,
+    text: stockText(language, 'prompt'),
+    reply_markup: stockMenu(),
+  })
+  return Response.json({ ok: true, awaiting: 'stock_receipt' }, { headers: CORS })
+}
+
+async function getStockRequest(requestId: string, chatId: string) {
+  const rows = await sbGet(
+    'telegram_stock_requests?select=*&id=eq.' + encodeURIComponent(requestId)
+    + '&telegram_chat_id=eq.' + encodeURIComponent(chatId) + '&limit=1',
+  )
+  return Array.isArray(rows) && rows.length ? rows[0] : null
+}
+
+async function getStockProduct(productId: string) {
+  const rows = await sbGet(
+    'pos_products?select=id,branch_id,name,name_ar,price,stock_qty,track_inventory,is_active&id=eq.'
+    + encodeURIComponent(productId) + '&limit=1',
+  )
+  return Array.isArray(rows) && rows.length ? rows[0] : null
+}
+
+async function getStockBranch(branchId: string) {
+  const rows = await sbGet('pos_branches?select=id,name,name_ar&id=eq.' + encodeURIComponent(branchId) + '&limit=1')
+  return Array.isArray(rows) && rows.length ? rows[0] : null
+}
+
+async function sendStockConfirmation(
+  botToken: string,
+  chatId: string,
+  request: Record<string, unknown>,
+  product: Record<string, unknown>,
+  editMessageId?: number,
+) {
+  const language = request.language === 'en' ? 'en' : 'ar'
+  const branch = await getStockBranch(String(request.branch_id))
+  const current = Number(product.stock_qty) || 0
+  const quantity = Number(request.quantity) || 0
+  const branchName = language === 'ar'
+    ? String(branch?.name_ar || branch?.name || '')
+    : String(branch?.name || branch?.name_ar || '')
+  const productName = displayProduct(product, language)
+  const price = Number(product.price) || 0
+  const text = [
+    stockText(language, 'confirm'),
+    branchName,
+    '',
+    `${stockText(language, 'product')}: ${productName} — ${price.toFixed(2)} LYD`,
+    `${stockText(language, 'quantity')}: +${formatStockQty(quantity)}`,
+    `${stockText(language, 'current')}: ${formatStockQty(current)}`,
+    `${stockText(language, 'newStock')}: ${formatStockQty(current + quantity)}`,
+  ].join('\n')
+  const payload = {
+    chat_id: chatId,
+    text,
+    reply_markup: {
+      inline_keyboard: [[
+        { text: stockText(language, 'confirmButton'), callback_data: 'stockapply|' + request.id },
+        { text: stockText(language, 'cancelButton'), callback_data: 'stockcancel|' + request.id },
+      ]],
+    },
+  }
+
+  if (editMessageId) {
+    await tg(botToken, 'editMessageText', { ...payload, message_id: editMessageId })
+  } else {
+    await tg(botToken, 'sendMessage', payload)
+  }
+}
+
+async function handleStockEntry(botToken: string, msg: TgMessage, session: Record<string, unknown>) {
+  const chatId = String(msg.chat.id)
+  const parsed = parseStockReceiptMessage(msg.text || '')
+  const language = parsed.language || (session.language === 'en' ? 'en' : 'ar')
+
+  if (!parsed.ok) {
+    const key = parsed.error === 'missing_product' ? 'badProduct' : 'badQuantity'
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, key), reply_markup: stockMenu() })
+    return Response.json({ ok: true, awaiting: 'stock_receipt', error: parsed.error }, { headers: CORS })
+  }
+
+  const products = await sbGet(
+    'pos_products?select=id,branch_id,name,name_ar,price,stock_qty,track_inventory,is_active'
+    + '&branch_id=eq.' + encodeURIComponent(String(session.branch_id))
+    + '&is_active=eq.true&order=name.asc',
+  )
+  const matches = findStockProductCandidates(Array.isArray(products) ? products : [], parsed.productQuery)
+
+  if (!matches.length) {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'notFound'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, awaiting: 'stock_receipt', error: 'product_not_found' }, { headers: CORS })
+  }
+
+  const existing = await sbGet(
+    'telegram_stock_requests?select=*&telegram_chat_id=eq.' + encodeURIComponent(chatId)
+    + '&telegram_message_id=eq.' + encodeURIComponent(String(msg.message_id)) + '&limit=1',
+  )
+  let request = Array.isArray(existing) && existing.length ? existing[0] : null
+  if (!request) {
+    const choosing = matches.length > 1
+    try {
+      const inserted = await sbPost('telegram_stock_requests', {
+        telegram_chat_id: chatId,
+        telegram_message_id: String(msg.message_id),
+        profile_id: session.profile_id,
+        branch_id: session.branch_id,
+        product_id: choosing ? null : matches[0].product.id,
+        candidate_product_ids: matches.map(match => match.product.id),
+        quantity: parsed.quantity,
+        language,
+        status: choosing ? 'selecting' : 'pending',
+      })
+      request = Array.isArray(inserted) && inserted.length ? inserted[0] : null
+    } catch (error) {
+      // Telegram can retry the same webhook. Reuse the original request if a
+      // concurrent delivery inserted it first.
+      const duplicate = await sbGet(
+        'telegram_stock_requests?select=*&telegram_chat_id=eq.' + encodeURIComponent(chatId)
+        + '&telegram_message_id=eq.' + encodeURIComponent(String(msg.message_id)) + '&limit=1',
+      )
+      if (!Array.isArray(duplicate) || !duplicate.length) throw error
+      request = duplicate[0]
+    }
+  }
+
+  await sbDelete('telegram_stock_sessions?telegram_chat_id=eq.' + encodeURIComponent(chatId))
+
+  if (!request) {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'failed'), reply_markup: stockMenu() })
+    return Response.json({ ok: false, error: 'stock request insert failed' }, { headers: CORS })
+  }
+
+  if (request.status === 'applied') {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'alreadyCompleted'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, duplicate: true }, { headers: CORS })
+  }
+
+  if (request.status === 'selecting') {
+    const candidates = matches.length > 1
+      ? matches
+      : (request.candidate_product_ids || []).map((id: string) => ({ product: products.find((p: Record<string, unknown>) => p.id === id) })).filter((m: Record<string, unknown>) => m.product)
+    await tg(botToken, 'sendMessage', {
+      chat_id: chatId,
+      text: stockText(language, 'choose'),
+      reply_markup: {
+        inline_keyboard: candidates.map((match: { product: Record<string, unknown> }, index: number) => [{
+          text: `${displayProduct(match.product, language)} — ${Number(match.product.price || 0).toFixed(2)} LYD`,
+          callback_data: `stockpick|${request.id}|${index}`,
+        }]),
+      },
+    })
+    return Response.json({ ok: true, awaiting: 'product_selection', request_id: request.id }, { headers: CORS })
+  }
+
+  const product = await getStockProduct(String(request.product_id))
+  if (!product) {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'notFound'), reply_markup: stockMenu() })
+    return Response.json({ ok: false, error: 'selected product unavailable' }, { headers: CORS })
+  }
+  await sendStockConfirmation(botToken, chatId, request, product)
+  return Response.json({ ok: true, awaiting: 'stock_confirmation', request_id: request.id }, { headers: CORS })
+}
+
+async function handleStockCallback(botToken: string, cb: TgCallbackQuery): Promise<Response> {
+  const data = cb.data || ''
+  const chatId = String(cb.message?.chat?.id ?? '')
+  const messageId = cb.message?.message_id
+  const [action, requestId, indexText] = data.split('|')
+  const request = await getStockRequest(requestId, chatId)
+
+  await tg(botToken, 'answerCallbackQuery', { callback_query_id: cb.id })
+
+  if (!request) {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText('ar', 'expired'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, ignored: true, reason: 'stock request missing' }, { headers: CORS })
+  }
+
+  const language = request.language === 'en' ? 'en' : 'ar'
+  const expired = Date.now() - new Date(request.created_at).getTime() > 30 * 60 * 1000
+  if (expired && !['applied', 'cancelled'].includes(request.status)) {
+    await sbPatch('telegram_stock_requests?id=eq.' + encodeURIComponent(request.id), { status: 'expired' })
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'expired'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, expired: true }, { headers: CORS })
+  }
+
+  if (action === 'stockcancel') {
+    if (request.status !== 'applied') {
+      await sbPatch('telegram_stock_requests?id=eq.' + encodeURIComponent(request.id), { status: 'cancelled' })
+    }
+    if (messageId) {
+      await tg(botToken, 'editMessageText', { chat_id: chatId, message_id: messageId, text: stockText(language, 'cancelled') })
+    }
+    return Response.json({ ok: true, cancelled: true }, { headers: CORS })
+  }
+
+  if (action === 'stockpick') {
+    if (request.status !== 'selecting') return Response.json({ ok: true, ignored: true }, { headers: CORS })
+    const index = Number(indexText)
+    const productId = request.candidate_product_ids?.[index]
+    const product = productId ? await getStockProduct(String(productId)) : null
+    if (!product || product.branch_id !== request.branch_id) {
+      await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'notFound'), reply_markup: stockMenu() })
+      return Response.json({ ok: false, error: 'invalid stock product selection' }, { headers: CORS })
+    }
+    await sbPatch('telegram_stock_requests?id=eq.' + encodeURIComponent(request.id), {
+      product_id: product.id,
+      status: 'pending',
+    })
+    request.product_id = product.id
+    request.status = 'pending'
+    await sendStockConfirmation(botToken, chatId, request, product, messageId)
+    return Response.json({ ok: true, awaiting: 'stock_confirmation' }, { headers: CORS })
+  }
+
+  if (action !== 'stockapply') return Response.json({ ok: true, ignored: true }, { headers: CORS })
+  if (request.status === 'applied') {
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'alreadyCompleted'), reply_markup: stockMenu() })
+    return Response.json({ ok: true, duplicate: true }, { headers: CORS })
+  }
+  if (request.status !== 'pending' || !request.product_id) {
+    return Response.json({ ok: true, ignored: true, reason: 'stock request not pending' }, { headers: CORS })
+  }
+
+  try {
+    const result = await sbRpc('receive_pos_product_stock', {
+      p_product_id: request.product_id,
+      p_quantity: request.quantity,
+      p_source: 'telegram',
+      p_source_ref: `telegram:${chatId}:${request.telegram_message_id}`,
+      p_actor_profile_id: request.profile_id,
+    })
+    await sbPatch('telegram_stock_requests?id=eq.' + encodeURIComponent(request.id), {
+      status: 'applied',
+      applied_at: new Date().toISOString(),
+    })
+    const done = [
+      stockText(language, result?.duplicate ? 'alreadyCompleted' : 'completed'),
+      `${stockText(language, 'quantity')}: +${formatStockQty(result?.quantity_received || request.quantity)}`,
+      `${stockText(language, 'newStock')}: ${formatStockQty(result?.stock_after)}`,
+    ].join('\n')
+    if (messageId) {
+      await tg(botToken, 'editMessageText', { chat_id: chatId, message_id: messageId, text: done })
+    } else {
+      await tg(botToken, 'sendMessage', { chat_id: chatId, text: done, reply_markup: stockMenu() })
+    }
+    return Response.json({ ok: true, stock: result }, { headers: CORS })
+  } catch (error) {
+    console.error('telegram stock receive failed', error)
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: stockText(language, 'failed'), reply_markup: stockMenu() })
+    return Response.json({ ok: false, error: 'stock receive failed' }, { headers: CORS })
+  }
+}
+
 // ── Receipt Snap: inline button pressed ─────────────────────
 async function handleCallback(botToken: string, cb: TgCallbackQuery) {
   const data = cb.data || ''
   const chatId = String(cb.message?.chat?.id ?? '')
   const msgId = cb.message?.message_id
+
+  if (data.startsWith('stockpick|') || data.startsWith('stockapply|') || data.startsWith('stockcancel|')) {
+    return handleStockCallback(botToken, cb)
+  }
 
   if (!data.startsWith('esnap|')) {
     await tg(botToken, 'answerCallbackQuery', { callback_query_id: cb.id })
@@ -210,6 +639,21 @@ const HELP_TEXT =
 async function handleText(botToken: string, msg: TgMessage): Promise<Response> {
   const chatId = String(msg.chat.id)
   const text = (msg.text || '').trim()
+
+  // Stock receiving is an explicit conversational mode so a message such as
+  // "20 tiramisu" can never be confused with the existing expense intake.
+  if (isStockButton(text)) {
+    const telegramLanguage = msg.from?.language_code?.toLowerCase().startsWith('ar') ? 'ar' : 'en'
+    return startStockSession(botToken, msg, telegramLanguage)
+  }
+
+  const stockSessions = await sbGet(
+    'telegram_stock_sessions?select=*&telegram_chat_id=eq.' + encodeURIComponent(chatId)
+    + '&expires_at=gt.' + encodeURIComponent(new Date().toISOString()) + '&limit=1',
+  )
+  if (Array.isArray(stockSessions) && stockSessions.length) {
+    return handleStockEntry(botToken, msg, stockSessions[0])
+  }
 
   // 1) Pending "type the amount" snap?
   const awaitingAmount = await sbGet(
@@ -267,7 +711,7 @@ async function handleText(botToken: string, msg: TgMessage): Promise<Response> {
   }
 
   // 4) Anything else (including /start) → help
-  await tg(botToken, 'sendMessage', { chat_id: chatId, text: HELP_TEXT })
+  await tg(botToken, 'sendMessage', { chat_id: chatId, text: HELP_TEXT, reply_markup: stockMenu() })
   return Response.json({ ok: true, help: true }, { headers: CORS })
 }
 
@@ -280,6 +724,12 @@ Deno.serve(async (req: Request) => {
   // GET: self-register the Telegram webhook URL
   if (req.method === 'GET') {
     if (!botToken) return Response.json({ error: 'no TELEGRAM_BOT_TOKEN' }, { status: 500, headers: CORS })
+    await tg(botToken, 'setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Open Noch bot menu' },
+        { command: 'stock', description: 'استلام مخزون / Receive stock' },
+      ],
+    })
     const r = await fetch('https://api.telegram.org/bot' + botToken + '/setWebhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -405,7 +855,7 @@ Deno.serve(async (req: Request) => {
 
 interface TgMessage {
   message_id: number
-  from?: { id: number; first_name?: string; last_name?: string; username?: string }
+  from?: { id: number; first_name?: string; last_name?: string; username?: string; language_code?: string }
   chat: { id: number }
   text?: string
   caption?: string

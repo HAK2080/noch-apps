@@ -17,12 +17,13 @@ const ReceiptModal   = lazy(() => import('../components/ReceiptModal'))
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
-  setProductSoldOut, getAllModifierData, getModifierGroupsForProduct,
+  setProductSoldOut, receiveProductStock, getAllModifierData, getModifierGroupsForProduct,
 } from '../lib/pos-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
 import POSPinLogin from './POSPinLogin'
 import ShiftAttendees from '../components/ShiftAttendees'
 import ProductModifierModal from '../components/ProductModifierModal'
+import ReceiveStockModal from '../components/ReceiveStockModal'
 import {
   cacheProducts, getCachedProducts,
   cacheCategories, getCachedCategories,
@@ -38,7 +39,7 @@ import PrintHostBadge from '../components/PrintHostBadge'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
 import { isKioskMode } from '../lib/pos-kiosk'
-import { isPrinterConnected, printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
+import { printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
 import { isPrintHost, startHostSubscriber, stopHostSubscriber } from '../lib/print-queue'
 import { sendCustomerGreeting } from '../../../lib/vestaboard'
 import Layout from '../../../components/Layout'
@@ -64,7 +65,7 @@ function playOrderAlert() {
     play(880, 0, 0.15)
     play(1100, 0.18, 0.15)
     play(1320, 0.36, 0.25)
-  } catch {}
+  } catch { /* audio alerts are optional */ }
 }
 
 // ── New order popup modal ─────────────────────────────────────────────────────
@@ -281,7 +282,7 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
 export default function POSTerminal() {
   const { branchId } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { profile } = useAuth()
 
   const [branch, setBranch] = useState(null)
   const [products, setProducts] = useState([])
@@ -335,6 +336,7 @@ export default function POSTerminal() {
   const [showAttendees, setShowAttendees] = useState(false)
   const [showMore, setShowMore] = useState(false)
   const [modifierProduct, setModifierProduct] = useState(null)
+  const [stockProduct, setStockProduct] = useState(null)
   const [modifierData, setModifierData] = useState({ groupsForProduct: () => [] })
 
   // Load branch, products, categories
@@ -407,6 +409,29 @@ export default function POSTerminal() {
       stopSync()
       stopHostSubscriber()
     }
+  }, [branchId])
+
+  // Keep product stock live across POS devices and Telegram receipts.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`pos-product-stock-${branchId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'pos_products',
+        filter: `branch_id=eq.${branchId}`,
+      }, payload => {
+        if (!payload.new?.id) return
+        setProducts(current => current.map(product =>
+          product.id === payload.new.id ? { ...product, ...payload.new } : product
+        ))
+        setStockProduct(current =>
+          current?.id === payload.new.id ? { ...current, ...payload.new } : current
+        )
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [branchId])
 
   // Fetch pending online orders (initial load + after actions)
@@ -518,7 +543,7 @@ export default function POSTerminal() {
     addCartLine(product)
   }, [settings, addCartLine])
 
-  // Long-press a tile to flip is_sold_out for the day. Optimistic UI.
+  // Sold-out remains a separate manual availability control inside the stock modal.
   const handleSoldOutToggle = useCallback(async (product) => {
     const next = !product.is_sold_out
     setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_sold_out: next } : p))
@@ -529,8 +554,26 @@ export default function POSTerminal() {
       // Revert on failure
       setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_sold_out: !next } : p))
       toast.error(err.message || 'Could not update')
+      throw err
     }
   }, [])
+
+  const handleReceiveStock = useCallback(async (product, quantity) => {
+    const actorProfileId = getServedBy()?.id || profile?.id || null
+    try {
+      const result = await receiveProductStock(product.id, quantity, actorProfileId)
+      setProducts(current => current.map(item =>
+        item.id === product.id
+          ? { ...item, stock_qty: result.stock_after, track_inventory: true }
+          : item
+      ))
+      toast.success(`${product.name}: +${result.quantity_received} received`)
+      return result
+    } catch (error) {
+      toast.error(error.message || 'Could not receive stock')
+      throw error
+    }
+  }, [profile?.id])
 
   const updateQty = (itemId, qty) => {
     setCart(prev => prev.map(i => i.id === itemId ? { ...i, quantity: qty } : i))
@@ -616,7 +659,7 @@ export default function POSTerminal() {
     await refreshHeld()
   }, [refreshHeld, tileLang])
 
-  const handleDiscount = useCallback(({ type, value, amount }) => {
+  const handleDiscount = useCallback(() => {
     // stored in charge data via CartPanel
   }, [])
 
@@ -1020,7 +1063,7 @@ export default function POSTerminal() {
             products={products}
             categories={categories}
             onSelect={addToCart}
-            onLongPress={handleSoldOutToggle}
+            onLongPress={setStockProduct}
             blockOutOfStock={!!settings?.block_out_of_stock}
             searchQuery={searchQuery}
             tileLang={tileLang}
@@ -1108,6 +1151,15 @@ export default function POSTerminal() {
         <Suspense fallback={null}>
           <BarcodeScanner onScan={handleScan} onClose={() => setShowScanner(false)} />
         </Suspense>
+      )}
+
+      {stockProduct && (
+        <ReceiveStockModal
+          product={stockProduct}
+          onReceive={quantity => handleReceiveStock(stockProduct, quantity)}
+          onToggleSoldOut={() => handleSoldOutToggle(stockProduct)}
+          onClose={() => setStockProduct(null)}
+        />
       )}
 
       {showPayment && (
@@ -1214,7 +1266,7 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
-    } catch {}
+    } catch { /* clipboard access is optional */ }
   }
 
   if (!data) {
