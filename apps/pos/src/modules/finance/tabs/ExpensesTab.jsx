@@ -8,9 +8,11 @@
 // Other OpEx on the Daily P&L.
 
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Receipt, TrendingDown } from 'lucide-react'
+import { ExternalLink, Landmark, Receipt, TrendingDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { lyd } from '../lib/thresholds'
+import { getShareholderFundingBalances, recordShareholderRepayment } from '../lib/finance-supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import PeriodSelector from '../components/PeriodSelector'
 import { businessToday } from '../../pos/lib/pos-supabase'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
@@ -44,11 +46,18 @@ const STATUS_STYLE = {
 }
 
 export default function ExpensesTab() {
+  const { isOwner, profile } = useAuth()
+  const canFund = isOwner || profile?.role === 'accountant'
   const [period, setPeriod] = useState(defaultPeriod)
   const [rows, setRows] = useState([])
   const [loadedKey, setLoadedKey] = useState(null)
   const [ccFilter, setCcFilter] = useState('all')
   const [catFilter, setCatFilter] = useState('all')
+  // Shareholder funding card state (owner/accountant only)
+  const today = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
+  const [balances, setBalances] = useState([])
+  const [repay, setRepay] = useState({ paid_to: '', amount: '', currency: 'LYD', rate: '1', date: today, note: '' })
+  const [repaySaving, setRepaySaving] = useState(false)
 
   const periodKey = period ? `${period.from}_${period.to}` : null
   // Derived, not set in the effect: loading until the fetch for this period lands
@@ -65,6 +74,50 @@ export default function ExpensesTab() {
       })
     return () => { cancelled = true }
   }, [period?.from, period?.to])
+
+  // Shareholder funding balances — owner/accountant only
+  useEffect(() => {
+    if (!canFund) return
+    let cancelled = false
+    getShareholderFundingBalances()
+      .then(d => { if (!cancelled) setBalances(d) })
+      .catch(err => toast.error(err.message || 'Failed to load shareholder balances'))
+    return () => { cancelled = true }
+  }, [canFund])
+
+  async function reloadBalances() {
+    try { setBalances(await getShareholderFundingBalances()) }
+    catch (err) { toast.error(err.message || 'Failed to load shareholder balances') }
+  }
+
+  const repayAmount = parseFloat(repay.amount || 0)
+  const repayRate = parseFloat(repay.rate || 0)
+  const repayLyd = repayAmount * repayRate
+
+  async function submitRepayment() {
+    if (!repay.paid_to) { toast.error('Select a person'); return }
+    if (!repay.amount || isNaN(repayAmount) || repayAmount <= 0) { toast.error('Enter a valid amount'); return }
+    if (!repay.rate || isNaN(repayRate) || repayRate <= 0) { toast.error('Enter a valid rate'); return }
+    setRepaySaving(true)
+    try {
+      await recordShareholderRepayment({
+        paid_to: repay.paid_to,
+        amount: repayAmount,
+        currency: repay.currency,
+        rate: repayRate,
+        amount_lyd: repayLyd,
+        date: repay.date,
+        note: repay.note || null,
+      })
+      toast.success('Repayment recorded')
+      setRepay({ paid_to: '', amount: '', currency: 'LYD', rate: '1', date: today, note: '' })
+      await reloadBalances()
+    } catch (err) {
+      toast.error(err.message || 'Failed to record repayment')
+    } finally {
+      setRepaySaving(false)
+    }
+  }
 
   // Filter options derive from the loaded rows — no extra queries needed
   const ccOptions = useMemo(() => [...new Set(rows.map(r => r.cost_centers?.name).filter(Boolean))].sort(), [rows])
@@ -145,6 +198,82 @@ export default function ExpensesTab() {
           </button>
         )}
       </div>
+
+      {/* Shareholder funding — owner/accountant only */}
+      {canFund && (
+        <div className="card">
+          <h3 className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
+            <Landmark size={13} className="text-noch-green" /> Shareholder funding
+          </h3>
+          {balances.length === 0 ? (
+            <p className="text-noch-muted text-xs mb-4">No shareholder funding recorded yet.</p>
+          ) : (
+            <div className="overflow-x-auto mb-4">
+              <table className="w-full text-xs">
+                <thead className="text-noch-muted">
+                  <tr>
+                    <th className="text-left py-1 pr-2">Person</th>
+                    <th className="text-right py-1 pr-2">Loaned</th>
+                    <th className="text-right py-1 pr-2">Repaid</th>
+                    <th className="text-right py-1 pr-2">Outstanding</th>
+                    <th className="text-right py-1">Capital injected</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {balances.map(b => (
+                    <tr key={b.paid_by} className="border-t border-noch-border/40">
+                      <td className="py-1.5 pr-2 text-white">{b.paid_by}</td>
+                      <td className="py-1.5 pr-2 text-right font-mono text-white">{lyd(b.loans_lyd)}</td>
+                      <td className="py-1.5 pr-2 text-right font-mono text-noch-muted">{lyd(b.repayments_lyd)}</td>
+                      <td className="py-1.5 pr-2 text-right font-mono text-white">{lyd(b.outstanding_lyd)}</td>
+                      <td className="py-1.5 text-right font-mono text-noch-muted">{lyd(b.capital_lyd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Record repayment */}
+          <div className="border-t border-noch-border/40 pt-3">
+            <p className="text-noch-muted text-xs font-semibold mb-2">Record repayment</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <select value={repay.paid_to} onChange={e => setRepay(r => ({ ...r, paid_to: e.target.value }))}
+                className="input py-2 text-sm">
+                <option value="">Person…</option>
+                {balances.map(b => <option key={b.paid_by} value={b.paid_by}>{b.paid_by}</option>)}
+              </select>
+              <input type="number" min="0" step="0.01" placeholder="Amount"
+                value={repay.amount} onChange={e => setRepay(r => ({ ...r, amount: e.target.value }))}
+                className="input py-2 text-sm" />
+              <div className="flex gap-2">
+                <select value={repay.currency}
+                  onChange={e => setRepay(r => ({ ...r, currency: e.target.value, rate: e.target.value === 'LYD' ? '1' : r.rate }))}
+                  className="input py-2 text-sm flex-1">
+                  {['LYD', 'USD', 'EUR', 'GBP', 'AED'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="number" min="0" step="0.0001" placeholder="Rate" title="Rate to LYD"
+                  value={repay.rate} onChange={e => setRepay(r => ({ ...r, rate: e.target.value }))}
+                  className="input py-2 text-sm w-24" />
+              </div>
+              <input type="date" value={repay.date}
+                onChange={e => setRepay(r => ({ ...r, date: e.target.value }))}
+                className="input py-2 text-sm" />
+              <input type="text" placeholder="Note (optional)"
+                value={repay.note} onChange={e => setRepay(r => ({ ...r, note: e.target.value }))}
+                className="input py-2 text-sm col-span-2" />
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <p className="text-noch-muted text-xs">
+                {repayAmount > 0 && repayRate > 0 ? `≈ ${lyd(repayLyd)}` : 'LYD equivalent preview'}
+              </p>
+              <button onClick={submitRepayment} disabled={repaySaving} className="btn-secondary text-sm">
+                {repaySaving ? 'Recording…' : 'Record repayment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

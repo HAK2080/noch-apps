@@ -1118,6 +1118,7 @@ export default function POSTerminal() {
           onClose={() => !submitting && setShowPayment(null)}
           loyaltyCustomer={loyaltyCustomer}
           posLang={tileLang === 'ar' ? 'ar' : 'en'}
+          prestoEnabled={settings?.presto_enabled === true}
         />
       )}
 

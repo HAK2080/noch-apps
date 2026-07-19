@@ -1,5 +1,4 @@
-// escpos.js — ESC/POS printer driver via Web Serial API
-// Target: XPrinter NP-N200L, 48 char width
+// escpos.js — ESC/POS receipt rendering with swappable device transports.
 
 import { enqueuePrintJob, broadcastJobReady, isPrintHost } from './print-queue'
 
@@ -72,10 +71,6 @@ function encodeForPrinter(text) {
   return out
 }
 
-// XPrinter XP-58IIH is a 58mm thermal printer → 32 chars per line.
-// (The previous value 48 targeted an 80mm printer and would truncate
-// totals and double up the separator bar on a 58mm unit.)
-const RECEIPT_WIDTH = 32
 const TRANSPORT_KEY = 'noch_printer_transport'
 
 // ──────────────────────────────────────────────────────────────────
@@ -85,16 +80,18 @@ const TRANSPORT_KEY = 'noch_printer_transport'
 // ──────────────────────────────────────────────────────────────────
 import * as serialTransport from './escpos-transport-serial'
 import * as bluetoothTransport from './escpos-transport-bluetooth'
+import * as windowsAgentTransport from './escpos-transport-windows-agent'
 
 const TRANSPORTS = {
   serial: serialTransport,
   bluetooth: bluetoothTransport,
+  windows: windowsAgentTransport,
 }
 
 function readSavedTransport() {
   try {
     const v = localStorage.getItem(TRANSPORT_KEY)
-    if (v === 'serial' || v === 'bluetooth') return v
+    if (v === 'serial' || v === 'bluetooth' || v === 'windows') return v
   } catch { /* ignore */ }
   return null
 }
@@ -108,6 +105,10 @@ function defaultTransportKind() {
 }
 
 let _kind = readSavedTransport() || defaultTransportKind()
+
+function getReceiptWidth() {
+  return Number(TRANSPORTS[_kind]?.columns || 32)
+}
 
 export function getTransport() {
   return _kind
@@ -214,7 +215,7 @@ function padRight(left, right, width) {
   return left + ' '.repeat(Math.max(1, spaces)) + right
 }
 
-function separator(char = '-', width = RECEIPT_WIDTH) {
+function separator(char = '-', width = getReceiptWidth()) {
   return line(char.repeat(width))
 }
 
@@ -283,7 +284,7 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
   bytes.push(...separator('='))
 
   pushLine(`Order: ${order.order_number}`)
-  pushLine(padRight(dateStr, timeStr, RECEIPT_WIDTH))
+  pushLine(padRight(dateStr, timeStr, getReceiptWidth()))
   if (order.customer_name) {
     pushLine(`Name: ${sanitiseHeader(order.customer_name)}`)
   }
@@ -291,15 +292,15 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
 
   // Items — English name + modifiers
   for (const item of items) {
-    const name = (item.product_name || item.name || 'Item').slice(0, RECEIPT_WIDTH)
+    const name = (item.product_name || item.name || 'Item').slice(0, getReceiptWidth())
     const qty = item.quantity || 1
     const price = parseFloat(item.unit_price).toFixed(2)
     const total = (parseFloat(item.unit_price) * qty).toFixed(2)
     pushLine(name)
-    pushLine(padRight(`  ${qty} x ${price}`, total, RECEIPT_WIDTH))
+    pushLine(padRight(`  ${qty} x ${price}`, total, getReceiptWidth()))
     if (Array.isArray(item.modifiers) && item.modifiers.length) {
       for (const m of item.modifiers) {
-        const label = `   + ${m.modifier_name || ''}`.slice(0, RECEIPT_WIDTH)
+        const label = `   + ${m.modifier_name || ''}`.slice(0, getReceiptWidth())
         pushLine(label)
       }
     }
@@ -310,15 +311,15 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
   // Totals
   const subtotal = parseFloat(order.subtotal).toFixed(2)
   const total = parseFloat(order.total).toFixed(2)
-  pushLine(padRight('Subtotal:', subtotal, RECEIPT_WIDTH))
+  pushLine(padRight('Subtotal:', subtotal, getReceiptWidth()))
 
   if (parseFloat(order.discount_amount) > 0) {
-    pushLine(padRight('Discount:', `-${parseFloat(order.discount_amount).toFixed(2)}`, RECEIPT_WIDTH))
+    pushLine(padRight('Discount:', `-${parseFloat(order.discount_amount).toFixed(2)}`, getReceiptWidth()))
   }
 
   pushCmd(CMD.BOLD_ON)
   pushCmd(CMD.DOUBLE_SIZE)
-  pushLine(padRight('TOTAL:', total + ' LYD', RECEIPT_WIDTH - 4))
+  pushLine(padRight('TOTAL:', total + ' LYD', getReceiptWidth() - 4))
   pushCmd(CMD.NORMAL_SIZE)
   pushCmd(CMD.BOLD_OFF)
 
@@ -329,15 +330,15 @@ export async function printReceiptDirect(order, branch, items, loyaltyCustomer =
   const methodLabel = methodEn[order.payment_method] || (order.payment_method?.toUpperCase() || 'CASH')
   pushLine(`Payment: ${methodLabel}`)
   if (order.payment_method === 'cash' && order.cash_tendered) {
-    pushLine(padRight('Tendered:', parseFloat(order.cash_tendered).toFixed(2), RECEIPT_WIDTH))
-    pushLine(padRight('Change:', parseFloat(order.change_due || 0).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('Tendered:', parseFloat(order.cash_tendered).toFixed(2), getReceiptWidth()))
+    pushLine(padRight('Change:', parseFloat(order.change_due || 0).toFixed(2), getReceiptWidth()))
   } else if (order.payment_method === 'split') {
     const cardAmt = parseFloat(order.card_amount || 0).toFixed(2)
     const cashAmt = (parseFloat(order.total) - parseFloat(order.card_amount || 0)).toFixed(2)
-    pushLine(padRight('Card:', cardAmt, RECEIPT_WIDTH))
-    pushLine(padRight('Cash:', cashAmt, RECEIPT_WIDTH))
+    pushLine(padRight('Card:', cardAmt, getReceiptWidth()))
+    pushLine(padRight('Cash:', cashAmt, getReceiptWidth()))
   } else if (order.payment_method === 'presto') {
-    pushLine(padRight('Presto delivery:', parseFloat(order.total).toFixed(2), RECEIPT_WIDTH))
+    pushLine(padRight('Presto delivery:', parseFloat(order.total).toFixed(2), getReceiptWidth()))
   }
 
   bytes.push(...separator('='))
@@ -447,7 +448,7 @@ export async function printDrinkTicketDirect(order, items, branch) {
 
   // Items — bold name, indented modifiers below
   for (const item of items) {
-    const name = (item.product_name || item.name || 'Item').slice(0, RECEIPT_WIDTH)
+    const name = (item.product_name || item.name || 'Item').slice(0, getReceiptWidth())
     const qty = item.quantity || 1
     pushCmd(CMD.BOLD_ON)
     pushLine(`${qty}x ${name}`)
@@ -455,12 +456,12 @@ export async function printDrinkTicketDirect(order, items, branch) {
 
     if (Array.isArray(item.modifiers) && item.modifiers.length) {
       for (const m of item.modifiers) {
-        const label = `   + ${m.modifier_name || ''}`.slice(0, RECEIPT_WIDTH)
+        const label = `   + ${m.modifier_name || ''}`.slice(0, getReceiptWidth())
         pushLine(label)
       }
     }
     if (item.notes) {
-      pushLine(`   * ${String(item.notes).slice(0, RECEIPT_WIDTH - 5)}`)
+      pushLine(`   * ${String(item.notes).slice(0, getReceiptWidth() - 5)}`)
     }
     pushLine()
   }
@@ -503,7 +504,7 @@ export async function printTestPage() {
     LF,
     ...textToBytes(new Date().toLocaleString()),
     LF,
-    ...textToBytes('48 chars: ' + '-'.repeat(38)),
+    ...textToBytes(`${getReceiptWidth()} chars: ` + '-'.repeat(Math.max(1, getReceiptWidth() - 10))),
     LF,
     LF,
     LF,

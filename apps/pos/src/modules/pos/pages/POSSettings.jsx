@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Monitor } from 'lucide-react'
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
@@ -55,7 +55,7 @@ export default function POSSettings({ onClose } = {}) {
   // branchId comes from route params when standalone, or from props when overlay.
   // (parent passes it via the onClose pattern — we read params as fallback)
   const branchId = params.branchId
-  const { user } = useAuth()
+  const { user, isOwner } = useAuth()
 
   const [branch, setBranch] = useState(null)
   const [shift, setShift] = useState(null)
@@ -76,6 +76,7 @@ export default function POSSettings({ onClose } = {}) {
 
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
+  const windowsAgentAvailable = isTransportAvailable('windows')
   const transportAvailable = isTransportAvailable(transport)
 
   // On mount: silently reconnect to the last-used printer. The host
@@ -209,7 +210,7 @@ export default function POSSettings({ onClose } = {}) {
       <div className="max-w-xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(`/pos/${branchId}`)} className="p-2 text-noch-muted hover:text-white">
+          <button onClick={() => onClose ? onClose() : navigate(`/pos/${branchId}`)} className="p-2 text-noch-muted hover:text-white">
             <ArrowLeft size={18} />
           </button>
           <div>
@@ -232,8 +233,8 @@ export default function POSSettings({ onClose } = {}) {
               USB Serial. Each option is hidden when its underlying browser
               API isn't available, so a desktop without Bluetooth won't
               show a dead BT button. */}
-          {(bluetoothAvailable || serialAvailable) && (
-            <div className="grid grid-cols-2 gap-2 mb-3">
+          {(bluetoothAvailable || serialAvailable || windowsAgentAvailable) && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
               <button
                 onClick={() => handleTransportChange('bluetooth')}
                 disabled={!bluetoothAvailable || printerConnected}
@@ -258,6 +259,20 @@ export default function POSSettings({ onClose } = {}) {
                 <Usb size={14} />
                 USB Serial
               </button>
+              {windowsAgentAvailable && (
+                <button
+                  onClick={() => handleTransportChange('windows')}
+                  disabled={printerConnected}
+                  className={`flex items-center justify-center gap-2 py-2 rounded-xl border text-sm transition-all ${
+                    transport === 'windows'
+                      ? 'bg-noch-green/10 border-noch-green/50 text-noch-green'
+                      : 'border-noch-border text-noch-muted hover:border-noch-green/20'
+                  } ${printerConnected ? 'opacity-40 cursor-not-allowed' : ''}`}
+                >
+                  <Monitor size={14} />
+                  Windows USB
+                </button>
+              )}
             </div>
           )}
 
@@ -297,6 +312,21 @@ export default function POSSettings({ onClose } = {}) {
             </div>
           )}
 
+          {!printerConnected && transport === 'windows' && (
+            <div className="bg-blue-400/10 border border-blue-400/20 rounded-lg px-3 py-2 mb-3">
+              <p className="text-blue-200 text-xs">
+                For Bloom's XP-N200L on Windows. Install the Noch Print Agent once, then connect here. This setting only applies to this PC.
+              </p>
+              <a
+                href="/noch-print-agent/noch-print-agent.zip"
+                className="inline-block text-noch-green text-xs font-semibold mt-2 hover:underline"
+                download
+              >
+                Download Windows Print Agent
+              </a>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button
               onClick={handleConnectPrinter}
@@ -313,7 +343,9 @@ export default function POSSettings({ onClose } = {}) {
                   ? 'Disconnect'
                   : transport === 'bluetooth'
                     ? 'Connect Bluetooth Printer'
-                    : 'Connect USB Printer'}
+                    : transport === 'windows'
+                      ? 'Connect Windows USB Printer'
+                      : 'Connect USB Printer'}
             </button>
             {printerConnected && (
               <button onClick={handleTestPrint} className="btn-secondary flex-1 py-2 text-sm">
@@ -559,6 +591,14 @@ export default function POSSettings({ onClose } = {}) {
                 value={posSettings.require_pin !== false}
                 onChange={v => handleToggleFlag('require_pin', v)}
               />
+              {isOwner && (
+                <FlagRow
+                  label="Enable Presto delivery payments"
+                  hint="Shows Presto at checkout for this branch only. Presto orders are counted as receivable until Presto settles them."
+                  value={!!posSettings.presto_enabled}
+                  onChange={v => handleToggleFlag('presto_enabled', v)}
+                />
+              )}
               <FlagRow
                 label="Manager override (coming soon)"
                 hint="When on, baristas above their discount cap or attempting a void/refund prompt for a manager PIN. Wired but not yet active."

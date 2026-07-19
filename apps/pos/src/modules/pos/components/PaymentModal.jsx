@@ -46,7 +46,7 @@ function Numpad({ value, onChange }) {
   )
 }
 
-export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'en' }) {
+export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'en', prestoEnabled = false }) {
   const t = (k) => posT(k, posLang)
   const [method, setMethod] = useState('cash') // cash | card | split | presto
   const [cashTendered, setCashTendered] = useState(total.toFixed(2))
@@ -163,12 +163,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
 
           <div className="p-5">
             {/* Method tabs */}
-            <div className="grid grid-cols-4 gap-2 mb-5">
+            <div className={`grid ${prestoEnabled ? 'grid-cols-4' : 'grid-cols-3'} gap-2 mb-5`}>
               {[
                 { id: 'cash',   icon: DollarSign,  label: t('posCash') },
                 { id: 'card',   icon: CreditCard,  label: t('posCard') },
                 { id: 'split',  icon: Shuffle,     label: t('posSplit') },
-                { id: 'presto', icon: Bike,        label: t('posPresto') },
+                ...(prestoEnabled ? [{ id: 'presto', icon: Bike, label: t('posPresto') }] : []),
               ].map(m => (
                 <button
                   key={m.id}

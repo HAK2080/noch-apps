@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { fmt, getOwnerSetting, setOwnerSetting, uploadReceipt } from './lib/expensesData'
 
-export default function SubmitTab({ user, isOwner, costCenters, categories, rates, onSubmitted }) {
+export default function SubmitTab({ user, profile, isOwner, costCenters, categories, rates, onSubmitted }) {
   // local date, not UTC — toISOString() defaulted expense_date to yesterday before 2 AM (Libya UTC+2)
   const today = (() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })()
   const [form, setForm] = useState({
@@ -19,6 +19,9 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
   const [prepaid, setPrepaid] = useState(false)
   const [coverageMonths, setCoverageMonths] = useState(2)
   const [coverageStart, setCoverageStart] = useState('')
+  // Owner/accountant extras: FX rate override + shareholder funding classification
+  const [rateOverride, setRateOverride] = useState('')
+  const [fundingType, setFundingType] = useState('shareholder_loan')
   const fileRef = useRef()
 
   useEffect(() => {
@@ -26,8 +29,11 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
   }, [isOwner])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const canFund = isOwner || profile?.role === 'accountant'
 
-  const selectedRate = rates.find(r => r.currency === form.currency)?.rate_to_lyd || 1
+  const autoRate = rates.find(r => r.currency === form.currency)?.rate_to_lyd || 1
+  // Non-privileged users always get the table rate; owner/accountant may override
+  const selectedRate = canFund && rateOverride !== '' && !isNaN(parseFloat(rateOverride)) ? parseFloat(rateOverride) : autoRate
   const amountLyd = parseFloat(form.amount || 0) * selectedRate
 
   function onFileChange(e) {
@@ -49,6 +55,7 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
         catch { toast('Receipt upload failed — saving without photo', { icon: '⚠️' }) }
       }
       const isAutoApproved = isOwner && autoApprove
+      const paidBy = form.paid_by || 'Business'
       const { data: expense, error } = await supabase.from('expenses').insert({
         submitted_by: user.id,
         cost_center_id: form.cost_center_id,
@@ -59,7 +66,9 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
         amount_lyd: amountLyd,
         vendor: form.vendor || null,
         description: form.description || null,
-        paid_by: form.paid_by || 'Business',
+        paid_by: paidBy,
+        // Shareholder funding classification — DB default covers 'business'
+        ...(paidBy !== 'Business' ? { funding_type: canFund ? fundingType : 'shareholder_loan' } : {}),
         receipt_url,
         expense_date: form.expense_date,
         status: isAutoApproved ? 'approved' : 'pending',
@@ -84,6 +93,8 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
       setPrepaid(false)
       setCoverageMonths(2)
       setCoverageStart('')
+      setRateOverride('')
+      setFundingType('shareholder_loan')
       onSubmitted()
     } catch (err) {
       toast.error(err.message || 'Failed to submit expense')
@@ -148,8 +159,8 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
         </div>
       </div>
 
-      {/* Amount + Currency */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Amount + Currency (+ rate override for owner/accountant) */}
+      <div className={`grid gap-3 ${canFund ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <div>
           <label className="text-xs text-noch-muted mb-1 block">Amount *</label>
           <input type="number" min="0" step="0.01" placeholder="0.00"
@@ -159,17 +170,25 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
         <div>
           <label className="text-xs text-noch-muted mb-1 block">Currency</label>
           <div className="relative">
-            <select value={form.currency} onChange={e => set('currency', e.target.value)}
+            <select value={form.currency} onChange={e => { set('currency', e.target.value); setRateOverride('') }}
               className="w-full bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50 appearance-none">
               {rates.map(r => <option key={r.currency} value={r.currency}>{r.currency}</option>)}
             </select>
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-noch-muted pointer-events-none" />
           </div>
         </div>
+        {canFund && (
+          <div>
+            <label className="text-xs text-noch-muted mb-1 block">Rate → LYD</label>
+            <input type="number" min="0" step="0.0001" placeholder={`auto ${autoRate}`}
+              value={rateOverride} onChange={e => setRateOverride(e.target.value)}
+              className="w-full bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+          </div>
+        )}
       </div>
       {form.currency !== 'LYD' && form.amount && (
         <p className="text-xs text-noch-muted -mt-2">
-          ≈ {fmt(amountLyd)} at {selectedRate} LYD/{form.currency}
+          ≈ {fmt(amountLyd)} at {selectedRate} LYD/{form.currency}{canFund && rateOverride !== '' ? ' (manual rate)' : ''}
         </p>
       )}
 
@@ -208,6 +227,27 @@ export default function SubmitTab({ user, isOwner, costCenters, categories, rate
           <option value="Other">Other</option>
         </select>
       </div>
+
+      {/* Shareholder funding classification (paid_by ≠ Business) */}
+      {form.paid_by !== 'Business' && (
+        canFund ? (
+          <div className="bg-noch-dark/50 border border-noch-border rounded-xl px-4 py-3 space-y-2">
+            <p className="text-xs text-noch-muted">Funding type *</p>
+            <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+              <input type="radio" name="funding_type" checked={fundingType === 'shareholder_loan'}
+                onChange={() => setFundingType('shareholder_loan')} />
+              Shareholder loan (company owes them)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+              <input type="radio" name="funding_type" checked={fundingType === 'capital_injection'}
+                onChange={() => setFundingType('capital_injection')} />
+              Capital injection (investment, no repayment)
+            </label>
+          </div>
+        ) : (
+          <p className="text-xs text-noch-muted">Recorded as shareholder loan — owner/accountant will review.</p>
+        )
+      )}
 
       {/* Vendor (optional) */}
       <div>

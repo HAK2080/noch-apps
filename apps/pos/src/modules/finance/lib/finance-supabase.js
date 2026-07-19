@@ -532,6 +532,30 @@ export async function cancelStaffLoan(id) {
   return data
 }
 
+// ── Shareholder funding ─────────────────────────────────────
+export async function getShareholderFundingBalances() {
+  const { data, error } = await supabase
+    .from('shareholder_funding_balances')
+    .select('*')
+    .order('paid_by')
+  if (error) throw error
+  return data || []
+}
+
+export async function recordShareholderRepayment({ paid_to, amount, currency, rate, amount_lyd, date, note }) {
+  const { data, error } = await supabase.rpc('record_shareholder_repayment', {
+    p_paid_to: paid_to,
+    p_amount: amount,
+    p_currency: currency,
+    p_exchange_rate: rate,
+    p_amount_lyd: amount_lyd,
+    p_date: date,
+    p_note: note || null,
+  })
+  if (error) throw error
+  return data
+}
+
 // Loan repayments booked in completed runs — used for est. remaining balance.
 export async function listLoanRepayments(runIds) {
   if (!runIds?.length) return []

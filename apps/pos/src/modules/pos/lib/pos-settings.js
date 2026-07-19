@@ -14,6 +14,7 @@ const DEFAULTS = {
   manager_override_enabled: false,
   per_barista_shift: false,
   require_pin: true,
+  presto_enabled: false,
 }
 
 const _cache = new Map()  // branchId → settings
