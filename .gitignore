@@ -53,3 +53,6 @@ supabase/.temp/
 .claude/worktrees/
 
 _noch_cloud_index.html
+
+__pycache__/
+*.pyc
