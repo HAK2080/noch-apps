@@ -71,7 +71,15 @@ export default function PayrollTab({ readOnly = false }) {
       return []
     } finally { setLoading(false) }
   }
-  useEffect(() => { reload() }, [])
+  // Auto-open the latest run on load so returning to the tab restores
+  // the detail view instead of looking like the run disappeared.
+  useEffect(() => {
+    const init = async () => {
+      const list = await reload()
+      if (list?.length) openRun(list[0])
+    }
+    init()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openRun = async (run) => {
     if (!run) { setSelected(null); setItems([]); return }
