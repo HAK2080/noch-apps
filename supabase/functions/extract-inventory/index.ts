@@ -9,6 +9,32 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    // Auth: this function spends Anthropic credit, so the caller must be an
+    // authenticated owner/staff user (POS inventory pages invoke it with the
+    // user JWT).
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ success: false, error: "missing Authorization" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const uRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { "apikey": Deno.env.get("SUPABASE_ANON_KEY")!, "Authorization": authHeader },
+    });
+    if (!uRes.ok) {
+      return new Response(JSON.stringify({ success: false, error: "invalid token" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 });
+    }
+    const caller = await uRes.json();
+    const pRes = await fetch(`${supabaseUrl}/rest/v1/profiles?select=role&id=eq.${caller.id}&limit=1`, {
+      headers: { "apikey": serviceKey!, "Authorization": `Bearer ${serviceKey}` },
+    });
+    const profiles = await pRes.json();
+    const role = Array.isArray(profiles) && profiles.length ? profiles[0].role : null;
+    if (role !== "owner" && role !== "staff") {
+      return new Response(JSON.stringify({ success: false, error: "forbidden — owner/staff only" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 });
+    }
+
     const { file_base64, mime_type, known_ingredients } = await req.json();
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return new Response(JSON.stringify({ success: false, error: "ANTHROPIC_API_KEY not set" }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });

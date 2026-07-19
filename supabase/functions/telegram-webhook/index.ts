@@ -45,12 +45,32 @@ Deno.serve(async (req: Request) => {
     const r = await fetch('https://api.telegram.org/bot' + botToken + '/setWebhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: fnUrl }),
+      // Register the shared secret so Telegram signs every update with the
+      // X-Telegram-Bot-Api-Secret-Token header we verify below.
+      body: JSON.stringify({
+        url: fnUrl,
+        ...(Deno.env.get('TELEGRAM_WEBHOOK_SECRET')
+          ? { secret_token: Deno.env.get('TELEGRAM_WEBHOOK_SECRET') }
+          : {}),
+      }),
     })
     return Response.json(await r.json(), { headers: CORS })
   }
 
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+
+  // Verify Telegram's webhook secret header so forged POSTs can't inject
+  // task comments. Set TELEGRAM_WEBHOOK_SECRET and pass the same value as
+  // secret_token when registering the webhook. Until it is configured we
+  // log a loud warning and allow, so existing deployments keep working.
+  const webhookSecret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET')
+  if (webhookSecret) {
+    if (req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== webhookSecret) {
+      return new Response('Unauthorized', { status: 401 })
+    }
+  } else {
+    console.warn('TELEGRAM_WEBHOOK_SECRET not set — telegram-webhook accepts unverified POSTs; set the secret and re-register the webhook with secret_token')
+  }
 
   let update: { message?: TgMessage }
   try {
