@@ -1852,6 +1852,18 @@ export async function getInventorySupplierPriceHistory(ingredientId = null) {
   return data || []
 }
 
+export async function getProcurementPayablesStatus() {
+  const { data, error } = await supabase
+    .from('procurement_payables_status')
+    .select('*')
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .order('invoice_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return data || []
+}
+
 export async function uploadIngredientImage(ingredientId, file) {
   const ext = file.name.split('.').pop()
   const path = `ingredients/${ingredientId}/${Date.now()}.${ext}`

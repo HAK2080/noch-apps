@@ -94,6 +94,10 @@ where source_table = 'expenses';
 select 'procurement_payables_status_rows' as check_name, count(*)::text as result
 from procurement_payables_status;
 
+select 'procurement_payables_status_open_rows' as check_name, count(*)::text as result
+from procurement_payables_status
+where outstanding_amount_lyd > 0;
+
 select 'inventory_stock_valuation_rows' as check_name, count(*)::text as result
 from inventory_stock_valuation;
 
@@ -152,6 +156,10 @@ cross join lateral pos_security_status(b.id);
 select 'gl_ap_aging_rows' as check_name, count(*)::text as result
 from gl_ap_aging(current_date, null);
 
+select 'gl_ap_aging_open_rows' as check_name, count(*)::text as result
+from gl_ap_aging(current_date, null)
+where outstanding_amount_lyd > 0;
+
 with supplier_seed as (
   select supplier_name
   from procurement_payables_status
@@ -168,3 +176,25 @@ from gl_cash_flow_statement(current_date - 30, current_date, null);
 
 select 'gl_statement_lines_rows' as check_name, count(*)::text as result
 from gl_statement_lines(current_date - 30, current_date, null);
+
+select 'procurement_receipt_events_missing_batches_rows' as check_name, count(*)::text as result
+from procurement_receipt_events
+where total_cost_lyd > 0
+  and journal_batch_id is null;
+
+select 'procurement_return_events_missing_batches_rows' as check_name, count(*)::text as result
+from procurement_return_events
+where total_cost_lyd > 0
+  and journal_batch_id is null;
+
+select 'procurement_paid_orders_missing_batches_rows' as check_name, count(*)::text as result
+from procurement_orders
+where payment_status = 'paid'
+  and coalesce(total_cost_lyd, 0) > 0
+  and payment_journal_batch_id is null;
+
+select 'procurement_received_orders_missing_batches_rows' as check_name, count(*)::text as result
+from procurement_orders
+where coalesce(quantity_received, 0) > 0
+  and coalesce(total_cost_lyd, 0) > 0
+  and received_journal_batch_id is null;

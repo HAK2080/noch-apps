@@ -12,6 +12,7 @@ import {
   getInventoryStockValuation,
   getInventoryReorderSuggestions,
   getInventorySupplierPriceHistory,
+  getProcurementPayablesStatus,
   receiveProcurementOrder,
   returnProcurementOrder,
   supabase,
@@ -113,6 +114,7 @@ export default function ProcurementOrders() {
   const [valuationRows, setValuationRows] = useState([])
   const [reorderRows, setReorderRows] = useState([])
   const [priceHistory, setPriceHistory] = useState([])
+  const [payablesRows, setPayablesRows] = useState([])
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -163,18 +165,20 @@ export default function ProcurementOrders() {
   async function loadData() {
     try {
       setLoading(true)
-      const [orderData, ingredientData, valuationData, reorderData, priceData] = await Promise.all([
+      const [orderData, ingredientData, valuationData, reorderData, priceData, payablesData] = await Promise.all([
         getProcurementOrders(),
         getIngredientsForCost(),
         getInventoryStockValuation().catch(() => []),
         getInventoryReorderSuggestions().catch(() => []),
         getInventorySupplierPriceHistory().catch(() => []),
+        getProcurementPayablesStatus().catch(() => []),
       ])
       setOrders(orderData || [])
       setIngredients(ingredientData || [])
       setValuationRows(valuationData || [])
       setReorderRows(reorderData || [])
       setPriceHistory(priceData || [])
+      setPayablesRows(payablesData || [])
     } catch (err) {
       toast.error(tr('loadError', 'Failed to load procurement data'))
     } finally {
@@ -216,6 +220,22 @@ export default function ProcurementOrders() {
     if (ingredientFilter && o.ingredient_id !== ingredientFilter) return false
     return true
   })
+  const payableSnapshotRows = useMemo(() => {
+    return [...payablesRows]
+      .sort((a, b) => {
+        const aOpen = Number(a.outstanding_amount_lyd || 0) > 0 ? 0 : 1
+        const bOpen = Number(b.outstanding_amount_lyd || 0) > 0 ? 0 : 1
+        if (aOpen !== bOpen) return aOpen - bOpen
+        const aDate = a.due_date || a.invoice_date || a.created_at || ''
+        const bDate = b.due_date || b.invoice_date || b.created_at || ''
+        return String(aDate).localeCompare(String(bDate))
+      })
+      .slice(0, 6)
+  }, [payablesRows])
+  const overduePayables = useMemo(
+    () => payablesRows.filter(row => Number(row.outstanding_amount_lyd || 0) > 0 && Number(row.days_past_due || 0) > 0),
+    [payablesRows],
+  )
 
   // Totals
   const totalCost = filtered.reduce((sum, o) => sum + (parseFloat(o.total_cost_lyd) || 0), 0)
@@ -532,7 +552,47 @@ export default function ProcurementOrders() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr_1fr] gap-4">
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h2 className="text-white font-semibold">Payables snapshot</h2>
+              <span className="text-noch-muted text-xs">{overduePayables.length} overdue</span>
+            </div>
+            <p className="text-noch-muted text-sm mb-3">
+              Read-only view of supplier invoices, due dates, and paid status from the payable register.
+            </p>
+            {payableSnapshotRows.length === 0 ? (
+              <p className="text-noch-muted text-sm">No supplier invoices in the payable register yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {payableSnapshotRows.map(row => {
+                  const isPaid = row.payment_status === 'paid' || Number(row.outstanding_amount_lyd || 0) <= 0
+                  return (
+                    <div key={row.id} className="rounded-lg border border-noch-border/60 bg-noch-dark/40 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-white text-sm font-medium truncate">{row.supplier_name || 'Unspecified supplier'}</p>
+                        <span className={`text-[10px] font-semibold uppercase ${
+                          isPaid ? 'text-noch-green' : Number(row.days_past_due || 0) > 30 ? 'text-red-400' : 'text-yellow-300'
+                        }`}>
+                          {isPaid ? 'paid' : row.aging_bucket}
+                        </span>
+                      </div>
+                      <p className="text-noch-muted text-xs mt-1">
+                        {row.invoice_no || 'No invoice #'} · due {row.due_date || row.invoice_date || 'n/a'}
+                      </p>
+                      <div className="flex items-center justify-between mt-2 text-xs font-mono">
+                        <span className="text-white">{Number(row.total_cost_lyd || 0).toFixed(2)} LYD</span>
+                        <span className={isPaid ? 'text-noch-green' : 'text-yellow-300'}>
+                          {isPaid ? 'Paid' : `${Number(row.outstanding_amount_lyd || 0).toFixed(2)} open`}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="rounded-xl border border-noch-border bg-noch-card p-4">
             <div className="flex items-center justify-between gap-2 mb-3">
               <h2 className="text-white font-semibold">Reorder suggestions</h2>
