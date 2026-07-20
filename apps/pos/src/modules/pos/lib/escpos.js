@@ -77,6 +77,9 @@ function encodeForPrinter(text) {
 // totals and double up the separator bar on a 58mm unit.)
 const RECEIPT_WIDTH = 32
 const TRANSPORT_KEY = 'noch_printer_transport'
+const SERIAL_BAUD_KEY = 'noch_printer_serial_baud'
+const DEFAULT_SERIAL_BAUD = 9600
+const VALID_SERIAL_BAUDS = new Set([9600, 19200, 38400, 115200])
 
 // ──────────────────────────────────────────────────────────────────
 // Transport façade. Two implementations live in sibling modules and
@@ -109,12 +112,46 @@ function defaultTransportKind() {
 
 let _kind = readSavedTransport() || defaultTransportKind()
 
+function normaliseSerialBaudRate(value) {
+  const baudRate = Number(value)
+  return VALID_SERIAL_BAUDS.has(baudRate) ? baudRate : DEFAULT_SERIAL_BAUD
+}
+
+function readSavedSerialBaudRate() {
+  try {
+    return normaliseSerialBaudRate(localStorage.getItem(SERIAL_BAUD_KEY))
+  } catch {
+    return DEFAULT_SERIAL_BAUD
+  }
+}
+
+function saveSerialBaudRate(baudRate) {
+  const normalised = normaliseSerialBaudRate(baudRate)
+  try { localStorage.setItem(SERIAL_BAUD_KEY, String(normalised)) } catch { /* ignore */ }
+  return normalised
+}
+
+function resolveConnectOpts(kind, opts = {}) {
+  const connectOpts = typeof opts === 'number' ? { baudRate: opts } : (opts || {})
+  if (kind !== 'serial') return connectOpts
+  const baudRate = saveSerialBaudRate(connectOpts.baudRate ?? readSavedSerialBaudRate())
+  return { ...connectOpts, baudRate }
+}
+
 export function getTransport() {
   return _kind
 }
 
 export function getTransportLabel() {
   return TRANSPORTS[_kind]?.label || _kind
+}
+
+export function getDefaultSerialBaudRate() {
+  return readSavedSerialBaudRate()
+}
+
+export function setDefaultSerialBaudRate(baudRate) {
+  return saveSerialBaudRate(baudRate)
 }
 
 export function isTransportAvailable(kind = _kind) {
@@ -139,7 +176,7 @@ export function setTransport(kind) {
 export async function connectPrinter(opts = {}) {
   const t = TRANSPORTS[_kind]
   if (!t) throw new Error('No transport selected')
-  const connectOpts = typeof opts === 'number' ? { baudRate: opts } : (opts || {})
+  const connectOpts = resolveConnectOpts(_kind, opts)
   return t.connect(connectOpts)
 }
 
@@ -163,9 +200,20 @@ export async function autoConnectPrinter(opts = {}) {
   const t = TRANSPORTS[_kind]
   if (typeof t?.autoConnect !== 'function') return false
   try {
-    return await t.autoConnect(opts)
+    return await t.autoConnect(resolveConnectOpts(_kind, opts))
   } catch {
     return false
+  }
+}
+
+export function getPrinterConnectionDetails() {
+  const t = TRANSPORTS[_kind]
+  const details = typeof t?.getConnectionInfo === 'function' ? t.getConnectionInfo() : null
+  return {
+    connected: isPrinterConnected(),
+    transport: _kind,
+    label: getTransportLabel(),
+    ...(details || {}),
   }
 }
 

@@ -10,6 +10,7 @@ import {
   connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
   printTestPage, openCashDrawer,
   getTransport, setTransport, isTransportAvailable, getTransportLabel,
+  getDefaultSerialBaudRate, setDefaultSerialBaudRate, getPrinterConnectionDetails,
 } from '../lib/escpos'
 import {
   isPrintHost, setPrintHost,
@@ -46,6 +47,11 @@ function FlagRow({ label, hint, value, onChange }) {
   )
 }
 
+function formatUsbId(value) {
+  if (value == null) return null
+  return `0x${Number(value).toString(16).toUpperCase().padStart(4, '0')}`
+}
+
 // When `onClose` is provided, POSSettings renders as a full-screen overlay
 // on top of POSTerminal (no Layout wrapper, back button calls onClose).
 // When absent, it works as a standalone route (existing behaviour).
@@ -62,8 +68,9 @@ export default function POSSettings({ onClose } = {}) {
   const [loading, setLoading] = useState(true)
   const [printerConnected, setPrinterConnected] = useState(isPrinterConnected())
   const [connecting, setConnecting] = useState(false)
-  const [baudRate, setBaudRate] = useState(9600)
+  const [baudRate, setBaudRate] = useState(() => getDefaultSerialBaudRate())
   const [transport, setTransportState] = useState(getTransport())
+  const [printerDetails, setPrinterDetails] = useState(() => getPrinterConnectionDetails())
   const [editing, setEditing] = useState(false)
   const [branchForm, setBranchForm] = useState({})
   const [savingBranch, setSavingBranch] = useState(false)
@@ -81,14 +88,19 @@ export default function POSSettings({ onClose } = {}) {
   const bluetoothAvailable = isTransportAvailable('bluetooth')
   const transportAvailable = isTransportAvailable(transport)
 
+  const refreshPrinterState = () => {
+    setPrinterConnected(isPrinterConnected())
+    setPrinterDetails(getPrinterConnectionDetails())
+  }
+
   // On mount: silently reconnect to the last-used printer. The host
   // subscriber is started unconditionally (if flagged) — do NOT gate it
   // on printer connect success, as POSTerminal is the primary start point.
   useEffect(() => {
     if (isPrintHost() && branchId) startHostSubscriber(branchId)
-    autoConnectPrinter({ baudRate }).then(ok => {
-      if (ok) setPrinterConnected(true)
-    }).catch(() => {})
+    autoConnectPrinter()
+      .catch(() => {})
+      .finally(() => refreshPrinterState())
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -153,7 +165,7 @@ export default function POSSettings({ onClose } = {}) {
   const handleConnectPrinter = async () => {
     if (printerConnected) {
       await disconnectPrinter()
-      setPrinterConnected(false)
+      refreshPrinterState()
       toast('Printer disconnected')
       return
     }
@@ -162,7 +174,7 @@ export default function POSSettings({ onClose } = {}) {
       // Façade routes to the active transport. Baud rate is only used by
       // the serial transport; bluetooth ignores it.
       await connectPrinter(transport === 'serial' ? { baudRate } : {})
-      setPrinterConnected(true)
+      refreshPrinterState()
       toast.success(`Connected via ${getTransportLabel()}`)
     } catch (err) {
       toast.error(err.message || 'Connection failed')
@@ -175,7 +187,13 @@ export default function POSSettings({ onClose } = {}) {
     if (kind === transport) return
     setTransport(kind)
     setTransportState(kind)
-    setPrinterConnected(isPrinterConnected())
+    setBaudRate(getDefaultSerialBaudRate())
+    refreshPrinterState()
+  }
+
+  const handleBaudRateChange = (value) => {
+    const nextBaudRate = setDefaultSerialBaudRate(Number(value))
+    setBaudRate(nextBaudRate)
   }
 
   const handleTestPrint = async () => {
@@ -234,6 +252,10 @@ export default function POSSettings({ onClose } = {}) {
     refund_applied: 'Refund applied',
     discount_applied: 'Discount applied',
   }
+
+  const usbVendorId = formatUsbId(printerDetails?.usbVendorId)
+  const usbProductId = formatUsbId(printerDetails?.usbProductId)
+  const activeBaudRate = printerDetails?.baudRate || baudRate
 
   return (
     <Layout>
@@ -312,12 +334,24 @@ export default function POSSettings({ onClose } = {}) {
             </span>
           </div>
 
+          {transport === 'serial' && (
+            <div className="rounded-lg border border-noch-border/70 bg-noch-dark/30 px-3 py-2 mb-3">
+              <p className="text-white text-xs font-medium">
+                {printerConnected ? `Active baud: ${activeBaudRate}` : `Saved baud: ${baudRate}`}
+                {usbVendorId || usbProductId ? ` • ${usbVendorId || 'VID ?'} / ${usbProductId || 'PID ?'}` : ''}
+              </p>
+              <p className="text-noch-muted text-xs mt-1">
+                Opening the USB serial port does not prove the printer responded. If Test Print and Test Open Drawer both do nothing on Bloom POS, disconnect and reconnect the printer at 9600 first, then 115200. The drawer opens through the printer kick command, so it will not fire until printing works.
+              </p>
+            </div>
+          )}
+
           {!printerConnected && transport === 'serial' && (
             <div className="mb-3">
               <label className="label block mb-1">Baud Rate</label>
               <select
                 value={baudRate}
-                onChange={e => setBaudRate(Number(e.target.value))}
+                onChange={e => handleBaudRateChange(e.target.value)}
                 className="input py-1.5 text-sm"
               >
                 <option value={9600}>9600</option>
