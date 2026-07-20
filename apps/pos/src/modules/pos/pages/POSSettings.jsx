@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Monitor } from 'lucide-react'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Monitor, Download } from 'lucide-react'
 import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
@@ -313,17 +313,24 @@ export default function POSSettings({ onClose } = {}) {
           )}
 
           {!printerConnected && transport === 'windows' && (
-            <div className="bg-blue-400/10 border border-blue-400/20 rounded-lg px-3 py-2 mb-3">
-              <p className="text-blue-200 text-xs">
-                For Bloom's XP-N200L on Windows. Install the Noch Print Agent once, then connect here. This setting only applies to this PC.
-              </p>
+            <div className="bg-blue-400/10 border border-blue-400/20 rounded-xl px-4 py-3 mb-3">
+              <p className="text-blue-100 text-sm font-semibold">Bloom Windows printer setup</p>
+              <ol className="text-blue-200/80 text-xs mt-2 space-y-1 list-decimal list-inside">
+                <li>Download and open the installer once on this PC.</li>
+                <li>Accept the Windows administrator prompt.</li>
+                <li>Return here and click Connect Windows USB Printer.</li>
+              </ol>
               <a
-                href="/noch-print-agent/noch-print-agent.zip"
-                className="inline-block text-noch-green text-xs font-semibold mt-2 hover:underline"
+                href="/noch-print-agent/Noch-Bloom-Printer-Setup.exe"
+                className="btn-primary mt-3 w-full py-2.5 flex items-center justify-center gap-2 text-sm"
                 download
               >
-                Download Windows Print Agent
+                <Download size={15} />
+                Install Bloom Printer
               </a>
+              <p className="text-noch-muted text-[11px] mt-2">
+                Requires the XP-N200L Windows driver and a successful Windows test page. This installer affects only this Bloom PC.
+              </p>
             </div>
           )}
 
