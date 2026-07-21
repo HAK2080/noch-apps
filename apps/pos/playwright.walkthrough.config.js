@@ -25,7 +25,7 @@ export default defineConfig({
   projects: [
     {
       name: 'readonly-walkthrough',
-      testMatch: '**/walkthrough-readonly.spec.js',
+      testMatch: '**/*readonly*.spec.js',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
