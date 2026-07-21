@@ -145,7 +145,7 @@ export async function getProductPopularity(branchId) {
 export async function getAllProducts() {
   const { data, error } = await supabase
     .from('pos_products')
-    .select('*, pos_categories(name, name_ar, color), pos_branches(name)')
+    .select('*, pos_categories(name, name_ar, color), pos_branches!pos_products_branch_id_fkey(name)')
     .eq('is_active', true)
     .order('name')
   if (error) throw error
