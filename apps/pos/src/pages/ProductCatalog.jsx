@@ -11,12 +11,13 @@ import toast from 'react-hot-toast'
 import {
   getPOSBranches, getAllProducts, getAllCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
-  getProductSalesStats, uploadProductImage,
+  getProductSalesStats, uploadProductImage, getProductCostComponents,
+  replaceProductCostComponents,
 } from '../modules/pos/lib/pos-supabase'
-import { getRecipesForCost, getCurrencyRates, calcCostPerBaseUnit } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
 import CoffeeConsumptionField from '../modules/pos/components/CoffeeConsumptionField'
+import ProductCostComponents from '../modules/pos/components/ProductCostComponents'
 import {
   STOCK_UNIT_OPTIONS,
   convertDisplayedQuantity,
@@ -26,21 +27,9 @@ import {
   toBaseQuantity,
 } from '../modules/pos/lib/inventory-units'
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
+import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
 
 // ─── helpers ──────────────────────────────────────────────────
-function calcRecipeCost(recipe, rates) {
-  return (recipe.recipe_ingredients || []).reduce((sum, ri) => {
-    if (ri.is_fixed_cost) return sum + (parseFloat(ri.fixed_cost_lyd) || 0)
-    const ing = ri.ingredient
-    if (!ing || !ri.qty_used) return sum
-    const cpp = calcCostPerBaseUnit(
-      parseFloat(ing.bulk_qty), ing.bulk_unit,
-      parseFloat(ing.bulk_cost), ing.purchase_currency, rates
-    )
-    return sum + cpp * parseFloat(ri.qty_used)
-  }, 0)
-}
-
 function fmt(n) { return parseFloat(n || 0).toFixed(3) }
 
 // ─── Margin display ───────────────────────────────────────────
@@ -140,7 +129,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
 
 // ─── Edit / Add modal ─────────────────────────────────────────
 const BLANK = {
-  name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
+  name: '', name_ar: '', price: '', cost_price: '', manual_cost_lyd: '', barcode: '', sku: '',
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
   stock_base_unit: 'pc', stock_display_unit: 'pc',
@@ -150,7 +139,7 @@ const BLANK = {
   is_available: true,
 }
 
-function ProductModal({ product, products, categories, branches, recipes, rates, onSave, onClose }) {
+function ProductModal({ product, products, categories, branches, canEditCost, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (product) {
       const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
@@ -159,6 +148,7 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
         ...product,
         price: product.price ?? '',
         cost_price: product.cost_price ?? '',
+        manual_cost_lyd: product.manual_cost_lyd ?? product.cost_price ?? '',
         cost_recipe_id: product.cost_recipe_id ?? '',
         stock_base_unit: product.stock_base_unit || getStockBaseUnit(displayUnit),
         stock_display_unit: displayUnit,
@@ -177,7 +167,8 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
-  const [recipeCalc, setRecipeCalc] = useState(null)
+  const [costComponents, setCostComponents] = useState([])
+  const [costComponentsLoading, setCostComponentsLoading] = useState(!!product?.id)
   const [pendingFile, setPendingFile] = useState(null)
   const [pendingPreview, setPendingPreview] = useState(null)
   const fileRef = useRef()
@@ -208,15 +199,24 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
     setForm(f => (f.visible_branch_ids?.length ? f : { ...f, visible_branch_ids: branches.map(b => b.id) }))
   }, [branches, isEdit])
 
-  // Live cost preview from the linked recipe — recomputes each time
-  // ingredients change. cost_price stays manual; this is just a hint.
   useEffect(() => {
-    if (!form.cost_recipe_id) { setRecipeCalc(null); return }
-    const r = recipes.find(x => x.id === form.cost_recipe_id)
-    if (!r) { setRecipeCalc(null); return }
-    const cost = calcRecipeCost(r, rates)
-    setRecipeCalc({ cost, name: r.name })
-  }, [form.cost_recipe_id, recipes, rates])
+    let cancelled = false
+    if (!product?.id || !canEditCost) {
+      setCostComponentsLoading(false)
+      return undefined
+    }
+    getProductCostComponents(product.id)
+      .then(rows => {
+        if (!cancelled) setCostComponents(rows.map(row => ({ ...row })))
+      })
+      .catch(error => {
+        if (!cancelled) toast.error(error.message || 'Failed to load product ingredients')
+      })
+      .finally(() => {
+        if (!cancelled) setCostComponentsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [product?.id, canEditCost])
 
   const toggleBranch = (id) => setForm(f => {
     const cur = Array.isArray(f.visible_branch_ids) ? f.visible_branch_ids : []
@@ -225,6 +225,18 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.price) return toast.error('Name and price required')
+    if (costComponentsLoading) return toast.error('Please wait for ingredients to finish loading')
+
+    const productCost = calculateProductCost({
+      components: costComponents,
+      inventoryProducts: products,
+      coffeeGrams: form.is_coffee_bean ? null : form.coffee_grams_per_sale,
+      coffeeBeanProductId: resolvedCoffeeBeanProductId,
+      manualProductCost: form.manual_cost_lyd,
+    })
+    if (canEditCost && productCost.source === 'incomplete') {
+      return toast.error('Add a manual cost for every ingredient without an inventory cost')
+    }
     setSaving(true)
     try {
       const payload = {
@@ -233,7 +245,13 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
         price: parseFloat(form.price),
         cost_price: form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
           ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
-          : form.cost_price ? parseFloat(form.cost_price) : null,
+          : canEditCost ? productCost.effectiveCost : (product?.cost_price ?? null),
+        cost_lyd: form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
+          ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
+          : canEditCost ? productCost.effectiveCost : (product?.cost_lyd ?? null),
+        manual_cost_lyd: canEditCost
+          ? (form.manual_cost_lyd === '' ? null : parseFloat(form.manual_cost_lyd))
+          : (product?.manual_cost_lyd ?? product?.cost_price ?? null),
         stock_cost_per_base_unit: form.stock_cost_per_base_unit ? parseFloat(form.stock_cost_per_base_unit) : null,
         retail_pack_size_base_units: form.retail_pack_size_base_units ? parseFloat(form.retail_pack_size_base_units) : null,
         is_coffee_bean: !!form.is_coffee_bean,
@@ -243,7 +261,7 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
         stock_qty: toBaseQuantity(parseFloat(form.stock_qty) || 0, form.stock_display_unit),
         low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
         coffee_grams_per_sale: normalizeCoffeeGrams(form.coffee_grams_per_sale),
-        coffee_bean_product_id: form.coffee_bean_product_id || null,
+        coffee_bean_product_id: normalizeCoffeeGrams(form.coffee_grams_per_sale) ? (resolvedCoffeeBeanProductId || null) : null,
         category_id: form.category_id || null,
         visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
         visible_on_menu:          !!form.visible_on_menu,
@@ -262,6 +280,10 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
         saved = await updatePOSProduct(product.id, payload)
       } else {
         saved = await createPOSProduct(payload)
+      }
+
+      if (canEditCost) {
+        await replaceProductCostComponents(saved.id, serializeCostComponents(costComponents))
       }
 
       // If the user picked a photo before saving (new product flow), upload now
@@ -308,10 +330,19 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
   }
 
   const beanProducts = (products || []).filter(candidate => candidate.is_coffee_bean && candidate.id !== product?.id)
+  const defaultBeanProduct = beanProducts.find(candidate => candidate.name?.toLowerCase().includes('ghadamis')) || beanProducts[0]
+  const resolvedCoffeeBeanProductId = form.coffee_bean_product_id || defaultBeanProduct?.id || ''
   const calculatedRetailCost = form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
     ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
     : null
-  const effectiveCost = calculatedRetailCost ?? (form.cost_price ? parseFloat(form.cost_price) : null)
+  const productCost = calculateProductCost({
+    components: costComponents,
+    inventoryProducts: products,
+    coffeeGrams: form.is_coffee_bean ? null : form.coffee_grams_per_sale,
+    coffeeBeanProductId: resolvedCoffeeBeanProductId,
+    manualProductCost: form.manual_cost_lyd,
+  })
+  const effectiveCost = calculatedRetailCost ?? productCost.effectiveCost
   const margin = form.price && effectiveCost !== null
     ? ((parseFloat(form.price) - effectiveCost) / parseFloat(form.price) * 100)
     : null
@@ -374,8 +405,8 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
                 <input type="number" value={form.price} onChange={e => set('price', e.target.value)} className="input" placeholder="8.500" step="0.001" min="0" />
               </div>
               <div>
-                <label className="label">Cost Price (LYD)</label>
-                <input type="number" value={form.cost_price} onChange={e => set('cost_price', e.target.value)} className="input" placeholder="3.200" step="0.001" min="0" />
+                <label className="label">Manual cost fallback (LYD)</label>
+                <input type="number" value={form.manual_cost_lyd} onChange={e => set('manual_cost_lyd', e.target.value)} className="input" placeholder="3.200" step="0.001" min="0" disabled={!canEditCost} />
               </div>
             </div>
 
@@ -385,38 +416,9 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
                 <TrendingUp size={14} className={margin >= 55 ? 'text-emerald-400' : margin >= 35 ? 'text-amber-400' : 'text-red-400'} />
                 <span className="text-zinc-400 text-xs">Gross margin:</span>
                 <span className={`font-bold ${margin >= 55 ? 'text-emerald-400' : margin >= 35 ? 'text-amber-400' : 'text-red-400'}`}>{margin.toFixed(1)}%</span>
-                <span className="text-zinc-600 text-xs ml-auto">profit {fmt(parseFloat(form.price || 0) - parseFloat(form.cost_price || 0))} LYD</span>
+                <span className="text-zinc-600 text-xs ml-auto">profit {fmt(parseFloat(form.price || 0) - effectiveCost)} LYD</span>
               </div>
             )}
-
-            {/* Linked recipe — drives the live cost hint shown next to Cost Price.
-                Cost Price stays manual; this just suggests the up-to-date value. */}
-            <div>
-              <label className="label">Linked recipe (optional)</label>
-              <select value={form.cost_recipe_id} onChange={e => set('cost_recipe_id', e.target.value)} className="input">
-                <option value="">— None —</option>
-                {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
-              {recipeCalc && (
-                <div className="mt-2 flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.18)' }}>
-                  <span className="text-zinc-400 text-xs flex-1">
-                    Latest cost from <span className="text-white">{recipeCalc.name}</span> (current inventory):{' '}
-                    <span className="text-noch-green font-bold">{fmt(recipeCalc.cost)} LYD</span>
-                    {form.cost_price && Math.abs(parseFloat(form.cost_price) - recipeCalc.cost) > 0.001 && (
-                      <span className="text-amber-400 text-[11px] ms-2">· cost price differs ({fmt(parseFloat(form.cost_price))})</span>
-                    )}
-                  </span>
-                  <button
-                    onClick={() => set('cost_price', recipeCalc.cost.toFixed(3))}
-                    className="text-xs font-semibold px-3 py-1 rounded-lg transition-colors"
-                    style={{ background: 'rgba(74,222,128,0.15)', color: '#4ADE80' }}
-                  >
-                    Use latest
-                  </button>
-                </div>
-              )}
-              <p className="text-zinc-600 text-[11px] mt-1">Cost Price below is what the system uses. The hint above shows what it would be from current ingredient prices — apply only when you want to.</p>
-            </div>
 
             <div className="rounded-xl border border-noch-border p-3">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -460,6 +462,19 @@ function ProductModal({ product, products, categories, branches, recipes, rates,
               onBeanProductChange={value => set('coffee_bean_product_id', value)}
               beanProducts={beanProducts}
             />}
+
+            {canEditCost && (
+              costComponentsLoading
+                ? <div className="rounded-xl border border-noch-border p-4 text-center text-noch-muted text-xs">Loading ingredients…</div>
+                : <ProductCostComponents
+                    components={costComponents}
+                    onChange={setCostComponents}
+                    inventoryProducts={(products || []).filter(candidate => candidate.id !== product?.id)}
+                    coffeeGrams={form.is_coffee_bean ? null : form.coffee_grams_per_sale}
+                    coffeeBeanProductId={resolvedCoffeeBeanProductId}
+                    manualProductCost={form.manual_cost_lyd}
+                  />
+            )}
 
             {/* Category + SKU */}
             <div className="grid grid-cols-2 gap-3">
@@ -639,8 +654,6 @@ export default function ProductCatalog() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [salesStats, setSalesStats] = useState({})
-  const [recipes, setRecipes] = useState([])
-  const [rates, setRates] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -650,13 +663,11 @@ export default function ProductCatalog() {
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
 
-  // Load branches + recipes + rates once
+  // Load branches once.
   useEffect(() => {
-    Promise.all([getPOSBranches(), getRecipesForCost(), getCurrencyRates()])
-      .then(([b, r, rates]) => {
+    getPOSBranches()
+      .then(b => {
         setBranches(b)
-        setRecipes(r)
-        setRates(rates)
         // activeBranch is now optional — used as a FILTER on the global catalog,
         // not a scope for what's loaded
       })
@@ -820,8 +831,7 @@ export default function ProductCatalog() {
           products={products}
           categories={categories}
           branches={branches}
-          recipes={recipes}
-          rates={rates}
+          canEditCost={perms.cost}
           onSave={() => { setShowAdd(false); setEditProduct(null); load() }}
           onClose={() => { setShowAdd(false); setEditProduct(null) }}
         />

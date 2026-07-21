@@ -40,6 +40,14 @@ _Avoid_: Menu product when referring to raw materials
 The stock item and quantity consumed when one unit of a menu product is sold.
 _Avoid_: Product stock when referring to recipe usage
 
+**Product cost component**:
+A stock-linked or manually priced ingredient entered directly on a menu product, with the quantity and unit used for one sale.
+_Avoid_: Linked recipe
+
+**Resolved product cost**:
+The sum of a menu product's complete cost components. A stock item's base-unit cost is preferred; a component's manual unit cost is the fallback when stock cost is unavailable. A manual product cost is used only when no components exist.
+_Avoid_: Treating an unpriced component as zero
+
 **Central roasted storage**:
 The central inventory location that holds roasted Ghadamis coffee beans before transfer to a branch.
 _Avoid_: Branch stock, green-bean storage

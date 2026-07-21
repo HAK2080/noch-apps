@@ -723,6 +723,26 @@ export async function updateProductStock(productId, newQty) {
   return data
 }
 
+export async function getProductCostComponents(productId) {
+  if (!productId) return []
+  const { data, error } = await supabase
+    .from('pos_product_cost_components')
+    .select('*')
+    .eq('product_id', productId)
+    .order('sort_order')
+  if (error) throw error
+  return data || []
+}
+
+export async function replaceProductCostComponents(productId, components) {
+  const { data, error } = await supabase.rpc('replace_pos_product_cost_components', {
+    p_product_id: productId,
+    p_components: components,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function receiveProductStock(productId, quantity, unit, actorProfileId = null) {
   const sourceRef = typeof crypto !== 'undefined' && crypto.randomUUID
     ? `pos:${crypto.randomUUID()}`
