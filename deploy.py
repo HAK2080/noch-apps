@@ -131,7 +131,7 @@ def build(target_key: str):
     result = subprocess.run(
         ["npm", "run", "build"],
         cwd=str(cfg["cwd"]),
-        shell=True,
+        shell=(os.name == "nt"),
     )
     if result.returncode != 0:
         sys.exit(f"Build failed for {target_key}")
