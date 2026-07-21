@@ -20,6 +20,7 @@ import {
   setProductSoldOut, receiveProductStock, getAllModifierData, getModifierGroupsForProduct,
 } from '../lib/pos-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
+import { getProductLongPressAction } from '../lib/product-long-press'
 import POSPinLogin from './POSPinLogin'
 import ShiftAttendees from '../components/ShiftAttendees'
 import ProductModifierModal from '../components/ProductModifierModal'
@@ -558,6 +559,18 @@ export default function POSTerminal() {
     }
   }, [])
 
+  const handleProductLongPress = useCallback(async (product) => {
+    if (getProductLongPressAction(product) === 'restore_availability') {
+      try {
+        await handleSoldOutToggle(product)
+      } catch {
+        // The toggle handler already reports and reverts the failed update.
+      }
+      return
+    }
+    setStockProduct(product)
+  }, [handleSoldOutToggle])
+
   const handleReceiveStock = useCallback(async (product, quantity) => {
     const actorProfileId = getServedBy()?.id || profile?.id || null
     try {
@@ -1063,7 +1076,7 @@ export default function POSTerminal() {
             products={products}
             categories={categories}
             onSelect={addToCart}
-            onLongPress={setStockProduct}
+            onLongPress={handleProductLongPress}
             blockOutOfStock={!!settings?.block_out_of_stock}
             searchQuery={searchQuery}
             tileLang={tileLang}
