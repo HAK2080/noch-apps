@@ -27,6 +27,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - run: npm ci
+        working-directory: apps/pos
       - run: pip install --quiet paramiko
       - name: Write application environment
         working-directory: apps/pos
