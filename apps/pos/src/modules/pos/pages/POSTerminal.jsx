@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle } from 'lucide-react'
+import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../loyalty/lib/loyalty-supabase'
 import { format, round, sum, lineTotal } from '../lib/money'
@@ -989,6 +989,10 @@ export default function POSTerminal() {
                 <button onClick={() => { navigate(`/pos/${branchId}/stock-check`); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
                   <ClipboardList size={16} /> Stock Check
+                </button>
+                <button onClick={() => { navigate(`/pos/${branchId}/waste`); setShowMore(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
+                  <Trash2 size={16} /> Report Waste
                 </button>
                 <button onClick={() => { navigate(`/pos/${branchId}/end-of-day`); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">

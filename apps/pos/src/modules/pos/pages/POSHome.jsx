@@ -3,14 +3,20 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, MapPin, Plus, Clock } from 'lucide-react'
+import { ShoppingCart, MapPin, Plus, Clock, Trash2 } from 'lucide-react'
 import { getPOSBranches, getOpenShift, openShift } from '../lib/pos-supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import { isKioskMode } from '../lib/pos-kiosk'
 import toast from 'react-hot-toast'
 
-function BranchCard({ branch, onOpen, onSelect }) {
+// In kiosk mode we render a minimal full-screen branch picker instead
+// of wrapping in <Layout> (which adds the app sidebar/back-to-dashboard).
+function KioskWrapper({ children }) {
+  return <div className="min-h-screen bg-noch-dark px-4 py-8 sm:py-12">{children}</div>
+}
+
+function BranchCard({ branch, onOpen, onSelect, onWaste }) {
   const [shift, setShift] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -71,6 +77,15 @@ function BranchCard({ branch, onOpen, onSelect }) {
           </div>
         )}
       </div>
+
+      {/* Report waste */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onWaste(branch) }}
+        className="btn-secondary text-xs px-3 py-1.5 mt-3 w-full flex items-center justify-center gap-1.5"
+      >
+        <Trash2 size={12} />
+        Report waste
+      </button>
     </div>
   )
 }
@@ -83,11 +98,7 @@ export default function POSHome() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const kiosk = isKioskMode()
-  // In kiosk mode we render a minimal full-screen branch picker instead
-  // of wrapping in <Layout> (which adds the app sidebar/back-to-dashboard).
-  const Wrapper = kiosk
-    ? ({ children }) => <div className="min-h-screen bg-noch-dark px-4 py-8 sm:py-12">{children}</div>
-    : Layout
+  const Wrapper = kiosk ? KioskWrapper : Layout
 
   useEffect(() => {
     getPOSBranches()
@@ -134,6 +145,7 @@ export default function POSHome() {
               branch={branch}
               onOpen={(b) => { setOpeningShift(b); setOpeningCash('') }}
               onSelect={(b) => navigate(`/pos/${b.id}`)}
+              onWaste={(b) => navigate(`/pos/${b.id}/waste`)}
             />
           ))}
         </div>

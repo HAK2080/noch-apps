@@ -104,6 +104,20 @@ a full-system audit with file:line evidence for every known defect.
 
 ## Change log
 
+### 2026-07-21 — Central warehouse, transfers, waste tracking
+- Migrations `20260719180000` + `20260719190000`: product-level warehouse
+  stock (`location_product_stock`), full request → ship → receive transfer
+  flow with in-transit visibility and discrepancy capture
+  (`inventory_transfers`, computed `inventory_in_transit` view), waste
+  reporting RPC with required reasons (used / damaged / lost / thrown away /
+  expired / staff meal / count correction), per-branch min/target par
+  levels, warehouse stock intake + transfer cancel RPCs.
+- New screens: Inventory → Warehouse Stock (with receive form), Branch
+  Stock (par editing), Requests, Transfers (ship/receive queues), In
+  Transit, Movement History; POS → "Report waste" barista screen (big
+  reason buttons) on POS home + terminal menu.
+- Research basis: docs/research/2026-07-21-central-inventory-best-practices.md.
+
 ### 2026-07-19 — Payroll runs, staff loans, GL posting, cost allocation
 - Migration `20260719130000_payroll_runs_and_loans.sql`: monthly payroll
   runs (generate draft from profile salaries + adjustments + loan

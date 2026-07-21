@@ -46,6 +46,12 @@ const StockManager     = lazy(() => import('./pages/inventory/StockManager'))
 const ProcurementOrders= lazy(() => import('./pages/inventory/ProcurementOrders'))
 const Suppliers        = lazy(() => import('./pages/inventory/Suppliers'))
 const StockCheckAll    = lazy(() => import('./pages/StockCheckAll'))
+const WarehouseStock   = lazy(() => import('./pages/inventory/WarehouseStock'))
+const BranchStock      = lazy(() => import('./pages/inventory/BranchStock'))
+const TransferRequests = lazy(() => import('./pages/inventory/TransferRequests'))
+const Transfers        = lazy(() => import('./pages/inventory/Transfers'))
+const InTransit        = lazy(() => import('./pages/inventory/InTransit'))
+const MovementHistory  = lazy(() => import('./pages/inventory/MovementHistory'))
 const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
 const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
 
@@ -59,6 +65,7 @@ const POSSessions      = lazy(() => import('./modules/pos/pages/POSSessions'))
 const Sales            = lazy(() => import('./pages/Sales'))
 const POSReports       = lazy(() => import('./modules/pos/pages/POSReports'))
 const POSModifiers     = lazy(() => import('./modules/pos/pages/POSModifiers'))
+const POSWaste         = lazy(() => import('./modules/pos/pages/POSWaste'))
 const TableQRGenerator = lazy(() => import('./pages/TableQRGenerator'))
 
 const IdeasBoard       = lazy(() => import('./pages/ideas/IdeasBoard'))
@@ -249,6 +256,12 @@ export default function App() {
         <Route path="/inventory/stock" element={<ProtectedRoute><StockManager /></ProtectedRoute>} />
         <Route path="/inventory/procurement" element={<ProtectedRoute><OwnerRoute><ProcurementOrders /></OwnerRoute></ProtectedRoute>} />
         <Route path="/inventory/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+        <Route path="/inventory/warehouse" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
+        <Route path="/inventory/branch-stock" element={<ProtectedRoute><BranchStock /></ProtectedRoute>} />
+        <Route path="/inventory/requests" element={<ProtectedRoute><TransferRequests /></ProtectedRoute>} />
+        <Route path="/inventory/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
+        <Route path="/inventory/in-transit" element={<ProtectedRoute><InTransit /></ProtectedRoute>} />
+        <Route path="/inventory/movements" element={<ProtectedRoute><MovementHistory /></ProtectedRoute>} />
         <Route path="/inventory/intelligence" element={<ProtectedRoute><OwnerRoute><InventoryIntelligence /></OwnerRoute></ProtectedRoute>} />
 
         {/* Analytics (owner only) */}
@@ -302,6 +315,7 @@ export default function App() {
         <Route path="/pos/:branchId" element={<ProtectedRoute><POSTerminal /></ProtectedRoute>} />
         <Route path="/pos/:branchId/end-of-day" element={<ProtectedRoute><POSEndOfDay /></ProtectedRoute>} />
         <Route path="/pos/:branchId/inventory" element={<ProtectedRoute><POSInventory /></ProtectedRoute>} />
+        <Route path="/pos/:branchId/waste" element={<ProtectedRoute><POSWaste /></ProtectedRoute>} />
         <Route path="/pos/:branchId/settings" element={<ProtectedRoute><POSSettings /></ProtectedRoute>} />
         <Route path="/pos/:branchId/products" element={<ProtectedRoute><POSProducts /></ProtectedRoute>} />
         <Route path="/pos/:branchId/stock-check" element={<ProtectedRoute><POSStockCheck /></ProtectedRoute>} />

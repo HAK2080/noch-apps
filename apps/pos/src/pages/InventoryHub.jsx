@@ -7,13 +7,14 @@ import {
   Package, ShoppingCart, AlertTriangle, CheckCircle, TrendingDown,
   Bell, BellOff, Send, Users, Clock, RefreshCw, ChevronDown,
   ChevronUp, Loader2, MessageCircle, Settings, Lock, ClipboardList,
+  Warehouse, Store, ArrowRightLeft, Truck, PackagePlus, History,
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../contexts/PermissionsContext'
 import { supabase } from '../lib/supabase'
 import { sendTelegram } from '../lib/telegram'
-import { getPOSBranches, getAllLatestStockEntries } from '../modules/pos/lib/pos-supabase'
+import { getAllLatestStockEntries } from '../modules/pos/lib/pos-supabase'
 import ConsumptionCard from '../components/inventory/ConsumptionCard'
 import toast from 'react-hot-toast'
 
@@ -211,7 +212,7 @@ async function sendStockReport(flaggedItems, senderProfile) {
     try {
       await sendTelegram(user.telegram_chat_id, msg)
       sent++
-    } catch {}
+    } catch { /* best-effort: skip recipients whose send fails */ }
   }
 
   // Log the alert
@@ -480,6 +481,79 @@ export default function InventoryHub() {
                 <p className="text-noch-muted text-sm">Order tracking and cost management</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Central Warehouse */}
+        <div>
+          <h3 className="text-noch-muted text-xs font-semibold uppercase tracking-wide mb-3">Central Warehouse</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <button onClick={() => navigate('/inventory/warehouse')}
+              className="bg-noch-card border border-noch-border rounded-xl p-6 text-left hover:border-noch-green/50 transition-colors group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-noch-green/10 flex items-center justify-center">
+                  <Warehouse size={20} className="text-noch-green" />
+                </div>
+                <h2 className="text-white font-semibold text-lg group-hover:text-noch-green transition-colors">Warehouse Stock</h2>
+              </div>
+              <p className="text-noch-muted text-sm">What the central warehouse has on hand</p>
+            </button>
+
+            <button onClick={() => navigate('/inventory/branch-stock')}
+              className="bg-noch-card border border-noch-border rounded-xl p-6 text-left hover:border-noch-green/50 transition-colors group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-noch-green/10 flex items-center justify-center">
+                  <Store size={20} className="text-noch-green" />
+                </div>
+                <h2 className="text-white font-semibold text-lg group-hover:text-noch-green transition-colors">Branch Stock</h2>
+              </div>
+              <p className="text-noch-muted text-sm">Stock vs min/target par levels per branch</p>
+            </button>
+
+            <button onClick={() => navigate('/inventory/requests')}
+              className="bg-noch-card border border-noch-border rounded-xl p-6 text-left hover:border-noch-green/50 transition-colors group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-noch-green/10 flex items-center justify-center">
+                  <PackagePlus size={20} className="text-noch-green" />
+                </div>
+                <h2 className="text-white font-semibold text-lg group-hover:text-noch-green transition-colors">Request Stock</h2>
+              </div>
+              <p className="text-noch-muted text-sm">Ask the warehouse to send stock to a branch</p>
+            </button>
+
+            <button onClick={() => navigate('/inventory/transfers')}
+              className="bg-noch-card border border-noch-border rounded-xl p-6 text-left hover:border-noch-green/50 transition-colors group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-noch-green/10 flex items-center justify-center">
+                  <ArrowRightLeft size={20} className="text-noch-green" />
+                </div>
+                <h2 className="text-white font-semibold text-lg group-hover:text-noch-green transition-colors">Transfers</h2>
+              </div>
+              <p className="text-noch-muted text-sm">Ship from warehouse, receive at branch, history</p>
+            </button>
+
+            <button onClick={() => navigate('/inventory/in-transit')}
+              className="bg-noch-card border border-noch-border rounded-xl p-6 text-left hover:border-noch-green/50 transition-colors group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-noch-green/10 flex items-center justify-center">
+                  <Truck size={20} className="text-noch-green" />
+                </div>
+                <h2 className="text-white font-semibold text-lg group-hover:text-noch-green transition-colors">In Transit</h2>
+              </div>
+              <p className="text-noch-muted text-sm">Shipped but not yet received, per branch</p>
+            </button>
+
+            <button onClick={() => navigate('/inventory/movements')}
+              className="bg-noch-card border border-noch-border rounded-xl p-6 text-left hover:border-noch-green/50 transition-colors group">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-noch-green/10 flex items-center justify-center">
+                  <History size={20} className="text-noch-green" />
+                </div>
+                <h2 className="text-white font-semibold text-lg group-hover:text-noch-green transition-colors">Movement History</h2>
+              </div>
+              <p className="text-noch-muted text-sm">Sales, waste, transfers and adjustments log</p>
+            </button>
           </div>
         </div>
 
