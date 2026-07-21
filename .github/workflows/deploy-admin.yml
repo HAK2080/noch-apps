@@ -31,7 +31,7 @@ jobs:
       - name: Write application environment
         working-directory: apps/pos
         env:
-          APP_ENV: ${{ secrets.NOCH_POS_ENV }}
+          APP_ENV: ${{ secrets.NOCH_BACKEND_ENV }}
         run: printf '%s\n' "$APP_ENV" > .env
       - name: Write deploy key
         env:
