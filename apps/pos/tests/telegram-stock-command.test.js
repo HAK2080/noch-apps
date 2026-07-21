@@ -30,6 +30,23 @@ test('parses natural English and mixed stock receipts', () => {
   })
 })
 
+test('parses English and Arabic receiving units without treating them as product names', () => {
+  assert.deepEqual(parseStockReceiptMessage('received 3 kg Ghadamis coffee'), {
+    ok: true,
+    language: 'en',
+    quantity: 3,
+    unit: 'kg',
+    productQuery: 'Ghadamis coffee',
+  })
+  assert.deepEqual(parseStockReceiptMessage('استلمنا 2500 غرام قهوة غدامس'), {
+    ok: true,
+    language: 'ar',
+    quantity: 2500,
+    unit: 'g',
+    productQuery: 'قهوة غدامس',
+  })
+})
+
 test('requires both a positive quantity and product name', () => {
   assert.equal(parseStockReceiptMessage('تيراميسو').error, 'missing_quantity')
   assert.equal(parseStockReceiptMessage('20').error, 'missing_product')

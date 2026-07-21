@@ -16,6 +16,14 @@ import {
 import { getRecipesForCost, getCurrencyRates, calcCostPerBaseUnit } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
+import {
+  STOCK_UNIT_OPTIONS,
+  convertDisplayedQuantity,
+  formatStockQuantity,
+  fromBaseQuantity,
+  getStockBaseUnit,
+  toBaseQuantity,
+} from '../modules/pos/lib/inventory-units'
 
 // ─── helpers ──────────────────────────────────────────────────
 function calcRecipeCost(recipe, rates) {
@@ -42,13 +50,13 @@ function Margin({ price, cost, size = 'sm' }) {
 }
 
 // ─── Stock badge ──────────────────────────────────────────────
-function StockBadge({ qty, threshold, track }) {
+function StockBadge({ qty, threshold, track, unit }) {
   if (!track) return null
   const n = parseFloat(qty) || 0
   const t = parseFloat(threshold) || 5
   if (n <= 0) return <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/12 text-red-400 border border-red-500/20">Out</span>
-  if (n <= t) return <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/12 text-amber-400 border border-amber-500/20">Low {n}</span>
-  return <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/12 text-emerald-400 border border-emerald-500/20">{n}</span>
+  if (n <= t) return <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/12 text-amber-400 border border-amber-500/20">Low {formatStockQuantity(n, unit)}</span>
+  return <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/12 text-emerald-400 border border-emerald-500/20">{formatStockQuantity(n, unit)}</span>
 }
 
 // ─── Product card ─────────────────────────────────────────────
@@ -109,7 +117,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
             {product.cost_price && <p className="text-zinc-600 text-[11px] leading-tight">cost {fmt(product.cost_price)}</p>}
           </div>
           <div className="flex flex-col items-end gap-1">
-            <StockBadge qty={product.stock_qty} threshold={product.low_stock_alert} track={product.track_inventory} />
+            <StockBadge qty={product.stock_qty} threshold={product.low_stock_alert} track={product.track_inventory} unit={product.stock_display_unit} />
             <Margin price={product.price} cost={product.cost_price} size="xs" />
           </div>
         </div>
@@ -130,6 +138,7 @@ const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', barcode: '', sku: '',
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
+  stock_base_unit: 'pc', stock_display_unit: 'pc',
   visible_branch_ids: [], visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true,
   is_available: true,
 }
@@ -137,7 +146,18 @@ const BLANK = {
 function ProductModal({ product, categories, branches, recipes, rates, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (product) {
-      return { ...BLANK, ...product, price: product.price ?? '', cost_price: product.cost_price ?? '', cost_recipe_id: product.cost_recipe_id ?? '' }
+      const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
+      return {
+        ...BLANK,
+        ...product,
+        price: product.price ?? '',
+        cost_price: product.cost_price ?? '',
+        cost_recipe_id: product.cost_recipe_id ?? '',
+        stock_base_unit: product.stock_base_unit || getStockBaseUnit(displayUnit),
+        stock_display_unit: displayUnit,
+        stock_qty: fromBaseQuantity(product.stock_qty, displayUnit),
+        low_stock_alert: fromBaseQuantity(product.low_stock_alert, displayUnit),
+      }
     }
     // New product: default to ALL branches selected, customer-menu ON.
     // Owner can opt out of a branch by clicking it off.
@@ -160,6 +180,18 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
   useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const changeStockUnit = (nextUnit) => setForm(current => {
+    const previousUnit = current.stock_display_unit || 'pc'
+    const sameDimension = getStockBaseUnit(previousUnit) === getStockBaseUnit(nextUnit)
+    return {
+      ...current,
+      stock_base_unit: getStockBaseUnit(nextUnit),
+      stock_display_unit: nextUnit,
+      stock_qty: sameDimension ? convertDisplayedQuantity(current.stock_qty, previousUnit, nextUnit) : '0',
+      low_stock_alert: sameDimension ? convertDisplayedQuantity(current.low_stock_alert, previousUnit, nextUnit) : '5',
+    }
+  })
 
   // New product: auto-select all branches once they load (modal often opens
   // before parent finishes fetching branches, so the initializer sees []).
@@ -194,8 +226,10 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
         price: parseFloat(form.price),
         cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
         cost_recipe_id: form.cost_recipe_id || null,
-        stock_qty: parseFloat(form.stock_qty) || 0,
-        low_stock_alert: parseFloat(form.low_stock_alert) || 5,
+        stock_base_unit: getStockBaseUnit(form.stock_display_unit),
+        stock_display_unit: form.stock_display_unit,
+        stock_qty: toBaseQuantity(parseFloat(form.stock_qty) || 0, form.stock_display_unit),
+        low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
         category_id: form.category_id || null,
         visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
         visible_on_menu:          !!form.visible_on_menu,
@@ -399,7 +433,7 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                 <span className="text-white text-sm font-medium">Track stock level</span>
               </label>
               {form.track_inventory && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="label">Current Stock</label>
                     <input type="number" value={form.stock_qty} onChange={e => set('stock_qty', e.target.value)} className="input" step="0.01" />
@@ -407,6 +441,12 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
                   <div>
                     <label className="label">Low Stock Alert</label>
                     <input type="number" value={form.low_stock_alert} onChange={e => set('low_stock_alert', e.target.value)} className="input" step="0.01" />
+                  </div>
+                  <div>
+                    <label className="label">Unit</label>
+                    <select value={form.stock_display_unit} onChange={e => changeStockUnit(e.target.value)} className="input">
+                      {STOCK_UNIT_OPTIONS.map(unit => <option key={unit.value} value={unit.value}>{unit.label} ({unit.shortLabel})</option>)}
+                    </select>
                   </div>
                 </div>
               )}
@@ -528,7 +568,7 @@ function getProductPerms(role) {
 
 // ─── Main page ────────────────────────────────────────────────
 export default function ProductCatalog() {
-  const { isOwner, profile } = useAuth()
+  const { profile } = useAuth()
   const perms = getProductPerms(profile?.role)
   const canEdit = perms.canEdit
 

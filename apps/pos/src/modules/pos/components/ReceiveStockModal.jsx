@@ -1,25 +1,30 @@
 import { useState } from 'react'
 import { Ban, CheckCircle2, PackagePlus, X } from 'lucide-react'
-
-const QUICK_QUANTITIES = [1, 6, 12, 24]
-
-function displayQty(value) {
-  const quantity = Number(value) || 0
-  return Number.isInteger(quantity) ? String(quantity) : quantity.toFixed(2)
-}
+import {
+  formatQuantityValue,
+  formatStockQuantity,
+  getCompatibleStockUnits,
+  quickQuantitiesForUnit,
+  toBaseQuantity,
+} from '../lib/inventory-units'
 
 export default function ReceiveStockModal({ product, onReceive, onToggleSoldOut, onClose }) {
   const [quantity, setQuantity] = useState('')
+  const [unit, setUnit] = useState(product?.stock_display_unit || product?.stock_base_unit || 'pc')
   const [saving, setSaving] = useState(false)
   const current = Number(product?.stock_qty) || 0
   const received = Number(quantity) || 0
+  const receivedBase = toBaseQuantity(received, unit)
   const valid = Number.isFinite(received) && received > 0
+  const displayUnit = product.track_inventory ? (product.stock_display_unit || unit) : unit
+  const unitOptions = getCompatibleStockUnits(product.stock_base_unit || 'pc', !product.track_inventory && current === 0)
+  const quickQuantities = quickQuantitiesForUnit(unit)
 
   const submit = async () => {
     if (!valid || saving) return
     setSaving(true)
     try {
-      await onReceive(received)
+      await onReceive(received, unit)
       onClose()
     } catch {
       // The terminal reports the error; keep the modal open for another try.
@@ -61,30 +66,35 @@ export default function ReceiveStockModal({ product, onReceive, onToggleSoldOut,
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-noch-dark border border-noch-border rounded-xl p-3">
               <p className="text-noch-muted text-xs mb-1">Current stock</p>
-              <p className="text-white text-xl font-bold">{displayQty(current)}</p>
+              <p className="text-white text-xl font-bold">{formatStockQuantity(current, displayUnit)}</p>
             </div>
             <div className="bg-noch-green/10 border border-noch-green/30 rounded-xl p-3">
               <p className="text-noch-muted text-xs mb-1">New stock</p>
-              <p className="text-noch-green text-xl font-bold">{displayQty(current + received)}</p>
+              <p className="text-noch-green text-xl font-bold">{formatStockQuantity(current + receivedBase, displayUnit)}</p>
             </div>
           </div>
 
           <label className="label block mb-2">Quantity received</label>
-          <input
-            type="number"
-            min="0.01"
-            step="1"
-            inputMode="decimal"
-            value={quantity}
-            onChange={event => setQuantity(event.target.value)}
-            onKeyDown={event => { if (event.key === 'Enter') submit() }}
-            className="input w-full text-xl font-bold text-center py-3"
-            placeholder="0"
-            autoFocus
-          />
+          <div className="grid grid-cols-[1fr_110px] gap-2">
+            <input
+              type="number"
+              min="0.001"
+              step={unit === 'pc' ? '1' : unit === 'kg' || unit === 'l' ? '0.001' : '0.01'}
+              inputMode="decimal"
+              value={quantity}
+              onChange={event => setQuantity(event.target.value)}
+              onKeyDown={event => { if (event.key === 'Enter') submit() }}
+              className="input w-full text-xl font-bold text-center py-3"
+              placeholder="0"
+              autoFocus
+            />
+            <select value={unit} onChange={event => setUnit(event.target.value)} className="input w-full font-semibold">
+              {unitOptions.map(option => <option key={option.value} value={option.value}>{option.shortLabel}</option>)}
+            </select>
+          </div>
 
           <div className="grid grid-cols-4 gap-2 mt-3">
-            {QUICK_QUANTITIES.map(value => (
+            {quickQuantities.map(value => (
               <button
                 key={value}
                 onClick={() => setQuantity(String(value))}
@@ -94,7 +104,7 @@ export default function ReceiveStockModal({ product, onReceive, onToggleSoldOut,
                     : 'border-noch-border text-noch-muted hover:text-white'
                 }`}
               >
-                +{value}
+                +{formatQuantityValue(value)}
               </button>
             ))}
           </div>
@@ -111,7 +121,7 @@ export default function ReceiveStockModal({ product, onReceive, onToggleSoldOut,
             className="btn-primary w-full py-3 mt-5 flex items-center justify-center gap-2 disabled:opacity-40"
           >
             <CheckCircle2 size={17} />
-            {saving ? 'Saving...' : `Confirm +${valid ? displayQty(received) : '0'}`}
+            {saving ? 'Saving...' : `Confirm +${valid ? `${formatQuantityValue(received)} ${unitOptions.find(option => option.value === unit)?.shortLabel || unit}` : '0'}`}
           </button>
 
           <button

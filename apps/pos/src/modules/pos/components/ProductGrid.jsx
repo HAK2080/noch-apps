@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { AlertTriangle, Ban } from 'lucide-react'
 import { format } from '../lib/money'
+import { formatStockQuantity } from '../lib/inventory-units'
 
 const LONG_PRESS_MS = 500
 
@@ -226,7 +227,7 @@ function ProductGrid({
                     <span className={`text-[10px] font-semibold tabular-nums shrink-0 ${
                       isOutOfStock(product) ? 'text-red-400' : isLowStock(product) ? 'text-yellow-400' : 'text-noch-green'
                     }`}>
-                      Qty {Number(product.stock_qty || 0).toFixed(0)}
+                      {formatStockQuantity(product.stock_qty, product.stock_display_unit)}
                     </span>
                   )}
                 </div>

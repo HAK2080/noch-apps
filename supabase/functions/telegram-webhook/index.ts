@@ -13,6 +13,7 @@ import {
   detectStockLanguage,
   findStockProductCandidates,
   parseStockReceiptMessage,
+  stockUnitFactor,
 } from '../_shared/stock-command.js'
 
 const CORS = {
@@ -344,7 +345,7 @@ async function getStockRequest(requestId: string, chatId: string) {
 
 async function getStockProduct(productId: string) {
   const rows = await sbGet(
-    'pos_products?select=id,branch_id,name,name_ar,price,stock_qty,track_inventory,is_active&id=eq.'
+    'pos_products?select=id,branch_id,name,name_ar,price,stock_qty,track_inventory,stock_base_unit,stock_display_unit,is_active&id=eq.'
     + encodeURIComponent(productId) + '&limit=1',
   )
   return Array.isArray(rows) && rows.length ? rows[0] : null
@@ -366,6 +367,12 @@ async function sendStockConfirmation(
   const branch = await getStockBranch(String(request.branch_id))
   const current = Number(product.stock_qty) || 0
   const quantity = Number(request.quantity) || 0
+  const receivingUnit = String(request.unit || product.stock_display_unit || product.stock_base_unit || 'pc')
+  const displayUnit = product.track_inventory
+    ? String(product.stock_display_unit || receivingUnit)
+    : receivingUnit
+  const receivedBase = quantity * stockUnitFactor(receivingUnit)
+  const displayFactor = stockUnitFactor(displayUnit)
   const branchName = language === 'ar'
     ? String(branch?.name_ar || branch?.name || '')
     : String(branch?.name || branch?.name_ar || '')
@@ -376,9 +383,9 @@ async function sendStockConfirmation(
     branchName,
     '',
     `${stockText(language, 'product')}: ${productName} — ${price.toFixed(2)} LYD`,
-    `${stockText(language, 'quantity')}: +${formatStockQty(quantity)}`,
-    `${stockText(language, 'current')}: ${formatStockQty(current)}`,
-    `${stockText(language, 'newStock')}: ${formatStockQty(current + quantity)}`,
+    `${stockText(language, 'quantity')}: +${formatStockQty(quantity)} ${receivingUnit}`,
+    `${stockText(language, 'current')}: ${formatStockQty(current / displayFactor)} ${displayUnit}`,
+    `${stockText(language, 'newStock')}: ${formatStockQty((current + receivedBase) / displayFactor)} ${displayUnit}`,
   ].join('\n')
   const payload = {
     chat_id: chatId,
@@ -410,7 +417,7 @@ async function handleStockEntry(botToken: string, msg: TgMessage, session: Recor
   }
 
   const products = await sbGet(
-    'pos_products?select=id,branch_id,name,name_ar,price,stock_qty,track_inventory,is_active'
+    'pos_products?select=id,branch_id,name,name_ar,price,stock_qty,track_inventory,stock_base_unit,stock_display_unit,is_active'
     + '&branch_id=eq.' + encodeURIComponent(String(session.branch_id))
     + '&is_active=eq.true&order=name.asc',
   )
@@ -437,6 +444,7 @@ async function handleStockEntry(botToken: string, msg: TgMessage, session: Recor
         product_id: choosing ? null : matches[0].product.id,
         candidate_product_ids: matches.map(match => match.product.id),
         quantity: parsed.quantity,
+        unit: parsed.unit || null,
         language,
         status: choosing ? 'selecting' : 'pending',
       })
@@ -558,6 +566,7 @@ async function handleStockCallback(botToken: string, cb: TgCallbackQuery): Promi
       p_source: 'telegram',
       p_source_ref: `telegram:${chatId}:${request.telegram_message_id}`,
       p_actor_profile_id: request.profile_id,
+      p_unit: request.unit,
     })
     await sbPatch('telegram_stock_requests?id=eq.' + encodeURIComponent(request.id), {
       status: 'applied',
@@ -565,8 +574,8 @@ async function handleStockCallback(botToken: string, cb: TgCallbackQuery): Promi
     })
     const done = [
       stockText(language, result?.duplicate ? 'alreadyCompleted' : 'completed'),
-      `${stockText(language, 'quantity')}: +${formatStockQty(result?.quantity_received || request.quantity)}`,
-      `${stockText(language, 'newStock')}: ${formatStockQty(result?.stock_after)}`,
+      `${stockText(language, 'quantity')}: +${formatStockQty(result?.quantity_received || request.quantity)} ${result?.received_unit || request.unit || ''}`.trim(),
+      `${stockText(language, 'newStock')}: ${formatStockQty(result?.stock_after)} ${result?.stock_base_unit || ''}`.trim(),
     ].join('\n')
     if (messageId) {
       await tg(botToken, 'editMessageText', { chat_id: chatId, message_id: messageId, text: done })

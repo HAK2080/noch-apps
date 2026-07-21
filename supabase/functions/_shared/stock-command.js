@@ -10,6 +10,24 @@ const RECEIPT_WORDS = [
   'received', 'receive', 'stock', 'units', 'unit', 'items', 'item',
 ]
 
+const STOCK_UNIT_PATTERNS = [
+  { unit: 'kg', pattern: /(^|\s)(?:kg|kgs|kilo|kilos|kilograms?|كغ|كجم|كيلو|كيلوغرام)(?=\s|$)/iu },
+  { unit: 'g', pattern: /(^|\s)(?:g|gm|grams?|غ|غم|غرام|جرام)(?=\s|$)/iu },
+  { unit: 'ml', pattern: /(^|\s)(?:ml|mls|millilit(?:re|er)s?|مل|مليلتر)(?=\s|$)/iu },
+  { unit: 'l', pattern: /(^|\s)(?:l|lt|ltr|lit(?:re|er)s?|لتر|لترات)(?=\s|$)/iu },
+  { unit: 'pc', pattern: /(^|\s)(?:pc|pcs|pieces?|units?|حبة|حبات|قطعة|قطع)(?=\s|$)/iu },
+]
+
+export function stockUnitBase(unit = 'pc') {
+  if (unit === 'kg' || unit === 'g') return 'g'
+  if (unit === 'l' || unit === 'ml') return 'ml'
+  return 'pc'
+}
+
+export function stockUnitFactor(unit = 'pc') {
+  return unit === 'kg' || unit === 'l' ? 1000 : 1
+}
+
 export function detectStockLanguage(text = '') {
   return /[\u0600-\u06ff]/.test(text) ? 'ar' : 'en'
 }
@@ -49,6 +67,14 @@ export function parseStockReceiptMessage(text = '') {
     .replace(quantityMatch[0], ' ')
     .replace(/^\s*\/stock(?:@\w+)?\s*/i, '')
 
+  let unit
+  for (const candidate of STOCK_UNIT_PATTERNS) {
+    if (!candidate.pattern.test(productQuery)) continue
+    unit = candidate.unit
+    productQuery = productQuery.replace(candidate.pattern, '$1')
+    break
+  }
+
   for (const word of RECEIPT_WORDS) {
     productQuery = productQuery.replace(new RegExp(`(^|\\s)${word}(?=\\s|$)`, 'giu'), ' ')
   }
@@ -62,7 +88,9 @@ export function parseStockReceiptMessage(text = '') {
     return { ok: false, language, error: 'missing_product' }
   }
 
-  return { ok: true, language, quantity, productQuery }
+  return unit
+    ? { ok: true, language, quantity, unit, productQuery }
+    : { ok: true, language, quantity, productQuery }
 }
 
 function productNames(product) {

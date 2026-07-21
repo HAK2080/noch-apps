@@ -723,7 +723,7 @@ export async function updateProductStock(productId, newQty) {
   return data
 }
 
-export async function receiveProductStock(productId, quantity, actorProfileId = null) {
+export async function receiveProductStock(productId, quantity, unit, actorProfileId = null) {
   const sourceRef = typeof crypto !== 'undefined' && crypto.randomUUID
     ? `pos:${crypto.randomUUID()}`
     : `pos:${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -734,6 +734,7 @@ export async function receiveProductStock(productId, quantity, actorProfileId = 
     p_source: 'pos',
     p_source_ref: sourceRef,
     p_actor_profile_id: actorProfileId,
+    p_unit: unit,
   })
   if (error) throw error
   return data

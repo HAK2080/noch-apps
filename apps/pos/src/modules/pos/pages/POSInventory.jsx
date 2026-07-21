@@ -5,9 +5,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Package, Download, AlertTriangle, CheckCircle } from 'lucide-react'
 import { getPOSBranch, getPOSProducts, updateProductStock, createInventoryMovement } from '../lib/pos-supabase'
-import { supabase } from '../../../lib/supabase'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+import { formatStockQuantity, fromBaseQuantity, toBaseQuantity } from '../lib/inventory-units'
 
 function StockRow({ product, onAdjust }) {
   const [editing, setEditing] = useState(false)
@@ -16,6 +16,8 @@ function StockRow({ product, onAdjust }) {
 
   const stock = parseFloat(product.stock_qty)
   const alert = parseFloat(product.low_stock_alert)
+  const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
+  const displayStock = fromBaseQuantity(stock, displayUnit)
 
   const stockColor = !product.track_inventory
     ? 'text-noch-muted'
@@ -26,8 +28,9 @@ function StockRow({ product, onAdjust }) {
     : 'text-noch-green'
 
   const handleSave = async () => {
-    const n = parseFloat(newQty)
-    if (isNaN(n)) return
+    const displayedQuantity = parseFloat(newQty)
+    if (isNaN(displayedQuantity)) return
+    const n = toBaseQuantity(displayedQuantity, displayUnit)
     setSaving(true)
     try {
       await onAdjust(product.id, product.branch_id, stock, n)
@@ -55,7 +58,7 @@ function StockRow({ product, onAdjust }) {
               value={newQty}
               onChange={e => setNewQty(e.target.value)}
               className="input py-1 px-2 w-20 text-sm text-center"
-              placeholder={stock.toFixed(2)}
+              placeholder={String(displayStock)}
               autoFocus
               step="0.01"
             />
@@ -72,10 +75,10 @@ function StockRow({ product, onAdjust }) {
               {stock <= 0 ? <AlertTriangle size={12} className="text-red-400" /> :
                stock <= alert ? <AlertTriangle size={12} className="text-yellow-400" /> :
                <CheckCircle size={12} className="text-noch-green" />}
-              <span className={`font-bold text-sm ${stockColor}`}>{stock.toFixed(2)}</span>
+              <span className={`font-bold text-sm ${stockColor}`}>{formatStockQuantity(stock, displayUnit)}</span>
             </div>
             <button
-              onClick={() => { setNewQty(stock.toFixed(2)); setEditing(true) }}
+              onClick={() => { setNewQty(String(displayStock)); setEditing(true) }}
               className="btn-secondary text-xs px-2 py-1"
             >
               Adjust
@@ -123,9 +126,11 @@ export default function POSInventory() {
 
   const exportCSV = () => {
     const rows = [
-      ['Name', 'Name AR', 'Price', 'Track Inventory', 'Stock Qty', 'Low Stock Alert'],
+      ['Name', 'Name AR', 'Price', 'Track Inventory', 'Stock Qty', 'Stock Unit', 'Low Stock Alert'],
       ...products.map(p => [
-        p.name, p.name_ar || '', p.price, p.track_inventory, p.stock_qty, p.low_stock_alert
+        p.name, p.name_ar || '', p.price, p.track_inventory,
+        fromBaseQuantity(p.stock_qty, p.stock_display_unit), p.stock_display_unit || 'pc',
+        fromBaseQuantity(p.low_stock_alert, p.stock_display_unit)
       ]),
     ]
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')

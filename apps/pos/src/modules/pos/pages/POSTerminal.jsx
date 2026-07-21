@@ -571,16 +571,22 @@ export default function POSTerminal() {
     setStockProduct(product)
   }, [handleSoldOutToggle])
 
-  const handleReceiveStock = useCallback(async (product, quantity) => {
+  const handleReceiveStock = useCallback(async (product, quantity, unit) => {
     const actorProfileId = getServedBy()?.id || profile?.id || null
     try {
-      const result = await receiveProductStock(product.id, quantity, actorProfileId)
+      const result = await receiveProductStock(product.id, quantity, unit, actorProfileId)
       setProducts(current => current.map(item =>
         item.id === product.id
-          ? { ...item, stock_qty: result.stock_after, track_inventory: true }
+          ? {
+              ...item,
+              stock_qty: result.stock_after,
+              stock_base_unit: result.stock_base_unit || item.stock_base_unit,
+              stock_display_unit: result.stock_display_unit || item.stock_display_unit,
+              track_inventory: true,
+            }
           : item
       ))
-      toast.success(`${product.name}: +${result.quantity_received} received`)
+      toast.success(`${product.name}: +${result.quantity_received} ${result.received_unit || unit} received`)
       return result
     } catch (error) {
       toast.error(error.message || 'Could not receive stock')
@@ -1169,7 +1175,7 @@ export default function POSTerminal() {
       {stockProduct && (
         <ReceiveStockModal
           product={stockProduct}
-          onReceive={quantity => handleReceiveStock(stockProduct, quantity)}
+          onReceive={(quantity, unit) => handleReceiveStock(stockProduct, quantity, unit)}
           onToggleSoldOut={() => handleSoldOutToggle(stockProduct)}
           onClose={() => setStockProduct(null)}
         />

@@ -14,11 +14,19 @@ import BarcodeScanner from '../components/BarcodeScanner'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
+import {
+  STOCK_UNIT_OPTIONS,
+  convertDisplayedQuantity,
+  fromBaseQuantity,
+  getStockBaseUnit,
+  toBaseQuantity,
+} from '../lib/inventory-units'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
   description: '', category_id: '', track_inventory: false,
   stock_qty: '0', low_stock_alert: '5', is_active: true,
+  stock_base_unit: 'pc', stock_display_unit: 'pc',
   visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
   show_description_on_menu: true, show_description_on_website: true,
@@ -30,7 +38,18 @@ const BLANK_PRODUCT = {
 const JOINED_FIELDS = ['pos_categories', 'pos_branches']
 
 function ProductModal({ product, categories, branchId, onSave, onClose }) {
-  const [form, setForm] = useState(product || { ...BLANK_PRODUCT })
+  const [form, setForm] = useState(() => {
+    if (!product) return { ...BLANK_PRODUCT }
+    const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
+    return {
+      ...BLANK_PRODUCT,
+      ...product,
+      stock_base_unit: product.stock_base_unit || getStockBaseUnit(displayUnit),
+      stock_display_unit: displayUnit,
+      stock_qty: fromBaseQuantity(product.stock_qty, displayUnit),
+      low_stock_alert: fromBaseQuantity(product.low_stock_alert, displayUnit),
+    }
+  })
   const [saving, setSaving] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [uploadingImg, setUploadingImg] = useState(false)
@@ -40,6 +59,18 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
   const isEdit = !!product?.id
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const changeStockUnit = (nextUnit) => setForm(current => {
+    const previousUnit = current.stock_display_unit || 'pc'
+    const sameDimension = getStockBaseUnit(previousUnit) === getStockBaseUnit(nextUnit)
+    return {
+      ...current,
+      stock_base_unit: getStockBaseUnit(nextUnit),
+      stock_display_unit: nextUnit,
+      stock_qty: sameDimension ? convertDisplayedQuantity(current.stock_qty, previousUnit, nextUnit) : '0',
+      low_stock_alert: sameDimension ? convertDisplayedQuantity(current.low_stock_alert, previousUnit, nextUnit) : '5',
+    }
+  })
 
   // Handle image file selected from disk
   const handleFileSelected = async (e) => {
@@ -84,8 +115,10 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
         ...stripped,
         branch_id: branchId,
         price: parseFloat(form.price),
-        stock_qty: parseFloat(form.stock_qty) || 0,
-        low_stock_alert: parseFloat(form.low_stock_alert) || 5,
+        stock_base_unit: getStockBaseUnit(form.stock_display_unit),
+        stock_display_unit: form.stock_display_unit,
+        stock_qty: toBaseQuantity(parseFloat(form.stock_qty) || 0, form.stock_display_unit),
+        low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
         category_id: form.category_id || null,
       }
       if (isEdit) {
@@ -199,7 +232,7 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
             </div>
 
             {form.track_inventory && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="label block mb-1">Stock Qty</label>
                   <input type="number" value={form.stock_qty} onChange={e => set('stock_qty', e.target.value)} className="input w-full" step="0.01" />
@@ -207,6 +240,12 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
                 <div>
                   <label className="label block mb-1">Low Stock Alert</label>
                   <input type="number" value={form.low_stock_alert} onChange={e => set('low_stock_alert', e.target.value)} className="input w-full" step="0.01" />
+                </div>
+                <div>
+                  <label className="label block mb-1">Unit</label>
+                  <select value={form.stock_display_unit} onChange={e => changeStockUnit(e.target.value)} className="input w-full">
+                    {STOCK_UNIT_OPTIONS.map(unit => <option key={unit.value} value={unit.value}>{unit.shortLabel}</option>)}
+                  </select>
                 </div>
               </div>
             )}
