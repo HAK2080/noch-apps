@@ -117,6 +117,10 @@ def stamp_sw_cache(dist: Path):
 
 def build(target_key: str):
     cfg = TARGETS[target_key]
+    # CI writes each app's deployment environment beside that app. Load it
+    # before validating required variables so workflow and local builds use
+    # the same source of truth.
+    load_repo_env(cfg["cwd"] / ".env")
     missing_env = [name for name in cfg["required_env"] if not os.environ.get(name)]
     if missing_env:
         sys.exit(
