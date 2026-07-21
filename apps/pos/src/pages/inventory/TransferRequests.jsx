@@ -8,9 +8,9 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, PackagePlus, X, Loader2 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
-import { getPOSProducts } from '../../modules/pos/lib/pos-supabase'
+import { formatStockQuantity } from '../../modules/pos/lib/inventory-units'
 import {
-  listLocations, listWarehouseStock, listTransfers,
+  listLocations, listProducts, listWarehouseStock, listTransfers,
   requestTransfer, cancelTransfer,
 } from './lib/warehouse'
 import toast from 'react-hot-toast'
@@ -45,7 +45,7 @@ export default function TransferRequests() {
       try {
         const [locs, prods, wh] = await Promise.all([
           listLocations(),
-          getPOSProducts(),
+          listProducts(),
           listWarehouseStock(),
         ])
         const branchLocs = locs.filter(l => l.location_type === 'branch')
@@ -102,6 +102,7 @@ export default function TransferRequests() {
   }
 
   const selectedWarehouseQty = productId ? (warehouseQty[productId] ?? 0) : null
+  const selectedProduct = products.find(product => product.id === productId)
 
   return (
     <Layout>
@@ -136,13 +137,15 @@ export default function TransferRequests() {
                 <option value="">Select product...</option>
                 {products.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — warehouse: {warehouseQty[p.id] ?? 0}
+                    {p.name} — warehouse: {formatStockQuantity(warehouseQty[p.id] ?? 0, p.stock_display_unit)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="label block mb-1">Quantity</label>
+              <label className="label block mb-1">
+                Quantity{selectedProduct ? ` (${selectedProduct.stock_base_unit || 'pc'})` : ''}
+              </label>
               <input
                 type="number"
                 min="0"
@@ -154,7 +157,7 @@ export default function TransferRequests() {
               />
               {selectedWarehouseQty !== null && (
                 <p className={`text-xs mt-1 ${selectedWarehouseQty <= 0 ? 'text-red-400' : 'text-noch-muted'}`}>
-                  {selectedWarehouseQty} available in warehouse
+                  {formatStockQuantity(selectedWarehouseQty, selectedProduct?.stock_display_unit)} available in warehouse
                 </p>
               )}
             </div>
@@ -193,7 +196,7 @@ export default function TransferRequests() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{t.product_name}</p>
                     <p className="text-noch-muted text-xs">
-                      {parseFloat(t.qty_requested)} requested
+                      {formatStockQuantity(t.qty_requested, t.stock_display_unit)} requested
                       {t.requested_at && ` · ${new Date(t.requested_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
                       {t.note && ` · ${t.note}`}
                     </p>

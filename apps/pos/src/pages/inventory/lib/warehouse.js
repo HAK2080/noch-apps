@@ -12,7 +12,7 @@ export const WASTE_REASONS = ['used', 'damaged', 'lost', 'thrown_away', 'expired
 export async function listProducts() {
   const { data, error } = await supabase
     .from('pos_products')
-    .select('id, name')
+    .select('id, name, stock_base_unit, stock_display_unit, stock_cost_per_base_unit, is_coffee_bean')
     .eq('is_active', true)
     .order('name')
   if (error) throw error
@@ -46,13 +46,17 @@ export async function listWarehouseStock() {
   if (!warehouse) return { warehouse: null, rows: [] }
   const { data, error } = await supabase
     .from('location_product_stock')
-    .select('id, product_id, qty, updated_at, pos_products(name)')
+    .select('id, product_id, qty, updated_at, pos_products(name, stock_base_unit, stock_display_unit, stock_cost_per_base_unit)')
     .eq('location_id', warehouse.id)
     .order('updated_at', { ascending: false })
   if (error) throw error
   const rows = (data || []).map(r => ({
     ...r,
     product_name: r.pos_products?.name || 'Unknown product',
+    stock_base_unit: r.pos_products?.stock_base_unit || 'pc',
+    stock_display_unit: r.pos_products?.stock_display_unit || r.pos_products?.stock_base_unit || 'pc',
+    stock_cost_per_base_unit: Number(r.pos_products?.stock_cost_per_base_unit) || 0,
+    stock_value: (Number(r.qty) || 0) * (Number(r.pos_products?.stock_cost_per_base_unit) || 0),
   }))
   return { warehouse, rows }
 }
@@ -61,7 +65,7 @@ export async function listWarehouseStock() {
 export async function listTransfers({ status, limit = 50 } = {}) {
   let q = supabase
     .from('inventory_transfers')
-    .select('*, pos_products(name)')
+    .select('*, pos_products(name, stock_base_unit, stock_display_unit)')
     .order('requested_at', { ascending: false })
     .limit(limit)
   if (status) q = q.eq('status', status)
@@ -70,7 +74,40 @@ export async function listTransfers({ status, limit = 50 } = {}) {
   return (data || []).map(t => ({
     ...t,
     product_name: t.pos_products?.name || 'Unknown product',
+    stock_base_unit: t.pos_products?.stock_base_unit || 'pc',
+    stock_display_unit: t.pos_products?.stock_display_unit || t.pos_products?.stock_base_unit || 'pc',
   }))
+}
+
+export async function listBranchStock(branchId) {
+  const { data: location, error: locationError } = await supabase
+    .from('inventory_locations')
+    .select('id')
+    .eq('branch_id', branchId)
+    .eq('location_type', 'branch')
+    .limit(1)
+    .maybeSingle()
+  if (locationError) throw locationError
+  if (!location) return []
+
+  const { data, error } = await supabase
+    .from('location_product_stock')
+    .select('product_id, qty, updated_at, pos_products(name, name_ar, stock_base_unit, stock_display_unit, is_active)')
+    .eq('location_id', location.id)
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+
+  return (data || [])
+    .filter(row => row.pos_products?.is_active !== false)
+    .map(row => ({
+      id: row.product_id,
+      name: row.pos_products?.name || 'Unknown product',
+      name_ar: row.pos_products?.name_ar || '',
+      branch_stock_qty: Number(row.qty) || 0,
+      stock_base_unit: row.pos_products?.stock_base_unit || 'pc',
+      stock_display_unit: row.pos_products?.stock_display_unit || row.pos_products?.stock_base_unit || 'pc',
+      updated_at: row.updated_at,
+    }))
 }
 
 export async function requestTransfer(productId, toLocationId, qty, note) {
@@ -168,20 +205,47 @@ export async function upsertBranchPar(branchId, productId, minQty, targetQty) {
 
 // ── Movement history ─────────────────────────────────────────
 export async function listMovementHistory({ branchId, movementType, dateFrom, dateTo, limit = 200 } = {}) {
-  let q = supabase
+  let productQuery = supabase
     .from('pos_inventory_movements')
-    .select('*, pos_products(name), pos_branches(name)')
+    .select('*, pos_products(name, stock_base_unit), pos_branches(name)')
     .order('created_at', { ascending: false })
     .limit(limit)
-  if (branchId) q = q.eq('branch_id', branchId)
-  if (movementType) q = q.eq('movement_type', movementType)
-  if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00`)
-  if (dateTo) q = q.lte('created_at', `${dateTo}T23:59:59`)
-  const { data, error } = await q
-  if (error) throw error
-  return (data || []).map(m => ({
+  if (branchId) productQuery = productQuery.eq('branch_id', branchId)
+  if (movementType) productQuery = productQuery.eq('movement_type', movementType)
+  if (dateFrom) productQuery = productQuery.gte('created_at', `${dateFrom}T00:00:00`)
+  if (dateTo) productQuery = productQuery.lte('created_at', `${dateTo}T23:59:59`)
+
+  let locationQuery = supabase
+    .from('location_product_movements')
+    .select('*, pos_products(name, stock_base_unit), inventory_locations(branch_id, name)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (movementType) locationQuery = locationQuery.eq('movement_type', movementType)
+  if (dateFrom) locationQuery = locationQuery.gte('created_at', `${dateFrom}T00:00:00`)
+  if (dateTo) locationQuery = locationQuery.lte('created_at', `${dateTo}T23:59:59`)
+
+  const [productResult, locationResult] = await Promise.all([productQuery, locationQuery])
+  if (productResult.error) throw productResult.error
+  if (locationResult.error && locationResult.error.code !== '42P01') throw locationResult.error
+
+  const productRows = (productResult.data || []).map(m => ({
     ...m,
     product_name: m.pos_products?.name || 'Unknown product',
     branch_name: m.pos_branches?.name || '—',
+    unit: m.pos_products?.stock_base_unit || 'pc',
   }))
+
+  const locationRows = (locationResult.data || [])
+    .filter(m => !branchId || m.inventory_locations?.branch_id === branchId)
+    .map(m => ({
+      ...m,
+      product_name: m.pos_products?.name || 'Unknown product',
+      branch_name: m.inventory_locations?.name || 'Central Warehouse',
+      branch_id: m.inventory_locations?.branch_id || null,
+      unit: m.pos_products?.stock_base_unit || 'pc',
+    }))
+
+  return [...productRows, ...locationRows]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, limit)
 }

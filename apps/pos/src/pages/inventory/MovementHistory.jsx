@@ -12,6 +12,9 @@ import toast from 'react-hot-toast'
 const MOVEMENT_TYPES = [
   { value: '', label: 'All types' },
   { value: 'sale', label: 'Sale' },
+  { value: 'sale_consumption', label: 'Coffee consumed' },
+  { value: 'refund_reversal', label: 'Coffee refund reversal' },
+  { value: 'void_reversal', label: 'Coffee void reversal' },
   { value: 'transfer_in', label: 'Transfer in' },
   { value: 'adjustment', label: 'Adjustment' },
   { value: 'used', label: 'Used' },
@@ -25,6 +28,9 @@ const MOVEMENT_TYPES = [
 
 const TYPE_META = {
   sale:              { label: 'Sale',             cls: 'bg-noch-card text-noch-muted border-noch-border' },
+  sale_consumption:  { label: 'Coffee used',      cls: 'bg-amber-500/10 text-amber-300 border-amber-500/30' },
+  refund_reversal:   { label: 'Refund reversal',  cls: 'bg-blue-500/10 text-blue-300 border-blue-500/30' },
+  void_reversal:     { label: 'Void reversal',    cls: 'bg-blue-500/10 text-blue-300 border-blue-500/30' },
   transfer_in:       { label: 'Transfer in',      cls: 'bg-green-500/10 text-green-400 border-green-500/30' },
   adjustment:        { label: 'Adjustment',       cls: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
   used:              { label: 'Used',             cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
@@ -137,10 +143,10 @@ export default function MovementHistory() {
                   <div><TypeBadge type={m.movement_type} /></div>
                   <p className="text-noch-muted text-xs truncate">{m.branch_name}</p>
                   <p className="text-noch-muted text-xs text-right tabular-nums">
-                    {m.stock_before != null ? parseFloat(m.stock_before) : '—'} → {m.stock_after != null ? parseFloat(m.stock_after) : '—'}
+                    {m.stock_before != null ? `${parseFloat(m.stock_before)} ${m.unit || ''}` : '—'} → {m.stock_after != null ? `${parseFloat(m.stock_after)} ${m.unit || ''}` : '—'}
                   </p>
                   <p className={`text-sm font-bold text-right tabular-nums ${parseFloat(m.quantity) < 0 ? 'text-red-400' : 'text-noch-green'}`}>
-                    {parseFloat(m.quantity) > 0 ? '+' : ''}{parseFloat(m.quantity)}
+                    {parseFloat(m.quantity) > 0 ? '+' : ''}{parseFloat(m.quantity)} {m.unit || ''}
                   </p>
                 </div>
               ))}

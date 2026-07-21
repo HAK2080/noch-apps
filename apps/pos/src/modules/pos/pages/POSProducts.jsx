@@ -11,6 +11,7 @@ import {
   uploadProductImage, shareBranchMenu,
 } from '../lib/pos-supabase'
 import BarcodeScanner from '../components/BarcodeScanner'
+import CoffeeConsumptionField from '../components/CoffeeConsumptionField'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
@@ -21,12 +22,14 @@ import {
   getStockBaseUnit,
   toBaseQuantity,
 } from '../lib/inventory-units'
+import { normalizeCoffeeGrams } from '../lib/coffee-consumption'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
   description: '', category_id: '', track_inventory: false,
   stock_qty: '0', low_stock_alert: '5', is_active: true,
   stock_base_unit: 'pc', stock_display_unit: 'pc',
+  coffee_grams_per_sale: '', coffee_bean_product_id: '',
   visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
   show_description_on_menu: true, show_description_on_website: true,
@@ -37,7 +40,7 @@ const BLANK_PRODUCT = {
 // Columns that come from JOIN queries — never send these back to PostgREST
 const JOINED_FIELDS = ['pos_categories', 'pos_branches']
 
-function ProductModal({ product, categories, branchId, onSave, onClose }) {
+function ProductModal({ product, products, categories, branchId, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (!product) return { ...BLANK_PRODUCT }
     const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
@@ -119,6 +122,8 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
         stock_display_unit: form.stock_display_unit,
         stock_qty: toBaseQuantity(parseFloat(form.stock_qty) || 0, form.stock_display_unit),
         low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
+        coffee_grams_per_sale: normalizeCoffeeGrams(form.coffee_grams_per_sale),
+        coffee_bean_product_id: form.coffee_bean_product_id || null,
         category_id: form.category_id || null,
       }
       if (isEdit) {
@@ -208,6 +213,14 @@ function ProductModal({ product, categories, branchId, onSave, onClose }) {
                 </div>
               </div>
             )}
+
+            <CoffeeConsumptionField
+              value={form.coffee_grams_per_sale}
+              onChange={value => set('coffee_grams_per_sale', value)}
+              beanProductId={form.coffee_bean_product_id}
+              onBeanProductChange={value => set('coffee_bean_product_id', value)}
+              beanProducts={(products || []).filter(candidate => candidate.is_coffee_bean && candidate.id !== product?.id)}
+            />
 
             <div>
               <label className="label block mb-1">Barcode</label>
@@ -1046,6 +1059,7 @@ export default function POSProducts() {
       {(showAddProduct || editProduct) && (
         <ProductModal
           product={editProduct || null}
+          products={products}
           categories={categories}
           branchId={branchId}
           onSave={() => { setShowAddProduct(false); setEditProduct(null); load() }}

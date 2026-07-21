@@ -9,6 +9,7 @@ import { ArrowLeft, Warehouse, RefreshCw, Search, PackagePlus } from 'lucide-rea
 import Layout from '../../components/Layout'
 import { listWarehouseStock, listProducts, receiveWarehouseStock } from './lib/warehouse'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatStockQuantity, toBaseQuantity } from '../../modules/pos/lib/inventory-units'
 import toast from 'react-hot-toast'
 
 export default function WarehouseStock() {
@@ -42,11 +43,13 @@ export default function WarehouseStock() {
   async function submitReceive(e) {
     e.preventDefault()
     const qty = parseFloat(form.qty)
+    const product = products.find(item => item.id === form.productId)
     if (!form.productId) { toast.error('Select a product'); return }
     if (!qty || qty <= 0) { toast.error('Enter a valid quantity'); return }
     setSaving(true)
     try {
-      await receiveWarehouseStock(form.productId, qty, form.note)
+      const baseQty = toBaseQuantity(qty, product?.stock_display_unit || product?.stock_base_unit || 'pc')
+      await receiveWarehouseStock(form.productId, baseQty, form.note)
       toast.success('Stock received into warehouse')
       setForm({ productId: '', qty: '', note: '' })
       load()
@@ -60,6 +63,7 @@ export default function WarehouseStock() {
   const filtered = rows.filter(r =>
     !search || r.product_name.toLowerCase().includes(search.toLowerCase())
   )
+  const selectedProduct = products.find(product => product.id === form.productId)
 
   return (
     <Layout>
@@ -94,13 +98,15 @@ export default function WarehouseStock() {
                 className="input"
               >
                 <option value="">Select product…</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} · {p.stock_display_unit || p.stock_base_unit || 'pc'}</option>
+                ))}
               </select>
               <input
                 type="number"
                 min="0"
                 step="any"
-                placeholder="Qty"
+                placeholder={`Qty${selectedProduct ? ` (${selectedProduct.stock_display_unit || selectedProduct.stock_base_unit || 'pc'})` : ''}`}
                 value={form.qty}
                 onChange={e => setForm(f => ({ ...f, qty: e.target.value }))}
                 className="input"
@@ -133,9 +139,10 @@ export default function WarehouseStock() {
 
         {/* Table */}
         <div className="bg-noch-card border border-noch-border rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[1fr_100px_150px] gap-2 px-4 py-2.5 border-b border-noch-border text-xs font-semibold text-noch-muted uppercase tracking-wide">
+          <div className="grid grid-cols-[1fr_100px_110px_150px] gap-2 px-4 py-2.5 border-b border-noch-border text-xs font-semibold text-noch-muted uppercase tracking-wide">
             <span>Product</span>
             <span className="text-right">Qty</span>
+            <span className="text-right">Value</span>
             <span className="text-right">Updated</span>
           </div>
           {loading ? (
@@ -147,11 +154,15 @@ export default function WarehouseStock() {
           ) : (
             <div className="divide-y divide-noch-border/50">
               {filtered.map(r => (
-                <div key={r.id} className="grid grid-cols-[1fr_100px_150px] gap-2 px-4 py-3 items-center">
-                  <p className="text-white text-sm font-medium truncate">{r.product_name}</p>
+                <div key={r.id} className="grid grid-cols-[1fr_100px_110px_150px] gap-2 px-4 py-3 items-center">
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{r.product_name}</p>
+                    {r.stock_cost_per_base_unit > 0 && <p className="text-noch-muted text-[11px]">{r.stock_cost_per_base_unit.toFixed(5)} LYD/{r.stock_base_unit}</p>}
+                  </div>
                   <p className={`text-sm font-bold text-right tabular-nums ${parseFloat(r.qty) <= 0 ? 'text-red-400' : 'text-noch-green'}`}>
-                    {parseFloat(r.qty)}
+                    {formatStockQuantity(r.qty, r.stock_display_unit)}
                   </p>
+                  <p className="text-white text-xs text-right tabular-nums">{r.stock_value > 0 ? `${r.stock_value.toFixed(2)} LYD` : '—'}</p>
                   <p className="text-noch-muted text-xs text-right">
                     {r.updated_at ? new Date(r.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
                   </p>

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRightLeft, Truck, PackageCheck, Loader2, RefreshCw } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatStockQuantity } from '../../modules/pos/lib/inventory-units'
 import { listLocations, listTransfers, shipTransfer, receiveTransfer } from './lib/warehouse'
 import toast from 'react-hot-toast'
 
@@ -45,7 +46,7 @@ function ShipRow({ transfer, locationName, onShip }) {
       <div className="flex-1 min-w-0">
         <p className="text-white text-sm font-medium truncate">{transfer.product_name}</p>
         <p className="text-noch-muted text-xs">
-          → {locationName(transfer.to_location_id)} · requested {parseFloat(transfer.qty_requested)}
+          → {locationName(transfer.to_location_id)} · requested {formatStockQuantity(transfer.qty_requested, transfer.stock_display_unit)}
           {transfer.note && ` · ${transfer.note}`}
         </p>
       </div>
@@ -91,7 +92,7 @@ function ReceiveRow({ transfer, locationName, onReceive }) {
         <div className="flex-1 min-w-0">
           <p className="text-white text-sm font-medium truncate">{transfer.product_name}</p>
           <p className="text-noch-muted text-xs">
-            → {locationName(transfer.to_location_id)} · shipped {shipped}
+            → {locationName(transfer.to_location_id)} · shipped {formatStockQuantity(shipped, transfer.stock_display_unit)}
             {transfer.shipped_at && ` · ${new Date(transfer.shipped_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
           </p>
         </div>
@@ -222,7 +223,7 @@ export default function Transfers() {
                     <div key={t.id} className="px-4 py-3">
                       <p className="text-white text-sm font-medium truncate">{t.product_name}</p>
                       <p className="text-noch-muted text-xs">
-                        → {locationName(t.to_location_id)} · requested {parseFloat(t.qty_requested)}
+                        → {locationName(t.to_location_id)} · requested {formatStockQuantity(t.qty_requested, t.stock_display_unit)}
                       </p>
                     </div>
                   ))}
@@ -267,9 +268,9 @@ export default function Transfers() {
                         <p className="text-white text-sm truncate">{t.product_name}</p>
                         <p className="text-noch-muted text-xs">
                           {locationName(t.from_location_id)} → {locationName(t.to_location_id)}
-                          {' · req '}{parseFloat(t.qty_requested)}
-                          {t.qty_shipped != null && ` · ship ${parseFloat(t.qty_shipped)}`}
-                          {t.qty_received != null && ` · recv ${parseFloat(t.qty_received)}`}
+                          {' · req '}{formatStockQuantity(t.qty_requested, t.stock_display_unit)}
+                          {t.qty_shipped != null && ` · ship ${formatStockQuantity(t.qty_shipped, t.stock_display_unit)}`}
+                          {t.qty_received != null && ` · recv ${formatStockQuantity(t.qty_received, t.stock_display_unit)}`}
                           {t.discrepancy_reason && ` · ${t.discrepancy_reason}`}
                         </p>
                       </div>

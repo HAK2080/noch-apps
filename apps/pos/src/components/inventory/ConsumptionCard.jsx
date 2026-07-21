@@ -12,10 +12,9 @@ function fmtG(n) { return n != null ? Number(n).toFixed(1) : '—' }
 export default function ConsumptionCard({ ingredient }) {
   const [days, setDays] = useState(7)
   const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
     const end = new Date()
     const start = new Date(+end - days * 86400000)
     // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
@@ -40,7 +39,7 @@ export default function ConsumptionCard({ ingredient }) {
         <strong style={{ textTransform: 'capitalize', fontSize: 14 }}>{ingredient}</strong>
         <div style={{ display: 'flex', gap: 6 }}>
           {PRESETS.map(p => (
-            <button key={p.days} onClick={() => setDays(p.days)}
+            <button key={p.days} onClick={() => { setLoading(true); setDays(p.days) }}
               style={{
                 padding: '2px 10px', borderRadius: 20, border: '1px solid #ccc', cursor: 'pointer', fontSize: 12,
                 background: days === p.days ? '#222' : 'white',
@@ -58,7 +57,7 @@ export default function ConsumptionCard({ ingredient }) {
               <Stat label="Total used" value={`${fmtG(data.total)} g`} />
               <Stat label="Serves" value={data.serves} />
               <Stat label="Per serve" value={data.qps ? `${fmtG(data.qps)} g` : '—'}
-                sub={data.source === 'recipe' ? 'from recipe' : 'manual default'} />
+                sub={data.source === 'product_grams' ? 'from POS grams' : data.source === 'recipe' ? 'from recipe' : 'configured'} />
             </div>
           : <p style={{ color: '#999', fontSize: 13, margin: 0 }}>No data</p>
       }

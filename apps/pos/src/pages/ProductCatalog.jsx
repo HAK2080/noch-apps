@@ -16,6 +16,7 @@ import {
 import { getRecipesForCost, getCurrencyRates, calcCostPerBaseUnit } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
+import CoffeeConsumptionField from '../modules/pos/components/CoffeeConsumptionField'
 import {
   STOCK_UNIT_OPTIONS,
   convertDisplayedQuantity,
@@ -24,6 +25,7 @@ import {
   getStockBaseUnit,
   toBaseQuantity,
 } from '../modules/pos/lib/inventory-units'
+import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 
 // ─── helpers ──────────────────────────────────────────────────
 function calcRecipeCost(recipe, rates) {
@@ -115,6 +117,9 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
           <div>
             <p className="text-noch-green font-bold text-base leading-none">{fmt(product.price)}</p>
             {product.cost_price && <p className="text-zinc-600 text-[11px] leading-tight">cost {fmt(product.cost_price)}</p>}
+            {product.is_coffee_bean && product.stock_cost_per_base_unit && (
+              <p className="text-amber-400/80 text-[11px] leading-tight">{Number(product.stock_cost_per_base_unit).toFixed(5)} LYD/g</p>
+            )}
           </div>
           <div className="flex flex-col items-end gap-1">
             <StockBadge qty={product.stock_qty} threshold={product.low_stock_alert} track={product.track_inventory} unit={product.stock_display_unit} />
@@ -139,11 +144,13 @@ const BLANK = {
   category_id: '', track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
   stock_base_unit: 'pc', stock_display_unit: 'pc',
+  coffee_grams_per_sale: '', coffee_bean_product_id: '',
+  is_coffee_bean: false, stock_cost_per_base_unit: '', retail_pack_size_base_units: '250',
   visible_branch_ids: [], visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true,
   is_available: true,
 }
 
-function ProductModal({ product, categories, branches, recipes, rates, onSave, onClose }) {
+function ProductModal({ product, products, categories, branches, recipes, rates, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (product) {
       const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
@@ -224,12 +231,19 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
         ...form,
         name: form.name.trim(),
         price: parseFloat(form.price),
-        cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
+        cost_price: form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
+          ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
+          : form.cost_price ? parseFloat(form.cost_price) : null,
+        stock_cost_per_base_unit: form.stock_cost_per_base_unit ? parseFloat(form.stock_cost_per_base_unit) : null,
+        retail_pack_size_base_units: form.retail_pack_size_base_units ? parseFloat(form.retail_pack_size_base_units) : null,
+        is_coffee_bean: !!form.is_coffee_bean,
         cost_recipe_id: form.cost_recipe_id || null,
         stock_base_unit: getStockBaseUnit(form.stock_display_unit),
         stock_display_unit: form.stock_display_unit,
         stock_qty: toBaseQuantity(parseFloat(form.stock_qty) || 0, form.stock_display_unit),
         low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
+        coffee_grams_per_sale: normalizeCoffeeGrams(form.coffee_grams_per_sale),
+        coffee_bean_product_id: form.coffee_bean_product_id || null,
         category_id: form.category_id || null,
         visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
         visible_on_menu:          !!form.visible_on_menu,
@@ -293,8 +307,13 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
     }
   }
 
-  const margin = form.price && form.cost_price
-    ? ((parseFloat(form.price) - parseFloat(form.cost_price)) / parseFloat(form.price) * 100)
+  const beanProducts = (products || []).filter(candidate => candidate.is_coffee_bean && candidate.id !== product?.id)
+  const calculatedRetailCost = form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
+    ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
+    : null
+  const effectiveCost = calculatedRetailCost ?? (form.cost_price ? parseFloat(form.cost_price) : null)
+  const margin = form.price && effectiveCost !== null
+    ? ((parseFloat(form.price) - effectiveCost) / parseFloat(form.price) * 100)
     : null
 
   return (
@@ -398,6 +417,49 @@ function ProductModal({ product, categories, branches, recipes, rates, onSave, o
               )}
               <p className="text-zinc-600 text-[11px] mt-1">Cost Price below is what the system uses. The hint above shows what it would be from current ingredient prices — apply only when you want to.</p>
             </div>
+
+            <div className="rounded-xl border border-noch-border p-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!form.is_coffee_bean}
+                  onChange={event => setForm(current => ({
+                    ...current,
+                    is_coffee_bean: event.target.checked,
+                    stock_base_unit: event.target.checked ? 'g' : current.stock_base_unit,
+                    stock_display_unit: event.target.checked ? 'kg' : current.stock_display_unit,
+                    retail_pack_size_base_units: event.target.checked ? (current.retail_pack_size_base_units || '250') : current.retail_pack_size_base_units,
+                  }))}
+                  className="w-4 h-4 accent-noch-green"
+                />
+                <span className="text-white text-sm font-semibold">Coffee bean stock item</span>
+              </label>
+              {form.is_coffee_bean && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div>
+                    <label className="label">Base cost (LYD/g)</label>
+                    <input type="number" value={form.stock_cost_per_base_unit ?? ''} onChange={e => set('stock_cost_per_base_unit', e.target.value)} className="input" step="0.000001" min="0" placeholder="0.093470" />
+                  </div>
+                  <div>
+                    <label className="label">Retail bag size (g)</label>
+                    <input type="number" value={form.retail_pack_size_base_units ?? ''} onChange={e => set('retail_pack_size_base_units', e.target.value)} className="input" step="1" min="1" placeholder="250" />
+                  </div>
+                  {calculatedRetailCost !== null && (
+                    <p className="col-span-2 text-noch-muted text-xs">
+                      Retail bag cost: <span className="text-white font-semibold">{calculatedRetailCost.toFixed(3)} LYD</span>. The sale price above remains the customer price.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {!form.is_coffee_bean && <CoffeeConsumptionField
+              value={form.coffee_grams_per_sale}
+              onChange={value => set('coffee_grams_per_sale', value)}
+              beanProductId={form.coffee_bean_product_id}
+              onBeanProductChange={value => set('coffee_bean_product_id', value)}
+              beanProducts={beanProducts}
+            />}
 
             {/* Category + SKU */}
             <div className="grid grid-cols-2 gap-3">
@@ -755,6 +817,7 @@ export default function ProductCatalog() {
       {(showAdd || editProduct) && (
         <ProductModal
           product={editProduct || null}
+          products={products}
           categories={categories}
           branches={branches}
           recipes={recipes}

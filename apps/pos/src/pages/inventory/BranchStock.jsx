@@ -9,8 +9,9 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Store, Search } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
-import { getPOSBranches, getPOSProducts } from '../../modules/pos/lib/pos-supabase'
-import { listBranchPar, upsertBranchPar } from './lib/warehouse'
+import { getPOSBranches } from '../../modules/pos/lib/pos-supabase'
+import { formatStockQuantity } from '../../modules/pos/lib/inventory-units'
+import { listBranchPar, listBranchStock, upsertBranchPar } from './lib/warehouse'
 import toast from 'react-hot-toast'
 
 function ParRow({ product, par, canEdit, onSave }) {
@@ -18,7 +19,7 @@ function ParRow({ product, par, canEdit, onSave }) {
   const [targetQty, setTargetQty] = useState(par?.target_qty != null ? String(par.target_qty) : '')
   const [saving, setSaving] = useState(false)
 
-  const stock = parseFloat(product.stock_qty) || 0
+  const stock = parseFloat(product.branch_stock_qty) || 0
   const min = parseFloat(minQty) || 0
   const target = parseFloat(targetQty) || 0
 
@@ -44,9 +45,11 @@ function ParRow({ product, par, canEdit, onSave }) {
 
   return (
     <div className={`grid grid-cols-[1fr_70px_76px_76px] gap-2 px-4 py-2.5 items-center ${rowTone}`}>
-      <p className="text-white text-sm font-medium truncate">{product.name}</p>
+      <p className="text-white text-sm font-medium truncate">
+        {product.name} <span className="text-noch-muted text-xs">({product.stock_base_unit})</span>
+      </p>
       <p className={`text-sm font-bold text-right tabular-nums ${belowMin ? 'text-red-400' : belowTarget ? 'text-amber-400' : 'text-noch-green'}`}>
-        {stock}
+        {formatStockQuantity(stock, product.stock_display_unit)}
       </p>
       {canEdit ? (
         <>
@@ -108,7 +111,7 @@ export default function BranchStock() {
   const loadBranch = useCallback(async (id) => {
     setLoading(true)
     try {
-      const [prods, par] = await Promise.all([getPOSProducts(id), listBranchPar(id)])
+      const [prods, par] = await Promise.all([listBranchStock(id), listBranchPar(id)])
       setProducts(prods)
       setParMap(Object.fromEntries(par.map(p => [p.product_id, p])))
     } catch (err) {
@@ -136,7 +139,7 @@ export default function BranchStock() {
   )
   const belowMinCount = products.filter(p => {
     const min = parseFloat(parMap[p.id]?.min_qty) || 0
-    return min > 0 && (parseFloat(p.stock_qty) || 0) < min
+    return min > 0 && (parseFloat(p.branch_stock_qty) || 0) < min
   }).length
 
   return (
