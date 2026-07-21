@@ -121,7 +121,7 @@ export async function completeSuggestedAction(id, updates = {}) {
 // EVENT PRODUCERS
 // Run these on dashboard load to seed relevant signals.
 // They are idempotent — they skip events created within 24h
-// for the same event_type + source_id combo.
+// for the same event_type + source_id combo, including dismissed events.
 // ============================================================
 
 async function alreadyFired(event_type, source_id) {
@@ -131,7 +131,6 @@ async function alreadyFired(event_type, source_id) {
     .select('id', { count: 'exact', head: true })
     .eq('event_type', event_type)
     .eq('source_id', source_id)
-    .is('resolved_at', null)
     .gte('created_at', since)
   return count > 0
 }

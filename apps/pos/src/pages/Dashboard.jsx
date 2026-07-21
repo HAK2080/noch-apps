@@ -61,6 +61,10 @@ export default function Dashboard() {
     }
   }, [isOwner])
 
+  const handleSuggestedActionUpdate = useCallback((actionId) => {
+    setSuggestedActions(current => current.filter(action => action.id !== actionId))
+  }, [])
+
   const approveAccess = async (req) => {
     setBusyRequestId(req.id)
     try {
@@ -73,7 +77,7 @@ export default function Dashboard() {
       })
       if (error || data?.error) {
         let msg = data?.error || error?.message
-        try { const b = await error?.context?.json(); msg = b?.error || msg } catch {}
+        try { const b = await error?.context?.json(); msg = b?.error || msg } catch { /* keep the original error message */ }
         throw new Error(msg)
       }
       setAccessRequests(prev => prev.filter(r => r.id !== req.id))
@@ -124,7 +128,7 @@ export default function Dashboard() {
       const to = `${y}-${m}-${d}T23:59:59`
       getPnL({ from, to, netOfRefunds: true }).then(setPnl).catch(() => {})
     }
-  }, [loadAccessRequests, loadFoundersClub, loadSuggestedActions])
+  }, [isOwner, loadAccessRequests, loadFoundersClub, loadSuggestedActions, t])
 
   useEffect(() => { load() }, [load])
 
@@ -373,7 +377,7 @@ export default function Dashboard() {
           {suggestedActions.length > 0 ? (
             <div className="space-y-3">
               {suggestedActions.map(a => (
-                <ActionCard key={a.id} action={a} onAction={loadSuggestedActions} />
+                <ActionCard key={a.id} action={a} onUpdate={handleSuggestedActionUpdate} />
               ))}
             </div>
           ) : (

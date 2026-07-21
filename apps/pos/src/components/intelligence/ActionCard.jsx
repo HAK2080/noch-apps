@@ -49,7 +49,7 @@ export default function ActionCard({ action, onUpdate }) {
     try {
       await acceptSuggestedAction(action.id)
       toast.success('Action accepted')
-      onUpdate?.()
+      onUpdate?.(action.id)
     } catch (err) {
       toast.error(err.message || 'Failed')
     } finally {
@@ -62,7 +62,7 @@ export default function ActionCard({ action, onUpdate }) {
     try {
       await dismissSuggestedAction(action.id)
       if (event?.id) await resolveBusinessEvent(event.id)
-      onUpdate?.()
+      onUpdate?.(action.id)
     } catch (err) {
       toast.error(err.message || 'Failed')
     } finally {
@@ -76,7 +76,7 @@ export default function ActionCard({ action, onUpdate }) {
       await completeSuggestedAction(action.id)
       if (event?.id) await resolveBusinessEvent(event.id)
       toast.success('Marked as done')
-      onUpdate?.()
+      onUpdate?.(action.id)
     } catch (err) {
       toast.error(err.message || 'Failed')
     } finally {
