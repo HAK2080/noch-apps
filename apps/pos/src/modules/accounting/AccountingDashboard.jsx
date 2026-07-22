@@ -16,7 +16,7 @@ import {
   listAccounts, upsertAccount, deactivateAccount, listAccountMap, setAccountMap,
   listBatches, getBatchLines, createManualJournal, syncPeriod, postOpeningBalances,
   trialBalance, accountLedger, balanceSheet, incomeStatement, statementLines, cashFlowStatement,
-  listBranches, apAging, supplierStatement,
+  listBranches, apAging, supplierStatement, listRecurringExpensesDue, listBankTransactionsSnapshot,
   replaceManualJournal, voidGlBatch,
 } from './lib/accounting-supabase'
 import toast from 'react-hot-toast'
@@ -24,6 +24,17 @@ import toast from 'react-hot-toast'
 const ymd = d => d.toISOString().slice(0, 10)
 const TODAY = ymd(new Date())
 const MONTH_AGO = ymd(new Date(Date.now() - 30 * 86400000))
+const JOURNAL_SOURCE_OPTIONS = [
+  { value: '', label: 'All sources' },
+  { value: 'sales_daily', label: 'Sales receipts' },
+  { value: 'expense', label: 'Expenses' },
+  { value: 'procurement_receipt', label: 'Procurement receipt' },
+  { value: 'procurement_payment', label: 'Procurement payment' },
+  { value: 'procurement_return', label: 'Procurement return' },
+  { value: 'cash', label: 'Cash movement' },
+  { value: 'manual', label: 'Manual journal' },
+  { value: 'journal_correction', label: 'Journal correction' },
+]
 
 export default function AccountingDashboard() {
   const { lang } = useLanguage()
@@ -151,6 +162,7 @@ function JournalTab({ ar, branches, canPost }) {
   const [from, setFrom] = useState(MONTH_AGO)
   const [to, setTo] = useState(TODAY)
   const [branchId, setBranchId] = useState(null)
+  const [sourceType, setSourceType] = useState('')
   const [batches, setBatches] = useState([])
   const [expanded, setExpanded] = useState(null)
   const [lines, setLines] = useState([])
@@ -158,8 +170,8 @@ function JournalTab({ ar, branches, canPost }) {
   const [correcting, setCorrecting] = useState(null)
   const [syncing, setSyncing] = useState(false)
 
-  const reload = () => listBatches({ from, to, branchId }).then(setBatches)
-  useEffect(() => { reload() }, [from, to, branchId]) // eslint-disable-line
+  const reload = () => listBatches({ from, to, branchId, sourceType: sourceType || null }).then(setBatches)
+  useEffect(() => { reload() }, [from, to, branchId, sourceType]) // eslint-disable-line
 
   const toggle = async (b) => {
     if (expanded === b.id) { setExpanded(null); return }
@@ -203,11 +215,19 @@ function JournalTab({ ar, branches, canPost }) {
           <option value="">{ar ? 'كل الفروع' : 'All branches'}</option>
           {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        <select value={sourceType} onChange={e => setSourceType(e.target.value)} className="input py-1 px-2 text-xs">
+          {JOURNAL_SOURCE_OPTIONS.map(option => (
+            <option key={option.value || 'all'} value={option.value}>{option.label}</option>
+          ))}
+        </select>
         {canPost && <>
           <button onClick={() => setCreating(true)} className="btn-secondary text-xs flex items-center gap-1 ms-auto"><Plus size={12}/> {ar ? 'قيد يدوي' : 'Manual entry'}</button>
           <button onClick={runSync} disabled={syncing} className="btn-primary text-xs">{syncing ? '…' : (ar ? 'ترحيل الفترة' : 'Post period')}</button>
         </>}
       </div>
+      <p className="text-noch-muted text-xs">
+        {ar ? 'استخدم فلتر المصدر لمراجعة قيود استلام المشتريات ودفع الموردين والمرتجعات بدون تعديل القيود.' : 'Use the source filter to verify procurement receipts, supplier payments, and returns without changing posted journals.'}
+      </p>
 
       {creating && <ManualJournalForm ar={ar} branches={branches} onClose={() => setCreating(false)} onSaved={() => { setCreating(false); reload() }} />}
       {correcting && (
@@ -572,6 +592,8 @@ function PayablesTab({ ar, branches }) {
   const [statement, setStatement] = useState([])
   const [cf, setCf] = useState([])
   const [lines, setLines] = useState([])
+  const [recurringDue, setRecurringDue] = useState([])
+  const [bankRows, setBankRows] = useState([])
 
   const Section = ({ title, rows: sectionRows, valueKey }) => (
     <div className="mb-3">
@@ -611,12 +633,20 @@ function PayablesTab({ ar, branches }) {
   useEffect(() => {
     let cancelled = false
     const from = ymd(new Date(new Date(asOf).getTime() - 30 * 86400000))
-    cashFlowStatement(from, asOf, branchId)
-      .then(data => { if (!cancelled) setCf(data || []) })
-      .catch(err => toast.error(err.message || 'Failed to load cash flow statement'))
-    statementLines(from, asOf, branchId)
-      .then(data => { if (!cancelled) setLines(data || []) })
-      .catch(err => toast.error(err.message || 'Failed to load statement lines'))
+    Promise.all([
+      cashFlowStatement(from, asOf, branchId),
+      statementLines(from, asOf, branchId),
+      listRecurringExpensesDue(),
+      listBankTransactionsSnapshot({ from, to: asOf }),
+    ])
+      .then(([cashFlowRows, lineRows, recurringRows, bankTxRows]) => {
+        if (cancelled) return
+        setCf(cashFlowRows || [])
+        setLines(lineRows || [])
+        setRecurringDue(recurringRows || [])
+        setBankRows(bankTxRows || [])
+      })
+      .catch(err => toast.error(err.message || 'Failed to load reporting scaffolding'))
     return () => { cancelled = true }
   }, [asOf, branchId])
 
@@ -626,6 +656,20 @@ function PayablesTab({ ar, branches }) {
     .filter(r => Number(r.days_past_due || 0) > 0)
     .reduce((sum, row) => sum + Number(row.outstanding_amount_lyd || 0), 0)
   const suppliers = [...new Set(rows.map(r => r.supplier_name).filter(Boolean))]
+  const recurringSoon = recurringDue.filter(row => Number(row.days_until_due || 0) <= 14)
+  const unreconciledBankRows = bankRows.filter(row => !row.reconciled)
+  const uncategorisedBankRows = bankRows.filter(row => !row.category)
+  const latestBankRows = bankRows.slice(0, 5)
+  const latestRecurringRows = recurringDue.slice(0, 5)
+  const sourceWindowFrom = ymd(new Date(new Date(asOf).getTime() - 30 * 86400000))
+  const supplierPostingRows = cf.filter(row => ['procurement_receipt', 'procurement_payment'].includes(row.source_type))
+  const postingSourceLabel = (sourceType) => {
+    switch (sourceType) {
+      case 'procurement_receipt': return 'Inventory receipts'
+      case 'procurement_payment': return 'Supplier payments'
+      default: return sourceType
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -652,7 +696,7 @@ function PayablesTab({ ar, branches }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <div className="card">
           <p className="text-noch-muted text-xs mb-1">Open AP</p>
           <p className="text-white text-lg font-bold">{lyd(totalOpen)}</p>
@@ -664,6 +708,14 @@ function PayablesTab({ ar, branches }) {
         <div className="card">
           <p className="text-noch-muted text-xs mb-1">Unpaid invoices</p>
           <p className="text-white text-lg font-bold">{openRows.length}</p>
+        </div>
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Recurring due soon</p>
+          <p className="text-white text-lg font-bold">{recurringSoon.length}</p>
+        </div>
+        <div className="card">
+          <p className="text-noch-muted text-xs mb-1">Recon queue</p>
+          <p className="text-white text-lg font-bold">{unreconciledBankRows.length}</p>
         </div>
       </div>
 
@@ -753,6 +805,86 @@ function PayablesTab({ ar, branches }) {
             <span className="text-white">Net cash movement</span>
             <span className={`font-mono ${netCashFlow >= 0 ? 'text-noch-green' : 'text-red-400'}`}>{lyd(netCashFlow)}</span>
           </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="card">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-white font-semibold">Recurring expenses due</h2>
+            <span className="text-noch-muted text-xs">read-only scaffold</span>
+          </div>
+          {latestRecurringRows.length === 0 ? (
+            <p className="text-noch-muted text-sm">No recurring expense templates due yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {latestRecurringRows.map(row => (
+                <div key={row.id} className="rounded-xl border border-noch-border/50 bg-noch-dark/30 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-white text-sm font-medium truncate">{row.name}</p>
+                    <span className={`text-[10px] font-semibold ${Number(row.days_until_due || 0) <= 14 ? 'text-yellow-300' : 'text-noch-muted'}`}>
+                      {Number(row.days_until_due || 0) <= 0 ? 'due now' : `${row.days_until_due}d`}
+                    </span>
+                  </div>
+                  <p className="text-noch-muted text-xs mt-0.5">{row.vendor || 'Recurring vendor'} · {row.cadence}</p>
+                  <p className="text-noch-green text-xs font-semibold mt-1">{lyd(row.amount_lyd)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-white font-semibold">Bank reconciliation scaffold</h2>
+            <span className="text-noch-muted text-xs">{uncategorisedBankRows.length} uncategorised</span>
+          </div>
+          {latestBankRows.length === 0 ? (
+            <p className="text-noch-muted text-sm">No bank transactions imported for this period window.</p>
+          ) : (
+            <div className="space-y-2">
+              {latestBankRows.map(row => (
+                <div key={row.id} className="rounded-xl border border-noch-border/50 bg-noch-dark/30 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-white text-sm font-medium truncate">{row.description || 'Bank transaction'}</p>
+                    <span className={`text-[10px] font-semibold ${row.reconciled ? 'text-noch-green' : 'text-yellow-300'}`}>
+                      {row.reconciled ? 'reconciled' : 'pending'}
+                    </span>
+                  </div>
+                  <p className="text-noch-muted text-xs mt-0.5">{row.posted_at} · {row.account_label || 'Main'} · {row.category || 'uncategorised'}</p>
+                  <p className={`text-xs font-semibold mt-1 ${Number(row.amount_lyd || 0) >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                    {lyd(row.amount_lyd)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-white font-semibold">Procurement posting signals</h2>
+            <span className="text-noch-muted text-xs">{sourceWindowFrom} → {asOf}</span>
+          </div>
+          {supplierPostingRows.length === 0 ? (
+            <p className="text-noch-muted text-sm">No supplier receipt/payment cash-flow lines in this window.</p>
+          ) : (
+            <div className="space-y-2">
+              {supplierPostingRows.map(row => (
+                <div key={row.source_type} className="rounded-xl border border-noch-border/50 bg-noch-dark/30 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-white text-sm font-medium">{postingSourceLabel(row.source_type)}</p>
+                    <span className={`text-xs font-semibold ${Number(row.net_lyd || 0) >= 0 ? 'text-noch-green' : 'text-red-400'}`}>
+                      {lyd(row.net_lyd)}
+                    </span>
+                  </div>
+                  <p className="text-noch-muted text-xs mt-0.5">
+                    In {lyd(row.inflow_lyd)} · Out {lyd(row.outflow_lyd)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-noch-muted text-xs mt-3">
+            Cross-check these source types in the Journal tab with the source filter before posting corrections.
+          </p>
         </div>
       </div>
       <div className="card overflow-x-auto">

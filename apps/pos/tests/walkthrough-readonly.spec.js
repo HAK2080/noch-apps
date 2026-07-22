@@ -68,8 +68,10 @@ test.describe('Read-only app walkthrough', () => {
     await expect(page.getByText(/Supplier invoices|Open AP/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Supplier statement|Select supplier/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Cash flow statement|P&L drill-down/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Recurring expenses due|Bank reconciliation scaffold|Procurement posting signals/i).first()).toBeVisible({ timeout: 10000 })
     await clickTab(page, /Journal|دفتر اليومية/i)
     await expect(page.getByText(/Post period|Manual entry|No journal entries in this range/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('select').last()).toContainText(/All sources|Procurement receipt|Procurement payment|Procurement return/i)
     expect(errors.slice(0, 3), 'accounting payables console/page errors').toEqual([])
   })
 

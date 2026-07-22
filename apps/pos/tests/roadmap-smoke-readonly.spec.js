@@ -31,11 +31,15 @@ test.describe('Roadmap smoke coverage', () => {
     await page.goto('/accounting')
     await page.waitForLoadState('domcontentloaded')
 
-    await clickTab(page, /Payables|ط­ط³ط§ط¨ط§طھ ط§ظ„ظ…ظˆط±ط¯ظٹظ†/i)
+    await clickTab(page, /Payables|حسابات الموردين/i)
     await expect(page.getByText(/Open AP|Overdue|Unpaid invoices/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Supplier statement|Select supplier/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Cash flow statement|Net cash movement/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Recurring expenses due|Bank reconciliation scaffold|Procurement posting signals/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/P&L drill-down|No statement lines for this period/i).first()).toBeVisible({ timeout: 10000 })
+
+    await clickTab(page, /Journal|دفتر اليومية/i)
+    await expect(page.locator('select').last()).toContainText(/All sources|Procurement receipt|Procurement payment|Procurement return/i)
   })
 
   test('pos shell opens a payment modal without creating a live sale', async ({ page }) => {
