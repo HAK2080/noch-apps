@@ -692,6 +692,20 @@ export async function createPOSOrder(orderData, items) {
   }
 }
 
+export async function annotatePOSOrderOverride({
+  orderId, action, managerId, note = null, servedBy = null,
+}) {
+  const { data, error } = await supabase.rpc('annotate_pos_order_override', {
+    p_order_id: orderId,
+    p_override_action: action,
+    p_manager_override_by: managerId,
+    p_note: note,
+    p_served_by: servedBy,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function getPOSOrders(branchId, filters = {}) {
   let query = supabase
     .from('pos_orders')

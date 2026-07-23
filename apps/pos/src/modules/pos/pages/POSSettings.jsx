@@ -626,7 +626,7 @@ export default function POSSettings({ onClose } = {}) {
               />
               <FlagRow
                 label="Manager override for discounts"
-                hint="When on, discounts above the staff cap prompt for a manager PIN and record the override on the sale audit trail."
+                hint="When on, discount, refund, and cancel actions can require a manager PIN and record the override in the POS audit trail."
                 value={!!posSettings.manager_override_enabled}
                 onChange={v => handleToggleFlag('manager_override_enabled', v)}
               />

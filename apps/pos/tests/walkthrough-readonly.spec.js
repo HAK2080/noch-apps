@@ -139,6 +139,28 @@ test.describe('Read-only app walkthrough', () => {
     await expect(page.getByText(/Recent POS audit trail|Open RLS policies|Manager overrides \(30d\)/i).first()).toBeVisible({ timeout: 10000 })
   })
 
+  test('POS orders lookup renders refund and cancel surfaces without mutation', async ({ page }) => {
+    await page.goto('/pos')
+    await page.waitForLoadState('domcontentloaded')
+
+    const branchLink = page.locator('a[href^="/pos/"]').first()
+    if (await branchLink.count() === 0) {
+      await expect(page.getByText(/Point of Sale|No branches found/i).first()).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    const href = await branchLink.getAttribute('href')
+    await page.goto(`${href}/orders`)
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Orders|No orders match/i).first()).toBeVisible({ timeout: 10000 })
+
+    const orderRows = page.locator('.font-mono.text-noch-green')
+    if (await orderRows.count()) {
+      await orderRows.first().click()
+      await expect(page.getByText(/Reprint|Refund|Cancel|Drink ticket/i).first()).toBeVisible({ timeout: 10000 })
+    }
+  })
+
   test('POS sale shell can open payment flow without submitting an order', async ({ page }) => {
     await page.goto('/pos')
     await page.waitForLoadState('domcontentloaded')
