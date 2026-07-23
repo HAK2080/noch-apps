@@ -28,6 +28,7 @@ import {
 } from '../modules/pos/lib/inventory-units'
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
+import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
 
 // ─── helpers ──────────────────────────────────────────────────
 function fmt(n) { return parseFloat(n || 0).toFixed(3) }
@@ -135,7 +136,7 @@ const BLANK = {
   stock_base_unit: 'pc', stock_display_unit: 'pc',
   coffee_grams_per_sale: '', coffee_bean_product_id: '',
   is_coffee_bean: false, stock_cost_per_base_unit: '', retail_pack_size_base_units: '250',
-  visible_branch_ids: [], visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true,
+  visible_branch_ids: [], ...NEW_PRODUCT_VISIBILITY,
   is_available: true,
 }
 
@@ -161,7 +162,6 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
     return {
       ...BLANK,
       visible_branch_ids: (branches || []).map(b => b.id),
-      visible_on_menu: true,
     }
   })
   const [saving, setSaving] = useState(false)

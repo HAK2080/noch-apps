@@ -23,6 +23,7 @@ import {
   toBaseQuantity,
 } from '../lib/inventory-units'
 import { normalizeCoffeeGrams } from '../lib/coffee-consumption'
+import { NEW_PRODUCT_VISIBILITY } from '../lib/product-visibility'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
@@ -30,7 +31,7 @@ const BLANK_PRODUCT = {
   stock_qty: '0', low_stock_alert: '5', is_active: true,
   stock_base_unit: 'pc', stock_display_unit: 'pc',
   coffee_grams_per_sale: '', coffee_bean_product_id: '',
-  visible_on_menu: false, visible_on_customer_menu: true, visible_on_website: true, featured: false,
+  ...NEW_PRODUCT_VISIBILITY, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
   show_description_on_menu: true, show_description_on_website: true,
   secondary_category_ids: [],
