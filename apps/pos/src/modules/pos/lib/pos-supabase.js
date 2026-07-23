@@ -2,6 +2,7 @@
 // All POS CRUD functions. Follows exact pattern from src/lib/supabase.js
 
 import { supabase } from '../../../lib/supabase'
+import { ALL_PRODUCTS_SELECT } from './product-query'
 
 // ============================================================
 // BRANCHES
@@ -145,7 +146,7 @@ export async function getProductPopularity(branchId) {
 export async function getAllProducts() {
   const { data, error } = await supabase
     .from('pos_products')
-    .select('*, pos_categories(name, name_ar, color), pos_branches!pos_products_branch_id_fkey(name)')
+    .select(ALL_PRODUCTS_SELECT)
     .eq('is_active', true)
     .order('name')
   if (error) throw error
