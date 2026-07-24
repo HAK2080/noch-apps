@@ -3,6 +3,36 @@
 
 import { supabase } from '../../../lib/supabase'
 
+export async function getNotificationOutbox(status) {
+  let query = supabase
+    .from('notification_outbox')
+    .select(`
+      *,
+      customer:loyalty_customers!customer_id(id, full_name, phone),
+      campaign:marketing_campaigns!campaign_id(id, name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (status) query = query.eq('status', status)
+
+  const { data, error } = await query
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('does not exist')) return []
+    throw error
+  }
+  return data || []
+}
+
+export async function retryNotification(outboxId) {
+  const { data, error } = await supabase.functions.invoke('send-notification', {
+    body: { outbox_id: outboxId, send_now: true },
+  })
+  if (error) throw new Error(error.message ?? 'Failed to retry notification')
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 // ── Channel snapshots ────────────────────────────────────────────────
 export async function listChannelSnapshots({ channel = null, from, to } = {}) {
   let q = supabase.from('marketing_channel_snapshots').select('*').order('snapshot_date', { ascending: false })
@@ -174,9 +204,34 @@ export function renderTemplate(template, recipient) {
     .replaceAll('{{days}}',  String(recipient?.context?.days_since ?? ''))
 }
 
+const WHATSAPP_TEMPLATE_BY_SEGMENT = {
+  birthday_this_week: 'loyalty_marketing_birthday',
+  inactive: 'loyalty_lapsed_checkin',
+  reward_ready: 'loyalty_reward_ready',
+}
+
+function templateVariablesForSegment(segment, recipient) {
+  if (segment === 'birthday_this_week') {
+    return { '1': recipient?.full_name || '' }
+  }
+  if (segment === 'inactive') {
+    return {
+      '1': recipient?.full_name || '',
+      '2': String(recipient?.context?.days_since ?? 30),
+    }
+  }
+  if (segment === 'reward_ready') {
+    return {
+      '1': recipient?.full_name || '',
+      '2': recipient?.top_drink || 'your reward',
+    }
+  }
+  return {}
+}
+
 // Phase 6 — dispatch a WhatsApp campaign by looping through the chosen
-// segment's recipients and invoking the send-whatsapp edge function.
-// Each send is logged via record_whatsapp_send for dedupe + audit.
+// segment's recipients and invoking send-notification.
+// Each send lands in notification_outbox and whatsapp_sends for audit.
 // Returns { sent, failed, total } when the loop finishes.
 export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArgs, template, onProgress }) {
   const recipients = await loadSegmentRecipients(segment, segmentArgs || {})
@@ -191,35 +246,54 @@ export async function dispatchWhatsAppCampaign({ campaignId, segment, segmentArg
   }
 
   for (const r of recipients) {
-    const message = renderTemplate(template, r)
+    const templateName = WHATSAPP_TEMPLATE_BY_SEGMENT[segment]
     let status = 'sent', error = null
     try {
-      const { data, error: invokeErr } = await supabase.functions.invoke('send-whatsapp', {
-        body: { to: r.phone, message },
+      const { data, error: invokeErr } = await supabase.functions.invoke('send-notification', {
+        body: templateName
+          ? {
+              send_now: true,
+              channel: 'whatsapp',
+              audience: 'customer',
+              event_key: `campaign:${segment}`,
+              template_key: templateName,
+              customer_id: r.id,
+              recipient_name: r.full_name,
+              recipient_phone: r.phone,
+              template_variables: templateVariablesForSegment(segment, r),
+              message_body: template ? renderTemplate(template, r) : null,
+              context: {
+                segment,
+                preview_template: template || null,
+              },
+              source_module: 'marketing-campaign',
+              campaign_id: campaignId || null,
+              requires_template: true,
+              dedupe_key: campaignId ? `campaign:${campaignId}:${r.id}` : null,
+            }
+          : {
+              send_now: true,
+              channel: 'whatsapp',
+              audience: 'customer',
+              event_key: `campaign:${segment}`,
+              customer_id: r.id,
+              recipient_name: r.full_name,
+              recipient_phone: r.phone,
+              message_body: renderTemplate(template, r),
+              context: { segment },
+              source_module: 'marketing-campaign',
+              campaign_id: campaignId || null,
+              allow_freeform_session: false,
+            },
       })
       if (invokeErr) { status = 'failed'; error = invokeErr.message || 'invoke_failed' }
       else if (data?.error) { status = 'failed'; error = data.error }
+      else if (data?.status === 'failed') { status = 'failed'; error = data.error || 'notification_failed' }
     } catch (err) {
       status = 'failed'; error = err.message || 'exception'
     }
 
     if (status === 'sent') sent++; else failed++
-
-    // Log for dedupe + audit. Trigger name = `campaign:<segment>` so the
-    // existing whatsapp_sends history table holds the full picture.
-    try {
-      await supabase.rpc('record_whatsapp_send', {
-        p_customer_id: r.id,
-        p_phone:       r.phone,
-        p_template:    template?.slice(0, 200) || null,
-        p_trigger:     `campaign:${segment}`,
-        p_status:      status,
-        p_error:       error,
-        p_payload_key: campaignId ? `campaign:${campaignId}:${r.id}` : null,
-      })
-    } catch {
-      // Don't let audit-log failure block the loop.
-    }
 
     if (onProgress) onProgress({ recipient: r, status, error, sent, failed, total })
   }

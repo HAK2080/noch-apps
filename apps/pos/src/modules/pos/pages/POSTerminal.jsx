@@ -736,6 +736,8 @@ export default function POSTerminal() {
       branch_id: branchId,
       shift_id: shift?.id || null,
       served_by: servedByProfile?.id || null,
+      override_by: showPayment.override_by || null,
+      override_note: showPayment.override_by ? 'Discount approved above staff cap.' : null,
       idempotency_key: idempotencyKey,
       client_created_at: clientCreatedAt,
       subtotal,
@@ -798,6 +800,10 @@ export default function POSTerminal() {
       setShowReceipt({ order, items, loyaltyCustomer })
       setCart([])
       setLoyaltyCustomer(null)
+
+      if (order.audit_warning) {
+        toast.error(order.audit_warning)
+      }
 
       // Auto-print drink ticket — always fires when printer connected.
       // This is the bar-facing slip with big order # + customer name +

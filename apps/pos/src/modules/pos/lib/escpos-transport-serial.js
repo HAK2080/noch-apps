@@ -11,6 +11,7 @@ const DEFAULT_TIMEOUT_MS = 8000
 
 let _port = null
 let _writer = null
+let _baudRate = DEFAULT_BAUD
 
 export const label = 'USB Serial'
 
@@ -22,14 +23,39 @@ export function isConnected() {
   return _port !== null && _writer !== null
 }
 
+function readPortInfo(port = _port) {
+  if (!port || typeof port.getInfo !== 'function') return {}
+  try {
+    const info = port.getInfo() || {}
+    return {
+      usbVendorId: info.usbVendorId ?? null,
+      usbProductId: info.usbProductId ?? null,
+    }
+  } catch {
+    return {}
+  }
+}
+
+async function attachPort(port, baudRate) {
+  await port.open({ baudRate })
+  if (!port.writable) {
+    try { await port.close() } catch { /* noop */ }
+    throw new Error('Selected USB serial device is not writable.')
+  }
+
+  const writer = port.writable.getWriter()
+  _port = port
+  _writer = writer
+  _baudRate = baudRate
+  return true
+}
+
 export async function connect({ baudRate = DEFAULT_BAUD } = {}) {
   if (!isAvailable()) {
     throw new Error('Web Serial API not available. Use HTTPS + Chrome/Edge.')
   }
-  _port = await navigator.serial.requestPort()
-  await _port.open({ baudRate })
-  _writer = _port.writable.getWriter()
-  return true
+  const port = await navigator.serial.requestPort()
+  return attachPort(port, baudRate)
 }
 
 export async function disconnect() {
@@ -53,14 +79,19 @@ export async function autoConnect({ baudRate = DEFAULT_BAUD } = {}) {
   try {
     const ports = await navigator.serial.getPorts()
     if (!ports.length) return false
-    _port = ports[0]
-    await _port.open({ baudRate })
-    _writer = _port.writable.getWriter()
-    return true
+    return attachPort(ports[0], baudRate)
   } catch {
     _port = null
     _writer = null
     return false
+  }
+}
+
+export function getConnectionInfo() {
+  if (!_port) return null
+  return {
+    baudRate: _baudRate,
+    ...readPortInfo(_port),
   }
 }
 

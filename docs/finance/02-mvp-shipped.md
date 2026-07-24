@@ -67,7 +67,7 @@ After step 1, the Menu Profitability Matrix has real numbers. After step 2, Dail
 
 ## Known limitations / gotchas
 
-- **`/analytics-legacy` is still owner-accessible.** It points at the old `BusinessAnalytics.jsx`. Decide whether to delete it after a few days of running the new dashboard.
+- **`/analytics-legacy` is no longer a live dashboard surface.** It now redirects to `/finance` as a compatibility alias, while `BusinessAnalytics.jsx` remains preserved in the repo only for historical/reference purposes.
 - **Bank CSV parser is generic.** It tries `date,description,debit,credit,balance` first then falls back to `amount`. If a Libyan-bank export uses Arabic headers or a different layout, the CSV import will need a per-bank adapter.
 - **Refunds and voids are reversed correctly in shift totals** (audit-fixed earlier) but `finance_pnl` filters by `status='completed'` and excludes voided rows — partial-refund line items still count toward revenue and COGS, which is correct (they were sold and the money was paid then later refunded as a separate cash outflow). If you want net-of-refunds revenue, that's a Phase 1.1 toggle.
 - **Cron job ID `8`** scheduled `refresh-customer-segments` (marketing migration); cron extension already in repo.

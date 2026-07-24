@@ -10,13 +10,13 @@
 // the dropdown for backward compat — they use marketing_opt_in only.
 //
 // Workflow: draft → preview recipients → owner approves → send. Each
-// send invokes the send-whatsapp edge function and is logged via
-// record_whatsapp_send for dedupe + audit.
+// send now routes through send-notification and lands in notification_outbox
+// for auditable delivery status.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Megaphone, Plus, Send, X, ShieldCheck, Loader2, Cake, Clock, Gift } from 'lucide-react'
 import {
-  listCampaigns, createCampaign, updateCampaign,
+  listCampaigns, createCampaign,
   loadSegmentRecipients, dispatchWhatsAppCampaign, approveCampaign, renderTemplate,
 } from '../lib/marketing-supabase'
 import SegmentBadge from '../components/SegmentBadge'
@@ -296,7 +296,7 @@ function CampaignForm({ presetSegment, onClose, onSaved }) {
               </div>
             )}
           </div>
-          <div className="col-span-2"><label className="label block mb-1">Message template</label>
+          <div className="col-span-2"><label className="label block mb-1">Preview copy</label>
             <textarea rows={3} className="input w-full resize-none font-mono text-xs"
               value={f.message_template}
               onChange={e => set('message_template', e.target.value)}
@@ -317,7 +317,7 @@ function CampaignForm({ presetSegment, onClose, onSaved }) {
 
         <p className="text-noch-muted text-[11px] mt-3">
           {isPhase6
-            ? 'Phase 6: only customers with whatsapp_opt_in = true are reached. Approve in the list, then click "send now" to dispatch via WhatsApp.'
+            ? 'Phase 6: only customers with whatsapp_opt_in = true are reached. The saved copy is for preview/audit; live delivery uses the approved WhatsApp template mapped to this segment.'
             : 'Legacy RFM segment — uses marketing_opt_in. Sending must happen manually outside this app.'
           }
         </p>

@@ -3,13 +3,14 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Monitor, Download } from 'lucide-react'
-import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories } from '../lib/pos-supabase'
+import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Monitor, Download, Shield } from 'lucide-react'
+import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories, getPOSSecurityStatus, listPOSAuditEvents } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
   printTestPage, openCashDrawer,
   getTransport, setTransport, isTransportAvailable, getTransportLabel,
+  getDefaultSerialBaudRate, setDefaultSerialBaudRate, getPrinterConnectionDetails,
 } from '../lib/escpos'
 import {
   isPrintHost, setPrintHost,
@@ -46,6 +47,11 @@ function FlagRow({ label, hint, value, onChange }) {
   )
 }
 
+function formatUsbId(value) {
+  if (value == null) return null
+  return `0x${Number(value).toString(16).toUpperCase().padStart(4, '0')}`
+}
+
 // When `onClose` is provided, POSSettings renders as a full-screen overlay
 // on top of POSTerminal (no Layout wrapper, back button calls onClose).
 // When absent, it works as a standalone route (existing behaviour).
@@ -62,8 +68,9 @@ export default function POSSettings({ onClose } = {}) {
   const [loading, setLoading] = useState(true)
   const [printerConnected, setPrinterConnected] = useState(isPrinterConnected())
   const [connecting, setConnecting] = useState(false)
-  const [baudRate, setBaudRate] = useState(9600)
+  const [baudRate, setBaudRate] = useState(() => getDefaultSerialBaudRate())
   const [transport, setTransportState] = useState(getTransport())
+  const [printerDetails, setPrinterDetails] = useState(() => getPrinterConnectionDetails())
   const [editing, setEditing] = useState(false)
   const [branchForm, setBranchForm] = useState({})
   const [savingBranch, setSavingBranch] = useState(false)
@@ -73,20 +80,28 @@ export default function POSSettings({ onClose } = {}) {
   const [categories, setCategories] = useState([])
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
   const [printHost, setPrintHostState] = useState(() => isPrintHost())
+  const [securityStatus, setSecurityStatus] = useState(null)
+  const [auditEvents, setAuditEvents] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
 
   const serialAvailable = isTransportAvailable('serial')
   const bluetoothAvailable = isTransportAvailable('bluetooth')
   const windowsAgentAvailable = isTransportAvailable('windows')
   const transportAvailable = isTransportAvailable(transport)
 
+  const refreshPrinterState = () => {
+    setPrinterConnected(isPrinterConnected())
+    setPrinterDetails(getPrinterConnectionDetails())
+  }
+
   // On mount: silently reconnect to the last-used printer. The host
   // subscriber is started unconditionally (if flagged) — do NOT gate it
   // on printer connect success, as POSTerminal is the primary start point.
   useEffect(() => {
     if (isPrintHost() && branchId) startHostSubscriber(branchId)
-    autoConnectPrinter({ baudRate }).then(ok => {
-      if (ok) setPrinterConnected(true)
-    }).catch(() => {})
+    autoConnectPrinter()
+      .catch(() => {})
+      .finally(() => refreshPrinterState())
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -112,6 +127,24 @@ export default function POSSettings({ onClose } = {}) {
       .finally(() => setLoading(false))
   }, [branchId])
 
+  useEffect(() => {
+    let cancelled = false
+    setAuditLoading(true)
+    Promise.all([
+      getPOSSecurityStatus(branchId).catch(() => null),
+      listPOSAuditEvents(branchId).catch(() => []),
+    ])
+      .then(([status, events]) => {
+        if (cancelled) return
+        setSecurityStatus(status)
+        setAuditEvents(events)
+      })
+      .finally(() => {
+        if (!cancelled) setAuditLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [branchId])
+
   const handleAutoPrintToggle = (value) => {
     setAutoPrint(value)
     localStorage.setItem('noch_auto_print', value ? 'true' : 'false')
@@ -133,7 +166,7 @@ export default function POSSettings({ onClose } = {}) {
   const handleConnectPrinter = async () => {
     if (printerConnected) {
       await disconnectPrinter()
-      setPrinterConnected(false)
+      refreshPrinterState()
       toast('Printer disconnected')
       return
     }
@@ -142,7 +175,7 @@ export default function POSSettings({ onClose } = {}) {
       // Façade routes to the active transport. Baud rate is only used by
       // the serial transport; bluetooth ignores it.
       await connectPrinter(transport === 'serial' ? { baudRate } : {})
-      setPrinterConnected(true)
+      refreshPrinterState()
       toast.success(`Connected via ${getTransportLabel()}`)
     } catch (err) {
       toast.error(err.message || 'Connection failed')
@@ -155,7 +188,13 @@ export default function POSSettings({ onClose } = {}) {
     if (kind === transport) return
     setTransport(kind)
     setTransportState(kind)
-    setPrinterConnected(isPrinterConnected())
+    setBaudRate(getDefaultSerialBaudRate())
+    refreshPrinterState()
+  }
+
+  const handleBaudRateChange = (value) => {
+    const nextBaudRate = setDefaultSerialBaudRate(Number(value))
+    setBaudRate(nextBaudRate)
   }
 
   const handleTestPrint = async () => {
@@ -204,6 +243,20 @@ export default function POSSettings({ onClose } = {}) {
   }
 
   if (loading) return <Layout><p className="text-noch-muted text-center py-16">Loading...</p></Layout>
+
+  const actionLabels = {
+    manager_override_applied: 'Manager override applied',
+    shift_closed: 'Shift closed',
+    shift_close_operator_recorded: 'Shift close operator recorded',
+    order_voided: 'Order voided',
+    refund_completed: 'Refund completed',
+    refund_applied: 'Refund applied',
+    discount_applied: 'Discount applied',
+  }
+
+  const usbVendorId = formatUsbId(printerDetails?.usbVendorId)
+  const usbProductId = formatUsbId(printerDetails?.usbProductId)
+  const activeBaudRate = printerDetails?.baudRate || baudRate
 
   return (
     <Layout>
@@ -296,12 +349,24 @@ export default function POSSettings({ onClose } = {}) {
             </span>
           </div>
 
+          {transport === 'serial' && (
+            <div className="rounded-lg border border-noch-border/70 bg-noch-dark/30 px-3 py-2 mb-3">
+              <p className="text-white text-xs font-medium">
+                {printerConnected ? `Active baud: ${activeBaudRate}` : `Saved baud: ${baudRate}`}
+                {usbVendorId || usbProductId ? ` • ${usbVendorId || 'VID ?'} / ${usbProductId || 'PID ?'}` : ''}
+              </p>
+              <p className="text-noch-muted text-xs mt-1">
+                Opening the USB serial port does not prove the printer responded. If Test Print and Test Open Drawer both do nothing on Bloom POS, disconnect and reconnect the printer at 9600 first, then 115200. The drawer opens through the printer kick command, so it will not fire until printing works.
+              </p>
+            </div>
+          )}
+
           {!printerConnected && transport === 'serial' && (
             <div className="mb-3">
               <label className="label block mb-1">Baud Rate</label>
               <select
                 value={baudRate}
-                onChange={e => setBaudRate(Number(e.target.value))}
+                onChange={e => handleBaudRateChange(e.target.value)}
                 className="input py-1.5 text-sm"
               >
                 <option value={9600}>9600</option>
@@ -607,14 +672,14 @@ export default function POSSettings({ onClose } = {}) {
                 />
               )}
               <FlagRow
-                label="Manager override (coming soon)"
-                hint="When on, baristas above their discount cap or attempting a void/refund prompt for a manager PIN. Wired but not yet active."
+                label="Manager override for discounts"
+                hint="When on, discount, refund, and cancel actions can require a manager PIN and record the override in the POS audit trail."
                 value={!!posSettings.manager_override_enabled}
                 onChange={v => handleToggleFlag('manager_override_enabled', v)}
               />
               <FlagRow
-                label="Per-barista shift attendees (coming soon)"
-                hint="When on, multiple staff clock in/out on the same shift with per-barista totals. Wired but not yet active."
+                label="Per-barista shift attendees"
+                hint="When on, multiple staff can clock into the same shift and the terminal records per-barista attendance and sales attribution."
                 value={!!posSettings.per_barista_shift}
                 onChange={v => handleToggleFlag('per_barista_shift', v)}
               />
@@ -627,6 +692,103 @@ export default function POSSettings({ onClose } = {}) {
             </div>
           </div>
         )}
+
+        <div className="card mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield size={16} className="text-noch-green" />
+            <div>
+              <h2 className="text-white font-semibold">Audit & Security</h2>
+              <p className="text-noch-muted text-xs mt-0.5">Read-only visibility for manager overrides, shift-close attribution, and POS RLS status.</p>
+            </div>
+          </div>
+
+          {securityStatus ? (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Manager overrides (30d)</p>
+                  <p className="text-white text-lg font-semibold">{securityStatus.recent_override_events || 0}</p>
+                </div>
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Shift-close audit (30d)</p>
+                  <p className="text-white text-lg font-semibold">{securityStatus.recent_shift_close_events || 0}</p>
+                </div>
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Staff assignments</p>
+                  <p className="text-white text-lg font-semibold">{securityStatus.staff_assignment_count || 0}</p>
+                </div>
+                <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                  <p className="text-noch-muted text-[11px]">Open RLS policies</p>
+                  <p className={`text-lg font-semibold ${(securityStatus.open_pos_policy_count || 0) > 0 ? 'text-yellow-300' : 'text-noch-green'}`}>
+                    {securityStatus.open_pos_policy_count || 0}
+                  </p>
+                </div>
+              </div>
+
+              {(securityStatus.open_pos_policy_count || 0) > 0 && (
+                <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 mb-3">
+                  <p className="text-yellow-200 text-sm font-medium">Branch-scoped POS RLS is still blocked</p>
+                  <p className="text-yellow-100/90 text-xs mt-1">
+                    The legacy <code>pos_all</code> policy family is still open on {securityStatus.open_pos_policy_count} tables:
+                    {' '}{(securityStatus.open_pos_policy_tables || []).join(', ') || 'none reported'}.
+                    Tightening this automatically is still unsafe until every active staff member has a validated <code>staff_branches</code> assignment model.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-noch-muted mb-3">
+                <span>Manager assignments: {securityStatus.manager_assignment_count || 0}</span>
+                <span>Void events (30d): {securityStatus.recent_void_events || 0}</span>
+                <span>Refund events (30d): {securityStatus.recent_refund_events || 0}</span>
+                <span>
+                  Last audit event: {securityStatus.last_audit_at ? new Date(securityStatus.last_audit_at).toLocaleString('en-GB') : 'none'}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2 mb-3">
+              <p className="text-white text-sm font-medium">Security status unavailable</p>
+              <p className="text-noch-muted text-xs mt-1">
+                The additive <code>pos_security_status</code> RPC is not reachable in this environment yet. Audit rows below still load directly from <code>pos_audit_log</code>.
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-noch-border bg-noch-dark/20 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-noch-border/60">
+              <h3 className="text-white text-sm font-medium">Recent POS audit trail</h3>
+              <span className="text-noch-muted text-xs">Latest 10 events</span>
+            </div>
+            {auditLoading ? (
+              <p className="text-noch-muted text-sm px-3 py-4">Loading audit events...</p>
+            ) : auditEvents.length === 0 ? (
+              <p className="text-noch-muted text-sm px-3 py-4">No audit events recorded for this branch yet.</p>
+            ) : (
+              <div className="divide-y divide-noch-border/40">
+                {auditEvents.map(event => (
+                  <div key={event.id} className="px-3 py-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-white text-sm font-medium">{actionLabels[event.action] || event.action.replaceAll('_', ' ')}</p>
+                        <p className="text-noch-muted text-xs mt-0.5">
+                          {event.served_by_name ? `Staff: ${event.served_by_name}` : 'Staff not recorded'}
+                          {event.approved_by_name ? ` · Approved by: ${event.approved_by_name}` : ''}
+                          {event.actor_name ? ` · Triggered by: ${event.actor_name}` : ''}
+                        </p>
+                        {event.metadata?.note && (
+                          <p className="text-noch-muted text-xs mt-1">{event.metadata.note}</p>
+                        )}
+                      </div>
+                      <span className="text-noch-muted text-[11px] whitespace-nowrap">
+                        {new Date(event.created_at).toLocaleString('en-GB')}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Shift */}
         <div className="card">

@@ -207,6 +207,29 @@ export async function cashFlowStatement(from, to, branchId = null) {
   return data || []
 }
 
+export async function listRecurringExpensesDue() {
+  const { data, error } = await supabase
+    .from('recurring_expense_due')
+    .select('*')
+    .order('next_due_on')
+    .limit(12)
+  if (error) throw error
+  return data || []
+}
+
+export async function listBankTransactionsSnapshot({ from, to } = {}) {
+  let q = supabase
+    .from('bank_transactions')
+    .select('id, account_label, posted_at, description, amount_lyd, category, reconciled')
+    .order('posted_at', { ascending: false })
+    .limit(80)
+  if (from) q = q.gte('posted_at', from)
+  if (to) q = q.lte('posted_at', to)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
 // Branches (reuse)
 export async function listBranches() {
   const { data, error } = await supabase.from('pos_branches').select('id, name').eq('is_active', true).order('name')

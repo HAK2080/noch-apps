@@ -8,15 +8,17 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ListOrdered, Clock, TrendingUp } from 'lucide-react'
+import { ListOrdered, Clock, Download, TrendingUp } from 'lucide-react'
 import {
-  getPOSBranches, getDailySalesRange, businessToday, localYmd,
+  getPOSBranches, getDailySalesRange, getSalesExportRows, businessToday, localYmd,
 } from '../modules/pos/lib/pos-supabase'
 import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../contexts/PermissionsContext'
 import Layout from '../components/Layout'
 import BusinessRangePicker from '../components/shared/BusinessRangePicker'
+import { downloadCsv } from '../lib/exportCsv'
+import toast from 'react-hot-toast'
 
 const PRESETS = [
   { key: 'today', label: 'Today', days: 0 },
@@ -46,6 +48,8 @@ export default function Sales() {
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState(() => ({ preset: 'today', ...rangeFor(0) }))
   const [totalsByBranch, setTotalsByBranch] = useState({})
+  const [exportBranchId, setExportBranchId] = useState('all')
+  const [exporting, setExporting] = useState(false)
 
   const choosePreset = (p) => {
     if (p === 'custom') { setRange(r => ({ ...r, preset: 'custom' })); return }
@@ -91,6 +95,86 @@ export default function Sales() {
     return a
   }, { gross: 0, orders: 0, cash: 0, card: 0 })
 
+  const handleExport = async () => {
+    if (!range.fromDate || !range.toDate || range.fromDate > range.toDate) {
+      toast.error('Choose a valid export date range')
+      return
+    }
+
+    setExporting(true)
+    try {
+      const selectedBranches = exportBranchId === 'all'
+        ? branches
+        : branches.filter(branch => branch.id === exportBranchId)
+      const fromIso = new Date(`${range.fromDate}T00:00:00`).toISOString()
+      const toIso = new Date(`${range.toDate}T23:59:59.999`).toISOString()
+      const chunks = await Promise.all(
+        selectedBranches.map(branch =>
+          getSalesExportRows(branch.id, { from: fromIso, to: toIso })
+            .then(rows => rows.map(row => ({ branch, row }))),
+        ),
+      )
+      const exportRows = chunks.flat().map(({ branch, row }) => {
+        const order = row.pos_orders || {}
+        const created = order.created_at ? new Date(order.created_at) : null
+        const quantity = Number(row.quantity) || 0
+        const unitPrice = Number(row.unit_price) || 0
+        const lineTotal = Number(row.total) || quantity * unitPrice
+        const refundedQty = Number(row.refunded_qty) || 0
+        const netQty = Math.max(0, quantity - refundedQty)
+        const netLineTotal = quantity > 0 ? lineTotal * (netQty / quantity) : lineTotal
+        return [
+          order.created_at || '',
+          created ? localYmd(created) : '',
+          created ? String(created.getHours()).padStart(2, '0') : '',
+          branch.name || order.pos_branches?.name || '',
+          order.order_number || '',
+          order.status || '',
+          order.source || 'pos',
+          order.payment_method || '',
+          order.customer_name || '',
+          order.customer_phone || '',
+          order.table_number || '',
+          order.pickup_code || '',
+          order.served_by_profile?.full_name || '',
+          row.product_id || '',
+          row.product_name || '',
+          row.product_name_ar || '',
+          quantity,
+          refundedQty,
+          netQty,
+          unitPrice.toFixed(2),
+          lineTotal.toFixed(2),
+          netLineTotal.toFixed(2),
+          Number(order.subtotal || 0).toFixed(2),
+          Number(order.discount_amount || 0).toFixed(2),
+          Number(order.discount_pct || 0).toFixed(2),
+          Number(order.total || 0).toFixed(2),
+          order.shift_id || '',
+          row.notes || '',
+        ]
+      })
+
+      downloadCsv(
+        `sales_detail_${exportBranchId === 'all' ? 'all_branches' : selectedBranches[0]?.name || 'branch'}_${range.fromDate}_${range.toDate}`,
+        [
+          'timestamp', 'date', 'hour', 'branch', 'order_number', 'order_status', 'source',
+          'payment_method', 'customer_name', 'customer_phone', 'table_number', 'pickup_code',
+          'served_by', 'product_id', 'product_name', 'product_name_ar', 'quantity',
+          'refunded_qty', 'net_quantity', 'unit_price_lyd', 'line_total_lyd',
+          'net_line_total_lyd', 'order_subtotal_lyd', 'order_discount_lyd',
+          'order_discount_pct', 'order_total_lyd', 'shift_id', 'line_notes',
+        ],
+        exportRows,
+      )
+      toast.success(`Exported ${exportRows.length} sale lines`)
+    } catch (err) {
+      toast.error(err.message || 'Sales export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (loading) {
     return (
       <Layout>
@@ -112,6 +196,25 @@ export default function Sales() {
             {/* Range presets */}
             <div className="mb-4">
               <BusinessRangePicker presets={PRESETS} value={{ preset: range.preset, from: range.fromDate, to: range.toDate }} onChange={next => setRange({ preset: next.preset, fromDate: next.from, toDate: next.to })} />
+            </div>
+            <div className="card p-4 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <Download size={15} className="text-noch-green" /> Export detailed sales
+                  </h2>
+                  <p className="text-noch-muted text-xs mt-1">One CSV row per sold item for the selected business-date range.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select value={exportBranchId} onChange={event => setExportBranchId(event.target.value)} className="input text-sm">
+                    <option value="all">All branches</option>
+                    {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                  </select>
+                  <button onClick={handleExport} disabled={exporting || branches.length === 0} className="btn-primary text-sm px-3 py-2 flex items-center justify-center gap-2 whitespace-nowrap">
+                    <Download size={14} /> {exporting ? 'Exporting...' : 'Export CSV'}
+                  </button>
+                </div>
+              </div>
             </div>
             {/* eslint-disable-next-line no-constant-binary-expression */}
             {false && <div className="flex flex-wrap items-center gap-2 mb-4">

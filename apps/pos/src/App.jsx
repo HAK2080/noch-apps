@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 import { usePermissions } from './contexts/PermissionsContext'
@@ -125,9 +125,24 @@ function KioskEntry() {
   return <POSHome />
 }
 
+function LegacyRedirect({ to }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    navigate(`${to}${location.search || ''}`, { replace: true })
+  }, [location.search, navigate, to])
+  return null
+}
+
 function LegacyContentBusinessRedirect() {
   const { id } = useParams()
-  return <Navigate to={id ? `/content-studio/businesses/${id}` : '/content-studio/businesses'} replace />
+  const location = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    const target = id ? `/content-studio/businesses/${id}` : '/content-studio/businesses'
+    navigate(`${target}${location.search || ''}`, { replace: true })
+  }, [id, location.search, navigate])
+  return null
 }
 
 function OwnerRoute({ children }) {
@@ -231,19 +246,22 @@ export default function App() {
           <ProtectedRoute><OwnerRoute><ContentStudio2 /></OwnerRoute></ProtectedRoute>
         } />
 
-        {/* Content Studio legacy routes redirect to v2. */}
-        <Route path="/content" element={<Navigate to="/content-studio" replace />} />
-        <Route path="/content/studio" element={<Navigate to="/content-studio" replace />} />
-        <Route path="/content/brand/setup" element={<Navigate to="/content-studio/businesses/new" replace />} />
-        <Route path="/content/brands/new" element={<Navigate to="/content-studio/businesses/new" replace />} />
-        <Route path="/content/brand/:id" element={<LegacyContentBusinessRedirect />} />
-        <Route path="/content/review" element={<Navigate to="/content-studio/drafts" replace />} />
-        <Route path="/content/ideas" element={<Navigate to="/content-studio/concepts" replace />} />
+        
         {/* Legacy routes — redirect to new studio */}
-        <Route path="/content/create" element={<Navigate to="/content-studio" replace />} />
-        <Route path="/content/research" element={<Navigate to="/content-studio/inspiration" replace />} />
-        <Route path="/content/calendar" element={<Navigate to="/content-studio/campaigns" replace />} />
-        <Route path="/content/experiments" element={<Navigate to="/content-studio/signals" replace />} />
+        
+        {/* Content Studio (legacy) */}
+        <Route path="/content" element={<LegacyRedirect to="/content-studio" />} />
+        <Route path="/content/studio" element={<LegacyRedirect to="/content-studio" />} />
+        <Route path="/content/brand/setup" element={<LegacyRedirect to="/content-studio/businesses/new" />} />
+        <Route path="/content/brands/new" element={<LegacyRedirect to="/content-studio/businesses/new" />} />
+        <Route path="/content/brand/:id" element={<LegacyContentBusinessRedirect />} />
+        <Route path="/content/review" element={<LegacyRedirect to="/content-studio/drafts" />} />
+        <Route path="/content/ideas" element={<LegacyRedirect to="/content-studio/concepts" />} />
+        {/* Legacy routes — redirect to new studio */}
+        <Route path="/content/create" element={<LegacyRedirect to="/content-studio" />} />
+        <Route path="/content/research" element={<LegacyRedirect to="/content-studio/inspiration" />} />
+        <Route path="/content/calendar" element={<LegacyRedirect to="/content-studio/campaigns" />} />
+        <Route path="/content/experiments" element={<LegacyRedirect to="/content-studio/signals" />} />
 
         {/* Product Catalog — staff get read-only via in-page gating */}
         <Route path="/products" element={
@@ -264,11 +282,11 @@ export default function App() {
         <Route path="/inventory/movements" element={<ProtectedRoute><MovementHistory /></ProtectedRoute>} />
         <Route path="/inventory/intelligence" element={<ProtectedRoute><OwnerRoute><InventoryIntelligence /></OwnerRoute></ProtectedRoute>} />
 
-        {/* Analytics (owner only) */}
+        {/* Analytics: finance is canonical, analytics-legacy kept as a safe alias */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
         <Route path="/finance" element={<ProtectedRoute><PermissionRoute feature="finance"><FinanceDashboard /></PermissionRoute></ProtectedRoute>} />
         <Route path="/marketing" element={<ProtectedRoute><PermissionRoute feature="marketing"><MarketingDashboard /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/analytics-legacy" element={<Navigate to="/finance" replace />} />
+        <Route path="/analytics-legacy" element={<LegacyRedirect to="/finance" />} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
