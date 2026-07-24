@@ -90,6 +90,7 @@ test.describe('Read-only app walkthrough', () => {
     await expect(page.getByText(/consolidated expense register|Total OpEx|No approved expenses in this period/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Canonical workflow|Open Expenses module|Submit or approve expenses/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Recurring expense scaffolding|By category|Top category|No approved expenses in this period/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Recurring templates|Add recurring template|No recurring templates yet/i).first()).toBeVisible({ timeout: 10000 })
 
     await clickTab(page, /Bank/i)
     await expect(page.getByText(/Recon queue|No bank transactions yet/i).first()).toBeVisible({ timeout: 10000 })

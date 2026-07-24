@@ -199,8 +199,71 @@ export async function listRecurringExpensesDue() {
     .select('*')
     .order('next_due_on')
     .limit(12)
-  if (error) throw error
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('recurring_expense_due')) return []
+    throw error
+  }
   return data || []
+}
+
+export async function listRecurringExpenseTemplates() {
+  const { data, error } = await supabase
+    .from('recurring_expense_templates')
+    .select('*')
+    .order('next_due_on')
+    .order('name')
+  if (error) {
+    if (error.code === '42P01' || error.message?.includes('recurring_expense_templates')) return []
+    throw error
+  }
+  return data || []
+}
+
+export async function upsertRecurringExpenseTemplate(template) {
+  const payload = {
+    ...template,
+    updated_at: new Date().toISOString(),
+  }
+  if (payload.id) {
+    const { data, error } = await supabase
+      .from('recurring_expense_templates')
+      .update(payload)
+      .eq('id', payload.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+
+  const { data: auth } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('recurring_expense_templates')
+    .insert({ ...payload, created_by: auth?.user?.id || null })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deactivateRecurringExpenseTemplate(id) {
+  const { error } = await supabase
+    .from('recurring_expense_templates')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function listExpenseReferenceData() {
+  const [centersRes, categoriesRes] = await Promise.all([
+    supabase.from('cost_centers').select('id, name').order('id'),
+    supabase.from('expense_categories').select('id, name').order('name'),
+  ])
+  if (centersRes.error) throw centersRes.error
+  if (categoriesRes.error) throw categoriesRes.error
+  return {
+    costCenters: centersRes.data || [],
+    categories: categoriesRes.data || [],
+  }
 }
 
 export async function createExpense(expense) {

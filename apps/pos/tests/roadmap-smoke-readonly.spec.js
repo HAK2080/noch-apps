@@ -16,6 +16,7 @@ test.describe('Roadmap smoke coverage', () => {
     await expect(page.getByText(/consolidated expense register|Total OpEx|No approved expenses in this period/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Canonical workflow|expense_entries|Open Expenses module/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Recurring expense scaffolding|By category|Top category/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Recurring templates|Add recurring template|No recurring templates yet/i).first()).toBeVisible({ timeout: 10000 })
   })
 
   test('procurement workspace exposes payables, receiving, returns, and warehouse signals', async ({ page }) => {

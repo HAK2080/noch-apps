@@ -6,11 +6,19 @@
 // entry screens or mutating legacy data.
 
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarClock, ExternalLink, Receipt, TrendingDown } from 'lucide-react'
+import { CalendarClock, ExternalLink, Pencil, Plus, Receipt, TrendingDown } from 'lucide-react'
 import { lyd } from '../lib/thresholds'
 import PeriodSelector from '../components/PeriodSelector'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
-import { listCanonicalExpenses, listRecurringExpensesDue } from '../lib/finance-supabase'
+import {
+  deactivateRecurringExpenseTemplate,
+  listCanonicalExpenses,
+  listExpenseReferenceData,
+  listRecurringExpenseTemplates,
+  listRecurringExpensesDue,
+  upsertRecurringExpenseTemplate,
+} from '../lib/finance-supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 function defaultPeriod() {
@@ -19,6 +27,26 @@ function defaultPeriod() {
   from.setDate(from.getDate() - 29)
   const ymd = (d) => d.toISOString().slice(0, 10)
   return { preset: '30d', from: ymd(from), to: ymd(to) }
+}
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function blankTemplate() {
+  return {
+    id: null,
+    name: '',
+    vendor: '',
+    category_id: '',
+    cost_center_id: '',
+    amount: '',
+    cadence: 'monthly',
+    next_due_on: todayYmd(),
+    paid_by: 'Business',
+    notes: '',
+    is_active: true,
+  }
 }
 
 const STATUS_STYLE = {
@@ -31,10 +59,17 @@ const SOURCE_STYLE = {
   expense_entries: 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20',
 }
 
-export default function ExpensesTab() {
+export default function ExpensesTab({ readOnly = false }) {
+  const { profile } = useAuth()
+  const canManageRecurring = !readOnly && profile?.role === 'owner'
   const [period, setPeriod] = useState(defaultPeriod)
   const [rows, setRows] = useState([])
   const [recurring, setRecurring] = useState([])
+  const [templates, setTemplates] = useState([])
+  const [referenceData, setReferenceData] = useState({ costCenters: [], categories: [] })
+  const [templateForm, setTemplateForm] = useState(blankTemplate)
+  const [templateSaving, setTemplateSaving] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -44,18 +79,30 @@ export default function ExpensesTab() {
     Promise.all([
       listCanonicalExpenses({ from: period.from, to: period.to }),
       listRecurringExpensesDue(),
+      listRecurringExpenseTemplates(),
+      listExpenseReferenceData(),
     ])
-      .then(([expenseRows, recurringRows]) => {
+      .then(([expenseRows, recurringRows, templateRows, refs]) => {
         if (cancelled) return
         setRows((expenseRows || []).filter(r => ['approved', 'paid'].includes(r.status)))
         setRecurring(recurringRows || [])
+        setTemplates(templateRows || [])
+        setReferenceData(refs || { costCenters: [], categories: [] })
       })
       .catch(err => toast.error(err.message || 'Failed to load expenses'))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [period?.from, period?.to])
+  }, [period?.from, period?.to, canManageRecurring, refreshTick])
 
   const total = useMemo(() => rows.reduce((s, r) => s + Number(r.amount_lyd || 0), 0), [rows])
+  const categoryLookup = useMemo(
+    () => Object.fromEntries((referenceData.categories || []).map(row => [row.id, row.name])),
+    [referenceData.categories],
+  )
+  const costCenterLookup = useMemo(
+    () => Object.fromEntries((referenceData.costCenters || []).map(row => [row.id, row.name])),
+    [referenceData.costCenters],
+  )
 
   const byCategory = useMemo(() => {
     const m = {}
@@ -67,6 +114,78 @@ export default function ExpensesTab() {
   }, [rows])
 
   const recurringDueSoon = recurring.filter(r => Number(r.days_until_due) <= 14)
+  const activeTemplates = templates.filter(row => row.is_active !== false)
+
+  async function handleSaveTemplate() {
+    const amount = Number(templateForm.amount || 0)
+    if (!templateForm.name.trim()) {
+      toast.error('Template name is required')
+      return
+    }
+    if (!(amount > 0)) {
+      toast.error('Amount must be greater than zero')
+      return
+    }
+    if (!templateForm.next_due_on) {
+      toast.error('Next due date is required')
+      return
+    }
+
+    setTemplateSaving(true)
+    try {
+      await upsertRecurringExpenseTemplate({
+        id: templateForm.id || undefined,
+        name: templateForm.name.trim(),
+        vendor: templateForm.vendor.trim() || null,
+        category_id: templateForm.category_id || null,
+        cost_center_id: templateForm.cost_center_id || null,
+        amount,
+        currency: 'LYD',
+        exchange_rate_to_lyd: 1,
+        amount_lyd: amount,
+        cadence: templateForm.cadence,
+        next_due_on: templateForm.next_due_on,
+        paid_by: templateForm.paid_by || 'Business',
+        notes: templateForm.notes.trim() || null,
+        is_active: true,
+      })
+      toast.success(templateForm.id ? 'Recurring template updated' : 'Recurring template created')
+      setTemplateForm(blankTemplate())
+      setRefreshTick(x => x + 1)
+    } catch (err) {
+      toast.error(err.message || 'Failed to save recurring template')
+    } finally {
+      setTemplateSaving(false)
+    }
+  }
+
+  async function handleArchiveTemplate(id) {
+    if (!window.confirm('Archive this recurring template? It will stay in history but no longer appear as due.')) return
+    try {
+      await deactivateRecurringExpenseTemplate(id)
+      toast.success('Recurring template archived')
+      if (templateForm.id === id) setTemplateForm(blankTemplate())
+      setRefreshTick(x => x + 1)
+    } catch (err) {
+      toast.error(err.message || 'Failed to archive recurring template')
+    }
+  }
+
+  function startEditTemplate(template) {
+    setTemplateForm({
+      id: template.id,
+      name: template.name || '',
+      vendor: template.vendor || '',
+      category_id: template.category_id || '',
+      cost_center_id: template.cost_center_id || '',
+      amount: String(template.amount ?? template.amount_lyd ?? ''),
+      cadence: template.cadence || 'monthly',
+      next_due_on: template.next_due_on || todayYmd(),
+      paid_by: template.paid_by || 'Business',
+      notes: template.notes || '',
+      is_active: template.is_active !== false,
+    })
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -153,6 +272,194 @@ export default function ExpensesTab() {
             <p className="text-yellow-300 text-xs mt-3">
               {recurringDueSoon.length} recurring outflow{recurringDueSoon.length === 1 ? '' : 's'} due within 14 days.
             </p>
+          )}
+        </div>
+      )}
+
+      {(canManageRecurring || activeTemplates.length > 0) && (
+        <div className="card">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <div>
+              <h3 className="text-white text-sm font-semibold">Recurring templates</h3>
+              <p className="text-noch-muted text-xs mt-1">
+                Safe additive planning layer. Templates help track known outflows without deleting or rewriting live expenses.
+              </p>
+            </div>
+            {canManageRecurring && (
+              <button
+                type="button"
+                onClick={() => setTemplateForm(blankTemplate())}
+                className="btn-secondary text-xs flex items-center gap-1"
+              >
+                <Plus size={12} /> {templateForm.id ? 'New template' : 'Add recurring template'}
+              </button>
+            )}
+          </div>
+
+          {canManageRecurring && (
+            <div className="rounded-xl border border-noch-border/60 bg-noch-dark/30 p-3 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Template name</label>
+                  <input
+                    value={templateForm.name}
+                    onChange={e => setTemplateForm(s => ({ ...s, name: e.target.value }))}
+                    className="input w-full text-sm"
+                    placeholder="Rent, internet, coffee bean retainer..."
+                  />
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Vendor</label>
+                  <input
+                    value={templateForm.vendor}
+                    onChange={e => setTemplateForm(s => ({ ...s, vendor: e.target.value }))}
+                    className="input w-full text-sm"
+                    placeholder="Supplier or landlord"
+                  />
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Amount (LYD)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={templateForm.amount}
+                    onChange={e => setTemplateForm(s => ({ ...s, amount: e.target.value }))}
+                    className="input w-full text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Cadence</label>
+                  <select
+                    value={templateForm.cadence}
+                    onChange={e => setTemplateForm(s => ({ ...s, cadence: e.target.value }))}
+                    className="input w-full text-sm"
+                  >
+                    {['weekly', 'monthly', 'quarterly', 'yearly'].map(value => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Next due</label>
+                  <input
+                    type="date"
+                    value={templateForm.next_due_on}
+                    onChange={e => setTemplateForm(s => ({ ...s, next_due_on: e.target.value }))}
+                    className="input w-full text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Paid by</label>
+                  <select
+                    value={templateForm.paid_by}
+                    onChange={e => setTemplateForm(s => ({ ...s, paid_by: e.target.value }))}
+                    className="input w-full text-sm"
+                  >
+                    {['Business', 'Owner', 'Petty Cash', 'Bank'].map(value => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Expense category</label>
+                  <select
+                    value={templateForm.category_id}
+                    onChange={e => setTemplateForm(s => ({ ...s, category_id: e.target.value }))}
+                    className="input w-full text-sm"
+                  >
+                    <option value="">Uncategorised</option>
+                    {(referenceData.categories || []).map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-noch-muted text-xs block mb-1">Cost centre</label>
+                  <select
+                    value={templateForm.cost_center_id}
+                    onChange={e => setTemplateForm(s => ({ ...s, cost_center_id: e.target.value }))}
+                    className="input w-full text-sm"
+                  >
+                    <option value="">Unassigned</option>
+                    {(referenceData.costCenters || []).map(center => (
+                      <option key={center.id} value={center.id}>{center.id} - {center.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-noch-muted text-xs block mb-1">Notes</label>
+                  <textarea
+                    rows={2}
+                    value={templateForm.notes}
+                    onChange={e => setTemplateForm(s => ({ ...s, notes: e.target.value }))}
+                    className="input w-full text-sm resize-none"
+                    placeholder="Optional planning note, contract reminder, payment reference..."
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-3">
+                {templateForm.id && (
+                  <button
+                    type="button"
+                    onClick={() => setTemplateForm(blankTemplate())}
+                    className="btn-secondary text-xs"
+                  >
+                    Cancel edit
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSaveTemplate}
+                  disabled={templateSaving}
+                  className="btn-primary text-xs"
+                >
+                  {templateSaving ? 'Saving...' : (templateForm.id ? 'Save template' : 'Create template')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTemplates.length === 0 ? (
+            <p className="text-noch-muted text-sm">No recurring templates yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {activeTemplates.map(template => (
+                <div key={template.id} className="rounded-xl border border-noch-border/60 bg-noch-dark/30 px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-medium truncate">{template.name}</p>
+                      <p className="text-noch-muted text-xs mt-0.5">
+                        {template.vendor || 'Recurring vendor'} · {template.cadence} · due {template.next_due_on}
+                      </p>
+                    </div>
+                    <span className="text-noch-green text-sm font-semibold">{lyd(template.amount_lyd ?? template.amount)}</span>
+                  </div>
+                  <p className="text-noch-muted text-xs mt-2">
+                    {categoryLookup[template.category_id] || 'Uncategorised'} · {costCenterLookup[template.cost_center_id] || 'Unassigned'}
+                  </p>
+                  {template.notes && <p className="text-noch-muted text-xs mt-1">{template.notes}</p>}
+                  {canManageRecurring && (
+                    <div className="flex justify-end gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => startEditTemplate(template)}
+                        className="text-noch-green text-xs inline-flex items-center gap-1 hover:underline"
+                      >
+                        <Pencil size={11} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleArchiveTemplate(template.id)}
+                        className="text-red-400 text-xs hover:underline"
+                      >
+                        Archive
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
