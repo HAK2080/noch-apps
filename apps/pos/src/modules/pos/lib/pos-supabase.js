@@ -296,6 +296,72 @@ export async function getOpenShift(branchId) {
   return data?.[0] || null
 }
 
+export async function getPOSSecurityStatus(branchId) {
+  const { data, error } = await supabase.rpc('pos_security_status', {
+    p_branch_id: branchId,
+  })
+  if (error) {
+    if (error.code === '42883' || error.message?.includes('pos_security_status')) return null
+    throw error
+  }
+  return Array.isArray(data) ? (data[0] || null) : (data || null)
+}
+
+export async function listPOSAuditEvents(branchId, { limit = 10 } = {}) {
+  let rows = []
+  const fullSelect = 'id, created_at, action, entity_type, entity_id, metadata, actor_user_id, served_by, approved_by'
+  const fallbackSelect = 'id, created_at, action, entity_type, entity_id, metadata, actor_user_id, served_by'
+
+  const runAuditQuery = async (selectClause) => {
+    const { data, error } = await supabase
+      .from('pos_audit_log')
+      .select(selectClause)
+      .eq('branch_id', branchId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return data || []
+  }
+
+  try {
+    rows = await runAuditQuery(fullSelect)
+  } catch (error) {
+    if (!error.message?.includes('approved_by')) throw error
+    rows = (await runAuditQuery(fallbackSelect)).map(row => ({ ...row, approved_by: null }))
+  }
+
+  const profileIds = [...new Set(rows.flatMap(row => [row.actor_user_id, row.served_by, row.approved_by]).filter(Boolean))]
+  if (profileIds.length === 0) {
+    return rows.map(row => ({
+      ...row,
+      actor_name: null,
+      served_by_name: null,
+      approved_by_name: null,
+    }))
+  }
+
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', profileIds)
+  if (error) {
+    return rows.map(row => ({
+      ...row,
+      actor_name: null,
+      served_by_name: null,
+      approved_by_name: null,
+    }))
+  }
+
+  const names = new Map((profiles || []).map(profile => [profile.id, profile.full_name]))
+  return rows.map(row => ({
+    ...row,
+    actor_name: names.get(row.actor_user_id) || null,
+    served_by_name: names.get(row.served_by) || null,
+    approved_by_name: names.get(row.approved_by) || null,
+  }))
+}
+
 // List recent shifts for a branch, newest first.
 // Default: 30 most recent (about a month). Used by the Sessions page.
 // Optional fromIso/toIso filter opened_at (use businessDayWindow for ranges).
@@ -353,6 +419,16 @@ export async function closeShift(shiftId, closeData) {
     p_notes: closeData.notes || null,
   })
   if (error) throw error
+  if (closeData.closed_by) {
+    try {
+      await supabase.rpc('annotate_shift_close_operator', {
+        p_shift_id: shiftId,
+        p_served_by: closeData.closed_by,
+      })
+    } catch (auditError) {
+      return { ...data, audit_warning: auditError.message || 'Shift close operator was not recorded.' }
+    }
+  }
   return data
 }
 
@@ -662,11 +738,43 @@ export async function createPOSOrder(orderData, items) {
   })
   if (error) throw error
 
+  if (orderData.override_by && data?.order?.id) {
+    try {
+      await supabase.rpc('annotate_pos_sale_override', {
+        p_order_id: data.order.id,
+        p_manager_override_by: orderData.override_by,
+        p_note: orderData.override_note || 'Discount approved above staff cap.',
+      })
+      data.order.manager_override_by = orderData.override_by
+    } catch (auditError) {
+      data.audit_warning = auditError.message || 'Manager override audit was not recorded.'
+    }
+  }
+
   // RPC returns { order, items, idempotent_replay }. Flatten for callers
   // that expected the old shape (order with pos_order_items inline).
   const order = data?.order || {}
   const returnedItems = data?.items || []
-  return { ...order, pos_order_items: returnedItems, idempotent_replay: !!data?.idempotent_replay }
+  return {
+    ...order,
+    pos_order_items: returnedItems,
+    idempotent_replay: !!data?.idempotent_replay,
+    audit_warning: data?.audit_warning || null,
+  }
+}
+
+export async function annotatePOSOrderOverride({
+  orderId, action, managerId, note = null, servedBy = null,
+}) {
+  const { data, error } = await supabase.rpc('annotate_pos_order_override', {
+    p_order_id: orderId,
+    p_override_action: action,
+    p_manager_override_by: managerId,
+    p_note: note,
+    p_served_by: servedBy,
+  })
+  if (error) throw error
+  return data
 }
 
 export async function getPOSOrders(branchId, filters = {}) {
@@ -685,6 +793,72 @@ export async function getPOSOrders(branchId, filters = {}) {
   const { data, error } = await query
   if (error) throw error
   return data
+}
+
+export async function getSalesExportRows(branchId, filters = {}) {
+  const pageSize = filters.pageSize || 1000
+  const rows = []
+  let from = 0
+  let total = null
+
+  while (true) {
+    let query = supabase
+      .from('pos_order_items')
+      .select(`
+        id,
+        product_id,
+        product_name,
+        product_name_ar,
+        quantity,
+        unit_price,
+        total,
+        refunded_qty,
+        notes,
+        pos_orders!inner(
+          id,
+          order_number,
+          branch_id,
+          shift_id,
+          status,
+          source,
+          payment_method,
+          subtotal,
+          discount_amount,
+          discount_pct,
+          total,
+          cash_tendered,
+          change_due,
+          card_amount,
+          customer_name,
+          customer_phone,
+          table_number,
+          pickup_code,
+          created_at,
+          served_by,
+          served_by_profile:profiles!pos_orders_served_by_fkey(full_name),
+          pos_branches(name, name_ar)
+        )
+      `, { count: 'exact' })
+      .eq('pos_orders.branch_id', branchId)
+      .order('created_at', { foreignTable: 'pos_orders', ascending: false })
+      .range(from, from + pageSize - 1)
+
+    if (filters.from) query = query.gte('pos_orders.created_at', filters.from)
+    if (filters.to) query = query.lte('pos_orders.created_at', filters.to)
+    if (filters.status) query = query.eq('pos_orders.status', filters.status)
+
+    const { data, error, count } = await query
+    if (error) throw error
+
+    if (total === null && typeof count === 'number') total = count
+    rows.push(...(data || []))
+    if (!data || data.length === 0) break
+    if (total !== null && rows.length >= total) break
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+
+  return rows
 }
 
 export async function voidPOSOrder(orderId, reason, servedBy = null) {

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { translations } from '../lib/i18n'
+import { applyUiAutoTranslate } from '../lib/uiAutoTranslate'
 
 const LanguageContext = createContext({})
 
@@ -14,6 +15,7 @@ export function LanguageProvider({ children }) {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
     document.documentElement.lang = lang
     localStorage.setItem('noch_lang', lang)
+    return applyUiAutoTranslate(lang)
   }, [lang])
 
   const toggleLang = () => setLang(l => l === 'ar' ? 'en' : 'ar')

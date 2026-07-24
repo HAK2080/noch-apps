@@ -7,11 +7,13 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, RotateCcw, CheckCircle2, Bike, Search, X, Minus, Plus, Coffee, CreditCard, DollarSign, ArrowLeftRight } from 'lucide-react'
 import {
-  getPOSBranch, getPOSOrders, voidPOSOrder, markPrestoCollected,
+  annotatePOSOrderOverride, getPOSBranch, getPOSOrders, voidPOSOrder, markPrestoCollected,
   refundPOSOrderLines, switchPOSOrderPayment,
 } from '../lib/pos-supabase'
 import { printReceipt, printDrinkTicket, isPrinterConnected } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
+import { getPOSSettings } from '../lib/pos-settings'
+import ManagerOverrideModal from '../components/ManagerOverrideModal'
 import { usePermissions } from '../../../contexts/PermissionsContext'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
@@ -25,7 +27,7 @@ const TOTALS_ROLES = ['owner', 'supervisor']
 // CancelModal — proper in-app dialog replacing the unreliable window.prompt.
 // window.prompt() returns null silently on Android tablets / kiosk WebViews,
 // which is the root cause of staff reporting "Cancel/Void is not working".
-function CancelModal({ order, onClose, onSaved }) {
+function CancelModal({ order, managerApproval, onClose, onSaved }) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -39,7 +41,22 @@ function CancelModal({ order, onClose, onSaved }) {
     try {
       const servedBy = getServedBy()?.id || null
       await voidPOSOrder(order.id, trimmed, servedBy)
+      let auditWarning = null
+      if (managerApproval?.id) {
+        try {
+          await annotatePOSOrderOverride({
+            orderId: order.id,
+            action: 'void',
+            managerId: managerApproval.id,
+            note: trimmed,
+            servedBy,
+          })
+        } catch (auditError) {
+          auditWarning = auditError.message || 'Manager override audit was not recorded.'
+        }
+      }
       toast.success(`Order ${order.order_number} cancelled`)
+      if (auditWarning) toast(auditWarning)
       onSaved()
       onClose()
     } catch (err) {
@@ -63,6 +80,11 @@ function CancelModal({ order, onClose, onSaved }) {
           <p className="text-noch-muted text-sm mb-3">
             Why is this order being cancelled? Stock will be returned, the shift total will be reversed, and an audit-log entry will be written.
           </p>
+          {managerApproval?.full_name && (
+            <div className="mb-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+              Manager override approved by {managerApproval.full_name}.
+            </div>
+          )}
           <label className="label block mb-1 text-xs">Reason</label>
           <textarea
             value={reason}
@@ -84,7 +106,7 @@ function CancelModal({ order, onClose, onSaved }) {
   )
 }
 
-function RefundModal({ order, onClose, onSaved }) {
+function RefundModal({ order, managerApproval, onClose, onSaved }) {
   // Initial state: 0 refund qty per line; the operator dials up the
   // lines they want to refund. "Refund full" sets all to remaining qty.
   const [qtys, setQtys] = useState(() => {
@@ -123,7 +145,22 @@ function RefundModal({ order, onClose, onSaved }) {
     try {
       const servedBy = getServedBy()?.id || null
       await refundPOSOrderLines(order.id, lines, reason, servedBy)
+      let auditWarning = null
+      if (managerApproval?.id) {
+        try {
+          await annotatePOSOrderOverride({
+            orderId: order.id,
+            action: 'refund',
+            managerId: managerApproval.id,
+            note: reason || `Refunded ${totalToRefund.toFixed(2)} LYD`,
+            servedBy,
+          })
+        } catch (auditError) {
+          auditWarning = auditError.message || 'Manager override audit was not recorded.'
+        }
+      }
       toast.success(`Refunded ${format(totalToRefund)} LYD`)
+      if (auditWarning) toast(auditWarning)
       onSaved()
       onClose()
     } catch (err) {
@@ -142,8 +179,13 @@ function RefundModal({ order, onClose, onSaved }) {
             <p className="text-noch-muted text-xs">{order.order_number}</p>
           </div>
           <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
-        </div>
+      </div>
         <div className="p-4">
+          {managerApproval?.full_name && (
+            <div className="mb-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300">
+              Manager override approved by {managerApproval.full_name}.
+            </div>
+          )}
           <div className="flex justify-end mb-2">
             <button onClick={refundFull} className="text-xs text-noch-green underline">Refund full order</button>
           </div>
@@ -220,12 +262,14 @@ export default function POSOrders() {
   const canCancel = TOTALS_ROLES.includes(activeRole)
 
   const [branch, setBranch] = useState(null)
+  const [posSettings, setPosSettings] = useState(null)
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [busyId, setBusyId] = useState(null)
-  const [refundOrder, setRefundOrder] = useState(null)
-  const [cancelOrder, setCancelOrder] = useState(null)
+  const [refundContext, setRefundContext] = useState(null)
+  const [cancelContext, setCancelContext] = useState(null)
+  const [overrideTarget, setOverrideTarget] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
   // Date range — defaults to today, but operators can scroll back.
   // Use LOCAL date components (not toISOString which is UTC) — otherwise
@@ -253,12 +297,14 @@ export default function POSOrders() {
     try {
       const fromIso = new Date(`${fromDate}T00:00:00`).toISOString()
       const toIso   = new Date(`${toDate}T23:59:59.999`).toISOString()
-      const [b, list] = await Promise.all([
+      const [b, list, settings] = await Promise.all([
         getPOSBranch(branchId),
         getPOSOrders(branchId, { from: fromIso, to: toIso, limit: 500 }),
+        getPOSSettings(branchId),
       ])
       setBranch(b)
       setOrders(list || [])
+      setPosSettings(settings)
     } catch (err) {
       toast.error(err.message || 'Failed to load orders')
     } finally {
@@ -343,7 +389,19 @@ export default function POSOrders() {
       toast.error('Only owner or manager can cancel orders')
       return
     }
-    setCancelOrder(order)
+    if (posSettings?.manager_override_enabled) {
+      setOverrideTarget({ action: 'void', order })
+      return
+    }
+    setCancelContext({ order, managerApproval: null })
+  }
+
+  const handleRefund = (order) => {
+    if (posSettings?.manager_override_enabled) {
+      setOverrideTarget({ action: 'refund', order })
+      return
+    }
+    setRefundContext({ order, managerApproval: null })
   }
 
   const handlePrestoCollected = async (order) => {
@@ -655,7 +713,7 @@ export default function POSOrders() {
                         )}
                         {!isVoided && refundState !== 'full' && (
                           <>
-                            <button onClick={(e) => { e.stopPropagation(); setRefundOrder(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-1">
+                            <button onClick={(e) => { e.stopPropagation(); handleRefund(o) }} disabled={busyId === o.id} className="btn-secondary text-xs px-3 py-1.5 text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-1">
                               <RotateCcw size={12} /> Refund
                             </button>
                             {canCancel && (
@@ -675,19 +733,42 @@ export default function POSOrders() {
         )}
       </div>
 
-      {refundOrder && (
+      {refundContext && (
         <RefundModal
-          order={refundOrder}
-          onClose={() => setRefundOrder(null)}
+          order={refundContext.order}
+          managerApproval={refundContext.managerApproval}
+          onClose={() => setRefundContext(null)}
           onSaved={load}
         />
       )}
 
-      {cancelOrder && (
+      {cancelContext && (
         <CancelModal
-          order={cancelOrder}
-          onClose={() => setCancelOrder(null)}
+          order={cancelContext.order}
+          managerApproval={cancelContext.managerApproval}
+          onClose={() => setCancelContext(null)}
           onSaved={load}
+        />
+      )}
+
+      {overrideTarget && (
+        <ManagerOverrideModal
+          action={
+            overrideTarget.action === 'refund'
+              ? 'Approve a refund on this shared terminal.'
+              : 'Approve cancelling this order on the shared terminal.'
+          }
+          onApprove={(profile) => {
+            const next = overrideTarget
+            setOverrideTarget(null)
+            if (!next) return
+            if (next.action === 'refund') {
+              setRefundContext({ order: next.order, managerApproval: profile })
+              return
+            }
+            setCancelContext({ order: next.order, managerApproval: profile })
+          }}
+          onClose={() => setOverrideTarget(null)}
         />
       )}
     </Layout>

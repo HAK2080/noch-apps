@@ -7,7 +7,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Upload, FileText, Save, Tag } from 'lucide-react'
-import { listBankTransactions, bulkInsertBankTransactions, updateBankTransactionCategory } from '../lib/finance-supabase'
+import {
+  listBankTransactions,
+  bulkInsertBankTransactions,
+  updateBankTransactionCategory,
+  updateBankTransactionReconciled,
+} from '../lib/finance-supabase'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
@@ -151,19 +156,20 @@ export default function BankTab() {
   useEffect(() => { reload() }, [])
 
   const totals = useMemo(() => {
-    let inflow = 0, outflow = 0, uncat = 0
+    let inflow = 0, outflow = 0, uncat = 0, reconciled = 0
     for (const r of list) {
       if (Number(r.amount_lyd) > 0) inflow += Number(r.amount_lyd)
       else outflow += -Number(r.amount_lyd)
       if (!r.category) uncat += 1
+      if (r.reconciled) reconciled += 1
     }
-    return { inflow, outflow, uncat }
+    return { inflow, outflow, uncat, reconciled, unreconciled: list.length - reconciled }
   }, [list])
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="card text-center py-2">
             <p className="text-noch-muted text-[10px] uppercase">Inflow</p>
             <p className="text-noch-green font-bold">{lyd(totals.inflow)}</p>
@@ -175,6 +181,10 @@ export default function BankTab() {
           <div className="card text-center py-2">
             <p className="text-noch-muted text-[10px] uppercase">Uncategorised</p>
             <p className="text-yellow-400 font-bold">{totals.uncat}</p>
+          </div>
+          <div className="card text-center py-2">
+            <p className="text-noch-muted text-[10px] uppercase">Recon queue</p>
+            <p className="text-white font-bold">{totals.unreconciled}</p>
           </div>
         </div>
         <button onClick={() => setShowImport(true)} className="btn-primary text-sm flex items-center gap-2">
@@ -197,6 +207,7 @@ export default function BankTab() {
                 <th className="text-left py-1 pr-2">Description</th>
                 <th className="text-right py-1 pr-2">Amount</th>
                 <th className="text-left py-1 pr-2">Category</th>
+                <th className="text-center py-1">Reconciled</th>
               </tr>
             </thead>
             <tbody>
@@ -213,6 +224,21 @@ export default function BankTab() {
                       try { await updateBankTransactionCategory(r.id, cat); reload() }
                       catch (err) { toast.error(err.message || 'Save failed') }
                     }}/>
+                  </td>
+                  <td className="py-1.5 text-center">
+                    <button
+                      onClick={async () => {
+                        try { await updateBankTransactionReconciled(r.id, !r.reconciled); reload() }
+                        catch (err) { toast.error(err.message || 'Save failed') }
+                      }}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                        r.reconciled
+                          ? 'text-noch-green border-noch-green/30 bg-noch-green/10'
+                          : 'text-yellow-300 border-yellow-500/20 bg-yellow-500/10'
+                      }`}
+                    >
+                      {r.reconciled ? 'yes' : 'pending'}
+                    </button>
                   </td>
                 </tr>
               ))}

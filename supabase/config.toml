@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.send-whatsapp]
 verify_jwt = true
 
+[functions.send-notification]
+verify_jwt = true
+
 [functions.cs-evaluate-draft]
 verify_jwt = true
 
@@ -37,6 +40,9 @@ verify_jwt = false
 verify_jwt = false
 # This machine-only function performs its own service-role/cron-secret check.
 
+[functions.process-notification-outbox]
+verify_jwt = false
+
 [functions.ops-generate-instances]
 verify_jwt = false
 
@@ -45,3 +51,6 @@ verify_jwt = false
 
 [functions.create-staff]
 verify_jwt = true
+
+[functions.vestaboard-cron]
+verify_jwt = false

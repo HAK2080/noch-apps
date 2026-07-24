@@ -16,6 +16,12 @@ import {
   checkWebPrice,
   supabase,
 } from '../../lib/supabase'
+import {
+  getInventoryLocations,
+  createInventoryLocation,
+  getInventoryLocationStock,
+  upsertInventoryLocationStock,
+} from './lib/inventory-supabase'
 import toast from 'react-hot-toast'
 
 // ── Constants ────────────────────────────────────────────────
@@ -65,12 +71,16 @@ export default function StockManager() {
   const [stock, setStock] = useState([])
   const [ingredients, setIngredients] = useState([])
   const [theoretical, setTheoretical] = useState({})
+  const [branches, setBranches] = useState([])
+  const [locations, setLocations] = useState([])
+  const [locationStock, setLocationStock] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [activeTab, setActiveTab] = useState('stock')
   const [viewMode, setViewMode] = useState('grid')
   const [showArchived, setShowArchived] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState('all')
 
   const [updateModal, setUpdateModal] = useState(null)
   const [updateQty, setUpdateQty] = useState('')
@@ -83,6 +93,12 @@ export default function StockManager() {
   const [newIngredient, setNewIngredient] = useState({ name: '', base_unit: 'g', bulk_qty: '', bulk_unit: 'kg', bulk_cost: '', track_type: 'consumable' })
   const [adding, setAdding] = useState(false)
   const [classifying, setClassifying] = useState(false)
+  const [showLocationModal, setShowLocationModal] = useState(false)
+  const [newLocation, setNewLocation] = useState({ name: '', name_ar: '', location_type: 'storage', branch_id: '', address: '', notes: '' })
+  const [locationCountModal, setLocationCountModal] = useState(null)
+  const [locationCountQty, setLocationCountQty] = useState('')
+  const [locationCountUnit, setLocationCountUnit] = useState('')
+  const [locationCountNotes, setLocationCountNotes] = useState('')
 
   const [deliveryItems, setDeliveryItems] = useState(null)
   const [extracting, setExtracting] = useState(false)
@@ -101,13 +117,19 @@ export default function StockManager() {
   async function loadData() {
     try {
       setLoading(true)
-      const [stockData, ingredientData, theoreticalResult] = await Promise.all([
+      const [stockData, ingredientData, theoreticalResult, locData, locStockData, branchRes] = await Promise.all([
         getStock(),
         getIngredientsForCost(),
         supabase.rpc('inventory_theoretical_status'),
+        getInventoryLocations().catch(() => []),
+        getInventoryLocationStock().catch(() => []),
+        supabase.from('pos_branches').select('id, name, name_ar').eq('is_active', true).order('name'),
       ])
       setStock(stockData || [])
       setIngredients(ingredientData || [])
+      setLocations(locData || [])
+      setLocationStock(locStockData || [])
+      setBranches(branchRes.data || [])
       setTheoretical(Object.fromEntries((theoreticalResult.data || []).map(row => [row.ingredient_id, row])))
     } catch { toast.error('Failed to load stock data') }
     finally { setLoading(false) }
@@ -147,6 +169,8 @@ export default function StockManager() {
   // ── Data processing ──────────────────────────────────────────
   const mergedItems = ingredients.map(ing => {
     const s = stock.find(st => st.ingredient_id === ing.id)
+    const locationRows = locationStock.filter(st => st.ingredient_id === ing.id)
+    const locationTotal = locationRows.reduce((sum, row) => sum + Number(row.qty_available || 0), 0)
     return {
       ...ing,
       qty_available: s?.qty_available ?? 0,
@@ -157,11 +181,17 @@ export default function StockManager() {
       count_is_stale: theoretical[ing.id]?.count_is_stale ?? true,
       last_manual_count_at: theoretical[ing.id]?.last_counted_at ?? s?.last_manual_count_at ?? null,
       hasStock: !!s,
+      locationRows,
+      locationTotal,
     }
   })
 
   const tabItems = mergedItems
     .filter(item => activeTab === 'equipment' ? item.track_type === 'equipment' : item.track_type !== 'equipment')
+    .filter(item => {
+      if (activeTab !== 'locations' || selectedLocation === 'all') return true
+      return item.locationRows.some(row => row.location_id === selectedLocation)
+    })
 
   const activeItems = tabItems.filter(i => !i.archived)
   const archivedItems = tabItems.filter(i => i.archived)
@@ -251,6 +281,56 @@ export default function StockManager() {
       await loadData()
     } catch (err) { toast.error(err.message || 'Failed to add item') }
     finally { setAdding(false) }
+  }
+
+  async function handleAddLocation() {
+    if (!newLocation.name.trim()) return toast.error('Location name required')
+    try {
+      await createInventoryLocation({
+        name: newLocation.name.trim(),
+        name_ar: newLocation.name_ar.trim() || null,
+        location_type: newLocation.location_type,
+        branch_id: newLocation.branch_id || null,
+        address: newLocation.address.trim() || null,
+        notes: newLocation.notes.trim() || null,
+      })
+      toast.success('Location added')
+      setShowLocationModal(false)
+      setNewLocation({ name: '', name_ar: '', location_type: 'storage', branch_id: '', address: '', notes: '' })
+      await loadData()
+    } catch (err) {
+      toast.error(err.message || 'Failed to add location')
+    }
+  }
+
+  async function handleSaveLocationCount() {
+    if (!locationCountModal || !locationCountModal.locationId) return
+    if (locationCountQty === '') return toast.error('Quantity required')
+    try {
+      await upsertInventoryLocationStock({
+        ingredientId: locationCountModal.item.id,
+        locationId: locationCountModal.locationId,
+        qty: locationCountQty,
+        unit: locationCountUnit || locationCountModal.item.unit || locationCountModal.item.base_unit,
+        notes: locationCountNotes,
+      })
+      toast.success('Location count saved')
+      setLocationCountModal(null)
+      setLocationCountQty('')
+      setLocationCountUnit('')
+      setLocationCountNotes('')
+      await loadData()
+    } catch (err) {
+      toast.error(err.message || 'Failed to save location count')
+    }
+  }
+
+  function openLocationCount(item, locationId = '') {
+    const existing = locationStock.find(row => row.ingredient_id === item.id && row.location_id === locationId)
+    setLocationCountModal({ item, locationId })
+    setLocationCountQty(existing ? String(existing.qty_available) : '')
+    setLocationCountUnit(existing?.unit || item.unit || item.base_unit)
+    setLocationCountNotes(existing?.notes || '')
   }
 
   async function handleDeliveryUpload(e) {
@@ -383,6 +463,23 @@ export default function StockManager() {
           </div>
         )}
 
+        {activeTab === 'locations' && (
+          <div className="bg-noch-dark/50 rounded-lg p-2 text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-noch-muted">Located total</span>
+              <span className="text-white">{smartQty(item.locationTotal, item.unit).value} {smartQty(item.locationTotal, item.unit).unit}</span>
+            </div>
+            {item.locationRows.length === 0 ? (
+              <p className="text-noch-muted">No location count yet</p>
+            ) : item.locationRows.slice(0, 3).map(row => (
+              <div key={row.id} className="flex justify-between gap-2">
+                <span className="text-noch-muted truncate">{row.location?.name || 'Location'}</span>
+                <span className="text-white shrink-0">{Number(row.qty_available || 0).toFixed(2)} {row.unit || item.unit}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isOwner && !!item.bulk_cost && (
           <div className="text-xs text-noch-muted">Cost: {item.bulk_cost} LYD / {item.bulk_qty} {item.bulk_unit}</div>
         )}
@@ -421,6 +518,11 @@ export default function StockManager() {
                 <button onClick={() => handleMoveTab(item)} className="text-noch-muted hover:text-blue-400 text-xs px-2 py-1.5 rounded-lg hover:bg-noch-border transition-colors flex items-center gap-1" title={item.track_type === 'equipment' ? 'Move to Stock' : 'Move to Equipment'}>
                   <ArrowRightLeft size={12} /> {item.track_type === 'equipment' ? 'To Stock' : 'To Equipment'}
                 </button>
+                {activeTab === 'locations' && (
+                  <button onClick={() => openLocationCount(item, selectedLocation === 'all' ? '' : selectedLocation)} className="text-noch-green hover:text-white text-xs px-2 py-1.5 rounded-lg hover:bg-noch-border transition-colors">
+                    Count by location
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -508,10 +610,33 @@ export default function StockManager() {
           <button onClick={() => { setActiveTab('stock'); setSelectedCategory('all') }} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'stock' ? 'bg-noch-green/15 text-noch-green' : 'text-noch-muted hover:text-white'}`}>
             <Package size={15} /> Stock ({mergedItems.filter(i => i.track_type !== 'equipment').length})
           </button>
+          <button onClick={() => { setActiveTab('locations'); setSelectedCategory('all') }} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'locations' ? 'bg-noch-green/15 text-noch-green' : 'text-noch-muted hover:text-white'}`}>
+            <Package size={15} /> Locations ({locations.length})
+          </button>
           <button onClick={() => { setActiveTab('equipment'); setSelectedCategory('all') }} className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'equipment' ? 'bg-blue-500/15 text-blue-400' : 'text-noch-muted hover:text-white'}`}>
             <Wrench size={15} /> Equipment ({mergedItems.filter(i => i.track_type === 'equipment').length})
           </button>
         </div>
+
+        {activeTab === 'locations' && (
+          <div className="card p-4 flex flex-col md:flex-row gap-3 md:items-center justify-between">
+            <div>
+              <h2 className="text-white font-semibold text-sm">Inventory locations / المخازن</h2>
+              <p className="text-noch-muted text-xs mt-1">Track quantities by warehouse, branch, fridge, shelf, or storage area.</p>
+            </div>
+            <div className="flex gap-2">
+              <select value={selectedLocation} onChange={e => setSelectedLocation(e.target.value)} className="input text-sm min-w-40">
+                <option value="all">All locations</option>
+                {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+              </select>
+              {isOwner && (
+                <button onClick={() => setShowLocationModal(true)} className="btn-primary text-sm px-3 py-2 flex items-center gap-2">
+                  <Plus size={14} /> Add location
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Category filter */}
         {categories.length > 1 && (
@@ -693,6 +818,85 @@ export default function StockManager() {
                 <button onClick={handleAddIngredient} disabled={adding || !newIngredient.name} className="bg-noch-green/10 text-noch-green border border-noch-green/30 rounded-lg px-4 py-2 text-sm font-medium hover:bg-noch-green/20 transition-colors disabled:opacity-50 flex items-center gap-2">
                   {adding && <Loader2 size={14} className="animate-spin" />} Add
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showLocationModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-noch-card border border-noch-border rounded-xl p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white font-semibold">Add inventory location</h2>
+                <button onClick={() => setShowLocationModal(false)} className="text-noch-muted hover:text-white"><X size={20} /></button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="col-span-2 text-xs text-noch-muted">Name
+                  <input value={newLocation.name} onChange={e => setNewLocation(s => ({ ...s, name: e.target.value }))} className="input mt-1 text-sm" placeholder="Main warehouse" />
+                </label>
+                <label className="col-span-2 text-xs text-noch-muted">Arabic name
+                  <input value={newLocation.name_ar} onChange={e => setNewLocation(s => ({ ...s, name_ar: e.target.value }))} className="input mt-1 text-sm" placeholder="المخزن الرئيسي" />
+                </label>
+                <label className="text-xs text-noch-muted">Type
+                  <select value={newLocation.location_type} onChange={e => setNewLocation(s => ({ ...s, location_type: e.target.value }))} className="input mt-1 text-sm">
+                    {['warehouse','branch','fridge','freezer','shelf','storage','other'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs text-noch-muted">Branch
+                  <select value={newLocation.branch_id} onChange={e => setNewLocation(s => ({ ...s, branch_id: e.target.value }))} className="input mt-1 text-sm">
+                    <option value="">No branch</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </label>
+                <label className="col-span-2 text-xs text-noch-muted">Address
+                  <input value={newLocation.address} onChange={e => setNewLocation(s => ({ ...s, address: e.target.value }))} className="input mt-1 text-sm" />
+                </label>
+                <label className="col-span-2 text-xs text-noch-muted">Notes
+                  <textarea rows={2} value={newLocation.notes} onChange={e => setNewLocation(s => ({ ...s, notes: e.target.value }))} className="input mt-1 text-sm resize-none" />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button onClick={() => setShowLocationModal(false)} className="btn-secondary">Cancel</button>
+                <button onClick={handleAddLocation} className="btn-primary">Add location</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {locationCountModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-noch-card border border-noch-border rounded-xl p-6 w-full max-w-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-white font-semibold">Count by location</h2>
+                  <p className="text-noch-muted text-xs">{locationCountModal.item.name}</p>
+                </div>
+                <button onClick={() => setLocationCountModal(null)} className="text-noch-muted hover:text-white"><X size={20} /></button>
+              </div>
+              <div className="space-y-3">
+                <label className="text-xs text-noch-muted">Location
+                  <select value={locationCountModal.locationId} onChange={e => openLocationCount(locationCountModal.item, e.target.value)} className="input mt-1 text-sm">
+                    <option value="">Select location</option>
+                    {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                  </select>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs text-noch-muted">Quantity
+                    <input type="number" step="0.01" value={locationCountQty} onChange={e => setLocationCountQty(e.target.value)} className="input mt-1 text-sm" />
+                  </label>
+                  <label className="text-xs text-noch-muted">Unit
+                    <select value={locationCountUnit} onChange={e => setLocationCountUnit(e.target.value)} className="input mt-1 text-sm">
+                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </label>
+                </div>
+                <label className="text-xs text-noch-muted">Notes
+                  <input value={locationCountNotes} onChange={e => setLocationCountNotes(e.target.value)} className="input mt-1 text-sm" placeholder="Shelf, batch, count note..." />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button onClick={() => setLocationCountModal(null)} className="btn-secondary">Cancel</button>
+                <button onClick={handleSaveLocationCount} className="btn-primary">Save count</button>
               </div>
             </div>
           </div>

@@ -159,12 +159,14 @@ export default function POSEndOfDay() {
     if (!shift) return
     setClosing(true)
     try {
-      await closeShift(shift.id, {
+      const result = await closeShift(shift.id, {
         closing_cash: actualCashNum,
         cash_difference: cashDiff,
         notes,
+        closed_by: getServedBy()?.id || null,
       })
       toast.success('Shift closed')
+      if (result?.audit_warning) toast.error(result.audit_warning)
       navigate('/pos')
     } catch (err) {
       toast.error(err.message || 'Failed to close shift')
