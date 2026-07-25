@@ -97,10 +97,11 @@ test('builds platform-specific benchmarks and portfolio summary', () => {
 })
 
 test('wires the evaluator into Content Studio and persists its report fields', async () => {
-  const [routes, nav, page, migration] = await Promise.all([
+  const [routes, nav, page, service, migration] = await Promise.all([
     readFile(new URL('../src/modules/contentStudio/index.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/modules/contentStudio/lib/constants.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/modules/contentStudio/pages/PostPerformance.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/modules/contentStudio/services/contentBank.js', import.meta.url), 'utf8'),
     readFile(
       new URL('../../../supabase/migrations/20260725141000_content_performance_evaluator.sql', import.meta.url),
       'utf8',
@@ -113,6 +114,8 @@ test('wires the evaluator into Content Studio and persists its report fields', a
   assert.match(page, /evaluateDraft/)
   assert.match(page, /updateBankItemPerformance/)
   assert.match(page, /recordSignal/)
+  assert.match(service, /PERF_INTEGER_FIELDS/)
+  assert.match(service, /Math\.round\(number\)/)
   assert.match(migration, /perf_effectiveness_score/)
   assert.match(migration, /perf_ai_evaluation/)
 })

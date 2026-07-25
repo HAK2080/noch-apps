@@ -58,6 +58,10 @@ const PERF_NUM_FIELDS  = new Set([
   'perf_engagement_rate', 'perf_effectiveness_score', 'perf_manifesto_score',
 ])
 const PERF_JSON_FIELDS = new Set(['perf_ai_evaluation'])
+const PERF_INTEGER_FIELDS = new Set([
+  'perf_effectiveness_score',
+  'perf_manifesto_score',
+])
 const PERF_FIELDS = [...PERF_TEXT_FIELDS, ...PERF_NUM_FIELDS, ...PERF_JSON_FIELDS]
 
 export async function updateBankItemPerformance(id, patch) {
@@ -66,7 +70,10 @@ export async function updateBankItemPerformance(id, patch) {
     if (!(k in patch)) continue
     const v = patch[k]
     if (PERF_NUM_FIELDS.has(k)) {
-      clean[k] = v === '' || v == null ? null : Number(v)
+      const number = v === '' || v == null ? null : Number(v)
+      clean[k] = number == null || !PERF_INTEGER_FIELDS.has(k)
+        ? number
+        : Math.round(number)
     } else if (PERF_JSON_FIELDS.has(k)) {
       clean[k] = v && typeof v === 'object' ? v : {}
     } else {
