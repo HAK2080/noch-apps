@@ -326,17 +326,7 @@ export async function getCashRunway(branchId = null) {
 }
 
 // ── Expenses ────────────────────────────────────────────────────────
-export async function listExpenses({ branchId = null, from, to } = {}) {
-  let q = supabase.from('expense_entries').select('*').order('paid_at', { ascending: false })
-  if (branchId) q = q.eq('branch_id', branchId)
-  if (from) q = q.gte('paid_at', from)
-  if (to)   q = q.lte('paid_at', to)
-  const { data, error } = await q
-  if (error) throw error
-  return data || []
-}
-
-export async function listCanonicalExpenses({ branchId = null, from, to } = {}) {
+function buildConsolidatedExpensesQuery({ branchId = null, from, to } = {}) {
   let q = supabase
     .from('finance_expense_documents')
     .select('*')
@@ -345,6 +335,30 @@ export async function listCanonicalExpenses({ branchId = null, from, to } = {}) 
   if (branchId) q = q.eq('branch_id', branchId)
   if (from) q = q.gte('booked_at', from)
   if (to)   q = q.lte('booked_at', to)
+  return q
+}
+
+export async function listExpenses(filters = {}) {
+  const { data, error } = await buildConsolidatedExpensesQuery(filters)
+  if (error) throw error
+  return data || []
+}
+
+export async function listCanonicalExpenses(filters = {}) {
+  const { data, error } = await buildConsolidatedExpensesQuery(filters)
+  if (error) throw error
+  return data || []
+}
+
+// Legacy finance-entry helpers are intentionally retained for backward
+// compatibility. New finance reads should use listExpenses /
+// listCanonicalExpenses so the UI stays aligned with the additive
+// finance_expense_documents read model.
+export async function listLegacyExpenseEntries({ branchId = null, from, to } = {}) {
+  let q = supabase.from('expense_entries').select('*').order('paid_at', { ascending: false })
+  if (branchId) q = q.eq('branch_id', branchId)
+  if (from) q = q.gte('paid_at', from)
+  if (to)   q = q.lte('paid_at', to)
   const { data, error } = await q
   if (error) throw error
   return data || []

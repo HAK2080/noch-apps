@@ -37,7 +37,7 @@ These routes no longer render the legacy Content Studio v1 UI directly. They now
 - `expenses` remains the canonical workflow table for approvals and payments.
 - `expense_entries` is retained for backward compatibility and historical reads.
 - `finance_expense_documents` is the additive read model used to consolidate both sources without destructive migration.
-- Older finance planning/setup notes may still mention `expense_entries` as the primary Finance source. Treat current Supabase migrations plus [`apps/pos/src/modules/finance/tabs/ExpensesTab.jsx`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/apps/pos/src/modules/finance/tabs/ExpensesTab.jsx) as the current source of truth.
+- Older finance planning/setup notes may still mention `expense_entries` as the primary Finance source. Treat current Supabase migrations plus [`apps/pos/src/modules/finance/tabs/ExpensesTab.jsx`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/apps/pos/src/modules/finance/tabs/ExpensesTab.jsx) and [`apps/pos/src/modules/finance/lib/finance-supabase.js`](/C:/Users/aeroh/AI%20apps/Noch_apps_June_2026/Noch%20Cafe%20V2/apps/pos/src/modules/finance/lib/finance-supabase.js) as the current source of truth.
 
 ## POS hardening status
 

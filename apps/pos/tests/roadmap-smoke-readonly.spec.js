@@ -80,4 +80,18 @@ test.describe('Roadmap smoke coverage', () => {
     await page.keyboard.press('Escape')
     await expect(paymentText).not.toBeVisible({ timeout: 10000 })
   })
+
+  test('legacy analytics and content routes stay pinned to supported surfaces', async ({ page }) => {
+    await page.goto('/analytics-legacy?period=30d')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page).toHaveURL(/\/finance\?period=30d/)
+
+    await page.goto('/content')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page).toHaveURL(/\/content-studio$/)
+
+    await page.goto('/content/research')
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page).toHaveURL(/\/content-studio\/inspiration/)
+  })
 })
