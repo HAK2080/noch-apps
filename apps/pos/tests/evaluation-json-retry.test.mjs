@@ -25,15 +25,28 @@ test('accepts schema JSON wrapped in a markdown fence', () => {
   assert.equal(parsed.scores.voice_match, 5)
 })
 
-test('retries once when the provider returns malformed evaluation JSON', async () => {
+test('repairs a missing comma between evaluation properties', async () => {
   let calls = 0
   const result = await generateParsedEvaluation(async () => {
     calls += 1
     return {
       model: 'gemini-2.5-flash',
-      text: calls === 1
-        ? '{"scores":{"voice_match":5 "dialect_fidelity":3}}'
-        : validEvaluation,
+      text: '{"scores":{"voice_match":5 "dialect_fidelity":3}}',
+    }
+  }, 'evaluate this post')
+
+  assert.equal(calls, 1)
+  assert.equal(result.parsed.scores.voice_match, 5)
+  assert.equal(result.parsed.scores.dialect_fidelity, 3)
+})
+
+test('retries once when malformed evaluation JSON cannot be repaired safely', async () => {
+  let calls = 0
+  const result = await generateParsedEvaluation(async () => {
+    calls += 1
+    return {
+      model: 'gemini-2.5-flash',
+      text: calls === 1 ? '{"scores":' : validEvaluation,
     }
   }, 'evaluate this post')
 
