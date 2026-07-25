@@ -3,6 +3,7 @@
 // Returns numeric scores (1-5) on key dimensions + categorical labels (e.g. "humor_weak").
 
 import Anthropic from "npm:@anthropic-ai/sdk";
+import { generateParsedEvaluation } from "../_shared/evaluationJson.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,15 +30,6 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
     status,
   });
-}
-
-function extractJson(text: string): Record<string, unknown> {
-  let s = text.trim();
-  s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-  const start = s.indexOf("{");
-  const end = s.lastIndexOf("}");
-  if (start < 0 || end < 0) throw new Error("no JSON object in model output");
-  return JSON.parse(s.slice(start, end + 1));
 }
 
 function asString(v: unknown): string {
@@ -267,22 +259,11 @@ Deno.serve(async (req) => {
   if (!voiceProfile) return jsonResponse({ error: "Missing voiceProfile" }, 400);
 
   try {
-    const generated = await generateEvaluationText(
-      buildPrompt({ draft, voiceProfile }),
+    const prompt = buildPrompt({ draft, voiceProfile });
+    const { parsed, generated } = await generateParsedEvaluation(
+      generateEvaluationText,
+      prompt,
     );
-
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = extractJson(generated.text);
-    } catch (e) {
-      return jsonResponse(
-        {
-          error: "The AI service returned an invalid evaluation format",
-          detail: String(e),
-        },
-        502,
-      );
-    }
 
     // Sanitize: clamp scores to 1-5, restrict labels to allowed set.
     const rawScores = (parsed.scores ?? {}) as Record<string, unknown>;
