@@ -62,6 +62,7 @@ test('content evaluator includes the configured OpenAI structured-output fallbac
   )
 
   assert.match(source, /Deno\.env\.get\("Openai_API_KEY"\)/)
+  assert.match(source, /GEMINI_FALLBACK_MODEL = "gemini-2\.5-flash-lite"/)
   assert.match(source, /https:\/\/api\.openai\.com\/v1\/chat\/completions/)
   assert.match(source, /response_format:\s*\{\s*type:\s*"json_schema"/)
   assert.ok(source.indexOf('if (geminiKey)') < source.indexOf('if (openaiKey)'))

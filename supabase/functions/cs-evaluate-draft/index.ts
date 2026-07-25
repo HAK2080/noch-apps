@@ -16,6 +16,7 @@ const corsHeaders = {
 
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash-lite";
 const OPENAI_MODEL = "gpt-4.1-mini";
 const EVALUATOR_VERSION = "v1";
 
@@ -44,9 +45,13 @@ function asArray<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
 }
 
-async function generateWithGemini(prompt: string, apiKey: string): Promise<string> {
+async function generateWithGemini(
+  prompt: string,
+  apiKey: string,
+  model: string,
+): Promise<string> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -101,7 +106,7 @@ async function generateWithGemini(prompt: string, apiKey: string): Promise<strin
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Gemini ${response.status}: ${detail}`);
+    throw new Error(`Gemini ${model} ${response.status}: ${detail}`);
   }
 
   const payload = await response.json();
@@ -218,13 +223,15 @@ async function generateEvaluationText(
   }
 
   if (geminiKey) {
-    try {
-      const text = await generateWithGemini(prompt, geminiKey);
-      return { text, model: GEMINI_MODEL };
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      failures.push(`Gemini: ${detail}`);
-      console.error("cs-evaluate-draft Gemini error", error);
+    for (const model of [GEMINI_MODEL, GEMINI_FALLBACK_MODEL]) {
+      try {
+        const text = await generateWithGemini(prompt, geminiKey, model);
+        return { text, model };
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        failures.push(`Gemini ${model}: ${detail}`);
+        console.error(`cs-evaluate-draft Gemini ${model} error`, error);
+      }
     }
   }
 
