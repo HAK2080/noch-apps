@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import {
   extractEvaluationJson,
@@ -52,4 +53,16 @@ test('retries once when malformed evaluation JSON cannot be repaired safely', as
 
   assert.equal(calls, 2)
   assert.equal(result.parsed.scores.voice_match, 5)
+})
+
+test('content evaluator includes the configured OpenAI structured-output fallback', async () => {
+  const source = await readFile(
+    new URL('../../../supabase/functions/cs-evaluate-draft/index.ts', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(source, /Deno\.env\.get\("Openai_API_KEY"\)/)
+  assert.match(source, /https:\/\/api\.openai\.com\/v1\/chat\/completions/)
+  assert.match(source, /response_format:\s*\{\s*type:\s*"json_schema"/)
+  assert.ok(source.indexOf('if (geminiKey)') < source.indexOf('if (openaiKey)'))
 })

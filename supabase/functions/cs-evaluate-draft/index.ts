@@ -3,7 +3,10 @@
 // Returns numeric scores (1-5) on key dimensions + categorical labels (e.g. "humor_weak").
 
 import Anthropic from "npm:@anthropic-ai/sdk";
-import { generateParsedEvaluation } from "../_shared/evaluationJson.ts";
+import {
+  EvaluationJsonError,
+  generateParsedEvaluation,
+} from "../_shared/evaluationJson.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +16,7 @@ const corsHeaders = {
 
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const GEMINI_MODEL = "gemini-2.5-flash";
+const OPENAI_MODEL = "gpt-5-mini";
 const EVALUATOR_VERSION = "v1";
 
 const ALLOWED_LABELS = [
@@ -108,11 +112,91 @@ async function generateWithGemini(prompt: string, apiKey: string): Promise<strin
   return text;
 }
 
+async function generateWithOpenAI(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "content_evaluation",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              scores: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  voice_match: { type: "integer", minimum: 1, maximum: 5 },
+                  dialect_fidelity: { type: "integer", minimum: 1, maximum: 5 },
+                  humor_strength: { type: "integer", minimum: 1, maximum: 5 },
+                  specificity: { type: "integer", minimum: 1, maximum: 5 },
+                  originality: { type: "integer", minimum: 1, maximum: 5 },
+                  ai_smell: { type: "integer", minimum: 1, maximum: 5 },
+                },
+                required: [
+                  "voice_match",
+                  "dialect_fidelity",
+                  "humor_strength",
+                  "specificity",
+                  "originality",
+                  "ai_smell",
+                ],
+              },
+              labels: {
+                type: "array",
+                items: {
+                  type: "string",
+                  enum: ALLOWED_LABELS,
+                },
+              },
+              explanations: {
+                type: "object",
+                additionalProperties: false,
+                properties: Object.fromEntries(
+                  ALLOWED_LABELS.map((label) => [label, { type: "string" }]),
+                ),
+                required: ALLOWED_LABELS,
+              },
+            },
+            required: ["scores", "labels", "explanations"],
+          },
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 1200);
+    throw new Error(`OpenAI ${response.status}: ${detail}`);
+  }
+
+  const payload = await response.json();
+  const message = payload?.choices?.[0]?.message;
+  if (typeof message?.refusal === "string" && message.refusal.trim()) {
+    throw new Error(`OpenAI refused the evaluation: ${message.refusal}`);
+  }
+  if (typeof message?.content !== "string" || !message.content.trim()) {
+    throw new Error("OpenAI returned no text");
+  }
+  return message.content;
+}
+
 async function generateEvaluationText(
   prompt: string,
 ): Promise<{ text: string; model: string }> {
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const openaiKey = Deno.env.get("Openai_API_KEY") ||
+    Deno.env.get("OPENAI_API_KEY");
   const failures: string[] = [];
 
   if (anthropicKey) {
@@ -144,7 +228,18 @@ async function generateEvaluationText(
     }
   }
 
-  if (!anthropicKey && !geminiKey) {
+  if (openaiKey) {
+    try {
+      const text = await generateWithOpenAI(prompt, openaiKey);
+      return { text, model: OPENAI_MODEL };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      failures.push(`OpenAI: ${detail}`);
+      console.error("cs-evaluate-draft OpenAI error", error);
+    }
+  }
+
+  if (!anthropicKey && !geminiKey && !openaiKey) {
     throw new Error("No AI provider is configured");
   }
   throw new Error(`All AI providers failed: ${failures.join(" | ")}`);
@@ -293,10 +388,21 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("cs-evaluate-draft error", e);
+    if (e instanceof EvaluationJsonError) {
+      return jsonResponse(
+        {
+          error: "The AI service returned an invalid evaluation format",
+          error_code: "evaluation_json_invalid",
+          detail: e.message,
+        },
+        502,
+      );
+    }
     return jsonResponse(
       {
         error:
           "Content evaluation is temporarily unavailable. Check the configured AI provider credits.",
+        error_code: "evaluation_provider_unavailable",
       },
       502,
     );

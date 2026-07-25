@@ -3,6 +3,13 @@ export type GeneratedEvaluation = {
   model: string;
 };
 
+export class EvaluationJsonError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "EvaluationJsonError";
+  }
+}
+
 function parseWithMissingCommaRepair(source: string): unknown {
   let candidate = source;
   let lastError: unknown;
@@ -32,7 +39,7 @@ function parseWithMissingCommaRepair(source: string): unknown {
     }
   }
 
-  throw lastError;
+  throw new EvaluationJsonError(lastError);
 }
 
 export function extractEvaluationJson(text: string): Record<string, unknown> {
