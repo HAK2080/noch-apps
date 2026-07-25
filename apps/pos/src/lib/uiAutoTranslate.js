@@ -1,4 +1,14 @@
-const PHRASES = {
+import { translations } from './i18n.js'
+
+export function buildTranslationPhrases(dictionary = translations) {
+  return Object.fromEntries(
+    Object.entries(dictionary.en || {})
+      .filter(([key, english]) => english && dictionary.ar?.[key])
+      .map(([key, english]) => [english, dictionary.ar[key]]),
+  )
+}
+
+const MANUAL_PHRASES = {
   'Dashboard': 'لوحة التحكم',
   'My Profile': 'ملفي',
   'Tasks': 'المهام',
@@ -111,6 +121,11 @@ const PHRASES = {
   'All branches': 'كل الفروع',
   'Export CSV': 'تصدير CSV',
   'Export detailed sales': 'تصدير تفاصيل المبيعات',
+}
+
+const PHRASES = {
+  ...buildTranslationPhrases(),
+  ...MANUAL_PHRASES,
 }
 
 const PLACEHOLDERS = {

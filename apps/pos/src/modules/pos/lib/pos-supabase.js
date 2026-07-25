@@ -672,7 +672,12 @@ export async function getShiftSummary(shiftId) {
   orders?.forEach(o => {
     o.pos_order_items?.forEach(item => {
       if (!productTotals[item.product_name]) {
-        productTotals[item.product_name] = { name: item.product_name, qty: 0, total: 0 }
+        productTotals[item.product_name] = {
+          name: item.product_name,
+          name_ar: item.product_name_ar || null,
+          qty: 0,
+          total: 0,
+        }
       }
       productTotals[item.product_name].qty += item.quantity
       productTotals[item.product_name].total += parseFloat(item.total)
