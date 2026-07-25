@@ -110,6 +110,7 @@ export const SUB_NAV = [
   { to: '/content-studio/voice-lab',       label: 'Voice Lab' },
   { to: '/content-studio/dialect-trainer', label: 'Dialect Trainer' },
   { to: '/content-studio/bank',            label: 'Content Bank' },
+  { to: '/content-studio/performance',     label: 'Performance' },
   { to: '/content-studio/settings',     label: 'Settings' },
 ]
 

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Mic, Loader2, Activity } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
+import ContentBenchmark from '../components/ContentBenchmark'
 import VoiceProfileEditor from '../components/VoiceProfileEditor'
 import { listVoiceProfiles } from '../services/voiceProfiles'
 import { listSignals } from '../services/learningSignals'
@@ -87,15 +88,23 @@ export default function VoiceLab() {
 
       <div className="lg:col-span-2 space-y-4">
         {active && (
-          <VoiceProfileEditor
-            key={active.id}
-            profile={active}
-            onChanged={(row) => setVoices(vs => vs.map(x => x.id === row.id ? row : x))}
-            onDeleted={(id) => {
-              setVoices(vs => vs.filter(x => x.id !== id))
-              if (activeVoiceId === id) setActiveVoiceId('')
-            }}
-          />
+          <>
+            <VoiceProfileEditor
+              key={active.id}
+              profile={active}
+              onChanged={(row) => setVoices(vs => vs.map(x => x.id === row.id ? row : x))}
+              onDeleted={(id) => {
+                setVoices(vs => vs.filter(x => x.id !== id))
+                if (activeVoiceId === id) setActiveVoiceId('')
+              }}
+            />
+            <ContentBenchmark
+              businessId={businessId}
+              voiceProfile={active}
+              onProfileChanged={(row) => setVoices(vs => vs.map(x => x.id === row.id ? row : x))}
+              onSignalRecorded={refresh}
+            />
+          </>
         )}
 
         <section className="bg-noch-card border border-noch-border rounded-2xl p-5">

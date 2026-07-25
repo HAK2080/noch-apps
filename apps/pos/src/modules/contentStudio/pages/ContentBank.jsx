@@ -201,14 +201,19 @@ function PerfPanel({ item, onSaved }) {
       for (const kind of signals) {
         try {
           await recordSignal({
-            kind,
-            source: 'content_bank_perf',
-            content_bank_item_id: item.id,
             business_id: item.business_id || null,
             brand_voice_profile_id: item.brand_voice_profile_id || null,
-            payload: { hook_rating: saved.hook_rating, creative_rating: saved.creative_rating, business_impact_rating: saved.business_impact_rating },
+            signal_type: kind,
+            source_table: 'cs_content_bank_items',
+            source_id: item.id,
+            payload: {
+              source: 'content_bank_perf',
+              hook_rating: saved.hook_rating,
+              creative_rating: saved.creative_rating,
+              business_impact_rating: saved.business_impact_rating,
+            },
           })
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
       }
       toast.success(signals.length ? `Saved · ${signals.length} learning signal${signals.length === 1 ? '' : 's'}` : 'Saved')
       onSaved?.()

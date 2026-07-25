@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext, Link } from 'react-router-dom'
-import { Building2, Lightbulb, Sparkles, FileText, Mic, Library } from 'lucide-react'
+import { Building2, Lightbulb, Sparkles, FileText, Mic, Library, BarChart3 } from 'lucide-react'
 import EmptyState from '../components/EmptyState'
 import { listInspirations } from '../services/inspirations'
 import { listConcepts } from '../services/concepts'
@@ -15,14 +15,15 @@ const TILES = [
   { to: '/content-studio/drafts',      icon: FileText,   label: 'Drafts',        desc: 'AI-generated variants', key: 'drafts' },
   { to: '/content-studio/voice-lab',   icon: Mic,        label: 'Voice Lab',     desc: 'Profiles & learning signals', key: 'voices' },
   { to: '/content-studio/bank',        icon: Library,    label: 'Content Bank',  desc: 'Approved & reusable', key: 'bank' },
+  { to: '/content-studio/performance', icon: BarChart3,  label: 'Performance',   desc: 'Post effectiveness & learning', key: 'performance' },
 ]
 
 export default function Overview() {
   const { businesses, businessId, loading } = useOutletContext()
-  const [counts, setCounts] = useState({})
+  const [countState, setCountState] = useState({ businessId: null, values: {} })
 
   useEffect(() => {
-    if (!businessId) { setCounts({}); return }
+    if (!businessId) return
     let cancelled = false
     Promise.all([
       listInspirations({ businessId }).then(r => r.length).catch(() => 0),
@@ -31,10 +32,17 @@ export default function Overview() {
       listVoiceProfiles(businessId).then(r => r.length).catch(() => 0),
       listBankItems({ businessId, status: 'approved' }).then(r => r.length).catch(() => 0),
     ]).then(([inspirations, concepts, drafts, voices, bank]) => {
-      if (!cancelled) setCounts({ inspirations, concepts, drafts, voices, bank })
+      if (!cancelled) {
+        setCountState({
+          businessId,
+          values: { inspirations, concepts, drafts, voices, bank, performance: bank },
+        })
+      }
     })
     return () => { cancelled = true }
   }, [businessId])
+
+  const counts = countState.businessId === businessId ? countState.values : {}
 
   if (loading) return null
 

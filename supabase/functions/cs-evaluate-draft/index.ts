@@ -10,7 +10,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "claude-sonnet-4-6";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
+const GEMINI_MODEL = "gemini-2.5-flash";
 const EVALUATOR_VERSION = "v1";
 
 const ALLOWED_LABELS = [
@@ -47,6 +48,116 @@ function asArray<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
 }
 
+async function generateWithGemini(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              scores: {
+                type: "OBJECT",
+                properties: {
+                  voice_match: { type: "INTEGER" },
+                  dialect_fidelity: { type: "INTEGER" },
+                  humor_strength: { type: "INTEGER" },
+                  specificity: { type: "INTEGER" },
+                  originality: { type: "INTEGER" },
+                  ai_smell: { type: "INTEGER" },
+                },
+                required: [
+                  "voice_match",
+                  "dialect_fidelity",
+                  "humor_strength",
+                  "specificity",
+                  "originality",
+                  "ai_smell",
+                ],
+              },
+              labels: {
+                type: "ARRAY",
+                items: {
+                  type: "STRING",
+                  enum: ALLOWED_LABELS,
+                },
+              },
+              explanations: {
+                type: "OBJECT",
+                properties: Object.fromEntries(
+                  ALLOWED_LABELS.map((label) => [label, { type: "STRING" }]),
+                ),
+              },
+            },
+            required: ["scores", "labels", "explanations"],
+          },
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Gemini ${response.status}: ${detail}`);
+  }
+
+  const payload = await response.json();
+  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error("Gemini returned no text");
+  }
+  return text;
+}
+
+async function generateEvaluationText(
+  prompt: string,
+): Promise<{ text: string; model: string }> {
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const failures: string[] = [];
+
+  if (anthropicKey) {
+    try {
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const response = await client.messages.create({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const block = response.content[0];
+      if (!block || block.type !== "text") throw new Error("Unexpected model output");
+      return { text: block.text, model: ANTHROPIC_MODEL };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      failures.push(`Anthropic: ${detail}`);
+      console.error("cs-evaluate-draft Anthropic error", error);
+    }
+  }
+
+  if (geminiKey) {
+    try {
+      const text = await generateWithGemini(prompt, geminiKey);
+      return { text, model: GEMINI_MODEL };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      failures.push(`Gemini: ${detail}`);
+      console.error("cs-evaluate-draft Gemini error", error);
+    }
+  }
+
+  if (!anthropicKey && !geminiKey) {
+    throw new Error("No AI provider is configured");
+  }
+  throw new Error(`All AI providers failed: ${failures.join(" | ")}`);
+}
+
 function buildPrompt(args: {
   draft: Record<string, unknown>;
   voiceProfile: Record<string, unknown>;
@@ -66,6 +177,18 @@ function buildPrompt(args: {
     preferred_phrases: voiceProfile.preferred_phrases,
     notes: voiceProfile.notes,
   };
+
+  const goodSamples = asArray<string>(voiceProfile.good_caption_samples)
+    .filter((sample) => typeof sample === "string" && sample.trim())
+    .slice(-12);
+  const badSamples = asArray<string>(voiceProfile.bad_caption_samples)
+    .filter((sample) => typeof sample === "string" && sample.trim())
+    .slice(-12);
+  const hybridNotes = asString(voiceProfile.hybrid_language_notes).trim();
+  const trainingContext = (goodSamples.length || badSamples.length || hybridNotes)
+    ? `\nBRAND MANIFESTO EVIDENCE:
+${goodSamples.length ? `Approved real captions:\n${goodSamples.map((sample, index) => `${index + 1}. ${sample}`).join("\n")}\n` : ""}${badSamples.length ? `Rejected / off-brand captions:\n${badSamples.map((sample, index) => `${index + 1}. ${sample}`).join("\n")}\n` : ""}${hybridNotes ? `Hybrid-language rules: ${hybridNotes}\n` : ""}`
+    : "";
 
   const dialect = asString(voiceProfile.dialect).trim();
   const dialectRules = asString(voiceProfile.dialect_rules).trim();
@@ -91,6 +214,7 @@ Format: ${asString(draft.format)}
 BRAND VOICE PROFILE:
 ${JSON.stringify(slimVoice, null, 2)}
 ${dialectContext}
+${trainingContext}
 
 Return ONLY a single JSON object, no prose, no markdown fences. Use this exact schema:
 {
@@ -109,7 +233,7 @@ Return ONLY a single JSON object, no prose, no markdown fences. Use this exact s
 }
 
 Scoring guide:
-- voice_match: how closely does it match tone, formality, humor_tolerance from the profile (1=way off, 5=spot on)
+- voice_match: how closely it matches the profile and approved real captions while avoiding rejected examples (1=way off, 5=spot on)
 - dialect_fidelity: if Arabic, how authentic to the target dialect (1=wrong dialect/MSA, 5=native register). Score 3 if non-Arabic content.
 - humor_strength: does the joke land? (1=cringe/wacky, 3=okay, 5=actually funny). Score 3 if not comedic content.
 - specificity: is it concrete and brand-specific, or generic copy? (1=template-y, 5=specific and grounded)
@@ -132,9 +256,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not set" }, 500);
-
   let body: {
     draft?: Record<string, unknown>;
     voiceProfile?: Record<string, unknown>;
@@ -145,29 +266,20 @@ Deno.serve(async (req) => {
   if (!draft) return jsonResponse({ error: "Missing draft" }, 400);
   if (!voiceProfile) return jsonResponse({ error: "Missing voiceProfile" }, 400);
 
-  const client = new Anthropic({ apiKey });
-
   try {
-    const resp = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      messages: [{
-        role: "user",
-        content: buildPrompt({ draft, voiceProfile }),
-      }],
-    });
-
-    const block = resp.content[0];
-    if (!block || block.type !== "text") {
-      return jsonResponse({ error: "Unexpected model output" }, 502);
-    }
+    const generated = await generateEvaluationText(
+      buildPrompt({ draft, voiceProfile }),
+    );
 
     let parsed: Record<string, unknown>;
     try {
-      parsed = extractJson(block.text);
+      parsed = extractJson(generated.text);
     } catch (e) {
       return jsonResponse(
-        { error: "Failed to parse JSON", raw: block.text, detail: String(e) },
+        {
+          error: "The AI service returned an invalid evaluation format",
+          detail: String(e),
+        },
         502,
       );
     }
@@ -196,10 +308,16 @@ Deno.serve(async (req) => {
       labels,
       explanations: cleanExplanations,
       evaluator_version: EVALUATOR_VERSION,
-      ai_model: MODEL,
+      ai_model: generated.model,
     });
   } catch (e) {
     console.error("cs-evaluate-draft error", e);
-    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonResponse(
+      {
+        error:
+          "Content evaluation is temporarily unavailable. Check the configured AI provider credits.",
+      },
+      502,
+    );
   }
 });

@@ -12,6 +12,7 @@ import Drafts from './pages/Drafts'
 import VoiceLab from './pages/VoiceLab'
 import DialectTrainer from './pages/DialectTrainer'
 import ContentBank from './pages/ContentBank'
+import PostPerformance from './pages/PostPerformance'
 import Settings from './pages/Settings'
 import Briefs from './pages/Briefs'
 import BriefDetail from './pages/BriefDetail'
@@ -44,6 +45,7 @@ export default function ContentStudio() {
         <Route path="voice-lab" element={<VoiceLab />} />
         <Route path="dialect-trainer" element={<DialectTrainer />} />
         <Route path="bank" element={<ContentBank />} />
+        <Route path="performance" element={<PostPerformance />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

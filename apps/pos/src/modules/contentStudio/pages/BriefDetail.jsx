@@ -2,7 +2,7 @@
 // quality, link to upstream artefacts, and generate drafts directly
 // from this brief.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, FileText, Sparkles, Loader2, Trash2, Save, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -21,6 +21,16 @@ const RUBRIC = [
   { id: 'q_execution_simplicity', label: 'Execution simplicity' },
 ]
 
+function draftFormat(value) {
+  const format = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (['short_post', 'caption', 'reel_hook', 'carousel_outline', 'story'].includes(format)) return format
+  if (format.includes('reel')) return 'reel_hook'
+  if (format.includes('carousel')) return 'carousel_outline'
+  if (format.includes('story')) return 'story'
+  if (format.includes('post') || format.includes('caption')) return 'caption'
+  return 'short_post'
+}
+
 export default function BriefDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -34,7 +44,7 @@ export default function BriefDetail() {
   const [n, setN] = useState(3)
   const [draftCount, setDraftCount] = useState(null)
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     setLoading(true)
     try {
       const [b, v, c] = await Promise.all([
@@ -45,11 +55,11 @@ export default function BriefDetail() {
       setBrief(b)
       setVoices(v || [])
       setCampaigns(c || [])
-      if (!voiceId && v?.[0]) setVoiceId(v[0].id)
+      setVoiceId(current => current || v?.[0]?.id || null)
     } catch (e) { toast.error(e.message || 'Load failed') }
     finally { setLoading(false) }
-  }
-  useEffect(() => { reload() }, [id])
+  }, [id])
+  useEffect(() => { reload() }, [reload])
 
   const set = (k, v) => setBrief(b => ({ ...b, [k]: v }))
 
@@ -79,8 +89,11 @@ export default function BriefDetail() {
     try {
       const result = await generateDraftsFromBrief({ brief, voiceProfile, n })
       const drafts = result?.drafts || result?.variants || []
+      if (!drafts.length) throw new Error('The AI service returned no draft variants. Please try again.')
+
       // Persist each generated draft, attached to this brief.
       const created = []
+      const persistErrors = []
       for (const d of drafts) {
         try {
           const row = await createDraft({
@@ -88,26 +101,39 @@ export default function BriefDetail() {
             concept_id: result.concept_id || brief.reference_concept_id || null,
             brand_voice_profile_id: voiceId,
             platform: brief.platform || 'instagram',
-            format:   brief.format   || 'reel',
-            language: brief.language || 'ar',
-            text_caption: d.caption || d.text || d.caption_final || '',
+            format: draftFormat(brief.format),
+            body_text: d.body || d.caption || d.text || d.caption_final || '',
             hook:         d.hook    || null,
             cta:          d.cta     || null,
-            hashtags:     d.hashtags || null,
-            ai_model:     result.ai_model || null,
-            generation_meta: { brief_id: brief.id, ...d._meta },
-            status: 'draft',
+            hashtags:     Array.isArray(d.hashtags) ? d.hashtags : [],
+            generation_params: {
+              n,
+              ai_model: result.ai_model || null,
+              brief_id: brief.id,
+              ...d._meta,
+            },
+            source: 'ai',
+            status: 'generated',
           })
           created.push(row)
-        } catch (e) { console.warn('Draft persist failed:', e) }
+        } catch (e) {
+          persistErrors.push(e)
+          console.warn('Draft persist failed:', e)
+        }
       }
+      if (!created.length) throw new Error(persistErrors[0]?.message || 'Generated drafts could not be saved.')
+
       setDraftCount(created.length)
       // Auto-bump status to 'used' once drafts have been generated.
       if (brief.status === 'draft' || brief.status === 'ready') {
         const updated = await updateBrief(id, { status: 'used' })
         setBrief(updated)
       }
-      toast.success(`Generated ${created.length} draft${created.length === 1 ? '' : 's'}`)
+      if (persistErrors.length) {
+        toast.error(`Generated ${created.length}; ${persistErrors.length} could not be saved`)
+      } else {
+        toast.success(`Generated ${created.length} draft${created.length === 1 ? '' : 's'}`)
+      }
     } catch (e) { toast.error(e.message || 'Generation failed') }
     finally { setGenerating(false) }
   }

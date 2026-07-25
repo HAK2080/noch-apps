@@ -13,7 +13,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "claude-opus-4-20250514";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -32,6 +33,92 @@ function extractJsonArray(text: string): unknown[] {
   const end = s.lastIndexOf("]");
   if (start >= 0 && end > start) s = s.slice(start, end + 1);
   return JSON.parse(s);
+}
+
+async function generateWithGemini(prompt: string, apiKey: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                body: { type: "STRING" },
+                hook: { type: "STRING" },
+                cta: { type: "STRING" },
+                hashtags: {
+                  type: "ARRAY",
+                  items: { type: "STRING" },
+                },
+              },
+              required: ["body", "hook", "cta", "hashtags"],
+            },
+          },
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Gemini ${response.status}: ${detail}`);
+  }
+
+  const payload = await response.json();
+  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error("Gemini returned no text");
+  }
+  return text;
+}
+
+async function generateDraftText(prompt: string): Promise<{ text: string; model: string }> {
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const failures: string[] = [];
+
+  if (anthropicKey) {
+    try {
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const response = await client.messages.create({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 2048,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const block = response.content[0];
+      if (!block || block.type !== "text") throw new Error("Unexpected model output");
+      return { text: block.text, model: ANTHROPIC_MODEL };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      failures.push(`Anthropic: ${detail}`);
+      console.error("cs-generate-drafts Anthropic error", error);
+    }
+  }
+
+  if (geminiKey) {
+    try {
+      const text = await generateWithGemini(prompt, geminiKey);
+      return { text, model: GEMINI_MODEL };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      failures.push(`Gemini: ${detail}`);
+      console.error("cs-generate-drafts Gemini error", error);
+    }
+  }
+
+  if (!anthropicKey && !geminiKey) {
+    throw new Error("No AI provider is configured");
+  }
+  throw new Error(`All AI providers failed: ${failures.join(" | ")}`);
 }
 
 type LexiconEntry = { msa?: string; dialect?: string; note?: string };
@@ -195,9 +282,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not set" }, 500);
-
   let body: {
     concept?: Record<string, unknown>;
     voiceProfile?: Record<string, unknown>;
@@ -213,42 +297,52 @@ Deno.serve(async (req) => {
   if (!format) return jsonResponse({ error: "Missing format" }, 400);
 
   const count = Math.max(1, Math.min(6, Number(n) || 3));
-  const client = new Anthropic({ apiKey });
 
   try {
-    const resp = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      messages: [{
-        role: "user",
-        content: buildPrompt({
-          concept,
-          voiceProfile,
-          platform: platform || "instagram",
-          format,
-          n: count,
-        }),
-      }],
+    const prompt = buildPrompt({
+      concept,
+      voiceProfile,
+      platform: platform || "instagram",
+      format,
+      n: count,
     });
+    const generated = await generateDraftText(prompt);
 
-    const block = resp.content[0];
-    if (!block || block.type !== "text") {
-      return jsonResponse({ error: "Unexpected model output" }, 502);
-    }
-
-    let variants: unknown[];
+    let variants: Record<string, unknown>[];
     try {
-      variants = extractJsonArray(block.text);
+      const parsed = extractJsonArray(generated.text);
+      if (!Array.isArray(parsed) || !parsed.length) throw new Error("No variants returned");
+      variants = parsed.map((variant) => {
+        if (!variant || typeof variant !== "object") {
+          throw new Error("Variant is not an object");
+        }
+        const row = variant as Record<string, unknown>;
+        const body = typeof row.body === "string"
+          ? row.body
+          : typeof row.caption === "string"
+          ? row.caption
+          : typeof row.text === "string"
+          ? row.text
+          : "";
+        if (!body.trim()) throw new Error("Variant body is empty");
+        // `caption` keeps already-deployed clients compatible; newer clients use `body`.
+        return { ...row, body, caption: body };
+      });
     } catch (e) {
       return jsonResponse(
-        { error: "Failed to parse JSON", raw: block.text, detail: String(e) },
+        { error: "The AI service returned an invalid draft format", detail: String(e) },
         502,
       );
     }
 
-    return jsonResponse({ variants, ai_model: MODEL });
+    return jsonResponse({ variants, ai_model: generated.model });
   } catch (e) {
     console.error("cs-generate-drafts error", e);
-    return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonResponse(
+      {
+        error: "Draft generation is temporarily unavailable. Check the configured AI provider credits.",
+      },
+      502,
+    );
   }
 });

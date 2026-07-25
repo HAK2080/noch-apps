@@ -1,11 +1,34 @@
 import { supabase } from '../../../lib/supabase'
 
+async function draftGenerationError(error) {
+  let message = error?.message || 'Draft generation failed'
+  const response = error?.context
+
+  if (response && typeof response.clone === 'function') {
+    try {
+      const payload = await response.clone().json()
+      if (typeof payload?.error === 'string') message = payload.error
+      else if (typeof payload?.message === 'string') message = payload.message
+    } catch {
+      // Keep the SDK error when the Edge Function did not return JSON.
+    }
+  }
+
+  if (/credit balance is too low|insufficient.*credit/i.test(message)) {
+    message = 'AI draft generation is unavailable because the Anthropic API credits are exhausted.'
+  }
+
+  const readableError = new Error(message)
+  readableError.cause = error
+  return readableError
+}
+
 // Original signature: generate from a concept.
 export async function generateDrafts({ concept, voiceProfile, platform, format, n = 3 }) {
   const { data, error } = await supabase.functions.invoke('cs-generate-drafts', {
     body: { concept, voiceProfile, platform, format, n },
   })
-  if (error) throw error
+  if (error) throw await draftGenerationError(error)
   return data
 }
 
@@ -47,6 +70,6 @@ export async function generateDraftsFromBrief({ brief, voiceProfile, n = 3 }) {
   const { data, error } = await supabase.functions.invoke('cs-generate-drafts', {
     body: { concept: synthConcept, voiceProfile, platform, format, n },
   })
-  if (error) throw error
+  if (error) throw await draftGenerationError(error)
   return { ...data, brief_id: brief.id, concept_id: synthConcept.__concept_id || null }
 }

@@ -43,14 +43,22 @@ export async function archiveBankItem(id) {
 }
 
 // Phase 7 — performance update. Whitelisted patch; numeric coercion.
-const PERF_TEXT_FIELDS = new Set(['posted_at', 'perf_platform', 'perf_format', 'perf_notes', 'perf_worked_because', 'perf_did_not_work_because'])
+const PERF_TEXT_FIELDS = new Set([
+  'posted_at', 'perf_platform', 'perf_format', 'perf_post_url',
+  'perf_notes', 'perf_worked_because', 'perf_did_not_work_because',
+  'perf_evaluated_at',
+])
 const PERF_NUM_FIELDS  = new Set([
-  'perf_views', 'perf_likes', 'perf_comments', 'perf_shares', 'perf_saves',
-  'perf_profile_visits', 'perf_orders_before', 'perf_orders_after',
+  'perf_reach', 'perf_impressions', 'perf_views',
+  'perf_likes', 'perf_comments', 'perf_shares', 'perf_saves',
+  'perf_profile_visits', 'perf_link_clicks',
+  'perf_orders_before', 'perf_orders_after',
   'perf_loyalty_visits_after',
   'hook_rating', 'creative_rating', 'business_impact_rating',
+  'perf_engagement_rate', 'perf_effectiveness_score', 'perf_manifesto_score',
 ])
-const PERF_FIELDS = [...PERF_TEXT_FIELDS, ...PERF_NUM_FIELDS]
+const PERF_JSON_FIELDS = new Set(['perf_ai_evaluation'])
+const PERF_FIELDS = [...PERF_TEXT_FIELDS, ...PERF_NUM_FIELDS, ...PERF_JSON_FIELDS]
 
 export async function updateBankItemPerformance(id, patch) {
   const clean = {}
@@ -59,6 +67,8 @@ export async function updateBankItemPerformance(id, patch) {
     const v = patch[k]
     if (PERF_NUM_FIELDS.has(k)) {
       clean[k] = v === '' || v == null ? null : Number(v)
+    } else if (PERF_JSON_FIELDS.has(k)) {
+      clean[k] = v && typeof v === 'object' ? v : {}
     } else {
       clean[k] = v === '' ? null : v
     }
