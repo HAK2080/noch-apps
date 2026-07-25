@@ -16,7 +16,7 @@ const corsHeaders = {
 
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_FALLBACK_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 const OPENAI_MODEL = "gpt-4.1-mini";
 const EVALUATOR_VERSION = "v1";
 
@@ -58,7 +58,6 @@ async function generateWithGemini(
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.2,
           maxOutputTokens: 2048,
           responseMimeType: "application/json",
           responseSchema: {
