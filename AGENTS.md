@@ -1,5 +1,18 @@
 # Repository Guidelines
 
+## Agent Coordination
+
+Before starting any task, every agent must:
+
+1. Read `AGENT_COORDINATION.md` and search `COMPLETED_WORK.md`.
+2. Run `git status` and preserve all active work from other agents.
+3. Search the current code and recent Git history before deciding to build.
+4. Treat code and Git history as authoritative if the work log is stale.
+5. Do not edit a file another agent is actively changing without an explicit handoff.
+6. After completing work, record the files, agent, verification, commit, and deployment status in `COMPLETED_WORK.md`.
+
+When agents share one workspace, edits to the same file must be sequential, never concurrent.
+
 ## Project Structure
 
 This is a small monorepo for Noch Apps:
