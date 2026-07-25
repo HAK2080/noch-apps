@@ -16,7 +16,7 @@ const corsHeaders = {
 
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 const GEMINI_MODEL = "gemini-2.5-flash";
-const OPENAI_MODEL = "gpt-5-mini";
+const OPENAI_MODEL = "gpt-4.1-mini";
 const EVALUATOR_VERSION = "v1";
 
 const ALLOWED_LABELS = [
