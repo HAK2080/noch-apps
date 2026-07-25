@@ -256,3 +256,21 @@ To find if something's been done:
 - **Deployment**: Live on `apps.noch.cloud` in `contentStudio-B7GmY1P3.js`. Migration `20260725141000` is applied and recorded; `cs-evaluate-draft` is active as version 15 with JWT verification. GitHub Actions run `30157280674` succeeded.
 
 ---
+
+## 2026-07-25 — Post Performance Evaluator Production Hardening
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/modules/contentStudio/services/contentBank.js`
+  - `apps/pos/tests/evaluation-json-retry.test.mjs`
+  - `apps/pos/tests/post-performance-evaluator.test.mjs`
+  - `supabase/functions/_shared/evaluationJson.ts`
+  - `supabase/functions/cs-evaluate-draft/index.ts`
+- **Description**: Repaired malformed AI JSON, retried unrepairable responses, added provider fallbacks, classified provider/format errors, and normalized 0–100 evaluator scores to whole numbers for the database while retaining the precise score in the report JSON.
+- **Root Cause**: Gemini occasionally omitted JSON commas; Anthropic credits and Gemini's primary daily quota were exhausted; the OpenAI key had no billing quota; and decimal effectiveness scores could not be written to the database's `smallint` columns.
+- **Commits**: `01a2f4d`, `07d0c52`, `bab257d`, `ab3342d`, `1440a86`, `3f29713`, `af60b2b`
+- **Deployment**: `cs-evaluate-draft` deployed with JWT verification; apps.noch.cloud deployed by GitHub Actions run `30158869825`.
+- **Verification**: Nine focused tests, targeted ESLint, Edge Function bundle, and POS production build passed. The exact Arabic Facebook post from the reported failure evaluated live at `96.7/100`, persisted as `97/100`, and remained visible after page reload.
+
+---
