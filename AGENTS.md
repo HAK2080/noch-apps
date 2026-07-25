@@ -13,6 +13,10 @@ Before starting any task, every agent must:
 
 When agents share one workspace, edits to the same file must be sequential, never concurrent.
 
+Unless the user explicitly requests local-only work or says not to deploy, a code change is
+not complete until it is verified, committed and pushed to GitHub, its required database
+migrations and Edge Functions are deployed, and the relevant production site is verified.
+
 ## Project Structure
 
 This is a small monorepo for Noch Apps:

@@ -80,7 +80,6 @@ When an agent is actively working on a major feature, add an entry below:
 
 | Module | Owner | Started | Estimated End |
 |--------|-------|---------|---|
-| Content Studio evaluator release | Codex | 2026-07-25 | 2026-07-25 |
 | (none yet) | — | — | — |
 
 ---

@@ -236,7 +236,7 @@ To find if something's been done:
 ## 2026-07-25 — Unified Social Post Performance Evaluator
 
 - **Agent**: Codex
-- **Status**: Complete; production release in progress
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/modules/contentStudio/pages/PostPerformance.jsx`
   - `apps/pos/src/modules/contentStudio/lib/postPerformance.js`
@@ -253,6 +253,6 @@ To find if something's been done:
 - **Reliability**: The evaluator now falls back from Anthropic to Gemini and returns readable provider errors. Existing Content Bank learning-signal payloads were corrected to match the current learning-signal schema.
 - **Verification**: Eight focused evaluator/benchmark tests passed; targeted ESLint passed; Edge Function bundled successfully; POS production build passed.
 - **Commit**: `3dd2a66`
-- **Deployment**: Production release in progress. The migration, `cs-evaluate-draft`, and POS app are being deployed together.
+- **Deployment**: Live on `apps.noch.cloud` in `contentStudio-B7GmY1P3.js`. Migration `20260725141000` is applied and recorded; `cs-evaluate-draft` is active as version 15 with JWT verification. GitHub Actions run `30157280674` succeeded.
 
 ---
