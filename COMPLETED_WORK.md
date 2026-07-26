@@ -22,6 +22,24 @@
 
 ---
 
+## 2026-07-26 — Expense Payment Drill-Down and Excel Export
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/pages/expenses/DashboardTab.jsx`
+  - `apps/pos/src/pages/expenses/ExpenseDrilldown.jsx`
+  - `apps/pos/src/pages/expenses/lib/expenseDashboard.js`
+  - `apps/pos/src/lib/exportCsv.jsx`
+  - `apps/pos/tests/expense-dashboard.test.mjs`
+- **Description**: Added an auditable expense drill-down scoped to the selected date range. Summary cards filter by status; cost-center and category rows narrow the same payment list; the ten largest matching payments appear first; and each row expands to show the submitter, original currency, payment account/date/reference/notes, and receipt link.
+- **Export**: Added an Excel-compatible UTF-8 CSV export containing every matching record, not only the top ten. The default view and export are Paid Out; owners can switch to all submitted, approved, or pending expenses.
+- **Commit**: `c51fc6b`
+- **Deployment**: Live on `apps.noch.cloud`; GitHub Actions run `30207601305` succeeded on retry after a transient SSH connection timeout.
+- **Verification**: Five focused tests, targeted ESLint, and the POS production build passed. Live verification confirmed the July Paid Out total of 164,380.72 LYD across 108 records, top-ten ordering, row expansion, City Walk and Food & Beverages filtering, and CSV download initiation.
+
+---
+
 ## 2026-07-25 — Shared Bloom/Noch End-of-Day Closeout
 
 - **Agent**: Codex
