@@ -1,6 +1,7 @@
 // exportCsv.js — tiny CSV builder + download helper.
 // UTF-8 BOM is required so Excel renders Arabic text correctly.
 
+/* eslint-disable react-refresh/only-export-components */
 export function rowsToCsv(headers, rows) {
   const esc = (v) => {
     if (v == null) return ''
@@ -14,7 +15,7 @@ export function rowsToCsv(headers, rows) {
 
 export function downloadCsv(filename, headers, rows) {
   const csv = rowsToCsv(headers, rows)
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

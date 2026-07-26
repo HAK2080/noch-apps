@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import {
   buildExpenseDashboard,
+  buildExpenseDrilldown,
+  expenseExportRows,
   getExpenseDateRange,
 } from '../src/pages/expenses/lib/expenseDashboard.js'
 
@@ -80,4 +82,110 @@ test('dashboard sends both date boundaries to the expense query', async () => {
   assert.match(dashboardSource, /endDate:\s*dateRange\.endDate/)
   assert.match(dataSource, /\.gte\('expense_date', filter\.startDate\)/)
   assert.match(dataSource, /\.lte\('expense_date', filter\.endDate\)/)
+})
+
+test('drill-down filters rejected records and sorts highest payments first', () => {
+  const expenses = [
+    {
+      id: 'small',
+      status: 'paid',
+      amount_lyd: 10,
+      cost_center_id: 'CC01',
+      expense_date: '2026-07-02',
+      expense_categories: { name: 'Food' },
+    },
+    {
+      id: 'largest',
+      status: 'paid',
+      amount_lyd: 200,
+      cost_center_id: 'CC01',
+      expense_date: '2026-07-01',
+      expense_categories: { name: 'Food' },
+    },
+    {
+      id: 'approved',
+      status: 'approved',
+      amount_lyd: 50,
+      cost_center_id: 'CC01',
+      expense_date: '2026-07-03',
+      expense_categories: { name: 'Food' },
+    },
+    {
+      id: 'other-center',
+      status: 'paid',
+      amount_lyd: 500,
+      cost_center_id: 'CC02',
+      expense_date: '2026-07-04',
+      expense_categories: { name: 'Food' },
+    },
+    {
+      id: 'rejected',
+      status: 'rejected',
+      amount_lyd: 1000,
+      cost_center_id: 'CC01',
+      expense_date: '2026-07-05',
+      expense_categories: { name: 'Food' },
+    },
+  ]
+
+  const drilldown = buildExpenseDrilldown(expenses, {
+    selectedCostCenterId: 'CC01',
+    selectedCategoryName: 'Food',
+    selectedStatus: 'paid',
+  })
+
+  assert.equal(drilldown.total, 210)
+  assert.equal(drilldown.count, 2)
+  assert.deepEqual(drilldown.rows.map(expense => expense.id), [
+    'largest',
+    'small',
+  ])
+  assert.deepEqual(drilldown.topRows.map(expense => expense.id), [
+    'largest',
+    'small',
+  ])
+})
+
+test('expense export rows contain the fields needed for manual investigation', () => {
+  const rows = expenseExportRows([{
+    expense_date: '2026-07-17',
+    paid_at: '2026-07-18T10:00:00Z',
+    status: 'paid',
+    amount_lyd: 120,
+    amount: 120,
+    currency: 'LYD',
+    exchange_rate_to_lyd: 1,
+    cost_center_id: 'CC01',
+    cost_centers: { name: 'City Walk' },
+    expense_categories: { name: 'Food & Beverages' },
+    vendor: 'Malfee',
+    description: '48 Malfee',
+    profiles: { full_name: 'Employee' },
+    submitted_at: '2026-07-17T12:00:00Z',
+    payment_account_key: 'cash',
+    payment_reference: 'REF-1',
+    payment_notes: 'Paid at branch',
+    receipt_url: 'https://example.com/receipt.jpg',
+  }])
+
+  assert.deepEqual(rows[0], [
+    '2026-07-17',
+    '2026-07-18T10:00:00Z',
+    'paid',
+    '120.00',
+    '120.00',
+    'LYD',
+    '1',
+    'CC01',
+    'City Walk',
+    'Food & Beverages',
+    'Malfee',
+    '48 Malfee',
+    'Employee',
+    '2026-07-17T12:00:00Z',
+    'cash',
+    'REF-1',
+    'Paid at branch',
+    'https://example.com/receipt.jpg',
+  ])
 })

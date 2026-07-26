@@ -30,8 +30,96 @@ export function getExpenseDateRange(period, now = new Date()) {
 }
 
 export function expenseAmountLyd(expense) {
-  return expense.amount_lyd ??
-    ((expense.amount || 0) * (expense.exchange_rate_to_lyd || 1))
+  return Number(
+    expense.amount_lyd ??
+    ((expense.amount || 0) * (expense.exchange_rate_to_lyd || 1)),
+  ) || 0
+}
+
+export function buildExpenseDrilldown(
+  expenses,
+  {
+    selectedCostCenterId = '',
+    selectedCategoryName = '',
+    selectedStatus = 'all',
+  } = {},
+) {
+  const rows = expenses
+    .filter(expense => expense.status !== 'rejected')
+    .filter(expense => (
+      !selectedCostCenterId ||
+      expense.cost_center_id === selectedCostCenterId
+    ))
+    .filter(expense => (
+      !selectedCategoryName ||
+      (expense.expense_categories?.name || 'Other') === selectedCategoryName
+    ))
+    .filter(expense => (
+      selectedStatus === 'all' ||
+      expense.status === selectedStatus
+    ))
+    .sort((a, b) => {
+      const amountDifference = expenseAmountLyd(b) - expenseAmountLyd(a)
+      if (amountDifference !== 0) return amountDifference
+      return String(b.expense_date || b.submitted_at || '')
+        .localeCompare(String(a.expense_date || a.submitted_at || ''))
+    })
+
+  return {
+    rows,
+    topRows: rows.slice(0, 10),
+    count: rows.length,
+    total: rows.reduce(
+      (sum, expense) => sum + expenseAmountLyd(expense),
+      0,
+    ),
+  }
+}
+
+export const expenseExportHeaders = [
+  'Expense Date',
+  'Paid At',
+  'Status',
+  'Amount LYD',
+  'Original Amount',
+  'Currency',
+  'Exchange Rate to LYD',
+  'Cost Center Code',
+  'Cost Center',
+  'Category',
+  'Vendor',
+  'Description',
+  'Submitted By',
+  'Submitted At',
+  'Payment Account',
+  'Payment Reference',
+  'Payment Notes',
+  'Receipt URL',
+]
+
+export function expenseExportRows(expenses) {
+  return expenses.map(expense => [
+    expense.expense_date || '',
+    expense.paid_at || '',
+    expense.status || '',
+    expenseAmountLyd(expense).toFixed(2),
+    Number(expense.amount || 0).toFixed(2),
+    expense.currency || 'LYD',
+    expense.exchange_rate_to_lyd == null
+      ? ''
+      : String(expense.exchange_rate_to_lyd),
+    expense.cost_center_id || '',
+    expense.cost_centers?.name || '',
+    expense.expense_categories?.name || 'Other',
+    expense.vendor || '',
+    expense.description || '',
+    expense.profiles?.full_name || '',
+    expense.submitted_at || '',
+    expense.payment_account_key || '',
+    expense.payment_reference || '',
+    expense.payment_notes || '',
+    expense.receipt_url || '',
+  ])
 }
 
 export function buildExpenseDashboard(
