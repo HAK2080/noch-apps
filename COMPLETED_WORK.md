@@ -284,8 +284,9 @@ To find if something's been done:
   - `apps/pos/src/pages/expenses/lib/expensesData.js`
   - `apps/pos/tests/expense-dashboard.test.mjs`
 - **Description**: Added inclusive month, quarter, year, and custom From/To date ranges to the expense dashboard. Centralized LYD conversion and dashboard aggregation so summary, status, cost-center, and category figures reconcile from the same records.
-- **Root Cause**: Preset periods filtered only from their start date, so the July dashboard incorrectly included a 120 LYD Food & Beverages expense dated 2026-12-17.
-- **Verified July Figures**: Total 166,640.39 LYD; Paid 164,260.72 LYD; Approved 2,379.67 LYD; Pending 0.00 LYD. Cost centers and categories reconcile to the same total, subject only to display rounding.
+- **Root Cause**: Preset periods filtered only from their start date, which made future-dated records eligible for the July dashboard. The flagged 120 LYD Food & Beverages expense was also dated 2026-12-17 by mistake; its July submission timestamp confirmed the intended expense date was 2026-07-17.
+- **Data Correction**: Corrected the single “48 Malfee” expense from 2026-12-17 to 2026-07-17 in production. No amount, category, cost center, payment status, or other record data changed.
+- **Verified July Figures**: Total 166,760.39 LYD; Paid 164,380.72 LYD; Approved 2,379.67 LYD; Pending 0.00 LYD. Cost centers and categories reconcile to the same total, subject only to display rounding.
 - **Commit**: `2326d7f`
 - **Deployment**: Live on `apps.noch.cloud`; GitHub Actions run `30206941288` succeeded.
 - **Verification**: Production records independently aggregated from the linked database; three focused tests, targeted ESLint, and the POS production build passed. The deployed dashboard and date selector were verified in the signed-in production UI.
