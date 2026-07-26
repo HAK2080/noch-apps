@@ -7,11 +7,29 @@ import { AuthProvider } from './contexts/AuthContext.jsx'
 import { LanguageProvider } from './contexts/LanguageContext.jsx'
 import { PermissionsProvider } from './contexts/PermissionsContext.jsx'
 import { ThemeProvider } from './contexts/ThemeContext.jsx'
+import { createServiceWorkerControllerChangeHandler } from './lib/service-worker-update.js'
 
 // Register PWA service worker (production only)
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  navigator.serviceWorker.addEventListener(
+    'controllerchange',
+    createServiceWorkerControllerChangeHandler({
+      getPathname: () => window.location.pathname,
+      reload: () => window.location.reload(),
+    }),
+  )
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {})
+    navigator.serviceWorker
+      .register('/sw.js', { updateViaCache: 'none' })
+      .then((registration) => {
+        // Long-lived management tabs should discover a deployment when the user
+        // returns to them instead of continuing to run an outdated API query.
+        window.addEventListener('focus', () => {
+          registration.update().catch(() => {})
+        })
+      })
+      .catch(() => {})
   })
 }
 
