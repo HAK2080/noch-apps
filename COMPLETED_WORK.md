@@ -274,3 +274,20 @@ To find if something's been done:
 - **Verification**: Nine focused tests, targeted ESLint, Edge Function bundle, and POS production build passed. The exact Arabic Facebook post from the reported failure evaluated live at `96.7/100`, persisted as `97/100`, and remained visible after page reload.
 
 ---
+## 2026-07-26 — Expense Dashboard Reconciliation and Date Range
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/pages/expenses/DashboardTab.jsx`
+  - `apps/pos/src/pages/expenses/lib/expenseDashboard.js`
+  - `apps/pos/src/pages/expenses/lib/expensesData.js`
+  - `apps/pos/tests/expense-dashboard.test.mjs`
+- **Description**: Added inclusive month, quarter, year, and custom From/To date ranges to the expense dashboard. Centralized LYD conversion and dashboard aggregation so summary, status, cost-center, and category figures reconcile from the same records.
+- **Root Cause**: Preset periods filtered only from their start date, so the July dashboard incorrectly included a 120 LYD Food & Beverages expense dated 2026-12-17.
+- **Verified July Figures**: Total 166,640.39 LYD; Paid 164,260.72 LYD; Approved 2,379.67 LYD; Pending 0.00 LYD. Cost centers and categories reconcile to the same total, subject only to display rounding.
+- **Commit**: `2326d7f`
+- **Deployment**: Live on `apps.noch.cloud`; GitHub Actions run `30206941288` succeeded.
+- **Verification**: Production records independently aggregated from the linked database; three focused tests, targeted ESLint, and the POS production build passed. The deployed dashboard and date selector were verified in the signed-in production UI.
+
+---
