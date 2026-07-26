@@ -1,12 +1,13 @@
 // expensesData.js — Expenses module: formatting helpers + DB access
 import { supabase } from '../../../lib/supabase'
 import { formatCurrency } from '../../../lib/numbers'
+import { expenseAmountLyd } from './expenseDashboard'
 
 // ── Formatting ──────────────────────────────────────────────
 export const fmt = (n, currency = 'LYD') => formatCurrency(n || 0, currency, 2)
 
 // Fall back to amount when amount_lyd wasn't populated (older records)
-export const amtLyd = (e) => e.amount_lyd ?? ((e.amount || 0) * (e.exchange_rate_to_lyd || 1))
+export const amtLyd = expenseAmountLyd
 
 // ── DB helpers ──────────────────────────────────────────────
 export async function loadCostCenters() {
@@ -29,6 +30,8 @@ export async function loadExpenses(filter = {}) {
   if (filter.userId) q = q.eq('submitted_by', filter.userId)
   if (filter.status) q = q.eq('status', filter.status)
   if (filter.ccId)   q = q.eq('cost_center_id', filter.ccId)
+  if (filter.startDate) q = q.gte('expense_date', filter.startDate)
+  if (filter.endDate) q = q.lte('expense_date', filter.endDate)
   const { data } = await q
   return data || []
 }

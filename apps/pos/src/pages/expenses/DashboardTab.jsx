@@ -1,78 +1,132 @@
 // DashboardTab.jsx — Expenses: totals + breakdowns
 import { useState, useEffect } from 'react'
-import { Loader2, X } from 'lucide-react'
-import { fmt, amtLyd, loadExpenses, loadCostCenters } from './lib/expensesData'
+import { CalendarDays, Loader2, X } from 'lucide-react'
+import { fmt, loadExpenses, loadCostCenters } from './lib/expensesData'
+import {
+  buildExpenseDashboard,
+  getExpenseDateRange,
+} from './lib/expenseDashboard'
 
 export default function DashboardTab({ refreshKey }) {
   const [expenses, setExpenses] = useState([])
   const [costCenters, setCostCenters] = useState([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState('month')
+  const [dateRange, setDateRange] = useState(() => getExpenseDateRange('month'))
   const [selectedCc, setSelectedCc] = useState('')
 
-  useEffect(() => { load() }, [refreshKey, period])
+  useEffect(() => {
+    let cancelled = false
 
-  async function load() {
-    setLoading(true)
-    const now = new Date()
-    const start = period === 'month'
-      ? new Date(now.getFullYear(), now.getMonth(), 1)
-      : period === 'quarter'
-        ? new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-        : new Date(now.getFullYear(), 0, 1)
-    const [exp, ccs] = await Promise.all([
-      loadExpenses(),
-      loadCostCenters(),
-    ])
-    const filtered = exp.filter(e => new Date(e.expense_date) >= start)
-    setExpenses(filtered)
-    setCostCenters(ccs)
-    setLoading(false)
-  }
-
-  // Exclude rejected from all totals
-  const active = expenses.filter(e => e.status !== 'rejected')
-  const total = active.reduce((s, e) => s + amtLyd(e), 0)
-  const pending = active.filter(e => e.status === 'pending').reduce((s, e) => s + amtLyd(e), 0)
-  const approved = active.filter(e => e.status === 'approved').reduce((s, e) => s + amtLyd(e), 0)
-  const paid = active.filter(e => e.status === 'paid').reduce((s, e) => s + amtLyd(e), 0)
-
-  // Per cost center totals
-  const byCc = costCenters.map(cc => {
-    const ccExp = active.filter(e => e.cost_center_id === cc.id)
-    return {
-      ...cc,
-      total: ccExp.reduce((s, e) => s + amtLyd(e), 0),
-      count: ccExp.length,
-      pending: ccExp.filter(e => e.status === 'pending').length,
+    async function load() {
+      if (
+        !dateRange.startDate ||
+        !dateRange.endDate ||
+        dateRange.startDate > dateRange.endDate
+      ) {
+        if (!cancelled) setLoading(false)
+        return
+      }
+      setLoading(true)
+      const [exp, ccs] = await Promise.all([
+        loadExpenses({
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+        }),
+        loadCostCenters(),
+      ])
+      if (cancelled) return
+      setExpenses(exp)
+      setCostCenters(ccs)
+      setLoading(false)
     }
-  }).filter(cc => cc.count > 0).sort((a, b) => b.total - a.total)
 
-  // Category breakdown — filtered by selected CC when one is chosen
-  const drillExp = selectedCc ? active.filter(e => e.cost_center_id === selectedCc) : active
-  const catMap = {}
-  drillExp.forEach(e => {
-    const k = e.expense_categories?.name || 'Other'
-    if (!catMap[k]) catMap[k] = { name: k, total: 0, count: 0 }
-    catMap[k].total += amtLyd(e)
-    catMap[k].count += 1
+    load()
+    return () => { cancelled = true }
+  }, [refreshKey, dateRange.startDate, dateRange.endDate])
+
+  const {
+    total,
+    pending,
+    approved,
+    paid,
+    byCostCenter: byCc,
+    byCategory,
+    drillTotal,
+  } = buildExpenseDashboard(expenses, costCenters, {
+    selectedCostCenterId: selectedCc,
   })
-  const byCategory = Object.values(catMap).sort((a, b) => b.total - a.total)
-  const drillTotal = drillExp.reduce((s, e) => s + amtLyd(e), 0)
 
   const selectedCcName = costCenters.find(cc => cc.id === selectedCc)?.name
+  const invalidRange = dateRange.startDate &&
+    dateRange.endDate &&
+    dateRange.startDate > dateRange.endDate
+
+  function selectPreset(nextPeriod) {
+    setPeriod(nextPeriod)
+    setDateRange(getExpenseDateRange(nextPeriod))
+    setSelectedCc('')
+  }
+
+  function setCustomDate(field, value) {
+    setPeriod('custom')
+    setDateRange(current => ({ ...current, [field]: value }))
+    setSelectedCc('')
+  }
 
   return (
     <div className="space-y-5">
       {/* Period selector */}
-      <div className="flex gap-2 flex-wrap">
-        {[['month','This Month'],['quarter','This Quarter'],['year','This Year']].map(([v,l]) => (
-          <button key={v} onClick={() => setPeriod(v)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors
-              ${period === v ? 'bg-noch-green text-black' : 'bg-noch-card border border-noch-border text-noch-muted hover:text-white'}`}>
-            {l}
+      <div className="space-y-3">
+        <div className="flex gap-2 flex-wrap">
+          {[['month','This Month'],['quarter','This Quarter'],['year','This Year']].map(([v,l]) => (
+            <button key={v} onClick={() => selectPreset(v)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors
+                ${period === v ? 'bg-noch-green text-black' : 'bg-noch-card border border-noch-border text-noch-muted hover:text-white'}`}>
+              {l}
+            </button>
+          ))}
+          <button
+            onClick={() => setPeriod('custom')}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5
+              ${period === 'custom' ? 'bg-noch-green text-black' : 'bg-noch-card border border-noch-border text-noch-muted hover:text-white'}`}
+          >
+            <CalendarDays size={13} />
+            Custom Range
           </button>
-        ))}
+        </div>
+
+        {period === 'custom' && (
+          <div className="bg-noch-card border border-noch-border rounded-xl p-3 flex flex-wrap items-end gap-3">
+            <label className="space-y-1 min-w-[160px]">
+              <span className="block text-xs text-noch-muted">From date</span>
+              <input
+                type="date"
+                aria-label="Expense start date"
+                value={dateRange.startDate}
+                max={dateRange.endDate || undefined}
+                onChange={event => setCustomDate('startDate', event.target.value)}
+                className="input w-full text-sm"
+              />
+            </label>
+            <label className="space-y-1 min-w-[160px]">
+              <span className="block text-xs text-noch-muted">To date</span>
+              <input
+                type="date"
+                aria-label="Expense end date"
+                value={dateRange.endDate}
+                min={dateRange.startDate || undefined}
+                onChange={event => setCustomDate('endDate', event.target.value)}
+                className="input w-full text-sm"
+              />
+            </label>
+            <p className={`pb-2 text-xs ${invalidRange ? 'text-red-400' : 'text-noch-muted'}`}>
+              {invalidRange
+                ? 'The end date must be on or after the start date.'
+                : 'Both dates are included in the figures.'}
+            </p>
+          </div>
+        )}
       </div>
 
       {loading ? (
