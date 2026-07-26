@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Shield } from 'lucide-react'
-import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories, getPOSSecurityStatus, listPOSAuditEvents } from '../lib/pos-supabase'
+import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories, getPOSSecurityStatus, getPOSIdentityCoverage, listPOSAuditEvents } from '../lib/pos-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
@@ -81,6 +81,7 @@ export default function POSSettings({ onClose } = {}) {
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
   const [printHost, setPrintHostState] = useState(() => isPrintHost())
   const [securityStatus, setSecurityStatus] = useState(null)
+  const [identityCoverage, setIdentityCoverage] = useState(null)
   const [auditEvents, setAuditEvents] = useState([])
   const [auditLoading, setAuditLoading] = useState(false)
 
@@ -131,11 +132,13 @@ export default function POSSettings({ onClose } = {}) {
     setAuditLoading(true)
     Promise.all([
       getPOSSecurityStatus(branchId).catch(() => null),
+      getPOSIdentityCoverage(branchId).catch(() => null),
       listPOSAuditEvents(branchId).catch(() => []),
     ])
-      .then(([status, events]) => {
+      .then(([status, coverage, events]) => {
         if (cancelled) return
         setSecurityStatus(status)
+        setIdentityCoverage(coverage)
         setAuditEvents(events)
       })
       .finally(() => {
@@ -256,6 +259,12 @@ export default function POSSettings({ onClose } = {}) {
   const usbVendorId = formatUsbId(printerDetails?.usbVendorId)
   const usbProductId = formatUsbId(printerDetails?.usbProductId)
   const activeBaudRate = printerDetails?.baudRate || baudRate
+  const coverageCardTone = (recorded, total) => {
+    if (!total) return 'text-noch-muted'
+    return recorded === total ? 'text-noch-green' : 'text-yellow-300'
+  }
+  const coverageValue = (recorded, total) => total ? `${recorded}/${total}` : '0/0'
+  const missingCoverage = (recorded, total) => Math.max(0, (total || 0) - (recorded || 0))
 
   return (
     <Layout>
@@ -704,6 +713,54 @@ export default function POSSettings({ onClose } = {}) {
               <p className="text-noch-muted text-xs mt-1">
                 The additive <code>pos_security_status</code> RPC is not reachable in this environment yet. Audit rows below still load directly from <code>pos_audit_log</code>.
               </p>
+            </div>
+          )}
+
+          {identityCoverage && (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                <p className="text-noch-muted text-[11px]">Sales staff attribution</p>
+                <p className={`text-lg font-semibold ${coverageCardTone(identityCoverage.sales_with_staff_identity, identityCoverage.sales_count)}`}>
+                  {coverageValue(identityCoverage.sales_with_staff_identity, identityCoverage.sales_count)}
+                </p>
+                <p className="text-noch-muted text-[11px] mt-1">Completed sales with `served_by` in the last 30 days.</p>
+              </div>
+              <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                <p className="text-noch-muted text-[11px]">Override approval coverage</p>
+                <p className={`text-lg font-semibold ${coverageCardTone(identityCoverage.manager_override_events_fully_attributed, identityCoverage.manager_override_event_count)}`}>
+                  {coverageValue(identityCoverage.manager_override_events_fully_attributed, identityCoverage.manager_override_event_count)}
+                </p>
+                <p className="text-noch-muted text-[11px] mt-1">Override events carrying both staff and manager identity.</p>
+              </div>
+              <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                <p className="text-noch-muted text-[11px]">Refund / void attribution</p>
+                <p className={`text-lg font-semibold ${coverageCardTone(
+                  (identityCoverage.refund_events_with_staff_identity || 0) + (identityCoverage.void_events_with_staff_identity || 0),
+                  (identityCoverage.refund_event_count || 0) + (identityCoverage.void_event_count || 0),
+                )}`}>
+                  {coverageValue(
+                    (identityCoverage.refund_events_with_staff_identity || 0) + (identityCoverage.void_events_with_staff_identity || 0),
+                    (identityCoverage.refund_event_count || 0) + (identityCoverage.void_event_count || 0),
+                  )}
+                </p>
+                <p className="text-noch-muted text-[11px] mt-1">Refund and void audit events carrying staff identity.</p>
+              </div>
+              <div className="rounded-xl border border-noch-border bg-noch-dark/30 px-3 py-2">
+                <p className="text-noch-muted text-[11px]">Shift-close attribution</p>
+                <p className={`text-lg font-semibold ${coverageCardTone(identityCoverage.shift_close_events_with_staff_identity, identityCoverage.shift_close_event_count)}`}>
+                  {coverageValue(identityCoverage.shift_close_events_with_staff_identity, identityCoverage.shift_close_event_count)}
+                </p>
+                <p className="text-noch-muted text-[11px] mt-1">Shift-close audit rows carrying the closing operator identity.</p>
+              </div>
+            </div>
+          )}
+
+          {identityCoverage && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-noch-muted mb-3">
+              <span>Sales missing staff ID: {missingCoverage(identityCoverage.sales_with_staff_identity, identityCoverage.sales_count)}</span>
+              <span>Overrides missing manager/staff attribution: {missingCoverage(identityCoverage.manager_override_events_fully_attributed, identityCoverage.manager_override_event_count)}</span>
+              <span>Refund rows missing staff ID: {missingCoverage(identityCoverage.refund_events_with_staff_identity, identityCoverage.refund_event_count)}</span>
+              <span>Void rows missing staff ID: {missingCoverage(identityCoverage.void_events_with_staff_identity, identityCoverage.void_event_count)}</span>
             </div>
           )}
 

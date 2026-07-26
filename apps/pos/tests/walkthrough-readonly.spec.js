@@ -138,6 +138,7 @@ test.describe('Read-only app walkthrough', () => {
     await page.waitForLoadState('domcontentloaded')
     await expect(page.getByText(/Audit & Security|Security status unavailable/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Recent POS audit trail|Open RLS policies|Manager overrides \(30d\)/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Sales staff attribution|Override approval coverage|Refund \/ void attribution|Shift-close attribution/i).first()).toBeVisible({ timeout: 10000 })
   })
 
   test('POS orders lookup renders refund and cancel surfaces without mutation', async ({ page }) => {

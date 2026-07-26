@@ -282,6 +282,61 @@ export async function getPOSSecurityStatus(branchId) {
   return Array.isArray(data) ? (data[0] || null) : (data || null)
 }
 
+export async function getPOSIdentityCoverage(branchId, { days = 30 } = {}) {
+  const since = new Date(Date.now() - (days * 86400000)).toISOString()
+  const fullAuditSelect = 'action, served_by, approved_by'
+  const fallbackAuditSelect = 'action, served_by'
+
+  const loadAuditRows = async (selectClause) => {
+    const { data, error } = await supabase
+      .from('pos_audit_log')
+      .select(selectClause)
+      .eq('branch_id', branchId)
+      .gte('created_at', since)
+      .in('action', ['manager_override_applied', 'order_voided', 'refund_applied', 'refund_completed', 'shift_closed', 'shift_close_operator_recorded'])
+    if (error) throw error
+    return data || []
+  }
+
+  try {
+    const [{ data: orderRows, error: orderError }, auditRows] = await Promise.all([
+      supabase
+        .from('pos_orders')
+        .select('id, served_by, status')
+        .eq('branch_id', branchId)
+        .gte('created_at', since)
+        .not('status', 'eq', 'voided'),
+      loadAuditRows(fullAuditSelect)
+        .catch(async (error) => {
+          if (!error.message?.includes('approved_by')) throw error
+          return (await loadAuditRows(fallbackAuditSelect)).map(row => ({ ...row, approved_by: null }))
+        }),
+    ])
+    if (orderError) throw orderError
+
+    const orders = orderRows || []
+    const overrides = auditRows.filter(row => row.action === 'manager_override_applied')
+    const refunds = auditRows.filter(row => row.action === 'refund_applied' || row.action === 'refund_completed')
+    const voids = auditRows.filter(row => row.action === 'order_voided')
+    const shiftCloses = auditRows.filter(row => row.action === 'shift_closed' || row.action === 'shift_close_operator_recorded')
+
+    return {
+      sales_count: orders.length,
+      sales_with_staff_identity: orders.filter(row => !!row.served_by).length,
+      manager_override_event_count: overrides.length,
+      manager_override_events_fully_attributed: overrides.filter(row => !!row.served_by && !!row.approved_by).length,
+      refund_event_count: refunds.length,
+      refund_events_with_staff_identity: refunds.filter(row => !!row.served_by).length,
+      void_event_count: voids.length,
+      void_events_with_staff_identity: voids.filter(row => !!row.served_by).length,
+      shift_close_event_count: shiftCloses.length,
+      shift_close_events_with_staff_identity: shiftCloses.filter(row => !!row.served_by).length,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function listPOSAuditEvents(branchId, { limit = 10 } = {}) {
   let rows = []
   const fullSelect = 'id, created_at, action, entity_type, entity_id, metadata, actor_user_id, served_by, approved_by'

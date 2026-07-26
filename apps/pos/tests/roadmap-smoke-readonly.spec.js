@@ -81,6 +81,23 @@ test.describe('Roadmap smoke coverage', () => {
     await expect(paymentText).not.toBeVisible({ timeout: 10000 })
   })
 
+  test('pos settings expose attribution coverage without mutating data', async ({ page }) => {
+    await page.goto('/pos')
+    await page.waitForLoadState('domcontentloaded')
+
+    const branchLink = page.locator('a[href^="/pos/"]').first()
+    if (await branchLink.count() === 0) {
+      await expect(page.getByText(/Point of Sale|No branches found/i).first()).toBeVisible({ timeout: 10000 })
+      return
+    }
+
+    const href = await branchLink.getAttribute('href')
+    await page.goto(`${href}/settings`)
+    await page.waitForLoadState('domcontentloaded')
+    await expect(page.getByText(/Audit & Security|Security status unavailable/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Sales staff attribution|Override approval coverage|Refund \/ void attribution|Shift-close attribution/i).first()).toBeVisible({ timeout: 10000 })
+  })
+
   test('legacy analytics and content routes stay pinned to supported surfaces', async ({ page }) => {
     await page.goto('/analytics-legacy?period=30d')
     await page.waitForLoadState('domcontentloaded')
