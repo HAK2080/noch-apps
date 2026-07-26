@@ -310,3 +310,19 @@ To find if something's been done:
 - **Verification**: Production records independently aggregated from the linked database; three focused tests, targeted ESLint, and the POS production build passed. The deployed dashboard and date selector were verified in the signed-in production UI.
 
 ---
+
+## 2026-07-26 — Product Catalog Relationship Error Recovery
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/main.jsx`
+  - `apps/pos/src/lib/service-worker-update.js`
+  - `apps/pos/tests/service-worker-update.test.mjs`
+- **Description**: Added deployment-update detection for long-lived Products tabs. When a new service worker takes control, the Products catalog reloads once to replace an outdated in-memory bundle. Active POS and unrelated pages are never auto-reloaded.
+- **Root Cause**: Supabase now exposes both the legacy direct branch relation and the central-inventory product/branch relation. The catalog query had already been disambiguated, but an already-open browser tab could continue executing the old ambiguous query after deployment because the app did not react to a service-worker controller change.
+- **Commit**: `79944f4`
+- **Deployment**: Live on `apps.noch.cloud`; GitHub Actions run `30208523991` succeeded.
+- **Verification**: The exact ambiguous query reproduced HTTP 300 / `PGRST201`, while the deployed branch-free query returned HTTP 200. Five focused tests, targeted ESLint, and the POS production build passed. A fresh signed-in production page displayed all 216 products with no relationship error.
+
+---
