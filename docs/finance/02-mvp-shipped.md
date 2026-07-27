@@ -1,6 +1,15 @@
 # Finance MVP — Shipped (2026-05-08)
 
-Live as of `index-DnvlelMZ.js` on `apps.noch.cloud`.
+> Historical note:
+> This document captures the original May 8, 2026 Finance MVP launch state.
+> As of July 27, 2026, the current live roadmap source of truth is the additive Supabase migration chain plus the active `/finance` and `/accounting` codepaths.
+>
+> Current deltas from this snapshot:
+> - Finance Expenses now reads the additive `finance_expense_documents` register; the canonical workflow remains `/expenses` on `expenses`, with `expense_entries` retained for backward compatibility.
+> - `/analytics-legacy` is now only a compatibility redirect to `/finance`.
+> - `/accounting` is the active surface for AP aging, supplier statements, cash-flow, and P&L drill-down.
+>
+> Live as of `index-DnvlelMZ.js` on `apps.noch.cloud`.
 
 ## What's deployed
 

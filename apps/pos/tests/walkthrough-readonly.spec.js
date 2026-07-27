@@ -220,6 +220,7 @@ test.describe('Read-only app walkthrough', () => {
     if (await receiveButton.count()) {
       await receiveButton.click()
       await expect(page.getByText(/Mark as Received|Receipt quantity/i).first()).toBeVisible({ timeout: 10000 })
+      await expect(page.getByText(/Warehouse \/ location|No specific location/i).first()).toBeVisible({ timeout: 10000 })
       await page.keyboard.press('Escape')
     }
 
@@ -227,6 +228,7 @@ test.describe('Read-only app walkthrough', () => {
     if (await returnButton.count()) {
       await returnButton.click()
       await expect(page.getByText(/Purchase Return|Return quantity/i).first()).toBeVisible({ timeout: 10000 })
+      await expect(page.getByText(/Warehouse \/ location|No specific location/i).first()).toBeVisible({ timeout: 10000 })
       await page.keyboard.press('Escape')
     }
 
@@ -238,26 +240,31 @@ test.describe('Read-only app walkthrough', () => {
     }
   })
 
+  test('Inventory stock manager exposes the location workspace affordance', async ({ page }) => {
+    await page.goto('/inventory/stock')
+    await page.waitForLoadState('domcontentloaded')
+
+    const locationsTab = page.getByRole('button', { name: /Locations \(/i }).first()
+    await expect(locationsTab).toBeVisible({ timeout: 10000 })
+  })
+
   test('Legacy content routes redirect to supported surfaces', async ({ page }) => {
-    await page.goto('/content')
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content-studio$/)
+    const legacyRedirects = [
+      ['/content', /\/content-studio$/],
+      ['/content/studio', /\/content-studio$/],
+      ['/content/create', /\/content-studio$/],
+      ['/content/research', /\/content-studio\/inspiration/],
+      ['/content/ideas', /\/content-studio\/concepts/],
+      ['/content/calendar', /\/content-studio\/campaigns/],
+      ['/content/experiments', /\/content-studio\/signals/],
+      ['/content/brand/setup', /\/content-studio\/businesses\/new/],
+    ]
 
-    await page.goto('/content/studio')
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content-studio$/)
-
-    await page.goto('/content/research')
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content-studio\/inspiration/)
-
-    await page.goto('/content/ideas')
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content-studio\/concepts/)
-
-    await page.goto('/content/brand/setup')
-    await page.waitForLoadState('domcontentloaded')
-    await expect(page).toHaveURL(/\/content-studio\/businesses\/new/)
+    for (const [from, target] of legacyRedirects) {
+      await page.goto(from)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page).toHaveURL(target)
+    }
   })
 
   test('Messages page exposes notification outbox copy', async ({ page }) => {

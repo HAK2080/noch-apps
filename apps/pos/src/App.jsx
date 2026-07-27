@@ -136,6 +136,19 @@ function LegacyContentBusinessRedirect() {
   return null
 }
 
+const LEGACY_CONTENT_REDIRECTS = [
+  { path: '/content', to: '/content-studio' },
+  { path: '/content/studio', to: '/content-studio' },
+  { path: '/content/brand/setup', to: '/content-studio/businesses/new' },
+  { path: '/content/brands/new', to: '/content-studio/businesses/new' },
+  { path: '/content/review', to: '/content-studio/drafts' },
+  { path: '/content/ideas', to: '/content-studio/concepts' },
+  { path: '/content/create', to: '/content-studio' },
+  { path: '/content/research', to: '/content-studio/inspiration' },
+  { path: '/content/calendar', to: '/content-studio/campaigns' },
+  { path: '/content/experiments', to: '/content-studio/signals' },
+]
+
 function OwnerRoute({ children }) {
   const { isOwner, loading } = useAuth()
   const { t } = useLanguage()
@@ -230,19 +243,12 @@ export default function App() {
           <ProtectedRoute><OwnerRoute><ContentStudio2 /></OwnerRoute></ProtectedRoute>
         } />
 
-        {/* Content Studio (legacy) */}
-        <Route path="/content" element={<LegacyRedirect to="/content-studio" />} />
-        <Route path="/content/studio" element={<LegacyRedirect to="/content-studio" />} />
-        <Route path="/content/brand/setup" element={<LegacyRedirect to="/content-studio/businesses/new" />} />
-        <Route path="/content/brands/new" element={<LegacyRedirect to="/content-studio/businesses/new" />} />
+        {/* Content Studio v1 aliases stay explicit and redirect into v2. */}
+        {LEGACY_CONTENT_REDIRECTS.map(route => (
+          <Route key={route.path} path={route.path} element={<LegacyRedirect to={route.to} />} />
+        ))}
         <Route path="/content/brand/:id" element={<LegacyContentBusinessRedirect />} />
-        <Route path="/content/review" element={<LegacyRedirect to="/content-studio/drafts" />} />
-        <Route path="/content/ideas" element={<LegacyRedirect to="/content-studio/concepts" />} />
         {/* Legacy routes — redirect to new studio */}
-        <Route path="/content/create" element={<LegacyRedirect to="/content-studio" />} />
-        <Route path="/content/research" element={<LegacyRedirect to="/content-studio/inspiration" />} />
-        <Route path="/content/calendar" element={<LegacyRedirect to="/content-studio/campaigns" />} />
-        <Route path="/content/experiments" element={<LegacyRedirect to="/content-studio/signals" />} />
 
         {/* Product Catalog — staff get read-only via in-page gating */}
         <Route path="/products" element={
