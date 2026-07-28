@@ -24,8 +24,9 @@ test.describe('Roadmap smoke coverage', () => {
     await page.waitForLoadState('domcontentloaded')
 
     await expect(page.getByText(/Outstanding supplier invoices|Stock valuation|Recent supplier price updates|No procurement orders/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Partial receipts tracked|Over receipts tracked|Purchase returns posted/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Payables snapshot|supplier invoices, due dates, and paid status|No supplier invoices in the payable register yet/i).first()).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText(/Reorder suggestions|Warehouse signals|recent receipts|No procurement orders/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Reorder suggestions|Warehouse signals|Receiving activity|No procurement orders/i).first()).toBeVisible({ timeout: 10000 })
   })
 
   test('accounting reports expose AP aging, supplier statement, cash flow, and P&L drill-down', async ({ page }) => {

@@ -207,7 +207,9 @@ test.describe('Read-only app walkthrough', () => {
     await page.goto('/inventory/procurement')
     await page.waitForLoadState('domcontentloaded')
     await expect(page.getByText(/Outstanding supplier invoices|Stock valuation|Recent supplier price updates|No procurement orders/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Partial receipts tracked|Over receipts tracked|Purchase returns posted/i).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/Payables snapshot|supplier invoices, due dates, and paid status|No supplier invoices in the payable register yet/i).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/Receiving activity|No receipt or return events recorded yet/i).first()).toBeVisible({ timeout: 10000 })
 
     const hasOrderRows = await page.locator('button[title*="Received"], button[title*="received"], button[title*="Purchase return"], button[title*="Pay Supplier Invoice"], button[title*="Pay supplier invoice"]').count()
     if (hasOrderRows > 0) {

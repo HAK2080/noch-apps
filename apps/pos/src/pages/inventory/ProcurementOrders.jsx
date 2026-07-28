@@ -236,6 +236,49 @@ export default function ProcurementOrders() {
     () => payablesRows.filter(row => Number(row.outstanding_amount_lyd || 0) > 0 && Number(row.days_past_due || 0) > 0),
     [payablesRows],
   )
+  const partialReceiptCount = useMemo(
+    () => orders.filter(row => row.status === 'partially_received').length,
+    [orders],
+  )
+  const overReceiptCount = useMemo(
+    () => orders.filter(row => row.status === 'over_received').length,
+    [orders],
+  )
+  const recentActivity = useMemo(() => {
+    const receiptRows = (orders || [])
+      .filter(row => Number(row.last_received_qty || 0) > 0 || Number(row.quantity_received || 0) > 0)
+      .map(row => ({
+        id: `receipt-${row.id}`,
+        kind: 'receipt',
+        timestamp: row.last_received_at || row.received_at || row.created_at,
+        qty: Number(row.last_received_qty || row.quantity_received || 0),
+        unit: row.unit || '',
+        ingredientName: row.ingredient?.name || 'Ingredient',
+        supplierName: row.supplier_name || 'Supplier',
+        locationName: '',
+        variance: row.status === 'over_received' ? 'over' : row.status === 'partially_received' ? 'partial' : 'matched',
+        notes: row.receiving_notes || '',
+        amount: Number(row.total_cost_lyd || 0),
+      }))
+    const returnRows = (orders || [])
+      .filter(row => Number(row.last_returned_qty || 0) > 0 || Number(row.quantity_returned || 0) > 0)
+      .map(row => ({
+        id: `return-${row.id}`,
+        kind: 'return',
+        timestamp: row.last_returned_at || row.created_at,
+        qty: Number(row.last_returned_qty || row.quantity_returned || 0),
+        unit: row.unit || '',
+        ingredientName: row.ingredient?.name || 'Ingredient',
+        supplierName: row.supplier_name || 'Supplier',
+        locationName: '',
+        variance: 'return',
+        notes: row.return_notes || '',
+        amount: Number(row.total_cost_lyd || 0),
+      }))
+    return [...receiptRows, ...returnRows]
+      .sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')))
+      .slice(0, 6)
+  }, [orders])
 
   // Totals
   const totalCost = filtered.reduce((sum, o) => sum + (parseFloat(o.total_cost_lyd) || 0), 0)
@@ -428,6 +471,24 @@ export default function ProcurementOrders() {
           <div className="rounded-xl border border-noch-border bg-noch-card p-4">
             <p className="text-noch-muted text-xs mb-1 flex items-center gap-1"><TrendingUp size={12} /> Recent supplier price updates</p>
             <p className="text-white text-xl font-bold">{priceHistory.length}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1">Partial receipts tracked</p>
+            <p className="text-blue-300 text-xl font-bold">{partialReceiptCount}</p>
+            <p className="text-noch-muted text-xs mt-2">Current procurement orders with quantity still outstanding after at least one receipt.</p>
+          </div>
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1">Over receipts tracked</p>
+            <p className="text-purple-300 text-xl font-bold">{overReceiptCount}</p>
+            <p className="text-noch-muted text-xs mt-2">Captures cases where received quantity exceeded the original order.</p>
+          </div>
+          <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+            <p className="text-noch-muted text-xs mb-1">Purchase returns posted</p>
+            <p className="text-yellow-300 text-xl font-bold">{orders.filter(row => Number(row.quantity_returned || 0) > 0).length}</p>
+            <p className="text-noch-muted text-xs mt-2">Read-only count of procurement orders carrying returned quantity back out of stock.</p>
           </div>
         </div>
 
@@ -647,6 +708,56 @@ export default function ProcurementOrders() {
                       </div>
                     )
                   })}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h2 className="text-white font-semibold">Receiving activity</h2>
+                <span className="text-noch-muted text-xs">partial, over, and returns</span>
+              </div>
+              <p className="text-noch-muted text-sm mb-3">
+                Read-only trail from the current procurement order ledger so receiving variance can be verified without posting new changes.
+              </p>
+              {recentActivity.length === 0 ? (
+                <p className="text-noch-muted text-sm">No receipt or return events recorded yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentActivity.map(row => (
+                    <div key={row.id} className="rounded-lg border border-noch-border/60 bg-noch-dark/40 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-white text-sm font-medium">
+                          {row.kind === 'return' ? 'Purchase return' : row.ingredientName}
+                        </p>
+                        <span className={`text-[10px] font-semibold uppercase ${
+                          row.kind === 'return'
+                            ? 'text-yellow-300'
+                            : row.variance === 'over'
+                              ? 'text-purple-300'
+                              : row.variance === 'partial'
+                                ? 'text-blue-300'
+                                : 'text-noch-green'
+                        }`}>
+                          {row.kind === 'return' ? 'return' : row.variance}
+                        </span>
+                      </div>
+                      <p className="text-noch-muted text-xs mt-1">
+                        {row.kind === 'return' ? row.supplierName : `${row.supplierName} · ${row.ingredientName}`}
+                        {row.locationName ? ` · ${row.locationName}` : ''}
+                      </p>
+                      <div className="flex items-center justify-between mt-2 text-xs font-mono">
+                        <span className="text-white">{row.qty.toFixed(2)} {row.unit || '-'}</span>
+                        <span className={row.kind === 'return' ? 'text-yellow-300' : 'text-noch-green'}>
+                          {row.amount.toFixed(2)} LYD
+                        </span>
+                      </div>
+                      <p className="text-noch-muted text-[11px] mt-1">
+                        {row.timestamp ? new Date(row.timestamp).toLocaleString('en-GB') : 'No timestamp'}
+                        {row.notes ? ` · ${row.notes}` : ''}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
