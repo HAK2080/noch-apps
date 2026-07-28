@@ -8,13 +8,13 @@ import {
   CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronUp,
   ClipboardCheck, Save,
 } from 'lucide-react'
+import { getPOSBranch, getPOSProducts } from '../lib/pos-supabase'
 import {
   getStockCheckItems, getLatestStockEntries, hasCheckThisWeek,
   getLastCheckInfo, saveStockCheckSession,
   createStockCheckItem, updateStockCheckItem, deleteStockCheckItem,
   getStockCheckReminder, upsertStockCheckReminder,
-  getPOSBranch, getPOSProducts,
-} from '../lib/pos-supabase'
+} from '../lib/pos-stockcheck-supabase'
 import { supabase } from '../../../lib/supabase'
 import { getStaffProfiles } from '../../../lib/profiles'
 import { createTask } from '../../../lib/tasks'

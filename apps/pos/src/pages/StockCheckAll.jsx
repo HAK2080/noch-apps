@@ -11,7 +11,7 @@ import {
   getAllStockCheckItems,
   getAllLatestStockEntries,
   bulkSaveStockEntries,
-} from '../modules/pos/lib/pos-supabase'
+} from '../modules/pos/lib/pos-stockcheck-supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import toast from 'react-hot-toast'

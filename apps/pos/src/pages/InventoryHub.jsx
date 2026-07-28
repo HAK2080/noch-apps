@@ -14,7 +14,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../contexts/PermissionsContext'
 import { supabase } from '../lib/supabase'
 import { sendTelegram } from '../lib/telegram'
-import { getAllLatestStockEntries } from '../modules/pos/lib/pos-supabase'
+import { getAllLatestStockEntries } from '../modules/pos/lib/pos-stockcheck-supabase'
 import ConsumptionCard from '../components/inventory/ConsumptionCard'
 import toast from 'react-hot-toast'
 
