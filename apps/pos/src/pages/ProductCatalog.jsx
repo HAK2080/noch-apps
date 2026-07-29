@@ -11,9 +11,12 @@ import toast from 'react-hot-toast'
 import {
   getPOSBranches, getAllProducts, getAllCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
-  getProductSalesStats, uploadProductImage, getProductCostComponents,
-  replaceProductCostComponents,
+  getProductSalesStats, uploadProductImage,
 } from '../modules/pos/lib/pos-supabase'
+import {
+  getProductCostComponents,
+  replaceProductCostComponents,
+} from '../modules/pos/lib/pos-inventory-supabase'
 import { useAuth } from '../contexts/AuthContext'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
 import CoffeeConsumptionField from '../modules/pos/components/CoffeeConsumptionField'

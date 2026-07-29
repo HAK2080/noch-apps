@@ -16,8 +16,9 @@ const ReceiptModal   = lazy(() => import('../components/ReceiptModal'))
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
-  setProductSoldOut, receiveProductStock, getAllModifierData, getModifierGroupsForProduct,
+  setProductSoldOut, getAllModifierData, getModifierGroupsForProduct,
 } from '../lib/pos-supabase'
+import { receiveProductStock } from '../lib/pos-inventory-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
 import { getProductLongPressAction } from '../lib/product-long-press'
 import POSPinLogin from './POSPinLogin'
