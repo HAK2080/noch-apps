@@ -10,7 +10,7 @@ import { CalendarClock, ExternalLink, Landmark, Pencil, Plus, Receipt, TrendingD
 import { lyd } from '../lib/thresholds'
 import { getShareholderFundingBalances, recordShareholderRepayment } from '../lib/finance-supabase'
 import PeriodSelector from '../components/PeriodSelector'
-import { businessToday } from '../../pos/lib/pos-supabase'
+import { businessToday } from '../../../lib/businessDay'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import {
   deactivateRecurringExpenseTemplate,

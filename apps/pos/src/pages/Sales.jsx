@@ -10,8 +10,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListOrdered, Clock, Download, TrendingUp } from 'lucide-react'
 import {
-  getPOSBranches, getDailySalesRange, getSalesExportRows, businessToday, localYmd,
+  getPOSBranches, getDailySalesRange, getSalesExportRows,
 } from '../modules/pos/lib/pos-supabase'
+import { businessToday, localYmd } from '../lib/businessDay'
 import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../contexts/PermissionsContext'

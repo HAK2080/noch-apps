@@ -14,7 +14,7 @@ import {
   Users,
 } from 'lucide-react'
 import { getTasks, getTaskStats, getLastReport, logReport } from '../lib/tasks'
-import { localYmd } from '../modules/pos/lib/pos-supabase'
+import { localYmd } from '../lib/businessDay'
 import { getManagementReport } from '../modules/reports/lib/management-report'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'

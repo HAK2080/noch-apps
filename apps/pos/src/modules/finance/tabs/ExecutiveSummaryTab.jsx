@@ -3,7 +3,7 @@ import { RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import FinanceBreakdownModal from '../components/FinanceBreakdownModal'
 import { getExecutiveSummary, getLiquiditySummary } from '../lib/finance-supabase'
-import { businessToday } from '../../pos/lib/pos-supabase'
+import { businessToday } from '../../../lib/businessDay'
 import { lyd, pct } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
