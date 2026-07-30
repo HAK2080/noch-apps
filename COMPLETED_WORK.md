@@ -22,6 +22,22 @@
 
 ---
 
+## 2026-07-30 - Loyalty and Content Studio Business Audit
+
+- **Agent**: Codex
+- **Status**: Complete
+- **Files**:
+  - `CONTEXT.md`
+  - `docs/audit/2026-07-30-loyalty-content-audit.md`
+  - `docs/research/loyalty-content-benchmarks-2026-07-30.md`
+- **Description**: Mapped the current loyalty and Content Studio systems from customer/business intent through UX, database contracts, operating workflow, measurement, and production behavior. Documented the good, bad, and ugly; defined a contribution-margin north star; set operational KPIs; and proposed a phased 180-day recovery roadmap.
+- **Production findings**: Loyalty had 60 customer records but only 1 of 3,771 completed orders linked in the trailing 30 days (about 0.03%). The tokenized counter QR did not open the public loyalty dialog. Content Studio had 122 inspirations, 122 concepts, 60 drafts, and 23 approved bank items, but the deployed Performance route was blank and absent from navigation. No private customer data was copied into the audit.
+- **Verification**: Read current code, migrations, recent Git history, and work logs; inspected the signed-in production loyalty, marketing, and Content Studio surfaces plus the public storefront; verified external KPI guidance against primary sources; and ran the two focused Content Studio suites (8 tests passed). `git diff --check` passed. No focused loyalty accounting/redemption test suite was found.
+- **Commit**: `a2c1b44`
+- **Deployment**: Documentation-only; no application, database, Edge Function, or production-data changes.
+
+---
+
 ## 2026-07-26 — Expense Payment Drill-Down and Excel Export
 
 - **Agent**: Codex
