@@ -55,3 +55,39 @@ _Avoid_: Branch stock, green-bean storage
 **Theoretical stock**:
 Expected on-hand stock after receipts, transfers, sales consumption, reversals, and recorded waste.
 _Avoid_: Physical count
+
+## Loyalty language
+
+**Loyalty member**:
+A customer enrolled in Noch's loyalty program with a persistent identity and reward history.
+_Avoid_: Loyalty user, account
+
+**Linked order**:
+A completed customer order attributed to one loyalty member at checkout.
+_Avoid_: Loyalty visit when no order attribution exists
+
+**Stamp event**:
+An auditable unit of loyalty progress issued for one qualifying action and capable of being reversed.
+_Avoid_: Directly changing a customer's stamp balance
+
+**Reward entitlement**:
+An earned, unredeemed customer benefit with explicit issue, expiry, redemption, and reversal states.
+_Avoid_: Coupon when referring to an earned loyalty obligation
+
+## Content language
+
+**Content campaign**:
+A coordinated set of creative briefs and assets serving one audience, business objective, and measurement plan.
+_Avoid_: Marketing campaign when the work only groups content production
+
+**Marketing campaign**:
+A targeted customer communication or paid distribution effort with eligibility, consent, delivery, cost, and outcome rules.
+_Avoid_: Content campaign
+
+**Approved content**:
+A creative asset accepted as on-brand and ready for production or publishing.
+_Avoid_: Published content
+
+**Published content**:
+An approved asset released on an external channel with verifiable channel, time, campaign, and outcome evidence.
+_Avoid_: Approved content
