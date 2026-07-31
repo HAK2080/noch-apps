@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
   Download,
   Loader2,
+  MapPin,
   Package,
   RefreshCw,
-  Settings,
+  UtensilsCrossed,
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import BackButton from '../../components/shared/BackButton'
@@ -20,8 +21,8 @@ import {
 
 const STATUS_META = {
   out: {
-    en: 'Out of stock',
-    ar: 'نفد المخزون',
+    en: 'Out',
+    ar: 'نافد',
     className: 'border-red-500/30 bg-red-500/10 text-red-300',
   },
   below_minimum: {
@@ -40,20 +41,18 @@ const STATUS_META = {
     className: 'border-slate-400/30 bg-slate-400/10 text-slate-300',
   },
   healthy: {
-    en: 'Healthy',
-    ar: 'سليم',
+    en: 'Above minimum',
+    ar: 'فوق الحد الأدنى',
     className: 'border-noch-green/30 bg-noch-green/10 text-noch-green',
   },
 }
 
 function formatQuantity(value) {
-  return Number(value || 0).toLocaleString('en-GB', {
-    maximumFractionDigits: 3,
-  })
+  if (value == null) return '—'
+  return Number(value).toLocaleString('en-GB', { maximumFractionDigits: 3 })
 }
 
 function MetricCard({ label, value, detail, tone = 'text-white', icon }) {
-  const MetricIcon = icon
   return (
     <div className="rounded-xl border border-noch-border bg-noch-card p-4">
       <div className="flex items-start justify-between gap-3">
@@ -62,18 +61,9 @@ function MetricCard({ label, value, detail, tone = 'text-white', icon }) {
           <p className={`text-2xl font-bold mt-1 ${tone}`}>{value}</p>
           <p className="text-noch-muted text-xs mt-1">{detail}</p>
         </div>
-        <MetricIcon size={18} className={tone} />
+        {createElement(icon, { size: 18, className: tone })}
       </div>
     </div>
-  )
-}
-
-function StatusBadge({ status, arabic }) {
-  const meta = STATUS_META[status] || STATUS_META.unconfigured
-  return (
-    <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-1 text-[11px] font-semibold ${meta.className}`}>
-      {arabic ? meta.ar : meta.en}
-    </span>
   )
 }
 
@@ -82,6 +72,7 @@ export default function InventoryIntelligence() {
   const arabic = lang === 'ar'
   const copy = (english, arabicText) => arabic ? arabicText : english
   const [sourceRows, setSourceRows] = useState([])
+  const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshedAt, setRefreshedAt] = useState(null)
@@ -89,60 +80,72 @@ export default function InventoryIntelligence() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-    const { data, error: queryError } = await supabase.rpc('inventory_theoretical_status')
+    const [statusResult, summaryResult] = await Promise.all([
+      supabase.rpc('inventory_control_status_v2'),
+      supabase.rpc('inventory_control_summary'),
+    ])
+    const queryError = statusResult.error || summaryResult.error
     if (queryError) {
-      setError(queryError.message || 'Inventory report could not be loaded')
-      setLoading(false)
-      return
+      setError(queryError.message || (arabic ? 'تعذر تحميل تقرير المخزون' : 'Inventory report could not be loaded'))
+    } else {
+      setSourceRows(statusResult.data || [])
+      setSummary(summaryResult.data || null)
+      setRefreshedAt(new Date())
     }
-    setSourceRows(data || [])
-    setRefreshedAt(new Date())
     setLoading(false)
-  }, [])
+  }, [arabic])
 
   useEffect(() => {
     let active = true
-    supabase.rpc('inventory_theoretical_status').then(({ data, error: queryError }) => {
+    Promise.all([
+      supabase.rpc('inventory_control_status_v2'),
+      supabase.rpc('inventory_control_summary'),
+    ]).then(([statusResult, summaryResult]) => {
       if (!active) return
+      const queryError = statusResult.error || summaryResult.error
       if (queryError) {
-        setError(queryError.message || 'Inventory report could not be loaded')
+        setError(queryError.message || (arabic ? 'تعذر تحميل تقرير المخزون' : 'Inventory report could not be loaded'))
       } else {
-        setSourceRows(data || [])
+        setSourceRows(statusResult.data || [])
+        setSummary(summaryResult.data || null)
         setRefreshedAt(new Date())
       }
       setLoading(false)
     })
-    return () => {
-      active = false
-    }
-  }, [])
+    return () => { active = false }
+  }, [arabic])
 
   const report = useMemo(
     () => buildInventoryControlReport(sourceRows),
     [sourceRows],
   )
+  const locale = arabic ? 'ar-LY' : 'en-GB'
+  const attentionCount = report.statusCounts.out
+    + report.statusCounts.below_minimum
+    + report.statusCounts.near_minimum
 
   const exportReport = () => {
     downloadCsv(
-      `inventory_control_report_${new Date().toISOString().slice(0, 10)}`,
+      `inventory_control_evidence_${new Date().toISOString().slice(0, 10)}`,
       [
         'ingredient',
         'status',
-        'last_counted_qty',
-        'recipe_usage_since_count',
+        'physical_balance',
+        'explicit_recipe_usage_since_count',
         'estimated_on_hand',
+        'recipe_usage_status',
         'minimum_threshold',
         'threshold_configured',
         'count_freshness',
         'last_counted_at',
+        'location_count',
+        'location_total',
+        'location_variance',
         'unit',
       ],
       inventoryControlExportRows(report.rows),
     )
   }
-
-  const locale = arabic ? 'ar-LY' : 'en-GB'
-  const belowOrNear = report.statusCounts.below_minimum + report.statusCounts.near_minimum
 
   return (
     <Layout>
@@ -152,17 +155,17 @@ export default function InventoryIntelligence() {
         <div className="flex flex-col gap-4 mt-3 mb-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-white font-bold text-2xl">
-              {copy('Inventory Control Report', 'تقرير الرقابة على المخزون')}
+              {copy('Inventory Control', 'الرقابة على المخزون')}
             </h1>
             <p className="text-noch-muted text-sm mt-1 max-w-3xl">
               {copy(
-                'Estimated on-hand quantity equals the last physical count minus recipe usage from completed POS orders.',
-                'الكمية التقديرية المتاحة تساوي آخر جرد فعلي ناقص استهلاك الوصفات من طلبات نقاط البيع المكتملة.',
+                'Physical counts are the baseline. Estimated usage appears only when an explicit product recipe exists; missing evidence is never treated as zero.',
+                'الجرد الفعلي هو الأساس. يظهر الاستهلاك التقديري فقط عند وجود وصفة مرتبطة بالمنتج، ولا تُعامل البيانات المفقودة كأنها صفر.',
               )}
             </p>
             <p className="text-noch-muted text-xs mt-2">
               {refreshedAt
-                ? `${copy('Data refreshed', 'تم تحديث البيانات')}: ${refreshedAt.toLocaleString(locale)}`
+                ? `${copy('Refreshed', 'آخر تحديث')}: ${refreshedAt.toLocaleString(locale)}`
                 : copy('Waiting for current data', 'بانتظار البيانات الحالية')}
             </p>
           </div>
@@ -173,16 +176,14 @@ export default function InventoryIntelligence() {
               className="btn-secondary text-sm flex items-center gap-2 disabled:opacity-50"
             >
               <Download size={15} />
-              {copy('Export evidence', 'تصدير البيانات')}
+              {copy('Export evidence', 'تصدير الأدلة')}
             </button>
             <button
               onClick={load}
               disabled={loading}
               className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
             >
-              {loading
-                ? <Loader2 size={15} className="animate-spin" />
-                : <RefreshCw size={15} />}
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
               {copy('Refresh', 'تحديث')}
             </button>
           </div>
@@ -194,188 +195,143 @@ export default function InventoryIntelligence() {
               {copy('Inventory data is unavailable', 'بيانات المخزون غير متاحة')}
             </p>
             <p className="text-red-200/70 text-sm mt-1">{error}</p>
-            <button onClick={load} className="btn-secondary text-sm mt-4">
-              {copy('Try again', 'إعادة المحاولة')}
-            </button>
           </div>
         ) : loading ? (
           <div className="flex items-center justify-center gap-2 py-24 text-noch-muted">
             <Loader2 size={22} className="animate-spin" />
-            {copy('Calculating inventory controls…', 'جارٍ احتساب مؤشرات المخزون…')}
-          </div>
-        ) : report.total === 0 ? (
-          <div className="rounded-xl border border-noch-border bg-noch-card p-8 text-center">
-            <Package size={24} className="text-noch-muted mx-auto mb-3" />
-            <p className="text-white font-semibold">
-              {copy('No tracked ingredient stock', 'لا يوجد مخزون مكونات متابع')}
-            </p>
-            <p className="text-noch-muted text-sm mt-1">
-              {copy(
-                'Add ingredients and record a physical count before using this report.',
-                'أضف المكونات وسجل جرداً فعلياً قبل استخدام هذا التقرير.',
-              )}
-            </p>
+            {copy('Loading inventory controls…', 'جارٍ تحميل ضوابط المخزون…')}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
               <MetricCard
-                label={copy('Tracked ingredients', 'المكونات المتابعة')}
-                value={report.total}
-                detail={copy('Included in this report', 'مدرجة في هذا التقرير')}
-                icon={Package}
-              />
-              <MetricCard
-                label={copy('Out of stock', 'نفد المخزون')}
-                value={report.statusCounts.out}
-                detail={copy('Estimated on hand is zero', 'المتاح التقديري يساوي صفراً')}
-                tone="text-red-300"
-                icon={AlertTriangle}
-              />
-              <MetricCard
                 label={copy('Needs attention', 'يحتاج متابعة')}
-                value={belowOrNear}
-                detail={copy('Below or near minimum', 'أقل من الحد الأدنى أو قريب منه')}
-                tone="text-amber-300"
+                value={attentionCount}
+                detail={copy('Out, below, or near minimum', 'نافد أو أقل من الحد أو قريب منه')}
+                tone={attentionCount ? 'text-amber-300' : 'text-noch-green'}
                 icon={AlertTriangle}
               />
               <MetricCard
                 label={copy('Stale counts', 'جرد قديم')}
                 value={report.staleCount}
-                detail={copy('Last physical count is over 7 days old', 'آخر جرد فعلي أقدم من 7 أيام')}
+                detail={copy('More than 7 days old', 'أقدم من 7 أيام')}
                 tone={report.staleCount ? 'text-yellow-200' : 'text-noch-green'}
                 icon={CheckCircle2}
               />
+              <MetricCard
+                label={copy('Recipe usage unavailable', 'استهلاك الوصفات غير متاح')}
+                value={report.recipeUsageUnavailableCount}
+                detail={copy(
+                  `${summary?.recipe_coverage_pct ?? 0}% of sold products have recipes`,
+                  `${summary?.recipe_coverage_pct ?? 0}% من المنتجات المباعة مرتبطة بوصفات`,
+                )}
+                tone={report.recipeUsageUnavailableCount ? 'text-red-300' : 'text-noch-green'}
+                icon={UtensilsCrossed}
+              />
+              <MetricCard
+                label={copy('Location variances', 'فروقات المواقع')}
+                value={report.locationVarianceCount}
+                detail={copy(
+                  `${report.missingLocationCount} ingredients have no location count`,
+                  `${report.missingLocationCount} مكوّنًا بلا جرد للموقع`,
+                )}
+                tone={report.locationVarianceCount || report.missingLocationCount ? 'text-amber-300' : 'text-noch-green'}
+                icon={MapPin}
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-              <div className="rounded-xl border border-noch-border bg-noch-card p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-white font-semibold text-sm">
-                      {copy('Threshold coverage', 'تغطية حدود إعادة الطلب')}
-                    </p>
-                    <p className="text-noch-muted text-xs mt-1">
-                      {report.configuredCount} / {report.total} {copy('ingredients configured', 'مكونات تم إعدادها')}
-                    </p>
-                  </div>
-                  <p className="text-white font-bold text-xl">
-                    {report.thresholdCoveragePct ?? '—'}%
-                  </p>
-                </div>
-                <div className="h-2 rounded-full bg-black/30 mt-3 overflow-hidden">
-                  <div
-                    className="h-full bg-blue-400"
-                    style={{ width: `${report.thresholdCoveragePct || 0}%` }}
-                  />
-                </div>
-              </div>
-              <div className="rounded-xl border border-noch-border bg-noch-card p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-white font-semibold text-sm">
-                      {copy('Healthy configured stock', 'المخزون السليم المهيأ')}
-                    </p>
-                    <p className="text-noch-muted text-xs mt-1">
-                      {copy(
-                        'Share of threshold-configured items safely above 150% of minimum',
-                        'نسبة العناصر المهيأة التي تتجاوز 150٪ من الحد الأدنى بأمان',
-                      )}
-                    </p>
-                  </div>
-                  <p className="text-noch-green font-bold text-xl">
-                    {report.healthyConfiguredPct ?? '—'}{report.healthyConfiguredPct == null ? '' : '%'}
-                  </p>
-                </div>
-                <div className="h-2 rounded-full bg-black/30 mt-3 overflow-hidden">
-                  <div
-                    className="h-full bg-noch-green"
-                    style={{ width: `${report.healthyConfiguredPct || 0}%` }}
-                  />
-                </div>
-              </div>
+            <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 p-4 mb-4">
+              <p className="text-blue-200 font-semibold text-sm">
+                {copy('Current evidence status', 'حالة الأدلة الحالية')}
+              </p>
+              <p className="text-blue-200/70 text-xs mt-1 leading-relaxed">
+                {copy(
+                  `${summary?.open_procurement_orders ?? 0} open procurement orders, ${summary?.open_transfers ?? 0} open transfers, and ${summary?.negative_product_locations ?? 0} negative product-location balances. Ingredient source: stock and stock logs. Product source: location stock and location movements.`,
+                  `${summary?.open_procurement_orders ?? 0} أوامر شراء مفتوحة، و${summary?.open_transfers ?? 0} تحويلات مفتوحة، و${summary?.negative_product_locations ?? 0} أرصدة سالبة لمنتجات في المواقع. مصدر المكوّنات: المخزون وسجل الحركات. مصدر المنتجات: مخزون المواقع وحركاته.`,
+                )}
+              </p>
             </div>
 
-            <div className="rounded-xl border border-noch-border bg-noch-card overflow-hidden">
-              <div className="p-4 border-b border-noch-border">
-                <h2 className="text-white font-semibold">
-                  {copy('Inventory evidence', 'أدلة المخزون')}
-                </h2>
-                <p className="text-noch-muted text-xs mt-1">
-                  {copy(
-                    'Rows are sorted by operational risk. “Estimated on hand” is not a physical count.',
-                    'تم ترتيب الصفوف حسب المخاطر التشغيلية. «المتاح التقديري» ليس جرداً فعلياً.',
-                  )}
+            {report.total === 0 ? (
+              <div className="rounded-xl border border-noch-border bg-noch-card p-8 text-center">
+                <Package size={24} className="text-noch-muted mx-auto mb-3" />
+                <p className="text-white font-semibold">
+                  {copy('No tracked ingredient stock', 'لا يوجد مخزون مكوّنات متابع')}
                 </p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-black/20 text-noch-muted">
-                    <tr>
-                      <th className="text-left px-4 py-3">{copy('Ingredient', 'المكون')}</th>
-                      <th className="text-left px-3 py-3">{copy('Status', 'الحالة')}</th>
-                      <th className="text-right px-3 py-3">{copy('Last count', 'آخر جرد')}</th>
-                      <th className="text-right px-3 py-3">{copy('Recipe usage', 'استهلاك الوصفات')}</th>
-                      <th className="text-right px-3 py-3">{copy('Estimated on hand', 'المتاح التقديري')}</th>
-                      <th className="text-right px-3 py-3">{copy('Minimum', 'الحد الأدنى')}</th>
-                      <th className="text-right px-4 py-3">{copy('Counted at', 'تاريخ الجرد')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {report.rows.map(row => (
-                      <tr key={row.ingredientId || row.name} className="border-t border-noch-border/50">
-                        <td className="px-4 py-3 text-white font-medium min-w-44">
-                          {row.name}
-                          <span className="block text-noch-muted text-[10px] mt-0.5">{row.unit || '—'}</span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <StatusBadge status={row.status} arabic={arabic} />
-                        </td>
-                        <td className="px-3 py-3 text-right text-white tabular-nums">
-                          {formatQuantity(row.countedQty)}
-                        </td>
-                        <td className="px-3 py-3 text-right text-noch-muted tabular-nums">
-                          {formatQuantity(row.consumedSinceCount)}
-                        </td>
-                        <td className="px-3 py-3 text-right text-white font-semibold tabular-nums">
-                          {formatQuantity(row.theoreticalQty)}
-                        </td>
-                        <td className="px-3 py-3 text-right text-noch-muted tabular-nums">
-                          {row.thresholdConfigured ? formatQuantity(row.minThreshold) : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <p className={row.countIsStale ? 'text-yellow-200' : 'text-noch-muted'}>
-                            {row.lastCountedAt
-                              ? new Date(row.lastCountedAt).toLocaleDateString(locale)
-                              : copy('Never', 'لم يتم')}
-                          </p>
-                          {row.countIsStale && (
-                            <p className="text-yellow-200/70 text-[10px] mt-0.5">
-                              {copy('Stale', 'قديم')}
-                            </p>
-                          )}
-                        </td>
+            ) : (
+              <div className="rounded-xl border border-noch-border bg-noch-card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[920px] text-sm">
+                    <thead className="border-b border-noch-border text-noch-muted text-xs">
+                      <tr>
+                        <th className="text-start px-4 py-3">{copy('Ingredient', 'المكوّن')}</th>
+                        <th className="text-start px-3 py-3">{copy('Control', 'الحالة')}</th>
+                        <th className="text-end px-3 py-3">{copy('Physical balance', 'الرصيد الفعلي')}</th>
+                        <th className="text-end px-3 py-3">{copy('Recipe usage', 'استهلاك الوصفة')}</th>
+                        <th className="text-end px-3 py-3">{copy('Estimated now', 'التقدير الحالي')}</th>
+                        <th className="text-end px-3 py-3">{copy('Minimum', 'الحد الأدنى')}</th>
+                        <th className="text-end px-3 py-3">{copy('Location total', 'إجمالي المواقع')}</th>
+                        <th className="text-end px-4 py-3">{copy('Last count', 'آخر جرد')}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-noch-border/60">
+                      {report.rows.map(row => {
+                        const meta = STATUS_META[row.status] || STATUS_META.unconfigured
+                        return (
+                          <tr key={row.ingredientId} className="hover:bg-white/[0.02]">
+                            <td className="px-4 py-3">
+                              <p className="text-white font-medium">{arabic && row.nameAr ? row.nameAr : row.name}</p>
+                              {arabic && row.nameAr && <p className="text-noch-muted text-xs">{row.name}</p>}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${meta.className}`}>
+                                {arabic ? meta.ar : meta.en}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-end text-white tabular-nums">
+                              {formatQuantity(row.countedQty)} {row.unit}
+                            </td>
+                            <td className="px-3 py-3 text-end tabular-nums">
+                              {row.recipeUsageAvailable ? (
+                                <span className="text-yellow-200">-{formatQuantity(row.consumedSinceCount)} {row.unit}</span>
+                              ) : (
+                                <span className="text-red-300">{copy('Unavailable', 'غير متاح')}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-end text-white tabular-nums">
+                              {formatQuantity(row.theoreticalQty)} {row.theoreticalQty == null ? '' : row.unit}
+                            </td>
+                            <td className="px-3 py-3 text-end text-noch-muted tabular-nums">
+                              {row.thresholdConfigured ? `${formatQuantity(row.minThreshold)} ${row.unit}` : '—'}
+                            </td>
+                            <td className="px-3 py-3 text-end tabular-nums">
+                              {row.locationCount ? (
+                                <span className={Math.abs(row.locationVariance || 0) > 0.001 ? 'text-amber-300' : 'text-white'}>
+                                  {formatQuantity(row.locationQty)} {row.unit}
+                                </span>
+                              ) : (
+                                <span className="text-noch-muted">{copy('Not counted', 'لم يُجرد')}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-end">
+                              <p className={row.countIsStale ? 'text-yellow-200' : 'text-noch-muted'}>
+                                {row.lastCountedAt
+                                  ? new Date(row.lastCountedAt).toLocaleDateString(locale)
+                                  : copy('Never', 'لم يُسجل')}
+                              </p>
+                              {row.countIsStale && (
+                                <p className="text-yellow-200/70 text-[10px]">{copy('Count now', 'يجب الجرد الآن')}</p>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-
-            <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 p-4 mt-4 flex gap-3">
-              <Settings size={17} className="text-blue-300 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-blue-200 font-semibold text-sm">
-                  {copy('How to interpret this report', 'كيفية قراءة هذا التقرير')}
-                </p>
-                <p className="text-blue-200/70 text-xs mt-1 leading-relaxed">
-                  {copy(
-                    'Completed POS orders reduce theoretical stock through configured recipes. Refunds, waste, transfers, missing recipes, and unrecorded physical movements can create differences, so stale or high-risk rows should be physically counted before purchasing decisions.',
-                    'تخفض طلبات نقاط البيع المكتملة المخزون النظري عبر الوصفات المهيأة. قد تؤدي المرتجعات والهدر والتحويلات والوصفات الناقصة والحركات غير المسجلة إلى فروقات، لذلك يجب جرد الصفوف القديمة أو عالية المخاطر فعلياً قبل اتخاذ قرارات الشراء.',
-                  )}
-                </p>
-              </div>
-            </div>
+            )}
           </>
         )}
       </div>

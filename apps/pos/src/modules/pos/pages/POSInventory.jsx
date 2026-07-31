@@ -33,7 +33,7 @@ function StockRow({ product, onAdjust }) {
     const n = toBaseQuantity(displayedQuantity, displayUnit)
     setSaving(true)
     try {
-      await onAdjust(product.id, product.branch_id, stock, n)
+      await onAdjust(product.id, n)
       setEditing(false)
     } finally {
       setSaving(false)
@@ -107,7 +107,7 @@ export default function POSInventory() {
       .finally(() => setLoading(false))
   }, [branchId])
 
-  const handleAdjust = async (productId, branchId, stockBefore, newQty) => {
+  const handleAdjust = async (productId, newQty) => {
     await adjustProductStock(productId, branchId, newQty)
     setProducts(prev => prev.map(p =>
       p.id === productId ? { ...p, stock_qty: newQty } : p

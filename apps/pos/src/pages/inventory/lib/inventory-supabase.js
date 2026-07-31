@@ -31,20 +31,13 @@ export async function getInventoryLocationStock() {
 }
 
 export async function upsertInventoryLocationStock({ ingredientId, locationId, qty, unit, notes }) {
-  const payload = {
-    ingredient_id: ingredientId,
-    location_id: locationId,
-    qty_available: Number(qty) || 0,
-    unit,
-    notes: notes || null,
-    last_counted_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-  const { data, error } = await supabase
-    .from('inventory_location_stock')
-    .upsert(payload, { onConflict: 'ingredient_id,location_id' })
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('record_inventory_location_count', {
+    p_ingredient_id: ingredientId,
+    p_location_id: locationId,
+    p_counted_qty: Number(qty),
+    p_unit: unit || null,
+    p_notes: notes || null,
+  })
   if (error) throw error
   return data
 }

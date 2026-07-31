@@ -594,7 +594,7 @@ export default function POSTerminal() {
   const handleReceiveStock = useCallback(async (product, quantity, unit) => {
     const actorProfileId = getServedBy()?.id || profile?.id || null
     try {
-      const result = await receiveProductStock(product.id, quantity, unit, actorProfileId)
+      const result = await receiveProductStock(branchId, product.id, quantity, unit, actorProfileId)
       setProducts(current => current.map(item =>
         item.id === product.id
           ? {
@@ -612,7 +612,7 @@ export default function POSTerminal() {
       toast.error(error.message || 'Could not receive stock')
       throw error
     }
-  }, [profile?.id])
+  }, [branchId, profile?.id])
 
   const updateQty = (itemId, qty) => {
     setCart(prev => prev.map(i => i.id === itemId ? { ...i, quantity: qty } : i))

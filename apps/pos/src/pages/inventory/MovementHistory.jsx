@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, History, RefreshCw } from 'lucide-react'
 import Layout from '../../components/Layout'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { getPOSBranches } from '../../modules/pos/lib/pos-supabase'
 import { listMovementHistory } from './lib/warehouse'
 import toast from 'react-hot-toast'
@@ -51,6 +52,9 @@ function TypeBadge({ type }) {
 
 export default function MovementHistory() {
   const navigate = useNavigate()
+  const { lang } = useLanguage()
+  const arabic = lang === 'ar'
+  const copy = (english, arabicText) => arabic ? arabicText : english
   const [branches, setBranches] = useState([])
   const [branchId, setBranchId] = useState('')
   const [movementType, setMovementType] = useState('')
@@ -74,11 +78,11 @@ export default function MovementHistory() {
       })
       setRows(data)
     } catch (err) {
-      toast.error(err.message || 'Failed to load movements')
+      toast.error(err.message || (arabic ? 'تعذر تحميل الحركات' : 'Failed to load movements'))
     } finally {
       setLoading(false)
     }
-  }, [branchId, movementType, dateFrom, dateTo])
+  }, [arabic, branchId, movementType, dateFrom, dateTo])
 
   useEffect(() => { load() }, [load])
 
@@ -93,9 +97,9 @@ export default function MovementHistory() {
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl flex items-center gap-2">
               <History size={18} className="text-noch-green" />
-              Movement History
+              {copy('Movement History', 'سجل حركات المخزون')}
             </h1>
-            <p className="text-noch-muted text-sm">Sales, waste, transfers and adjustments</p>
+            <p className="text-noch-muted text-sm">{copy('Receipts, sales, waste, transfers, and adjustments', 'الاستلام والمبيعات والهدر والتحويلات والتعديلات')}</p>
           </div>
           <button onClick={load} className="p-2 text-noch-muted hover:text-white rounded-lg hover:bg-noch-card" title="Refresh">
             <RefreshCw size={16} />
@@ -105,7 +109,7 @@ export default function MovementHistory() {
         {/* Filter bar */}
         <div className="bg-noch-card border border-noch-border rounded-xl p-3 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <select value={branchId} onChange={e => setBranchId(e.target.value)} className="input w-full">
-            <option value="">All branches</option>
+            <option value="">{copy('All branches', 'كل الفروع')}</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
           <select value={movementType} onChange={e => setMovementType(e.target.value)} className="input w-full">
@@ -118,17 +122,17 @@ export default function MovementHistory() {
         {/* Table */}
         <div className="bg-noch-card border border-noch-border rounded-xl overflow-hidden">
           <div className="hidden sm:grid grid-cols-[140px_1fr_110px_130px_130px_90px] gap-2 px-4 py-2.5 border-b border-noch-border text-xs font-semibold text-noch-muted uppercase tracking-wide">
-            <span>Date</span>
-            <span>Product</span>
-            <span>Type</span>
-            <span>Branch</span>
-            <span className="text-right">Before → After</span>
-            <span className="text-right">Qty</span>
+            <span>{copy('Date', 'التاريخ')}</span>
+            <span>{copy('Product', 'المنتج')}</span>
+            <span>{copy('Type', 'النوع')}</span>
+            <span>{copy('Location', 'الموقع')}</span>
+            <span className="text-right">{copy('Before → After', 'قبل ← بعد')}</span>
+            <span className="text-right">{copy('Qty', 'الكمية')}</span>
           </div>
           {loading ? (
-            <p className="text-noch-muted text-center py-10 text-sm">Loading...</p>
+            <p className="text-noch-muted text-center py-10 text-sm">{copy('Loading…', 'جارٍ التحميل…')}</p>
           ) : rows.length === 0 ? (
-            <p className="text-noch-muted text-center py-10 text-sm">No movements match these filters</p>
+            <p className="text-noch-muted text-center py-10 text-sm">{copy('No movements match these filters', 'لا توجد حركات تطابق هذه الفلاتر')}</p>
           ) : (
             <div className="divide-y divide-noch-border/50">
               {rows.map(m => (

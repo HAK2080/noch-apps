@@ -88,7 +88,7 @@ export async function getManagementReport({
         p_to: to,
       }),
     ),
-    loadOptionalSource('inventory', supabase.rpc('inventory_theoretical_status')),
+    loadOptionalSource('inventory', supabase.rpc('inventory_control_status_v2')),
     loadOptionalSource(
       'expenses',
       supabase

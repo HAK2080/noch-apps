@@ -14,9 +14,11 @@ root `.env`.
 - **Loyalty V2:** privacy-first transaction QR capture, retained cashier
   lookup fallback, auditable opening balances from V1, missions, reward
   entitlements, refund/void reversals, and a read-only V1 archive.
-- **POS inventory:** management screens include menu-hidden products, shared
-  branch terminals refresh product data, and manual stock adjustments write
-  the balance change and audit movement atomically.
+- **Inventory control:** branch and warehouse product quantities use the
+  location stock ledger; POS receiving, adjustments, sales reversals,
+  transfers, and waste create auditable location movements. Ingredient
+  estimates require explicit recipes, and missing/stale evidence is shown
+  instead of converted to zero.
 - **Expenses:** submitters report unpaid, paid cash, or paid card before owner
   approval; Receipt Snap and Telegram follow the same accounting workflow.
 - **Finance:** owner-facing navigation and headline metrics use plain business

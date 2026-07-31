@@ -76,6 +76,7 @@ function normalizeInventory(source) {
       lowStockCount: null,
       outOfStockCount: null,
       staleCount: null,
+      usageUnavailableCount: null,
     }
   }
 
@@ -83,24 +84,30 @@ function normalizeInventory(source) {
     ingredientId: row.ingredient_id,
     name: row.ingredient_name || 'Stock item',
     unit: row.unit || '',
-    theoreticalQty: money(row.theoretical_qty),
+    countedQty: money(row.counted_qty),
+    theoreticalQty: row.theoretical_qty == null ? null : money(row.theoretical_qty),
+    decisionQty: row.theoretical_qty == null
+      ? money(row.counted_qty)
+      : money(row.theoretical_qty),
+    recipeUsageAvailable: row.recipe_usage_status === 'available',
     minThreshold: money(row.min_threshold),
     lastCountedAt: row.last_counted_at || null,
     countIsStale: Boolean(row.count_is_stale),
   }))
   const riskRows = rows
-    .filter(row => row.minThreshold > 0 && row.theoreticalQty < row.minThreshold)
+    .filter(row => row.minThreshold > 0 && row.decisionQty < row.minThreshold)
     .sort((left, right) => {
-      const leftRatio = left.minThreshold ? left.theoreticalQty / left.minThreshold : 1
-      const rightRatio = right.minThreshold ? right.theoreticalQty / right.minThreshold : 1
+      const leftRatio = left.minThreshold ? left.decisionQty / left.minThreshold : 1
+      const rightRatio = right.minThreshold ? right.decisionQty / right.minThreshold : 1
       return leftRatio - rightRatio
     })
 
   return {
     rows: riskRows.slice(0, 8),
     lowStockCount: riskRows.length,
-    outOfStockCount: riskRows.filter(row => row.theoreticalQty <= 0).length,
+    outOfStockCount: riskRows.filter(row => row.decisionQty <= 0).length,
     staleCount: rows.filter(row => row.countIsStale).length,
+    usageUnavailableCount: rows.filter(row => !row.recipeUsageAvailable).length,
   }
 }
 
@@ -301,6 +308,14 @@ function buildCompleteness({
       detail: `${inventory.staleCount} inventory count(s) are more than seven days old.`,
     })
   }
+  if (inventory.usageUnavailableCount > 0) {
+    issues.push({
+      id: 'inventory_recipe_usage_missing',
+      severity: 'risk',
+      title: 'Inventory usage evidence is incomplete',
+      detail: `${inventory.usageUnavailableCount} ingredient(s) have no explicit recipe links, so theoretical usage is unavailable.`,
+    })
+  }
   if (payments.reconciliationStatus === 'warning') {
     issues.push({
       id: 'payment_reconciliation_variance',
@@ -416,10 +431,10 @@ export function buildManagementReport({
   }
   if (inventory.lowStockCount > 0) {
     insights.push({
-      id: 'theoretical_stock_risk',
+      id: 'inventory_stock_risk',
       type: 'risk',
-      title: 'Theoretical stock risk',
-      detail: `${inventory.lowStockCount} item(s) are below minimum, including ${inventory.outOfStockCount} at zero.`,
+      title: 'Inventory stock risk',
+      detail: `${inventory.lowStockCount} item(s) are below minimum using the best available physical or recipe-backed balance, including ${inventory.outOfStockCount} at zero.`,
     })
   }
   if (whatsappFailed.length > 0) {

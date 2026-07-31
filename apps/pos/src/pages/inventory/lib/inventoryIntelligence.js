@@ -13,31 +13,43 @@ function finiteNumber(value, fallback = 0) {
 
 export function normalizeInventoryControlRow(row = {}) {
   const countedQty = finiteNumber(row.counted_qty)
-  const consumedSinceCount = Math.max(0, finiteNumber(row.consumed_since_count))
-  const theoreticalQty = Math.max(
-    0,
-    finiteNumber(row.theoretical_qty, countedQty),
-  )
+  const recipeUsageAvailable = row.recipe_usage_status === 'available'
+  const consumedSinceCount = recipeUsageAvailable
+    ? Math.max(0, finiteNumber(row.consumed_since_count))
+    : null
+  const theoreticalQty = recipeUsageAvailable
+    ? finiteNumber(row.theoretical_qty, countedQty)
+    : null
+  const decisionQty = theoreticalQty ?? countedQty
   const minThreshold = Math.max(0, finiteNumber(row.min_threshold))
   const thresholdConfigured = minThreshold > 0
 
   let status = 'healthy'
-  if (theoreticalQty <= 0) status = 'out'
+  if (decisionQty <= 0) status = 'out'
   else if (!thresholdConfigured) status = 'unconfigured'
-  else if (theoreticalQty <= minThreshold) status = 'below_minimum'
-  else if (theoreticalQty <= minThreshold * 1.5) status = 'near_minimum'
+  else if (decisionQty <= minThreshold) status = 'below_minimum'
+  else if (decisionQty <= minThreshold * 1.5) status = 'near_minimum'
 
   return {
     ingredientId: row.ingredient_id || null,
     name: row.ingredient_name || 'Unnamed ingredient',
+    nameAr: row.ingredient_name_ar || '',
     unit: row.unit || '',
     countedQty,
     consumedSinceCount,
     theoreticalQty,
+    decisionQty,
     minThreshold,
     thresholdConfigured,
     lastCountedAt: row.last_counted_at || null,
     countIsStale: row.count_is_stale !== false,
+    recipeUsageAvailable,
+    recipeCount: Math.max(0, finiteNumber(row.recipe_count)),
+    locationCount: Math.max(0, finiteNumber(row.location_count)),
+    locationQty: Math.max(0, finiteNumber(row.location_qty)),
+    locationVariance: row.location_variance == null
+      ? null
+      : finiteNumber(row.location_variance),
     status,
   }
 }
@@ -47,7 +59,7 @@ export function buildInventoryControlReport(sourceRows = []) {
     .map(normalizeInventoryControlRow)
     .sort((left, right) => (
       STATUS_RANK[left.status] - STATUS_RANK[right.status]
-      || left.theoreticalQty - right.theoreticalQty
+      || left.decisionQty - right.decisionQty
       || left.name.localeCompare(right.name)
     ))
 
@@ -66,6 +78,13 @@ export function buildInventoryControlReport(sourceRows = []) {
     row => row.thresholdConfigured && row.status === 'healthy',
   ).length
   const staleCount = rows.filter(row => row.countIsStale).length
+  const recipeUsageUnavailableCount = rows.filter(
+    row => !row.recipeUsageAvailable,
+  ).length
+  const missingLocationCount = rows.filter(row => row.locationCount === 0).length
+  const locationVarianceCount = rows.filter(
+    row => row.locationVariance != null && Math.abs(row.locationVariance) > 0.001,
+  ).length
 
   return {
     rows,
@@ -73,6 +92,9 @@ export function buildInventoryControlReport(sourceRows = []) {
     statusCounts,
     configuredCount,
     staleCount,
+    recipeUsageUnavailableCount,
+    missingLocationCount,
+    locationVarianceCount,
     thresholdCoveragePct: rows.length
       ? Math.round((configuredCount / rows.length) * 100)
       : null,
@@ -87,12 +109,16 @@ export function inventoryControlExportRows(rows = []) {
     row.name,
     row.status,
     row.countedQty,
-    row.consumedSinceCount,
-    row.theoreticalQty,
+    row.recipeUsageAvailable ? row.consumedSinceCount : '',
+    row.recipeUsageAvailable ? row.theoreticalQty : '',
+    row.recipeUsageAvailable ? 'available' : 'unavailable',
     row.minThreshold,
     row.thresholdConfigured ? 'yes' : 'no',
     row.countIsStale ? 'stale' : 'current',
     row.lastCountedAt || '',
+    row.locationCount,
+    row.locationQty,
+    row.locationVariance ?? '',
     row.unit,
   ])
 }

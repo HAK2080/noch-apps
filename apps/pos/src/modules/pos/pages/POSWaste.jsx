@@ -8,20 +8,24 @@ import { ArrowLeft, Trash2, Search, Minus, Plus, Loader2 } from 'lucide-react'
 import { getPOSBranch, getPOSProducts } from '../lib/pos-supabase'
 import { reportWaste } from '../../../pages/inventory/lib/warehouse'
 import Layout from '../../../components/Layout'
+import { useLanguage } from '../../../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 
 const REASONS = [
-  { value: 'used',        label: 'Used',        emoji: '🥛' },
-  { value: 'damaged',     label: 'Damaged',     emoji: '💧' },
-  { value: 'lost',        label: 'Lost',        emoji: '❓' },
-  { value: 'thrown_away', label: 'Thrown away', emoji: '🗑️' },
-  { value: 'expired',     label: 'Expired',     emoji: '⌛' },
-  { value: 'staff_meal',  label: 'Staff meal',  emoji: '🍽️' },
+  { value: 'used',        en: 'Used',        ar: 'مستخدم' },
+  { value: 'damaged',     en: 'Damaged',     ar: 'تالف' },
+  { value: 'lost',        en: 'Lost',        ar: 'مفقود' },
+  { value: 'thrown_away', en: 'Thrown away', ar: 'تم التخلص منه' },
+  { value: 'expired',     en: 'Expired',     ar: 'منتهي الصلاحية' },
+  { value: 'staff_meal',  en: 'Staff meal',  ar: 'وجبة موظف' },
 ]
 
 export default function POSWaste() {
   const { branchId } = useParams()
   const navigate = useNavigate()
+  const { lang } = useLanguage()
+  const arabic = lang === 'ar'
+  const copy = (english, arabicText) => arabic ? arabicText : english
 
   const [branch, setBranch] = useState(null)
   const [products, setProducts] = useState([])
@@ -35,10 +39,13 @@ export default function POSWaste() {
 
   useEffect(() => {
     Promise.all([getPOSBranch(branchId), getPOSProducts(branchId)])
-      .then(([b, p]) => { setBranch(b); setProducts(p) })
-      .catch(err => toast.error(err.message || 'Failed to load'))
+      .then(([b, p]) => {
+        setBranch(b)
+        setProducts(p.filter(item => item.track_inventory || item.stock_source === 'location_product_stock'))
+      })
+      .catch(err => toast.error(err.message || (arabic ? 'تعذر التحميل' : 'Failed to load')))
       .finally(() => setLoading(false))
-  }, [branchId])
+  }, [arabic, branchId])
 
   const matches = search.trim()
     ? products.filter(p =>
@@ -68,22 +75,26 @@ export default function POSWaste() {
     setSubmitting(true)
     try {
       await reportWaste(branchId, product.id, qty, reason, null)
-      toast.success(`${qty} × ${product.name} reported as ${REASONS.find(r => r.value === reason)?.label}`)
+      const reasonLabel = REASONS.find(r => r.value === reason)
+      toast.success(copy(
+        `${qty} × ${product.name} recorded as ${reasonLabel?.en}`,
+        `تم تسجيل ${qty} × ${product.name_ar || product.name} كـ ${reasonLabel?.ar}`,
+      ))
       // Keep local stock in sync so a second entry shows the new qty
       setProducts(prev => prev.map(p =>
         p.id === product.id
-          ? { ...p, stock_qty: Math.max(0, (parseFloat(p.stock_qty) || 0) - qty) }
+          ? { ...p, stock_qty: (parseFloat(p.stock_qty) || 0) - qty }
           : p
       ))
       reset()
     } catch (err) {
-      toast.error(err.message || 'Failed to report waste')
+      toast.error(err.message || copy('Failed to report waste', 'تعذر تسجيل الهدر'))
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (loading) return <Layout><p className="text-noch-muted text-center py-16">Loading...</p></Layout>
+  if (loading) return <Layout><p className="text-noch-muted text-center py-16">{copy('Loading…', 'جارٍ التحميل…')}</p></Layout>
 
   return (
     <Layout>
@@ -96,7 +107,7 @@ export default function POSWaste() {
           <div>
             <h1 className="text-white font-bold text-xl flex items-center gap-2">
               <Trash2 size={20} className="text-red-400" />
-              Report Waste
+              {copy('Report Waste', 'تسجيل الهدر')}
             </h1>
             <p className="text-noch-muted text-sm">{branch?.name}</p>
           </div>
@@ -111,14 +122,14 @@ export default function POSWaste() {
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search product..."
+                placeholder={copy('Search tracked product…', 'ابحث عن منتج متابع…')}
                 className="input w-full pl-9 py-3 text-base"
                 autoFocus
               />
             </div>
             <div className="mt-2 divide-y divide-noch-border/50">
               {search.trim() && matches.length === 0 && (
-                <p className="text-noch-muted text-sm text-center py-6">No products match</p>
+                <p className="text-noch-muted text-sm text-center py-6">{copy('No tracked products match', 'لا توجد منتجات متابعة مطابقة')}</p>
               )}
               {matches.map(p => (
                 <button
@@ -126,8 +137,10 @@ export default function POSWaste() {
                   onClick={() => setProduct(p)}
                   className="w-full flex items-center justify-between px-2 py-3.5 text-left hover:bg-noch-dark rounded-lg transition-colors"
                 >
-                  <span className="text-white text-base font-medium">{p.name}</span>
-                  <span className="text-noch-muted text-sm tabular-nums">{parseFloat(p.stock_qty) || 0} in stock</span>
+                  <span className="text-white text-base font-medium">{arabic ? p.name_ar || p.name : p.name}</span>
+                  <span className="text-noch-muted text-sm tabular-nums">
+                    {parseFloat(p.stock_qty) || 0} {copy('in stock', 'في المخزون')}
+                  </span>
                 </button>
               ))}
             </div>
@@ -137,10 +150,10 @@ export default function POSWaste() {
             {/* Selected product */}
             <div className="bg-noch-card border border-noch-green/40 rounded-xl p-4 flex items-center justify-between">
               <div>
-                <p className="text-white font-bold text-lg">{product.name}</p>
-                <p className="text-noch-muted text-sm">{parseFloat(product.stock_qty) || 0} in stock</p>
+                <p className="text-white font-bold text-lg">{arabic ? product.name_ar || product.name : product.name}</p>
+                <p className="text-noch-muted text-sm">{parseFloat(product.stock_qty) || 0} {copy('in stock', 'في المخزون')}</p>
               </div>
-              <button onClick={reset} className="btn-secondary text-sm px-3 py-1.5">Change</button>
+              <button onClick={reset} className="btn-secondary text-sm px-3 py-1.5">{copy('Change', 'تغيير')}</button>
             </div>
 
             {/* Step 2 — reason */}
@@ -154,8 +167,7 @@ export default function POSWaste() {
                       ? 'bg-red-500/20 border-red-500/60 text-red-300'
                       : 'bg-noch-card border-noch-border text-white hover:border-red-500/40'}`}
                 >
-                  <span className="text-2xl">{r.emoji}</span>
-                  {r.label}
+                  {arabic ? r.ar : r.en}
                 </button>
               ))}
             </div>
@@ -185,7 +197,7 @@ export default function POSWaste() {
               className="btn-primary w-full py-4 text-lg font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-40"
             >
               {submitting && <Loader2 size={18} className="animate-spin" />}
-              Submit waste report
+              {copy('Submit waste report', 'تسجيل الهدر')}
             </button>
           </div>
         )}

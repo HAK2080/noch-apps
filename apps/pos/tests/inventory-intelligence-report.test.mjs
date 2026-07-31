@@ -15,6 +15,7 @@ test('inventory control statuses are based on evidence, not invented runout days
       theoretical_qty: 0,
       min_threshold: 5,
       count_is_stale: false,
+      recipe_usage_status: 'available',
     },
     {
       ingredient_id: 'below',
@@ -24,6 +25,7 @@ test('inventory control statuses are based on evidence, not invented runout days
       theoretical_qty: 8,
       min_threshold: 10,
       count_is_stale: true,
+      recipe_usage_status: 'available',
     },
     {
       ingredient_id: 'near',
@@ -33,6 +35,7 @@ test('inventory control statuses are based on evidence, not invented runout days
       theoretical_qty: 14,
       min_threshold: 10,
       count_is_stale: false,
+      recipe_usage_status: 'available',
     },
     {
       ingredient_id: 'healthy',
@@ -42,6 +45,7 @@ test('inventory control statuses are based on evidence, not invented runout days
       theoretical_qty: 25,
       min_threshold: 10,
       count_is_stale: false,
+      recipe_usage_status: 'available',
     },
     {
       ingredient_id: 'unconfigured',
@@ -51,6 +55,7 @@ test('inventory control statuses are based on evidence, not invented runout days
       theoretical_qty: 30,
       min_threshold: 0,
       count_is_stale: true,
+      recipe_usage_status: 'available',
     },
   ])
 
@@ -82,6 +87,7 @@ test('inventory control report sanitizes malformed quantities and reconciles exp
       theoretical_qty: null,
       min_threshold: -1,
       count_is_stale: null,
+      recipe_usage_status: 'available',
     },
   ])
 
@@ -93,4 +99,51 @@ test('inventory control report sanitizes malformed quantities and reconciles exp
   assert.equal(row.status, 'out')
   assert.equal(row.countIsStale, true)
   assert.equal(inventoryControlExportRows(report.rows).length, report.total)
+})
+
+test('missing recipes remain visibly unavailable and never invent consumption', () => {
+  const report = buildInventoryControlReport([
+    {
+      ingredient_id: 'milk',
+      ingredient_name: 'Milk',
+      counted_qty: 25,
+      consumed_since_count: 9000,
+      theoretical_qty: -8975,
+      min_threshold: 10,
+      count_is_stale: true,
+      recipe_usage_status: 'unavailable',
+      recipe_count: 0,
+      location_count: 0,
+    },
+  ])
+
+  const [row] = report.rows
+  assert.equal(row.recipeUsageAvailable, false)
+  assert.equal(row.consumedSinceCount, null)
+  assert.equal(row.theoreticalQty, null)
+  assert.equal(row.decisionQty, 25)
+  assert.equal(row.status, 'healthy')
+  assert.equal(report.recipeUsageUnavailableCount, 1)
+  assert.equal(report.missingLocationCount, 1)
+  assert.equal(inventoryControlExportRows(report.rows)[0][3], '')
+})
+
+test('location reconciliation variance is counted without changing the physical balance', () => {
+  const report = buildInventoryControlReport([
+    {
+      ingredient_id: 'cups',
+      ingredient_name: 'Cups',
+      counted_qty: 100,
+      min_threshold: 20,
+      count_is_stale: false,
+      recipe_usage_status: 'unavailable',
+      location_count: 2,
+      location_qty: 95,
+      location_variance: -5,
+    },
+  ])
+
+  assert.equal(report.locationVarianceCount, 1)
+  assert.equal(report.rows[0].countedQty, 100)
+  assert.equal(report.rows[0].locationQty, 95)
 })

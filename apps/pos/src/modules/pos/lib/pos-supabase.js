@@ -126,6 +126,46 @@ export async function getPOSProducts(branchId, { includeHidden = false } = {}) {
   const { data, error } = await q
   if (error) throw error
 
+  let products = data || []
+  if (branchId) {
+    const { data: location } = await supabase
+      .from('inventory_locations')
+      .select('id')
+      .eq('branch_id', branchId)
+      .eq('location_type', 'branch')
+      .eq('is_active', true)
+      .order('created_at')
+      .limit(1)
+      .maybeSingle()
+    if (location?.id) {
+      const { data: locationRows } = await supabase
+        .from('location_product_stock')
+        .select('product_id, qty, updated_at')
+        .eq('location_id', location.id)
+      const locationMap = Object.fromEntries(
+        (locationRows || []).map(row => [row.product_id, row]),
+      )
+      products = products.map(product => {
+        const locationStock = locationMap[product.id]
+        return locationStock
+          ? {
+              ...product,
+              stock_qty: Number(locationStock.qty) || 0,
+              stock_location_id: location.id,
+              stock_updated_at: locationStock.updated_at,
+              stock_source: 'location_product_stock',
+            }
+          : {
+              ...product,
+              stock_qty: product.track_inventory ? 0 : product.stock_qty,
+              stock_location_id: location.id,
+              stock_updated_at: null,
+              stock_source: product.track_inventory ? 'missing_location_balance' : 'not_tracked',
+            }
+      })
+    }
+  }
+
   // Popularity sort: best-sellers (last 30 days) float to the top so the
   // cashier finds the most-tapped items first. Ties keep the existing
   // menu_sort/name order (Array.prototype.sort is stable), and unsold
@@ -134,9 +174,9 @@ export async function getPOSProducts(branchId, { includeHidden = false } = {}) {
   // before the migration is applied) so the grid always loads.
   try {
     const pop = await getProductPopularity(branchId)
-    return [...data].sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))
+    return [...products].sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))
   } catch {
-    return data
+    return products
   }
 }
 
@@ -959,15 +999,15 @@ export async function replaceProductCostComponents(productId, components) {
   return data
 }
 
-export async function receiveProductStock(productId, quantity, unit, actorProfileId = null) {
+export async function receiveProductStock(branchId, productId, quantity, unit, actorProfileId = null) {
   const sourceRef = typeof crypto !== 'undefined' && crypto.randomUUID
     ? `pos:${crypto.randomUUID()}`
     : `pos:${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-  const { data, error } = await supabase.rpc('receive_pos_product_stock', {
+  const { data, error } = await supabase.rpc('receive_branch_product_stock', {
+    p_branch_id: branchId,
     p_product_id: productId,
     p_quantity: Number(quantity),
-    p_source: 'pos',
     p_source_ref: sourceRef,
     p_actor_profile_id: actorProfileId,
     p_unit: unit,

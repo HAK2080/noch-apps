@@ -127,7 +127,9 @@ test('management report exposes a reconciled operating-profit model', () => {
       completeSource('inventory', [{
         ingredient_id: 'ingredient-1',
         ingredient_name: 'Milk',
+        counted_qty: 4,
         theoretical_qty: 2,
+        recipe_usage_status: 'available',
         min_threshold: 5,
         last_counted_at: '2026-07-29T10:00:00.000Z',
         count_is_stale: false,
@@ -152,7 +154,7 @@ test('management report exposes a reconciled operating-profit model', () => {
   assert.equal(report.branchPerformance.reconciliation.status, 'reconciled')
   assert.equal(report.metrics.lowStockCount, 1)
   assert.equal(report.stockRisk[0].theoreticalQty, 2)
-  assert.match(report.insights.map(item => item.title).join(' '), /Theoretical stock risk/)
+  assert.match(report.insights.map(item => item.title).join(' '), /Inventory stock risk/)
 })
 
 test('unavailable optional sources stay unavailable instead of becoming zero', () => {

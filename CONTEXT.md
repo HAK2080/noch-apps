@@ -52,9 +52,37 @@ _Avoid_: Treating an unpriced component as zero
 The central inventory location that holds roasted Ghadamis coffee beans before transfer to a branch.
 _Avoid_: Branch stock, green-bean storage
 
-**Theoretical stock**:
-Expected on-hand stock after receipts, transfers, sales consumption, reversals, and recorded waste.
-_Avoid_: Physical count
+**Physical count**:
+An observed quantity entered by an authorized owner or supervisor at a stated time and, when applicable, a stated storage location.
+_Avoid_: Theoretical stock, checklist status
+
+**Ingredient balance**:
+The business-wide physical balance for one ingredient, stored in `stock` and explained by `stock_logs`.
+_Avoid_: Sum of location counts unless reconciliation proves they match
+
+**Ingredient location count**:
+The latest observed quantity of one ingredient at one inventory location, stored in `inventory_location_stock` and audited in `inventory_location_stock_movements`.
+_Avoid_: Ingredient balance
+
+**Product location stock**:
+The operational product balance at one warehouse or branch, stored in `location_product_stock` and explained by `location_product_movements`.
+_Avoid_: `pos_products.stock_qty`, which is a compatibility total rather than branch evidence
+
+**Theoretical ingredient stock**:
+The ingredient balance minus completed, unrefunded sales consumption derived from explicit product recipes since the last physical count. It is unavailable when no explicit recipe link exists.
+_Avoid_: Applying an ingredient's default serving quantity to unrelated products, treating missing recipe evidence as zero
+
+**Inventory reconciliation variance**:
+The sum of ingredient location counts minus the business-wide ingredient balance. A non-zero value is an exception to investigate, not a balance to overwrite automatically.
+_Avoid_: Silently forcing either side to match
+
+**In-transit stock**:
+Quantity shipped from a source location but not yet recorded as received at the destination, derived from `inventory_transfers`.
+_Avoid_: On-hand stock at either location
+
+**Stock checklist status**:
+An operational observation such as available, low, or out, used to direct a check.
+_Avoid_: Quantity ledger or physical count
 
 ## Finance and reporting language
 
