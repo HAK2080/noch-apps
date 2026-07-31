@@ -68,6 +68,8 @@ const COPY = {
     sourceWarning: 'Reconstructed history',
     counterWarning: 'Stored counter differs',
     currency: 'LYD',
+    hour: 'h',
+    minute: 'm',
   },
   ar: {
     title: 'رقابة النقدية والورديات',
@@ -108,16 +110,20 @@ const COPY = {
     sourceWarning: 'سجل تاريخي مستنتج',
     counterWarning: 'عداد مخزن مختلف',
     currency: 'د.ل',
+    hour: 'س',
+    minute: 'د',
   },
 }
 
-function formatDuration(openedAt, closedAt) {
+function formatDuration(openedAt, closedAt, copy) {
   if (!openedAt) return '—'
   const end = closedAt ? new Date(closedAt) : new Date()
   const mins = Math.max(0, Math.round((end - new Date(openedAt)) / 60000))
   const hours = Math.floor(mins / 60)
   const minutes = mins % 60
-  return hours ? `${hours}h ${minutes}m` : `${minutes}m`
+  return hours
+    ? `${hours}${copy.hour} ${minutes}${copy.minute}`
+    : `${minutes}${copy.minute}`
 }
 
 function formatWhen(value, lang) {
@@ -229,7 +235,7 @@ export default function POSSessions() {
             <h1 className="text-white font-bold text-xl">{copy.title}</h1>
             <p className="text-noch-muted text-sm">
               {lang === 'ar' ? (branch?.name_ar || branch?.name) : branch?.name}
-              {' · '}{range.fromDate} → {range.toDate} · {shifts.length} {copy.shifts}
+              {' · '}{range.fromDate} → {range.toDate} · <span>{shifts.length}</span> {copy.shifts}
             </p>
           </div>
           <button onClick={load} className="btn-secondary text-sm px-3 py-1 flex items-center gap-1">
@@ -315,7 +321,7 @@ export default function POSSessions() {
                         </span>
                       </div>
                       <div className="text-noch-muted text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                        <span><Clock size={10} className="inline me-1" />{copy.duration}: {formatDuration(shift.opened_at, shift.closed_at)}</span>
+                        <span><Clock size={10} className="inline me-1" />{copy.duration}: {formatDuration(shift.opened_at, shift.closed_at, copy)}</span>
                         <span><Package size={10} className="inline me-1" />{shift.order_count} {copy.orders}</span>
                         {shift.refunds > 0 && <span className="text-red-300">{copy.refunds}: {money(shift.refunds)}</span>}
                         <CashVariance shift={shift} copy={copy} />

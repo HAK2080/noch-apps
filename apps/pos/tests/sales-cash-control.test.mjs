@@ -151,6 +151,7 @@ test('critical sales and cash-control journeys use the authoritative interfaces'
   assert.doesNotMatch(orders, /excludeLateNight/)
   assert.match(sessions, /getShiftControls/)
   assert.match(sessions, /normalizeShiftControl/)
+  assert.match(sessions, /<span>\{shifts\.length\}<\/span>/)
   assert.doesNotMatch(sessions, /getShiftRefundTotals/)
   assert.match(endOfDay, /getShiftControl/)
   assert.match(endOfDay, /cash_counted: !cashCloseState\.isMissing/)
