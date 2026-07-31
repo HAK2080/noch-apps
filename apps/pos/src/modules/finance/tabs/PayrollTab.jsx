@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Banknote, CheckCircle, HandCoins, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import {
   listPayrollRuns, getPayrollRunItems, updatePayrollRunItem,
   generatePayrollRun, completePayrollRun, deletePayrollRun,
@@ -25,6 +26,23 @@ function currentMonth() {
 function netOf(it) {
   return Number(it.base_lyd || 0) + Number(it.overtime_lyd || 0) + Number(it.bonus_lyd || 0)
     + Number(it.other_lyd || 0) - Number(it.deduction_lyd || 0) - Number(it.loan_repayment_lyd || 0)
+}
+
+const ISSUE_LABELS = {
+  missing_start_date: 'Missing employment start date',
+  missing_cost_allocation: 'Missing branch or cost allocation',
+  missing_pay_basis: 'Missing salary or hourly rate',
+  no_closed_attendance: 'No closed attendance evidence',
+  no_published_schedule: 'No published schedule evidence',
+  open_attendance: 'Open attendance must be closed',
+}
+
+function itemIssues(item) {
+  if (Array.isArray(item?.data_issues)) return item.data_issues
+  if (typeof item?.data_issues === 'string') {
+    try { return JSON.parse(item.data_issues) || [] } catch { return [] }
+  }
+  return []
 }
 
 function StatusBadge({ status }) {
@@ -164,6 +182,10 @@ export default function PayrollTab({ readOnly = false }) {
   const canComplete = isDraft
     && ['ready', 'warning'].includes(selected?.evidence_status)
     && Math.abs(storedVariance) <= 0.005
+  const issueCounts = items.reduce((counts, item) => {
+    for (const issue of itemIssues(item)) counts[issue] = (counts[issue] || 0) + 1
+    return counts
+  }, {})
 
   return (
     <div className="flex flex-col gap-4">
@@ -231,9 +253,19 @@ export default function PayrollTab({ readOnly = false }) {
           </div>
           {isDraft && !canComplete && (
             <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-              This draft cannot be approved until its employee evidence is ready and its stored total reconciles with its items.
+              <p className="font-semibold text-amber-100">Payroll is blocked until the employee evidence is ready.</p>
               {Math.abs(storedVariance) > 0.005 ? ` Current variance: ${lyd(storedVariance)}.` : ''}
-              {' '}Regenerate after completing employee start dates and allocations.
+              {Object.keys(issueCounts).length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 ps-4">
+                  {Object.entries(issueCounts).map(([issue, count]) => (
+                    <li key={issue}>{count} × {ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')}</li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-3 font-semibold">
+                <Link to="/staff/team" className="underline underline-offset-2">Open team directory to add dates</Link>
+                <Link to="/staff" className="underline underline-offset-2">Review attendance and schedule</Link>
+              </div>
             </div>
           )}
           {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
@@ -244,6 +276,7 @@ export default function PayrollTab({ readOnly = false }) {
                 <tr>
                   <th className="text-left py-1 pr-2">Staff</th>
                   <th className="text-left py-1 pr-2">Branch</th>
+                  <th className="text-left py-1 pr-2">Evidence</th>
                   <th className="text-right py-1 pr-2">Base</th>
                   <th className="text-right py-1 pr-2">Overtime</th>
                   <th className="text-right py-1 pr-2">Bonus</th>
@@ -259,6 +292,12 @@ export default function PayrollTab({ readOnly = false }) {
                   <tr key={it.id} className="border-t border-noch-border/40">
                     <td className="py-1.5 pr-2 text-white whitespace-nowrap">{nameOf(it.profile_id)}</td>
                     <td className="py-1.5 pr-2 text-noch-muted whitespace-nowrap">{branchOf(it.branch_id)}</td>
+                    <td className="py-1.5 pr-2 whitespace-nowrap">
+                      <span className={it.data_status === 'blocked' ? 'text-red-300' : it.data_status === 'warning' ? 'text-amber-300' : 'text-noch-green'}>
+                        {it.data_status || 'ready'}
+                      </span>
+                      {itemIssues(it).length > 0 && <span className="block max-w-52 whitespace-normal text-[10px] text-noch-muted">{itemIssues(it).map(issue => ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')).join(', ')}</span>}
+                    </td>
                     {MONEY_FIELDS.map(f => (
                       <td key={f} className="py-1.5 pr-2 text-right">
                         {editable ? (

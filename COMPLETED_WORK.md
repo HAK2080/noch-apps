@@ -1,3 +1,16 @@
+## 2026-07-31 — Payroll Readiness Guidance
+
+- **Agent**: Codex
+- **Status**: Implemented; deployment pending
+- **Files**:
+  - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
+  - `apps/pos/tests/workforce-control.test.mjs`
+- **Description**: Reproduced the disabled July payroll approval state. The draft is correctly blocked by nine employee records missing employment start dates; attendance is also unavailable, but it is not silently converted into paid hours. Payroll now shows each blocking/warning issue, counts, evidence status per employee, and direct links to the team directory and attendance/schedule controls.
+- **Verification**: Workforce control tests passed, targeted PayrollTab ESLint passed, and the POS production build passed.
+- **Deployment**: Pending commit and production release.
+
+---
+
 ## 2026-07-31 — Whole-System Reconciliation and Owner Acceptance
 
 - **Agent**: Codex

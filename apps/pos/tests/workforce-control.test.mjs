@@ -54,4 +54,7 @@ test('normal owner journey is consolidated under staff workforce control', async
   assert.doesNotMatch(finance, /ShiftsTab|PayrollTab/)
   assert.match(payroll, /getAllTeamMembers\(\)/)
   assert.match(payroll, /disabled=\{busy \|\| !canComplete\}/)
+  assert.match(payroll, /Open team directory to add dates/)
+  assert.match(payroll, /missing_start_date/)
+  assert.match(payroll, /Evidence/)
 })
