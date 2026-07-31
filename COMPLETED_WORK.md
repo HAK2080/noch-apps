@@ -483,3 +483,29 @@ To find if something's been done:
 - **Remaining business work**: Complete physical location counts, build explicit recipes, deliberately opt products into inventory tracking, reconcile business-wide ingredient balances to locations, and begin recording real procurement evidence.
 
 ---
+
+## 2026-07-31 — Staff, Attendance, Scheduling, and Payroll
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `CONTEXT.md`
+  - `README.md`
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/lib/profiles.js`
+  - `apps/pos/src/modules/finance/FinanceDashboard.jsx`
+  - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
+  - `apps/pos/src/modules/workforce/`
+  - `apps/pos/tests/workforce-control.test.mjs`
+  - `docs/audit/2026-07-31-staff-attendance-scheduling-payroll-module.md`
+  - `supabase/migrations/20260731230000_workforce_control_v2.sql`
+- **Description**: Established an explicit workforce boundary so owner login profiles are not silently treated as employees. Consolidated employee health, closed attendance evidence, weekly schedule planning/publication, payroll drafts, approval, loans, and payment evidence under `/staff`; `/staff/team` preserves the detailed directory. Finance no longer presents competing Shifts or Payroll normal journeys. Multiple closed attendance segments preserve breaks, open intervals never accrue payroll cost, corrections are audited, and schedule plans never substitute for attendance.
+- **Payroll controls**: Draft generation validates employee eligibility, start date, allocation, pay basis, closed attendance, schedule evidence, and per-loan repayments. Drafts have no Finance actuals. Approval posts gross wages, net wages payable, and loan recovery; payment is a separate cash/bank settlement. Payroll reads are restricted to owners and active accountants. The loan picker uses the employee-only source, and unreconciled legacy drafts cannot be approved.
+- **Production baseline**: 10 active employees, 12 former employees, nine active employees missing start dates, no attendance evidence, and no published schedule. The existing July draft remains preserved with stored total 24,900 LYD, item total 24,700.02 LYD, and visible 199.98 LYD variance. No historical employee, attendance, schedule, payroll, loan, or journal record was rewritten.
+- **Verification**: The migration compiled and produced the workforce summary against production in an explicit rolled-back transaction before application. All 76 Node tests passed, targeted ESLint passed, the POS production build passed, and `git diff --check` passed. Authenticated production checks passed in Arabic for the workforce overview and payroll drill-down; the legacy approval control is disabled, its evidence warning is visible, and owner/login profiles are absent from the loan picker.
+- **Commits**: `ad5b3ab` (`feat(workforce): unify staff attendance scheduling and payroll`), `bb75cdb` (`fix(workforce): restrict payroll to employees`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migration `20260731230000` is applied and recorded on Noch Production. GitHub Actions run `30618536171` deployed commit `bb75cdb` successfully to `apps.noch.cloud`.
+- **Required owner data work**: Enter the nine missing employment start dates, record real attendance, publish the schedule, then regenerate and review the July payroll draft before approval.
+
+---
