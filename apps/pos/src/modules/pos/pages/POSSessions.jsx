@@ -188,7 +188,9 @@ export default function POSSessions() {
       setLoading(false)
       return
     }
-    setLoading(true)
+    // Keep the last reconciled shift view visible while refreshing. This avoids
+    // replacing valid evidence with an indefinite loading state on a slow RPC.
+    setLoading(shifts.length === 0)
     try {
       const [branchRow, controlRows] = await Promise.all([
         getPOSBranch(branchId),

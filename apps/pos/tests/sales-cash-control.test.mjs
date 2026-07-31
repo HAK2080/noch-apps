@@ -151,6 +151,7 @@ test('critical sales and cash-control journeys use the authoritative interfaces'
   assert.doesNotMatch(orders, /excludeLateNight/)
   assert.match(sessions, /getShiftControls/)
   assert.match(sessions, /normalizeShiftControl/)
+  assert.match(sessions, /setLoading\(shifts\.length === 0\)/)
   assert.match(sessions, /loading\s+\?\s+copy\.loading/)
   assert.match(sessions, /\$\{totals\.shiftCount\} \$\{copy\.shifts\}/)
   assert.doesNotMatch(sessions, /getShiftRefundTotals/)
