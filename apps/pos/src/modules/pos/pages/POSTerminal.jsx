@@ -919,7 +919,7 @@ export default function POSTerminal() {
   }
 
   return (
-    <div className="flex flex-col h-screen h-[100dvh] bg-noch-dark overflow-hidden">
+    <div className="flex flex-col h-screen h-[100dvh] bg-noch-dark overflow-hidden skin-pos">
       <PrintHostBadge branchId={branchId} />
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-noch-card border-b border-noch-border shrink-0">
@@ -1135,9 +1135,9 @@ export default function POSTerminal() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden skin-pos-main">
         {/* Product grid — left 60% */}
-        <div className="flex-[3] p-3 overflow-hidden flex flex-col">
+        <div className="flex-[3] p-3 overflow-hidden flex flex-col skin-pos-products">
           <ProductGrid
             products={products}
             categories={categories}
@@ -1151,10 +1151,10 @@ export default function POSTerminal() {
         </div>
 
         {/* Divider */}
-        <div className="w-px bg-noch-border shrink-0" />
+        <div className="w-px bg-noch-border shrink-0 skin-pos-divider" />
 
         {/* Cart panel — right 40% */}
-        <div className="flex-[2] p-3 overflow-hidden flex flex-col min-w-[240px]">
+        <div className="flex-[2] p-3 overflow-hidden flex flex-col min-w-[240px] skin-pos-cart">
           {/* Passport customer chip (above cart) */}
           <div className="mb-2 shrink-0">
             {loyaltyCustomer ? (

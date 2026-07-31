@@ -27,6 +27,30 @@
 
 ---
 
+## 2026-07-31 — Staff Newsprint Skin Redesign
+
+- **Agent**: Codex
+- **Status**: Implemented and committed; deployment pending verification
+- **Files**:
+  - `apps/pos/index.html`
+  - `apps/pos/src/components/Layout.jsx`
+  - `apps/pos/src/components/dashboard/StatsBar.jsx`
+  - `apps/pos/src/components/shared/LanguageToggle.jsx`
+  - `apps/pos/src/index.css`
+  - `apps/pos/src/modules/pos/components/CartPanel.jsx`
+  - `apps/pos/src/modules/pos/components/ProductGrid.jsx`
+  - `apps/pos/src/modules/pos/pages/POSTerminal.jsx`
+  - `apps/pos/src/pages/Dashboard.jsx`
+  - `apps/pos/src/pages/Login.jsx`
+  - `apps/pos/tests/staff-skin-handoff.test.mjs`
+  - `docs/audit/2026-07-31-staff-skin-redesign.md`
+- **Description**: Applied the supplied Oatly/newsprint handoff as a scoped cream/ink staff skin for the owner dashboard, POS, shared shell, and login. Storefront routes and operational behavior remain unchanged. The staff theme toggle is hidden because this release selects cream-first until a deliberate dark variant is designed.
+- **Verification**: 129 repository tests passed, targeted ESLint passed, POS production build passed, and staged diff validation passed.
+- **Commit**: `57c837b` (`feat(ui): apply staff newsprint skin`)
+- **Deployment**: Pending push and production release verification.
+
+---
+
 ## 2026-07-31 — Navigation, Roles, Permissions, and Bilingual Consistency
 
 - **Agent**: Codex

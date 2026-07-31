@@ -92,19 +92,19 @@ export default function Layout({ children }) {
     .toUpperCase() || '?'
 
   const pageLabel = navLinkItems.find(item => item.to === location.pathname)?.label || (ar ? 'مساحة العمل' : 'Workspace')
+  const skinRoute = location.pathname === '/dashboard' || location.pathname.startsWith('/pos')
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div className={`flex min-h-screen bg-[var(--bg)] text-[var(--text)] ${skinRoute ? 'staff-skin' : ''}`}>
       <aside className="hidden md:flex md:w-[248px] fixed inset-y-0 start-0 flex-col border-e border-white/[0.07] bg-[#0b0b0d]">
         <div className="px-3 pt-3">
           <button
             onClick={() => navigate(landingRoute)}
             className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-start transition-colors hover:bg-white/[0.05]"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-green-300 to-emerald-600 text-[13px] font-bold text-[#06120a] shadow-[0_0_16px_rgba(74,222,128,0.18)]">n</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold tracking-[-0.01em] text-zinc-100">noch.apps</span>
-              <span className="block truncate text-[10px] text-zinc-600">{t('appTagline')}</span>
+            <span className="skin-wordmark"><span>noch</span><span>apps</span></span>
+            <span className="min-w-0 flex-1 skin-wordmark-meta">
+              <span className="block truncate text-[10px] text-zinc-600 skin-tagline">{t('appTagline')}</span>
             </span>
             <ChevronDown size={14} className="text-zinc-600" />
           </button>
@@ -140,7 +140,7 @@ export default function Layout({ children }) {
           </div>
           <div className="flex items-center justify-between gap-1 px-1">
             <LanguageToggle className="justify-start" />
-            <ThemeToggle />
+            {!skinRoute && <ThemeToggle />}
             <button onClick={handleSignOut} aria-label={t('logout')} className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /></button>
           </div>
         </div>
@@ -165,8 +165,7 @@ export default function Layout({ children }) {
 
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.07] bg-[#0b0b0d]/95 px-4 py-3 backdrop-blur md:hidden">
           <button onClick={() => navigate(landingRoute)} className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-noch-green text-xs font-bold text-[#07120a]">n</span>
-            <span className="text-sm font-semibold text-zinc-100">noch.apps</span>
+            <span className="skin-mobile-wordmark"><span>noch</span><span>apps</span></span>
           </button>
           <div className="flex items-center gap-2">
             <button onClick={() => setSearchOpen(true)} aria-label={ar ? 'بحث' : 'Search'} className="rounded-md p-1.5 text-zinc-500"><Search size={17} /></button>

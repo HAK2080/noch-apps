@@ -18,7 +18,7 @@ export default function StatsBar({ stats }) {
   const labels = LABELS[lang]
 
   return (
-    <div className="grid grid-cols-5 gap-3 mb-6">
+    <div className="grid grid-cols-5 gap-3 mb-6 skin-stats">
       {STATS.map(({ key, color }) => (
         <div key={key} className="card text-center">
           <p className={`text-2xl font-bold ${color}`}>{stats?.[key] ?? 0}</p>

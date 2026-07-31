@@ -82,7 +82,7 @@ function ProductGrid({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full staff-product-grid">
       {/* Category tabs — fatter targets, colour swatches */}
       <div className="flex gap-2 overflow-x-auto pb-2 shrink-0 scrollbar-hide">
         <button
