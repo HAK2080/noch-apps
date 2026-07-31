@@ -6,6 +6,10 @@ const migrationUrl = new URL(
   '../../../supabase/migrations/20260731203000_inventory_control_authority.sql',
   import.meta.url,
 )
+const ownerAccessMigrationUrl = new URL(
+  '../../../supabase/migrations/20260731213000_inventory_owner_access.sql',
+  import.meta.url,
+)
 const dataUrl = new URL('../src/modules/pos/lib/pos-supabase.js', import.meta.url)
 const terminalUrl = new URL('../src/modules/pos/pages/POSTerminal.jsx', import.meta.url)
 const inventoryUrl = new URL('../src/modules/pos/pages/POSInventory.jsx', import.meta.url)
@@ -81,4 +85,17 @@ test('waste is limited to tracked location stock and the hub uses authoritative 
   assert.match(hubSource, /inventory_control_status_v2/)
   assert.match(hubSource, /inventory_control_summary/)
   assert.doesNotMatch(hubSource, /ingredient_consumption/)
+})
+
+test('owner inventory authority is independent from the employee active lifecycle', async () => {
+  const sql = await readFile(ownerAccessMigrationUrl, 'utf8')
+
+  assert.match(sql, /p\.role = 'owner'/)
+  assert.match(sql, /p\.role = 'supervisor' and coalesce\(p\.is_active, true\)/)
+  assert.match(sql, /record_inventory_location_count/)
+  assert.match(sql, /receive_branch_product_stock/)
+  assert.match(sql, /adjust_pos_product_stock/)
+  assert.match(sql, /receive_warehouse_stock/)
+  assert.match(sql, /receive_transfer/)
+  assert.match(sql, /report_waste/)
 })
