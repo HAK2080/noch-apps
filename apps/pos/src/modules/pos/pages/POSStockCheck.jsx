@@ -15,7 +15,6 @@ import {
   getStockCheckReminder, upsertStockCheckReminder,
   getPOSBranch, getPOSProducts,
 } from '../lib/pos-supabase'
-import { supabase } from '../../../lib/supabase'
 import { getStaffProfiles } from '../../../lib/profiles'
 import { createTask } from '../../../lib/tasks'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -461,9 +460,10 @@ export default function POSStockCheck() {
 
       if (isOwner) {
         try {
-          const { data } = await supabase.from('profiles').select('id, full_name, role').eq('is_active', true).order('full_name')
-          setStaffList(data || [])
-        } catch {}
+          setStaffList(await getStaffProfiles())
+        } catch {
+          // Owner-only assignee suggestions are optional.
+        }
       }
 
       // Pre-populate draft from latest entries
@@ -483,7 +483,7 @@ export default function POSStockCheck() {
     } finally {
       setLoading(false)
     }
-  }, [branchId, isOwner, user])
+  }, [branchId, isOwner, user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadAll() }, [loadAll])
 

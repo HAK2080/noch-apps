@@ -8,11 +8,9 @@ async function assertPageLoaded(page, routeLabel) {
 }
 
 test.describe('Staff — route audit (Mohamed)', () => {
-  test('lands on my-tasks after login', async ({ page }) => {
+  test('lands on the first granted daily workflow after login', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(2000);
-    const url = page.url();
-    expect(url).toMatch(/my-tasks|dashboard/);
+    await expect(page).toHaveURL(/\/pos$/, { timeout: 10000 });
   });
 
   test('my-tasks page loads', async ({ page }) => {
@@ -41,16 +39,14 @@ test.describe('Staff — route audit (Mohamed)', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('loyalty loads for staff', async ({ page }) => {
+  test('loyalty admin is explicitly denied to staff', async ({ page }) => {
     await page.goto('/loyalty');
-    await assertPageLoaded(page, '/loyalty');
-    await page.waitForTimeout(2000);
+    await expect(page.getByRole('heading', { name: 'This page is not available for your role' })).toBeVisible();
   });
 
-  test('loyalty customers loads for staff', async ({ page }) => {
+  test('loyalty customer records are explicitly denied to staff', async ({ page }) => {
     await page.goto('/loyalty/customers');
-    await assertPageLoaded(page, '/loyalty/customers');
-    await page.waitForTimeout(2000);
+    await expect(page.getByRole('heading', { name: 'This page is not available for your role' })).toBeVisible();
   });
 
   test('ideas board loads for staff', async ({ page }) => {
@@ -65,10 +61,9 @@ test.describe('Staff — route audit (Mohamed)', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('my-card loads for staff', async ({ page }) => {
+  test('removed staff loyalty card route returns to the granted landing page', async ({ page }) => {
     await page.goto('/my-card');
-    await assertPageLoaded(page, '/my-card');
-    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL(/\/pos$/, { timeout: 10000 });
   });
 
   test('pos home loads for staff', async ({ page }) => {
@@ -77,16 +72,13 @@ test.describe('Staff — route audit (Mohamed)', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('owner-only routes redirect staff', async ({ page }) => {
-    // Staff should be redirected away from /dashboard
+  test('ungranted dashboard is explicitly denied to staff', async ({ page }) => {
     await page.goto('/dashboard');
-    await page.waitForTimeout(2000);
-    // Should redirect to /my-tasks
-    expect(page.url()).not.toContain('/login');
+    await expect(page.getByRole('heading', { name: 'This page is not available for your role' })).toBeVisible();
   });
 
-  test('finance permission check resolves instead of leaving a blank page', async ({ page }) => {
+  test('finance permission check fails closed with an explanation', async ({ page }) => {
     await page.goto('/finance');
-    await expect(page).toHaveURL(/\/my-tasks$/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'This page is not available for your role' })).toBeVisible();
   });
 });

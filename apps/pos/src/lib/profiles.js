@@ -5,23 +5,29 @@ import { supabase } from './supabase'
 // ============================================================
 
 export async function getProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('full_name')
+  const { data, error } = await supabase.rpc('profile_directory_v2', {
+    p_active_only: false,
+  })
   if (error) throw error
   return data
 }
 
 export async function getProfile(id) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .or(`id.eq.${id},auth_user_id.eq.${id}`)
-    .limit(1)
-    .single()
+  void id
+  const { data, error } = await supabase.rpc('my_profile_v2')
   if (error) throw error
-  return data
+  if (!data?.[0]) throw new Error('Profile not found')
+  return data[0]
+}
+
+export async function getProfileDirectory({ activeOnly = true, pinOnly = false, branchId = null } = {}) {
+  const { data, error } = await supabase.rpc('profile_directory_v2', {
+    p_active_only: activeOnly,
+    p_pin_only: pinOnly,
+    p_branch_id: branchId,
+  })
+  if (error) throw error
+  return data || []
 }
 
 export async function getStaffProfiles() {

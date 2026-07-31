@@ -4,7 +4,41 @@ import { supabase } from './supabase'
 // TASKS
 // ============================================================
 
-const TASK_SELECT = '*, assignee:profiles!assigned_to(*), assignees:task_assignments(*, assignee:profiles!task_assignments_assignee_id_fkey(*))'
+const TASK_SELECT = '*, assignees:task_assignments(*)'
+
+async function getTaskDirectory() {
+  const [{ data: directory, error }, ownerDirectory] = await Promise.all([
+    supabase.rpc('profile_directory_v2', { p_active_only: false }),
+    supabase.rpc('workforce_team_v2'),
+  ])
+  if (error) throw error
+
+  const ownerContacts = new Map(
+    (ownerDirectory.error ? [] : ownerDirectory.data || [])
+      .map(profile => [profile.id, profile.telegram_chat_id || null])
+  )
+
+  return new Map((directory || []).map(profile => [
+    profile.id,
+    {
+      ...profile,
+      telegram_chat_id: ownerContacts.get(profile.id) || null,
+    },
+  ]))
+}
+
+async function hydrateTasks(rows) {
+  if (!rows?.length) return []
+  const directory = await getTaskDirectory()
+  return rows.map(task => ({
+    ...task,
+    assignee: directory.get(task.assigned_to) || null,
+    assignees: (task.assignees || []).map(assignment => ({
+      ...assignment,
+      assignee: directory.get(assignment.assignee_id) || null,
+    })),
+  }))
+}
 
 export async function getTasks(filters = {}) {
   let query = supabase
@@ -19,14 +53,14 @@ export async function getTasks(filters = {}) {
 
   const { data, error } = await query
   if (error) throw error
-  return data
+  return hydrateTasks(data)
 }
 
 export async function getMyTasks(userId) {
   const { data, error } = await supabase
     .rpc('get_user_tasks', { user_id: userId })
   if (error) throw error
-  return data
+  return (await hydrateTasks([data]))[0]
 }
 
 export async function getTask(id) {
@@ -36,7 +70,7 @@ export async function getTask(id) {
     .eq('id', id)
     .single()
   if (error) throw error
-  return data
+  return (await hydrateTasks([data]))[0]
 }
 
 export async function createTask(task) {
@@ -46,7 +80,7 @@ export async function createTask(task) {
     .select(TASK_SELECT)
     .single()
   if (error) throw error
-  return data
+  return (await hydrateTasks([data]))[0]
 }
 
 export async function updateTask(id, updates) {
@@ -59,7 +93,7 @@ export async function updateTask(id, updates) {
     .select(TASK_SELECT)
     .single()
   if (error) throw error
-  return data
+  return (await hydrateTasks([data]))[0]
 }
 
 export async function deleteTask(id) {
@@ -78,7 +112,7 @@ export async function requestTaskCompletion(taskId) {
     .select(TASK_SELECT)
     .single()
   if (error) throw error
-  return data
+  return (await hydrateTasks([data]))[0]
 }
 
 export async function approveTaskCompletion(taskId) {
@@ -89,7 +123,7 @@ export async function approveTaskCompletion(taskId) {
     .select(TASK_SELECT)
     .single()
   if (error) throw error
-  return data
+  return (await hydrateTasks([data]))[0]
 }
 
 export async function rejectTaskCompletion(taskId, note) {
@@ -110,7 +144,7 @@ export async function getPendingApprovals() {
     .not('pending_status', 'is', null)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data || []
+  return hydrateTasks(data || [])
 }
 
 // Local date string (YYYY-MM-DD) — NOT UTC: toISOString() shifts dates back a
@@ -229,21 +263,26 @@ export async function deleteAttachment(id, filePath) {
 export async function getComments(taskId) {
   const { data, error } = await supabase
     .from('task_comments')
-    .select('*, author:profiles!task_comments_author_id_fkey(*)')
+    .select('*')
     .eq('task_id', taskId)
     .order('created_at')
   if (error) throw error
-  return data
+  const directory = await getTaskDirectory()
+  return (data || []).map(comment => ({
+    ...comment,
+    author: directory.get(comment.author_id) || null,
+  }))
 }
 
 export async function createComment(taskId, authorId, body) {
   const { data, error } = await supabase
     .from('task_comments')
     .insert({ task_id: taskId, author_id: authorId, body })
-    .select('*, author:profiles!task_comments_author_id_fkey(*)')
+    .select('*')
     .single()
   if (error) throw error
-  return data
+  const directory = await getTaskDirectory()
+  return { ...data, author: directory.get(data.author_id) || null }
 }
 
 // ============================================================
@@ -375,21 +414,26 @@ export function isOverdue(task) {
 export async function getTaskAssignees(taskId) {
   const { data, error } = await supabase
     .from('task_assignments')
-    .select('*, assignee:profiles!assignee_id(*)')
+    .select('*')
     .eq('task_id', taskId)
     .order('assigned_at', { ascending: false })
   if (error) throw error
-  return data
+  const directory = await getTaskDirectory()
+  return (data || []).map(assignment => ({
+    ...assignment,
+    assignee: directory.get(assignment.assignee_id) || null,
+  }))
 }
 
 export async function assignStaffToTask(taskId, staffId, assignedBy) {
   const { data, error } = await supabase
     .from('task_assignments')
     .insert({ task_id: taskId, assignee_id: staffId, assigned_by: assignedBy })
-    .select('*, assignee:profiles!assignee_id(*)')
+    .select('*')
     .single()
   if (error) throw error
-  return data
+  const directory = await getTaskDirectory()
+  return { ...data, assignee: directory.get(data.assignee_id) || null }
 }
 
 export async function removeAssignmentFromTask(taskId, staffId) {

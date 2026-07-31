@@ -390,10 +390,9 @@ export async function listPOSAuditEvents(branchId, { limit = 10 } = {}) {
     }))
   }
 
-  const { data: profiles, error } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .in('id', profileIds)
+  const { data: directory, error } = await supabase.rpc('profile_directory_v2', {
+    p_active_only: false,
+  })
   if (error) {
     return rows.map(row => ({
       ...row,
@@ -403,7 +402,8 @@ export async function listPOSAuditEvents(branchId, { limit = 10 } = {}) {
     }))
   }
 
-  const names = new Map((profiles || []).map(profile => [profile.id, profile.full_name]))
+  const profiles = (directory || []).filter(profile => profileIds.includes(profile.id))
+  const names = new Map(profiles.map(profile => [profile.id, profile.full_name]))
   return rows.map(row => ({
     ...row,
     actor_name: names.get(row.actor_user_id) || null,

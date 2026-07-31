@@ -11,6 +11,10 @@ root `.env`.
 
 ## Current release highlights
 
+- **Owner reporting:** `/report` and Finance use one Tripoli-business-day
+  reporting model for net sales, payment reconciliation, direct profit, shared
+  costs, and fully loaded operating profit. Missing or stale evidence stays
+  visible instead of becoming zero.
 - **Loyalty V2:** privacy-first transaction QR capture with retained masked
   cashier lookup fallback, an explicit linked/skipped decision for every
   online order, verified channel consent, owner-only masked customer
@@ -39,6 +43,26 @@ root `.env`.
   publication records with objective, product, campaign, spend, and fixed
   24-hour/7-day snapshots. Associated orders and revenue are never presented as
   causal lift without a recorded experiment and control.
+- **Access and acceptance:** navigation and direct URLs use the same role
+  policy, denied access fails closed with an English/Arabic explanation, and
+  mobile users can reach every granted page. Full profile rows are owner-or-self;
+  POS and staff pickers use a safe directory that excludes contact, PIN, payroll,
+  and access-control fields.
+
+## Current operating-readiness exceptions
+
+The software reports these as owner actions; they are not silently filled with
+estimates:
+
+- Complete 79 ingredient location counts, resolve 5 negative product-location
+  balances, and link explicit recipes for sold products.
+- Enter 9 missing employee start dates, then record attendance and publish a
+  schedule before regenerating the unreconciled July payroll draft.
+- Start post-launch loyalty capture and member self-linking; the 30% day-30 and
+  50% day-90 targets do not yet have an eligible post-launch order cohort.
+- Record Content Studio publications and 24-hour/7-day evidence snapshots.
+- Connect card/Presto settlement or bank-statement evidence; POS tenders
+  reconcile, but processor settlement is still unavailable.
 
 
 ```
