@@ -57,7 +57,7 @@ test('owner mission management covers launch mission types and campaign controls
     readFile(missionsUrl, 'utf8'),
   ])
 
-  assert.match(appSource, /path="\/loyalty\/missions"[\s\S]*<OwnerRoute><LoyaltyMissionsV2/)
+  assert.match(appSource, /path="\/loyalty\/missions"[\s\S]*<AccessRoute policy=\{OWNER_POLICY\}><LoyaltyMissionsV2/)
   assert.match(missionSource, /repeat_visit/)
   assert.match(missionSource, /selected_product/)
   assert.match(missionSource, /selected_category/)

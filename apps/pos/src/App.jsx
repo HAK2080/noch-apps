@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, usePa
 import { useAuth } from './contexts/AuthContext'
 import { useLanguage } from './contexts/LanguageContext'
 import { usePermissions } from './contexts/PermissionsContext'
+import { AUTH_POLICY, OWNER_POLICY, featurePolicy } from './lib/access-control'
 
 // Eagerly-loaded: critical-path screens that the operator hits within
 // 1 second of opening the app every day. Login + Dashboard + POS +
@@ -96,10 +97,11 @@ const ExperimentDetail      = lazy(() => import('./pages/ExperimentDetail'))
 const Messages              = lazy(() => import('./pages/Messages'))
 
 function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
-  const { t } = useLanguage()
+  const { user, profile, loading, signOut } = useAuth()
+  const { t, lang } = useLanguage()
+  const { accountEnabled, loading: permissionsLoading } = usePermissions()
   const location = useLocation()
-  if (loading) return (
+  if (loading || (user && permissionsLoading)) return (
     <div className="min-h-screen bg-noch-dark flex items-center justify-center">
       <p className="text-noch-muted">{t('loading')}</p>
     </div>
@@ -109,6 +111,21 @@ function ProtectedRoute({ children }) {
     const next = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={`/login?next=${next}`} replace />
   }
+  if (!profile || !accountEnabled) return (
+    <div className="min-h-screen bg-noch-dark flex items-center justify-center p-6">
+      <div className="card max-w-md text-center">
+        <h1 className="text-white text-lg font-semibold">
+          {lang === 'ar' ? 'الوصول إلى الحساب غير مفعّل' : 'Account access is not enabled'}
+        </h1>
+        <p className="mt-2 text-sm text-noch-muted">
+          {lang === 'ar'
+            ? 'بياناتك محفوظة. اطلب من المالك تفعيل دخولك إلى مساحة العمل.'
+            : 'Your records are preserved. Ask the owner to enable your workspace access.'}
+        </p>
+        <button className="btn-secondary mt-5" onClick={signOut}>{t('logout')}</button>
+      </div>
+    </div>
+  )
   return children
 }
 
@@ -139,34 +156,40 @@ function LegacyContentBusinessRedirect() {
   return null
 }
 
-function OwnerRoute({ children }) {
-  const { isOwner, loading } = useAuth()
-  if (loading) return null
-  if (!isOwner) return <Navigate to="/my-tasks" replace />
-  return children
-}
-
-// PermissionRoute — gate by role_permissions feature key (Manage Roles).
-// Owner always passes (PermissionsContext short-circuits).
-function PermissionRoute({ feature, children }) {
-  const { hasAccess, loading, isOwner } = usePermissions()
+function AccessRoute({ policy = AUTH_POLICY, children }) {
+  const { canAccess, loading, error, landingRoute } = usePermissions()
+  const { lang } = useLanguage()
   if (loading) return (
     <div className="min-h-screen bg-noch-dark flex items-center justify-center">
-      <p className="text-noch-muted">Loading permissions…</p>
+      <p className="text-noch-muted">{lang === 'ar' ? 'جارٍ التحقق من الصلاحيات…' : 'Checking access…'}</p>
     </div>
   )
-  if (isOwner || hasAccess(feature)) return children
-  return <Navigate to="/my-tasks" replace />
+  if (!error && canAccess(policy)) return children
+  return (
+    <div className="min-h-screen bg-noch-dark flex items-center justify-center p-6">
+      <div className="card max-w-md text-center">
+        <h1 className="text-white text-lg font-semibold">
+          {lang === 'ar' ? 'لا تتوفر صلاحية لهذه الصفحة' : 'This page is not available for your role'}
+        </h1>
+        <p className="mt-2 text-sm text-noch-muted">
+          {error
+            ? (lang === 'ar' ? 'تعذر التحقق من الصلاحيات. لم يتم افتراض أي صلاحية.' : 'Permissions could not be verified. Access was not assumed.')
+            : (lang === 'ar' ? 'يمكن للمالك تعديل الصلاحية من إدارة الأدوار.' : 'The owner can change this grant in Role Manager.')}
+        </p>
+        <a href={landingRoute} className="btn-secondary mt-5 inline-flex">
+          {lang === 'ar' ? 'العودة لمساحة العمل' : 'Return to workspace'}
+        </a>
+      </div>
+    </div>
+  )
 }
 
 function RootRedirect() {
-  const { profile, loading, user } = useAuth()
-  if (loading) return null
+  const { loading, user } = useAuth()
+  const { landingRoute, loading: permissionsLoading } = usePermissions()
+  if (loading || permissionsLoading) return null
   if (!user) return <Navigate to="/login" replace />
-  if (!profile) return null
-  if (profile.role === 'owner') return <Navigate to="/dashboard" replace />
-  if (profile.role === 'data_entry') return <Navigate to="/expenses" replace />
-  return <Navigate to="/pos" replace />
+  return <Navigate to={landingRoute} replace />
 }
 
 export default function App() {
@@ -185,64 +208,64 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
 
         <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('dashboard')}><Dashboard /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/tasks" element={
-          <ProtectedRoute><OwnerRoute><Tasks /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><Tasks /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/tasks/:id" element={
-          <ProtectedRoute><TaskDetail /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute><TaskDetail /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/staff" element={
-          <ProtectedRoute><OwnerRoute><WorkforceHub /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><WorkforceHub /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/staff/team" element={
-          <ProtectedRoute><OwnerRoute><Staff /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><Staff /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/staff/my-profile" element={
-          <ProtectedRoute><MyProfile /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute><MyProfile /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/staff/roles" element={
-          <ProtectedRoute><OwnerRoute><RoleManager /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><RoleManager /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/report" element={
-          <ProtectedRoute><PermissionRoute feature="reports"><Report /></PermissionRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('reports')}><Report /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/my-tasks" element={
-          <ProtectedRoute><MyTasks /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute><MyTasks /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/recipes/:id" element={
-          <ProtectedRoute><RecipeDetail /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('recipes')}><RecipeDetail /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/recipes" element={
-          <ProtectedRoute><Recipes /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('recipes')}><Recipes /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/cost-calculator/*" element={
-          <ProtectedRoute><OwnerRoute><CostCalculator /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><CostCalculator /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/expenses/*" element={
-          <ProtectedRoute><PermissionRoute feature="expenses"><ExpensesPage /></PermissionRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('expenses')}><ExpensesPage /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/snap" element={
-          <ProtectedRoute><PermissionRoute feature="expenses"><SnapReceipt /></PermissionRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('expenses')}><SnapReceipt /></AccessRoute></ProtectedRoute>
         } />
 
         {/* Content Studio 2.0 (Noch 4.0) */}
         <Route path="/content-studio/*" element={
-          <ProtectedRoute><OwnerRoute><ContentStudio2 /></OwnerRoute></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><ContentStudio2 /></AccessRoute></ProtectedRoute>
         } />
 
         
@@ -264,34 +287,34 @@ export default function App() {
 
         {/* Product Catalog — staff get read-only via in-page gating */}
         <Route path="/products" element={
-          <ProtectedRoute><ProductCatalog /></ProtectedRoute>
+          <ProtectedRoute><AccessRoute policy={featurePolicy('products')}><ProductCatalog /></AccessRoute></ProtectedRoute>
         } />
 
         {/* Inventory (staff + owner) */}
-        <Route path="/inventory" element={<ProtectedRoute><InventoryHub /></ProtectedRoute>} />
-        <Route path="/inventory/stock-check" element={<ProtectedRoute><StockCheckAll /></ProtectedRoute>} />
-        <Route path="/inventory/stock" element={<ProtectedRoute><StockManager /></ProtectedRoute>} />
-        <Route path="/inventory/procurement" element={<ProtectedRoute><OwnerRoute><ProcurementOrders /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/inventory/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
-        <Route path="/inventory/warehouse" element={<ProtectedRoute><WarehouseStock /></ProtectedRoute>} />
-        <Route path="/inventory/branch-stock" element={<ProtectedRoute><BranchStock /></ProtectedRoute>} />
-        <Route path="/inventory/requests" element={<ProtectedRoute><TransferRequests /></ProtectedRoute>} />
-        <Route path="/inventory/transfers" element={<ProtectedRoute><Transfers /></ProtectedRoute>} />
-        <Route path="/inventory/in-transit" element={<ProtectedRoute><InTransit /></ProtectedRoute>} />
-        <Route path="/inventory/movements" element={<ProtectedRoute><MovementHistory /></ProtectedRoute>} />
-        <Route path="/inventory/intelligence" element={<ProtectedRoute><OwnerRoute><InventoryIntelligence /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><InventoryHub /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/stock-check" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><StockCheckAll /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/stock" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><StockManager /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/procurement" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><ProcurementOrders /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/suppliers" element={<ProtectedRoute><AccessRoute policy={featurePolicy('suppliers')}><Suppliers /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/warehouse" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><WarehouseStock /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/branch-stock" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><BranchStock /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/requests" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><TransferRequests /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/transfers" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><Transfers /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/in-transit" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><InTransit /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/movements" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><MovementHistory /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/intelligence" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><InventoryIntelligence /></AccessRoute></ProtectedRoute>} />
 
         {/* Analytics: finance is canonical, analytics-legacy kept as a safe alias */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
-        <Route path="/finance" element={<ProtectedRoute><PermissionRoute feature="finance"><FinanceDashboard /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/marketing" element={<ProtectedRoute><PermissionRoute feature="marketing"><MarketingDashboard /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/finance" element={<ProtectedRoute><AccessRoute policy={featurePolicy('finance')}><FinanceDashboard /></AccessRoute></ProtectedRoute>} />
+        <Route path="/marketing" element={<ProtectedRoute><AccessRoute policy={featurePolicy('marketing')}><MarketingDashboard /></AccessRoute></ProtectedRoute>} />
         <Route path="/analytics-legacy" element={<LegacyRedirect to="/finance" />} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
-        <Route path="/loyalty" element={<ProtectedRoute><OwnerRoute><LoyaltyDashboard /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/loyalty/archive-v1" element={<ProtectedRoute><OwnerRoute><LoyaltyV1Archive /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/loyalty/missions" element={<ProtectedRoute><OwnerRoute><LoyaltyMissionsV2 /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/loyalty/customers" element={<ProtectedRoute><OwnerRoute><LoyaltyCustomersV2 /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/loyalty" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><LoyaltyDashboard /></AccessRoute></ProtectedRoute>} />
+        <Route path="/loyalty/archive-v1" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><LoyaltyV1Archive /></AccessRoute></ProtectedRoute>} />
+        <Route path="/loyalty/missions" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><LoyaltyMissionsV2 /></AccessRoute></ProtectedRoute>} />
+        <Route path="/loyalty/customers" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><LoyaltyCustomersV2 /></AccessRoute></ProtectedRoute>} />
         <Route path="/loyalty/rewards" element={<Navigate to="/loyalty/archive-v1" replace />} />
         <Route path="/loyalty/qr" element={<Navigate to="/loyalty" replace />} />
         <Route path="/loyalty/settings" element={<Navigate to="/loyalty" replace />} />
@@ -300,48 +323,48 @@ export default function App() {
         <Route path="/loyalty/gestures" element={<Navigate to="/loyalty" replace />} />
         <Route path="/loyalty/spin" element={<Navigate to="/loyalty" replace />} />
         <Route path="/loyalty/feedback" element={<Navigate to="/loyalty" replace />} />
-        <Route path="/loyalty/intelligence" element={<ProtectedRoute><OwnerRoute><LoyaltyIntelligence /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/loyalty/intelligence" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><LoyaltyIntelligence /></AccessRoute></ProtectedRoute>} />
 
         {/* Experience OS — Experiments + Messages */}
-        <Route path="/experiments" element={<ProtectedRoute><OwnerRoute><Experiments /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/experiments/:id" element={<ProtectedRoute><OwnerRoute><ExperimentDetail /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/messages" element={<ProtectedRoute><OwnerRoute><Messages /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/experiments" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><Experiments /></AccessRoute></ProtectedRoute>} />
+        <Route path="/experiments/:id" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><ExperimentDetail /></AccessRoute></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><Messages /></AccessRoute></ProtectedRoute>} />
 
         {/* Ideas Module */}
-        <Route path="/ideas" element={<ProtectedRoute><IdeasBoard /></ProtectedRoute>} />
-        <Route path="/ideas/categories" element={<ProtectedRoute><OwnerRoute><IdeasCategories /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/ideas" element={<ProtectedRoute><AccessRoute policy={featurePolicy('ideas')}><IdeasBoard /></AccessRoute></ProtectedRoute>} />
+        <Route path="/ideas/categories" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><IdeasCategories /></AccessRoute></ProtectedRoute>} />
 
         {/* Vestaboard */}
-        <Route path="/vestaboard" element={<ProtectedRoute><Vestaboard /></ProtectedRoute>} />
-        <Route path="/vestaboard/channels" element={<ProtectedRoute><OwnerRoute><VestaboardChannels /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/vestaboard" element={<ProtectedRoute><AccessRoute policy={featurePolicy('vestaboard')}><Vestaboard /></AccessRoute></ProtectedRoute>} />
+        <Route path="/vestaboard/channels" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><VestaboardChannels /></AccessRoute></ProtectedRoute>} />
 
         {/* Accounting — chart of accounts + double-entry GL (accountant/owner) */}
-        <Route path="/accounting"       element={<ProtectedRoute><PermissionRoute feature="accounting"><AccountingDashboard /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/accounting" element={<ProtectedRoute><AccessRoute policy={featurePolicy('accounting')}><AccountingDashboard /></AccessRoute></ProtectedRoute>} />
 
         {/* Ops Checklist — module ships disabled; UI handles the off case */}
-        <Route path="/ops"          element={<ProtectedRoute><PermissionRoute feature="ops"><OpsChecklist /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/ops/dashboard" element={<ProtectedRoute><PermissionRoute feature="ops"><OpsDashboard /></PermissionRoute></ProtectedRoute>} />
-        <Route path="/ops/settings"  element={<ProtectedRoute><PermissionRoute feature="ops"><OpsSettings /></PermissionRoute></ProtectedRoute>} />
+        <Route path="/ops" element={<ProtectedRoute><AccessRoute policy={featurePolicy('ops')}><OpsChecklist /></AccessRoute></ProtectedRoute>} />
+        <Route path="/ops/dashboard" element={<ProtectedRoute><AccessRoute policy={featurePolicy('ops', 'edit')}><OpsDashboard /></AccessRoute></ProtectedRoute>} />
+        <Route path="/ops/settings" element={<ProtectedRoute><AccessRoute policy={featurePolicy('ops', 'edit')}><OpsSettings /></AccessRoute></ProtectedRoute>} />
 
         {/* Customer-facing loyalty card */}
         {/* /my-card and /loyalty/register removed — customers use noch.cloud/#loyalty */}
 
         {/* POS System */}
-        <Route path="/kiosk" element={<ProtectedRoute><KioskEntry /></ProtectedRoute>} />
-        <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
-        <Route path="/pos" element={<ProtectedRoute><POSHome /></ProtectedRoute>} />
-        <Route path="/pos/:branchId" element={<ProtectedRoute><POSTerminal /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/end-of-day" element={<ProtectedRoute><POSEndOfDay /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/inventory" element={<ProtectedRoute><POSInventory /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/waste" element={<ProtectedRoute><POSWaste /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/settings" element={<ProtectedRoute><POSSettings /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/products" element={<ProtectedRoute><POSProducts /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/stock-check" element={<ProtectedRoute><POSStockCheck /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/orders" element={<ProtectedRoute><POSOrders /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/sessions" element={<ProtectedRoute><POSSessions /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/reports" element={<ProtectedRoute><Navigate to="/sales" replace /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/modifiers" element={<ProtectedRoute><POSModifiers /></ProtectedRoute>} />
-        <Route path="/pos/:branchId/tables" element={<ProtectedRoute><OwnerRoute><TableQRGenerator /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/kiosk" element={<ProtectedRoute><AccessRoute policy={featurePolicy('pos')}><KioskEntry /></AccessRoute></ProtectedRoute>} />
+        <Route path="/sales" element={<ProtectedRoute><AccessRoute policy={featurePolicy('sales')}><Sales /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos" element={<ProtectedRoute><AccessRoute policy={featurePolicy('pos')}><POSHome /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId" element={<ProtectedRoute><AccessRoute policy={featurePolicy('pos')}><POSTerminal /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/end-of-day" element={<ProtectedRoute><AccessRoute policy={featurePolicy('pos_eod')}><POSEndOfDay /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/inventory" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><POSInventory /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/waste" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory', 'edit')}><POSWaste /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/settings" element={<ProtectedRoute><AccessRoute policy={featurePolicy('pos', 'edit')}><POSSettings /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/products" element={<ProtectedRoute><AccessRoute policy={featurePolicy('products', 'edit')}><POSProducts /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/stock-check" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><POSStockCheck /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/orders" element={<ProtectedRoute><AccessRoute policy={featurePolicy('pos')}><POSOrders /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/sessions" element={<ProtectedRoute><AccessRoute policy={featurePolicy('sales')}><POSSessions /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/reports" element={<ProtectedRoute><AccessRoute policy={featurePolicy('sales')}><Navigate to="/sales" replace /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/modifiers" element={<ProtectedRoute><AccessRoute policy={featurePolicy('products', 'edit')}><POSModifiers /></AccessRoute></ProtectedRoute>} />
+        <Route path="/pos/:branchId/tables" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><TableQRGenerator /></AccessRoute></ProtectedRoute>} />
 
         {/* Storefront (Public — No Auth Required) */}
         <Route path="/menu/:branchId" element={<Menu />} />

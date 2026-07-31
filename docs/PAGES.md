@@ -203,12 +203,11 @@ Defined in `src/App.jsx`:
 
 | Component | Behaviour |
 |---|---|
-| `ProtectedRoute` | Redirects to `/login` if not signed in |
-| `OwnerRoute` | Redirects to `/my-tasks` if `profile.role !== 'owner'` |
-| `PermissionRoute feature="…"` | Gates on the `role_permissions` table for that feature (for example `finance`, `marketing`, `accounting`, `ops`, `expenses`, and `reports`) |
-| `RootRedirect` | At `/` — redirects owners to `/dashboard`, `data_entry` staff to `/expenses`, and everyone else to `/pos` |
+| `ProtectedRoute` | Requires authentication, a resolved profile, and enabled account access; disabled accounts receive an explicit bilingual explanation |
+| `AccessRoute policy={…}` | Uses the shared authenticated, owner-only, feature-access, or feature-edit policy used by navigation; failures are explicit and fail closed |
+| `RootRedirect` | Selects the first actually granted daily workflow: owner dashboard, POS, dashboard, expenses, inventory, tasks, then profile |
 
-Note: the **canonical permission system** is `usePermission` + `PermissionsContext`, backed by the `role_permissions` table. `OwnerRoute` is a coarse gate; finer-grained checks happen inside the page (e.g. `can('pos', 'end_of_day')` in `POSEndOfDay`).
+The canonical permission system is `access-control.js` + `PermissionsContext`, backed by `profiles.access_enabled` and `role_permissions`. `features.js` navigation and `App.jsx` routes consume the same policy objects. Legacy inline action checks still adapt through `usePermission`; database RLS and audited RPCs remain final write authority.
 
 ---
 

@@ -1,125 +1,93 @@
-// features.js — single source of truth for RBAC features + sidebar navigation.
-//
-// FEATURE_GROUPS drives the Role Manager matrix (/staff/roles).
-// NAV_ITEMS drives the Layout sidebar. Adding a future module = add its
-// feature key to FEATURE_GROUPS and (if it has a page) one NAV_ITEMS entry.
-//
-// NAV_ITEMS semantics (consumed by Layout.jsx):
-//   feature        role_permissions key that unlocks the link for non-owners
-//   fallbackRoles  roles that ALWAYS see the link (transcribed from the old
-//                  hardcoded staffNav/dataEntryNav arrays — zero-regression)
-//   ownerOnly      never shown to non-owners (route is OwnerRoute regardless)
-//   hideForOwner   not shown to owner (e.g. /my-tasks; owner uses /tasks)
-//   labelKey       i18n key for t(); otherwise labelEn/labelAr
+// Authoritative feature catalogue and navigation. Navigation and routes both
+// consume the same access-policy objects; there are no role-name fallbacks.
 import {
   LayoutDashboard, CheckSquare, Users, BarChart2, Coffee, Calculator,
   Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor,
-  ShoppingBag, Receipt, Settings, ListOrdered, FlaskConical, MessageSquare,
-  ClipboardList, BookOpen,
+  ShoppingBag, Receipt, Settings, ListOrdered, ClipboardList, BookOpen,
+  MoreHorizontal,
 } from 'lucide-react'
+import { AUTH_POLICY, OWNER_POLICY, featurePolicy } from './access-control'
 
-// ── Role Manager matrix ───────────────────────────────────────────────
 export const FEATURE_GROUPS = [
   {
-    label: 'Operations',
+    labelEn: 'Daily operations',
+    labelAr: 'العمليات اليومية',
     features: [
-      { key: 'dashboard', label: 'Dashboard' },
-      { key: 'tasks', label: 'Tasks' },
-      { key: 'inventory', label: 'Inventory' },
-      { key: 'suppliers', label: 'Suppliers' },
-      { key: 'recipes', label: 'Recipes' },
-      { key: 'products', label: 'Products Catalog' },
-      { key: 'pos', label: 'POS Terminal' },
-      { key: 'pos_eod', label: 'POS End of Day' },
-      { key: 'pos_void', label: 'POS Cancel Orders' },
-      { key: 'pos_discounts', label: 'POS Discounts' },
-      { key: 'sales', label: 'Sales Sessions' },
-      { key: 'loyalty', label: 'Loyalty Admin' },
-      { key: 'loyalty_stamp', label: 'Loyalty Stamp' },
+      { key: 'dashboard', labelEn: 'Business dashboard', labelAr: 'لوحة الأعمال' },
+      { key: 'expenses', labelEn: 'Submit and view expenses', labelAr: 'تسجيل وعرض المصروفات' },
+      { key: 'expenses_approve', labelEn: 'Approve expenses', labelAr: 'اعتماد المصروفات' },
+      { key: 'inventory', labelEn: 'Inventory', labelAr: 'المخزون' },
+      { key: 'suppliers', labelEn: 'Suppliers', labelAr: 'الموردون' },
+      { key: 'products', labelEn: 'Product catalogue', labelAr: 'دليل المنتجات' },
+      { key: 'recipes', labelEn: 'Recipes', labelAr: 'الوصفات' },
+      { key: 'ops', labelEn: 'Operations checklist', labelAr: 'قائمة مهام التشغيل' },
     ],
   },
   {
-    label: 'Finance',
+    labelEn: 'Sales and cash',
+    labelAr: 'المبيعات والنقدية',
     features: [
-      { key: 'finance', label: 'Finance Dashboard (P&L, Cash, Variance)' },
-      { key: 'accounting', label: 'Accounting (chart of accounts, ledger, journals)' },
-      { key: 'analytics', label: 'Analytics (legacy)' },
-      { key: 'cost_calculator', label: 'Cost Calculator' },
-      { key: 'staff_salaries', label: 'Staff Salaries' },
-      { key: 'reports', label: 'Reports' },
-      { key: 'expenses', label: 'Expenses — Submit & View Own' },
-      { key: 'expenses_approve', label: 'Expenses — Approve & Dashboard' },
+      { key: 'pos', labelEn: 'POS terminal', labelAr: 'نقطة البيع' },
+      { key: 'pos_eod', labelEn: 'End-of-day close', labelAr: 'إقفال نهاية اليوم' },
+      { key: 'pos_void', labelEn: 'Cancel orders', labelAr: 'إلغاء الطلبات' },
+      { key: 'pos_discounts', labelEn: 'Apply discounts', labelAr: 'تطبيق الخصومات' },
+      { key: 'sales', labelEn: 'Sales and sessions', labelAr: 'المبيعات والجلسات' },
     ],
   },
   {
-    label: 'Content & Marketing',
+    labelEn: 'Owner reporting',
+    labelAr: 'تقارير المالك',
     features: [
-      { key: 'ideas', label: 'Ideas' },
-      { key: 'content', label: 'Content (legacy)' },
-      { key: 'content_studio', label: 'Content Studio' },
-      { key: 'marketing', label: 'Marketing' },
-      { key: 'experiments', label: 'Experiments' },
-      { key: 'messages', label: 'Messages' },
+      { key: 'reports', labelEn: 'Reports', labelAr: 'التقارير' },
+      { key: 'finance', labelEn: 'Finance', labelAr: 'المالية' },
+      { key: 'accounting', labelEn: 'Accounting', labelAr: 'المحاسبة' },
     ],
   },
   {
-    label: 'Ops Checklist',
+    labelEn: 'Communication',
+    labelAr: 'التواصل',
     features: [
-      { key: 'ops', label: 'Ops Checklist (view = staff, edit = manager)' },
-    ],
-  },
-  {
-    label: 'System',
-    features: [
-      { key: 'staff', label: 'Staff Management' },
-      { key: 'vestaboard', label: 'Vestaboard' },
+      { key: 'marketing', labelEn: 'Marketing overview', labelAr: 'نظرة عامة على التسويق' },
+      { key: 'ideas', labelEn: 'Ideas', labelAr: 'الأفكار' },
+      { key: 'vestaboard', labelEn: 'Vestaboard', labelAr: 'فيستابورد' },
     ],
   },
 ]
 
-export const ALL_FEATURES = FEATURE_GROUPS.flatMap(g => g.features.map(f => f.key))
-
-// ── Sidebar navigation ────────────────────────────────────────────────
-const STAFFISH = ['supervisor', 'accountant', 'staff', 'limited_staff']
-const EVERYONE = [...STAFFISH, 'data_entry']
+export const ALL_FEATURES = FEATURE_GROUPS.flatMap(group => group.features.map(feature => feature.key))
 
 export const NAV_ITEMS = [
-  { to: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard', feature: 'dashboard', end: true, fallbackRoles: STAFFISH },
-  { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', feature: 'vestaboard', fallbackRoles: STAFFISH },
-  { to: '/staff/my-profile', icon: Settings, labelEn: 'My Profile', labelAr: 'ملفي', feature: null, end: true, fallbackRoles: EVERYONE },
+  { to: '/dashboard', icon: LayoutDashboard, labelEn: 'Dashboard', labelAr: 'لوحة الأعمال', policy: featurePolicy('dashboard'), end: true, mobilePriority: 2 },
+  { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', policy: featurePolicy('vestaboard') },
+  { to: '/staff/my-profile', icon: Settings, labelEn: 'My profile', labelAr: 'ملفي', policy: AUTH_POLICY, end: true },
 
-  { type: 'group', labelEn: 'OPERATIONS', labelAr: 'العمليات' },
-  { to: '/tasks', icon: CheckSquare, labelKey: 'tasks', feature: 'tasks', ownerOnly: true },
-  { to: '/my-tasks', icon: CheckSquare, labelKey: 'myTasks', feature: null, hideForOwner: true, fallbackRoles: EVERYONE },
-  { to: '/expenses', icon: Receipt, labelEn: 'Expenses', labelAr: 'المصاريف', feature: 'expenses', fallbackRoles: ['data_entry'] },
-  { to: '/inventory', icon: Package, labelEn: 'Inventory', labelAr: 'المخزون', feature: 'inventory', fallbackRoles: EVERYONE },
-  { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', feature: 'pos', fallbackRoles: STAFFISH },
-  { to: '/sales', icon: ListOrdered, labelEn: 'Sales', labelAr: 'المبيعات', feature: 'sales', fallbackRoles: STAFFISH },
-  { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', feature: 'products', fallbackRoles: EVERYONE },
-  { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', feature: 'staff', ownerOnly: true },
-  { to: '/loyalty', icon: Heart, labelEn: 'Nochi Loyalty', labelAr: 'نوتشي لويالتي', feature: 'loyalty', fallbackRoles: EVERYONE },
+  { type: 'group', labelEn: 'Operations', labelAr: 'العمليات' },
+  { to: '/tasks', icon: CheckSquare, labelEn: 'Task management', labelAr: 'إدارة المهام', policy: OWNER_POLICY },
+  { to: '/my-tasks', icon: CheckSquare, labelEn: 'My tasks', labelAr: 'مهامي', policy: AUTH_POLICY, hideForOwner: true, mobilePriority: 4 },
+  { to: '/expenses', icon: Receipt, labelEn: 'Expenses', labelAr: 'المصروفات', policy: featurePolicy('expenses') },
+  { to: '/inventory', icon: Package, labelEn: 'Inventory', labelAr: 'المخزون', policy: featurePolicy('inventory'), mobilePriority: 3 },
+  { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', policy: featurePolicy('pos'), mobilePriority: 1 },
+  { to: '/sales', icon: ListOrdered, labelEn: 'Sales', labelAr: 'المبيعات', policy: featurePolicy('sales') },
+  { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', policy: featurePolicy('products') },
+  { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', policy: OWNER_POLICY },
+  { to: '/loyalty', icon: Heart, labelEn: 'Nochi loyalty', labelAr: 'برنامج ولاء نوتشي', policy: OWNER_POLICY },
 
-  { type: 'group', labelEn: 'MANAGEMENT', labelAr: 'الإدارة' },
-  { to: '/report', icon: BarChart2, labelKey: 'report', feature: 'reports' },
-  { to: '/finance', icon: BarChart3, labelEn: 'Finance', labelAr: 'المالية', feature: 'finance' },
-  { to: '/accounting', icon: BookOpen, labelEn: 'Accounting', labelAr: 'المحاسبة', feature: 'accounting' },
-  { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', feature: 'marketing', fallbackRoles: ['data_entry'] },
+  { type: 'group', labelEn: 'Management', labelAr: 'الإدارة' },
+  { to: '/report', icon: BarChart2, labelEn: 'Reports', labelAr: 'التقارير', policy: featurePolicy('reports') },
+  { to: '/finance', icon: BarChart3, labelEn: 'Finance', labelAr: 'المالية', policy: featurePolicy('finance') },
+  { to: '/accounting', icon: BookOpen, labelEn: 'Accounting', labelAr: 'المحاسبة', policy: featurePolicy('accounting') },
+  { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', policy: featurePolicy('marketing') },
+  { to: '/content-studio', icon: Sparkles, labelEn: 'Content Studio', labelAr: 'استوديو المحتوى', policy: OWNER_POLICY },
 
-  { type: 'group', labelEn: 'CONTENT', labelAr: 'المحتوى' },
-  { to: '/content-studio', icon: Sparkles, labelEn: 'Content Studio', labelAr: 'استوديو المحتوى', feature: 'content_studio', ownerOnly: true },
+  { type: 'group', labelEn: 'Operations checklist', labelAr: 'قائمة مهام التشغيل', requiresOpsEnabled: true },
+  { to: '/ops', icon: ClipboardList, labelEn: 'Checklist', labelAr: 'القائمة', policy: featurePolicy('ops'), requiresOpsEnabled: true },
+  { to: '/ops/dashboard', icon: BarChart3, labelEn: 'Checklist dashboard', labelAr: 'لوحة مهام التشغيل', policy: featurePolicy('ops', 'edit'), requiresOpsEnabled: true },
+  { to: '/ops/settings', icon: Settings, labelEn: 'Checklist settings', labelAr: 'إعدادات مهام التشغيل', policy: featurePolicy('ops', 'edit'), requiresOpsEnabled: true },
 
-  // Ops Checklist — only renders when ops_settings.module_enabled (Layout filters
-  // out items flagged requiresOpsEnabled when the module is off).
-  { type: 'group', labelEn: 'OPS CHECKLIST', labelAr: 'قائمة المهام', requiresOpsEnabled: true },
-  { to: '/ops',           icon: ClipboardList, labelEn: 'Checklist',         labelAr: 'القائمة',     feature: 'ops', fallbackRoles: EVERYONE, requiresOpsEnabled: true },
-  { to: '/ops/dashboard', icon: BarChart3,     labelEn: 'Ops dashboard',     labelAr: 'لوحة المهام', feature: 'ops', fallbackRoles: ['supervisor'], requiresOpsEnabled: true, requiresOpsEdit: true },
-  { to: '/ops/settings',  icon: Settings,      labelEn: 'Ops settings',      labelAr: 'إعدادات المهام', feature: 'ops', fallbackRoles: ['supervisor'], requiresOpsEnabled: true, requiresOpsEdit: true },
-
-  { type: 'group', labelEn: 'TOOLS', labelAr: 'الأدوات' },
-  { to: '/ideas', icon: Lightbulb, labelEn: 'Ideas', labelAr: 'الأفكار', feature: 'ideas', fallbackRoles: ['data_entry'] },
-  { to: '/cost-calculator', icon: Calculator, labelEn: 'Cost Calculator', labelAr: 'حاسبة التكلفة', feature: 'cost_calculator', ownerOnly: true },
-  { to: '/recipes', icon: Coffee, labelKey: 'recipes', feature: 'recipes', fallbackRoles: EVERYONE },
+  { type: 'group', labelEn: 'Tools', labelAr: 'الأدوات' },
+  { to: '/ideas', icon: Lightbulb, labelEn: 'Ideas', labelAr: 'الأفكار', policy: featurePolicy('ideas') },
+  { to: '/cost-calculator', icon: Calculator, labelEn: 'Cost calculator', labelAr: 'حاسبة التكلفة', policy: OWNER_POLICY },
+  { to: '/recipes', icon: Coffee, labelEn: 'Recipes', labelAr: 'الوصفات', policy: featurePolicy('recipes') },
 ]
 
-// Icons exported for any consumer that needs them by name (future use)
-export const NAV_ICONS = { FlaskConical, MessageSquare }
+export const MORE_NAV_ICON = MoreHorizontal

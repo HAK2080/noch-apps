@@ -110,6 +110,28 @@ _Avoid_: Net profit, accounting profit
 The declared state of every source and required cost input used by a report: complete, warning, or unavailable.
 _Avoid_: Treating unavailable data as zero
 
+## Access-control language
+
+**Account role**:
+The supported authority class assigned to a login: owner, supervisor, accountant, staff, or limited staff.
+_Avoid_: Employee status; an owner account is not automatically an employee
+
+**Account access**:
+Whether a linked login may enter the Noch staff workspace, stored independently in `profiles.access_enabled`.
+_Avoid_: `profiles.is_active`, which describes workforce lifecycle
+
+**Module access**:
+The role grant that allows a user to see a module in navigation and open its routes. Navigation and direct URLs use the same policy.
+_Avoid_: Hard-coded role fallbacks in menus
+
+**Edit authority**:
+The role grant that permits management actions within an accessible module. Edit authority always implies module access; database policies and audited RPCs remain the final authority.
+_Avoid_: Treating a visible button as proof of database write authority
+
+**Archived role**:
+A historical role whose records are preserved but which cannot be newly assigned. `data_entry` is archived; its old permission rows remain as evidence.
+_Avoid_: Deleting legacy role rows or silently reintroducing the role
+
 ## Workforce language
 
 **Employee**:
