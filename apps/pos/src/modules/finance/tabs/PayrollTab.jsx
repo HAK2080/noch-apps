@@ -17,6 +17,20 @@ import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
 const MONEY_FIELDS = ['base_lyd', 'overtime_lyd', 'bonus_lyd', 'deduction_lyd', 'loan_repayment_lyd', 'other_lyd']
+const MONEY_LABELS = {
+  base_lyd: 'Base',
+  overtime_lyd: 'Overtime',
+  bonus_lyd: 'Bonus',
+  deduction_lyd: 'Deduction',
+  loan_repayment_lyd: 'Loan repayment',
+  other_lyd: 'Other',
+}
+const HOURS_FIELDS = [
+  ['manual_hours_per_day', 'Hours/day'],
+  ['manual_worked_days', 'Days'],
+  ['manual_scheduled_hours', 'Scheduled h'],
+  ['manual_overtime_hours', 'Overtime h'],
+]
 
 function currentMonth() {
   const d = new Date()
@@ -258,7 +272,7 @@ export default function PayrollTab({ readOnly = false }) {
 
       {/* Run detail */}
       {selected && (
-        <div className="card overflow-x-auto">
+        <div className="card">
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <h3 className="text-white text-sm font-semibold">{String(selected.period_month).slice(0, 7)}</h3>
             <StatusBadge status={selected.status} />
@@ -305,44 +319,39 @@ export default function PayrollTab({ readOnly = false }) {
           {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
             <p className="text-noch-muted text-sm py-3 text-center">No items in this run.</p>
           ) : (
-            <table className="w-full text-xs">
-              <thead className="text-noch-muted">
-                <tr>
-                  <th className="text-left py-1 pr-2">Staff</th>
-                  <th className="text-left py-1 pr-2">Branch</th>
-                  <th className="text-left py-1 pr-2">Evidence</th>
-                  <th className="text-right py-1 pr-2">Hours/day</th>
-                  <th className="text-right py-1 pr-2">Days</th>
-                  <th className="text-right py-1 pr-2">Scheduled h</th>
-                  <th className="text-right py-1 pr-2">Overtime h</th>
-                  <th className="text-right py-1 pr-2">Base</th>
-                  <th className="text-right py-1 pr-2">Overtime</th>
-                  <th className="text-right py-1 pr-2">Bonus</th>
-                  <th className="text-right py-1 pr-2">Deduction</th>
-                  <th className="text-right py-1 pr-2">Loan rep.</th>
-                  <th className="text-right py-1 pr-2">Other</th>
-                  <th className="text-right py-1 pr-2">Net</th>
-                  <th className="text-left py-1">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(it => (
-                  <tr key={it.id} className="border-t border-noch-border/40">
-                    <td className="py-1.5 pr-2 text-white whitespace-nowrap">{nameOf(it.profile_id)}</td>
-                    <td className="py-1.5 pr-2 text-noch-muted whitespace-nowrap">{branchOf(it.branch_id)}</td>
-                    <td className="py-1.5 pr-2 whitespace-nowrap">
+            <div className="space-y-3" data-testid="payroll-item-list">
+              {items.map(it => (
+                <section
+                  key={it.id}
+                  data-testid="payroll-item-card"
+                  className="rounded-xl border border-noch-border/60 bg-noch-dark/30 p-3"
+                >
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{nameOf(it.profile_id)}</p>
+                      <p className="truncate text-xs text-noch-muted">{branchOf(it.branch_id)}</p>
+                    </div>
+                    <div className="min-w-0 flex-1 text-xs sm:max-w-sm">
+                      <span className="mr-1 text-[10px] uppercase tracking-wide text-noch-muted">Evidence</span>
                       <span className={it.data_status === 'blocked' ? 'text-red-300' : it.data_status === 'warning' ? 'text-amber-300' : 'text-noch-green'}>
                         {it.data_status || 'ready'}
                       </span>
-                      {itemIssues(it).length > 0 && <span className="block max-w-52 whitespace-normal text-[10px] text-noch-muted">{itemIssues(it).map(issue => ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')).join(', ')}</span>}
-                    </td>
-                    {[
-                      ['manual_hours_per_day', 'Hours/day'],
-                      ['manual_worked_days', 'Days'],
-                      ['manual_scheduled_hours', 'Scheduled h'],
-                      ['manual_overtime_hours', 'Overtime h'],
-                    ].map(([field, label]) => (
-                      <td key={field} className="py-1.5 pr-2 text-right">
+                      {itemIssues(it).length > 0 && (
+                        <span className="block text-[10px] text-noch-muted">
+                          {itemIssues(it).map(issue => ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[10px] uppercase tracking-wide text-noch-muted">Net pay</p>
+                      <p className="font-mono text-sm text-noch-green">{lyd(netOf(it))}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-11">
+                    {HOURS_FIELDS.map(([field, label]) => (
+                      <label key={field} className="min-w-0 text-[10px] text-noch-muted">
+                        <span className="mb-1 block truncate">{label}</span>
                         {editable ? (
                           <input
                             aria-label={`${label} for ${nameOf(it.profile_id)}`}
@@ -352,40 +361,55 @@ export default function PayrollTab({ readOnly = false }) {
                             value={it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '' : '')}
                             onChange={event => setLocal(it.id, field, event.target.value)}
                             onBlur={() => persistHours(it)}
-                            className="input py-0.5 px-1.5 text-xs w-20 text-right"
+                            className="input w-full min-w-0 px-1.5 py-1 text-right text-xs"
                           />
                         ) : (
-                          <span className="text-white">{it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '—' : '—')}</span>
+                          <span className="block rounded border border-noch-border/60 px-2 py-1 text-right text-white">
+                            {it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '—' : '—')}
+                          </span>
                         )}
-                      </td>
+                      </label>
                     ))}
-                    {MONEY_FIELDS.map(f => (
-                      <td key={f} className="py-1.5 pr-2 text-right">
+                    {MONEY_FIELDS.map(field => (
+                      <label key={field} className="min-w-0 text-[10px] text-noch-muted">
+                        <span className="mb-1 block truncate">{MONEY_LABELS[field]}</span>
                         {editable ? (
-                          <input type="number" step="0.01" value={it[f] ?? 0}
-                            onChange={e => setLocal(it.id, f, e.target.value)}
-                            onBlur={() => persistItem(it, f)}
-                            className="input py-0.5 px-1.5 text-xs w-24 text-right" />
+                          <input
+                            aria-label={`${MONEY_LABELS[field]} for ${nameOf(it.profile_id)}`}
+                            type="number"
+                            step="0.01"
+                            value={it[field] ?? 0}
+                            onChange={event => setLocal(it.id, field, event.target.value)}
+                            onBlur={() => persistItem(it, field)}
+                            className="input w-full min-w-0 px-1.5 py-1 text-right text-xs"
+                          />
                         ) : (
-                          <span className="text-white">{Number(it[f] || 0).toFixed(2)}</span>
+                          <span className="block rounded border border-noch-border/60 px-2 py-1 text-right text-white">
+                            {Number(it[field] || 0).toFixed(2)}
+                          </span>
                         )}
-                      </td>
+                      </label>
                     ))}
-                    <td className="py-1.5 pr-2 text-right text-noch-green font-mono whitespace-nowrap">{lyd(netOf(it))}</td>
-                    <td className="py-1.5">
+                    <label className="min-w-0 text-[10px] text-noch-muted">
+                      <span className="mb-1 block truncate">Note</span>
                       {editable ? (
-                        <input type="text" value={it.note || ''} placeholder="—"
-                          onChange={e => setLocal(it.id, 'note', e.target.value)}
+                        <input
+                          aria-label={`Note for ${nameOf(it.profile_id)}`}
+                          type="text"
+                          value={it.note || ''}
+                          placeholder="—"
+                          onChange={event => setLocal(it.id, 'note', event.target.value)}
                           onBlur={() => persistItem(it, 'note')}
-                          className="input py-0.5 px-1.5 text-xs w-32" />
+                          className="input w-full min-w-0 px-1.5 py-1 text-xs"
+                        />
                       ) : (
-                        <span className="text-noch-muted">{it.note || ''}</span>
+                        <span className="block truncate rounded border border-noch-border/60 px-2 py-1 text-white">{it.note || '—'}</span>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </label>
+                  </div>
+                </section>
+              ))}
+            </div>
           )}
         </div>
       )}

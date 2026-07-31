@@ -114,7 +114,7 @@ export default function WorkforceHub() {
 
   return (
     <Layout>
-      <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5" dir={ar ? 'rtl' : 'ltr'}>
+      <div className={`p-4 md:p-6 mx-auto space-y-5 ${tab === 'payroll' ? 'max-w-none' : 'max-w-7xl'}`} dir={ar ? 'rtl' : 'ltr'}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white">{ar ? 'الفريق والحضور والرواتب' : 'Team, attendance & payroll'}</h1>

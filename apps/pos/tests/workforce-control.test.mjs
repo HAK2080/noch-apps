@@ -83,3 +83,17 @@ test('manual payroll hours are stored and calculated without attendance evidence
   assert.match(sql, /payroll hours cannot be negative/)
   assert.match(sql, /run\.status = 'draft'/)
 })
+
+test('payroll employee fields wrap inside cards without a horizontal table scroller', async () => {
+  const [hub, payroll] = await Promise.all([
+    readFile(hubUrl, 'utf8'),
+    readFile(payrollUrl, 'utf8'),
+  ])
+
+  assert.doesNotMatch(payroll, /card overflow-x-auto/)
+  assert.doesNotMatch(payroll, /<table className="w-full text-xs"/)
+  assert.match(payroll, /data-testid="payroll-item-card"/)
+  assert.match(payroll, /2xl:grid-cols-11/)
+  assert.match(payroll, /className="input[^\"]*w-full[^\"]*min-w-0/)
+  assert.match(hub, /tab === 'payroll' \? 'max-w-none' : 'max-w-7xl'/)
+})
