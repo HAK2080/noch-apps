@@ -234,8 +234,7 @@ export default function POSSessions() {
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl">{copy.title}</h1>
             <p className="text-noch-muted text-sm">
-              {lang === 'ar' ? (branch?.name_ar || branch?.name) : branch?.name}
-              {' · '}{range.fromDate} → {range.toDate} · <span>{totals.shiftCount}</span> {copy.shifts}
+              {`${lang === 'ar' ? (branch?.name_ar || branch?.name) : branch?.name} · ${range.fromDate} → ${range.toDate} · ${totals.shiftCount} ${copy.shifts}`}
             </p>
           </div>
           <button onClick={load} className="btn-secondary text-sm px-3 py-1 flex items-center gap-1">
