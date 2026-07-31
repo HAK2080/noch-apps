@@ -7,7 +7,7 @@ import { AlertTriangle, TrendingUp } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import KPICard from '../components/KPICard'
 import FinanceBreakdownModal from '../components/FinanceBreakdownModal'
-import { businessToday } from '../../pos/lib/pos-supabase'
+import { addYmdDays, businessYmd } from '../../pos/lib/pos-supabase'
 import { getPnL, getFinanceSettings, listBranches, listProductsMissingCost } from '../lib/finance-supabase'
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
@@ -20,12 +20,9 @@ import toast from 'react-hot-toast'
 // /finance hung forever.
 function defaultPeriod() {
   // Business days (5 AM → 5 AM): before 5 AM, "today" is still the evening's trading day
-  const to = businessToday(); to.setHours(23, 59, 59, 999)
-  const from = businessToday(); from.setHours(0, 0, 0, 0)
-  from.setDate(from.getDate() - 6)
+  const to = businessYmd()
   // Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
-  const ymd = (d) => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
-  return { preset: '7d', from: ymd(from), to: ymd(to) }
+  return { preset: '7d', from: addYmdDays(to, -6), to }
 }
 
 export default function DailyPnLTab() {
@@ -37,6 +34,7 @@ export default function DailyPnLTab() {
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [missingCosts, setMissingCosts] = useState([])
+  const [refreshedAt, setRefreshedAt] = useState(null)
   const [breakdown, setBreakdown] = useState(null) // 'prime' | 'revenue' | 'cogs' | 'labor' | 'opex' | 'net'
 
   useEffect(() => {
@@ -55,7 +53,6 @@ export default function DailyPnLTab() {
   useEffect(() => {
     if (!period) return
     let cancelled = false
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     setLoadError(null)
     // 12-second timeout so /finance never hangs forever if the RPC
@@ -67,7 +64,12 @@ export default function DailyPnLTab() {
       getPnL({ branchId, from: period.from, to: period.to, netOfRefunds }),
       timeoutPromise,
     ])
-      .then(d => { if (!cancelled) setPnl(d) })
+      .then(data => {
+        if (!cancelled) {
+          setPnl(data)
+          setRefreshedAt(new Date())
+        }
+      })
       .catch(err => {
         if (!cancelled) {
           setLoadError(err.message || 'Failed to load P&L')
@@ -146,7 +148,7 @@ export default function DailyPnLTab() {
           <ExportButtons onCsv={() => downloadCsv(`pnl_${period.from}_${period.to}`,
             ['Line', 'LYD', '% of revenue'],
             [
-              ['Revenue (net)', k.rev.toFixed(2), ''],
+              ['Net sales', k.rev.toFixed(2), ''],
               ['Discounts', Number(pnl.discounts || 0).toFixed(2), ''],
               ['Refunds', Number(pnl.refunds || 0).toFixed(2), ''],
               ['COGS', k.cogs.toFixed(2), k.cogsR != null ? (k.cogsR * 100).toFixed(1) + '%' : ''],
@@ -154,13 +156,33 @@ export default function DailyPnLTab() {
               ['Prime cost', k.prime.toFixed(2), k.primeR != null ? (k.primeR * 100).toFixed(1) + '%' : ''],
               ['Direct OpEx', k.opex.toFixed(2), ''],
               ['Shared costs allocated', k.shared.toFixed(2), ''],
-              ['Contribution before shared', k.netBeforeShared.toFixed(2), ''],
-              ['Fully loaded profit', k.net.toFixed(2), k.netR != null ? (k.netR * 100).toFixed(1) + '%' : ''],
+              ['Direct operating profit', k.netBeforeShared.toFixed(2), ''],
+              ['Fully loaded operating profit', k.net.toFixed(2), k.netR != null ? (k.netR * 100).toFixed(1) + '%' : ''],
               ['Orders', k.orders, ''],
               ['Period', `${period.from} to ${period.to}`, ''],
               ['Branch', branchId ? (branches.find(b => b.id === branchId)?.name || branchId) : 'All branches', ''],
             ])} />
         </div>
+      </div>
+
+      <div className="bg-noch-card border border-noch-border rounded-xl px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+        <span className="text-white font-semibold">Data trust</span>
+        <span className="text-noch-muted">
+          Refreshed: <b className="text-white">{refreshedAt ? refreshedAt.toLocaleString('en-GB') : 'not available'}</b>
+        </span>
+        <span className="text-noch-muted">
+          Business day: <b className="text-white">05:00–05:00 Africa/Tripoli</b>
+        </span>
+        {Number(pnl.data_quality?.missing_product_cost_count || 0) > 0 && (
+          <span className="text-yellow-300">
+            {pnl.data_quality.missing_product_cost_count} sold product(s) missing cost
+          </span>
+        )}
+        {Number(pnl.data_quality?.unallocated_expense_count || 0) > 0 && (
+          <span className="text-yellow-300">
+            {pnl.data_quality.unallocated_expense_count} unallocated expense(s)
+          </span>
+        )}
       </div>
 
       {/* KPIs */}
@@ -176,7 +198,7 @@ export default function DailyPnLTab() {
           emphasis
         />
         <KPICard
-          label="Sales after discounts/refunds"
+          label="Net sales"
           value={lyd(k.rev)}
           status={STATUS.NEUTRAL}
           sub={`-${lyd(pnl.discounts || 0)} disc`}
@@ -200,11 +222,11 @@ export default function DailyPnLTab() {
           sub={lyd(k.labor)}
           onClick={() => setBreakdown('labor')}
         />
-        <KPICard label="Branch running costs" value={lyd(k.opex)} onClick={() => setBreakdown('opex')} />
-        <KPICard label="Shared business costs" value={lyd(k.shared)} sub="Included in profit after operating costs" />
-        <KPICard label="Profit before shared costs" value={lyd(k.netBeforeShared)} onClick={() => setBreakdown('net')} />
-        <KPICard label="Profit after operating costs" value={lyd(k.net)} sub={pct(k.netR, 1)} onClick={() => setBreakdown('net')} />
-        <KPICard label="Sales margin" value={pct(k.grossR, 1)} />
+        <KPICard label="Direct operating expenses" value={lyd(k.opex)} onClick={() => setBreakdown('opex')} />
+        <KPICard label="Shared operating costs" value={lyd(k.shared)} sub="Allocated under the dated policy" />
+        <KPICard label="Direct operating profit" value={lyd(k.netBeforeShared)} onClick={() => setBreakdown('net')} />
+        <KPICard label="Fully loaded operating profit" value={lyd(k.net)} sub={pct(k.netR, 1)} onClick={() => setBreakdown('net')} />
+        <KPICard label="Gross margin" value={pct(k.grossR, 1)} />
         <KPICard
           label="Average order"
           value={k.orders ? lyd(k.rev / k.orders) : '—'}

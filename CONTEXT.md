@@ -56,6 +56,32 @@ _Avoid_: Branch stock, green-bean storage
 Expected on-hand stock after receipts, transfers, sales consumption, reversals, and recorded waste.
 _Avoid_: Physical count
 
+## Finance and reporting language
+
+**Business day**:
+Noch's reporting day from 05:00 to the following 05:00 in Africa/Tripoli; activity before 05:00 belongs to the preceding date.
+_Avoid_: Calendar day, local day
+
+**Net sales**:
+Completed-order value after discounts and recorded refunds for the selected business days.
+_Avoid_: Revenue, gross sales
+
+**Direct operating profit**:
+Net sales minus product costs, direct staff costs, and direct operating expenses before shared operating costs are allocated.
+_Avoid_: Net after expenses, branch profit
+
+**Shared operating costs**:
+Management payroll and operating expenses serving multiple branches, allocated under a dated shared-cost policy.
+_Avoid_: Overhead when the allocation scope or policy is unknown
+
+**Fully loaded operating profit**:
+Direct operating profit minus allocated shared operating costs.
+_Avoid_: Net profit, accounting profit
+
+**Report completeness**:
+The declared state of every source and required cost input used by a report: complete, warning, or unavailable.
+_Avoid_: Treating unavailable data as zero
+
 ## Loyalty language
 
 **Loyalty member**:

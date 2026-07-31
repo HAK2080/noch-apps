@@ -2,6 +2,7 @@
 // Reads from migrations 20260508010000_finance_mvp.sql.
 
 import { supabase } from '../../../lib/supabase'
+import { reconcileExecutiveSummary } from './finance-reporting'
 import { STATUS, statusForRatio } from './thresholds'
 
 // ── Settings (singleton row id='default') ──────────────────────────────
@@ -91,10 +92,14 @@ export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
     ...summarizePnl(await getPnL({ branchId: branch.id, from, to, netOfRefunds }), settings, branch),
   })))
 
+  const total = summarizePnl(totalPnl, settings)
+
   return {
+    generatedAt: new Date().toISOString(),
     settings,
-    total: summarizePnl(totalPnl, settings),
+    total,
     branches: rows,
+    reconciliation: reconcileExecutiveSummary(total, rows),
   }
 }
 
@@ -150,6 +155,9 @@ function summarizePnl(pnl = {}, settings = {}, branch = {}) {
     operationalStatus,
     status,
     reasons,
+    dataQuality: pnl.data_quality || {},
+    businessTimeZone: pnl.business_time_zone || null,
+    businessDayCutoffHour: pnl.business_day_cutoff_hour ?? null,
   }
 }
 

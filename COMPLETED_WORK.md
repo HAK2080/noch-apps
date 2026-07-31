@@ -398,3 +398,29 @@ To find if something's been done:
 - **Notes**: Generated Supabase state files and stale/destructive Bloom deployment helpers were reviewed and intentionally excluded from the release. Production already records Bloom migrations `20260725100000`, `20260725101000`, `20260725102000`, and `20260725110000`; they were not replayed.
 
 ---
+
+## 2026-07-31 — Enterprise Finance Reporting Controls
+
+- **Agent**: Codex
+- **Status**: Verified locally; production deployment pending
+- **Files**:
+  - `CONTEXT.md`
+  - `apps/pos/src/modules/reports/lib/reporting-periods.js`
+  - `apps/pos/src/modules/reports/lib/management-report-model.js`
+  - `apps/pos/src/modules/reports/lib/management-report.js`
+  - `apps/pos/src/modules/finance/lib/finance-reporting.js`
+  - `apps/pos/src/modules/finance/lib/finance-supabase.js`
+  - `apps/pos/src/modules/finance/tabs/ExecutiveSummaryTab.jsx`
+  - `apps/pos/src/modules/finance/tabs/DailyPnLTab.jsx`
+  - `apps/pos/src/pages/Report.jsx`
+  - `apps/pos/tests/enterprise-reporting-model.test.mjs`
+  - `apps/pos/tests/finance-owner-labels.test.mjs`
+  - `docs/audit/2026-07-31-owner-reporting-module.md`
+  - `supabase/migrations/20260731100000_enterprise_finance_reporting.sql`
+- **Description**: Established one authoritative management-reporting model built on Finance P&L rather than independently recalculated sales. Standardized the 05:00 Africa/Tripoli business day, net sales, direct operating profit, shared operating costs, and fully loaded operating profit. Added data-source provenance, freshness, completeness controls, unavailable-state handling, product-cost and expense-allocation warnings, branch-to-consolidated reconciliation, and auditable inventory scope.
+- **Database correction**: Restored shared-cost fields that a later payroll migration had dropped from `finance_pnl`, preserved consolidated costs exactly once, allocated shared payroll and operating costs under explicit policies, and returned structured data-quality evidence.
+- **Verification**: 31 focused reporting, inventory, POS, loyalty, expense, and finance tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed. The migration compiled and passed its field/timezone assertions against Noch Production inside an explicit transaction that was rolled back.
+- **Commit**: Pending
+- **Deployment**: Pending
+
+---

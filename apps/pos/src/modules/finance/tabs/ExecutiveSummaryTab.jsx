@@ -3,40 +3,12 @@ import { RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react'
 import PeriodSelector from '../components/PeriodSelector'
 import FinanceBreakdownModal from '../components/FinanceBreakdownModal'
 import { getExecutiveSummary, getLiquiditySummary } from '../lib/finance-supabase'
-import { businessToday } from '../../pos/lib/pos-supabase'
+import { completedExecutivePeriod } from '../../reports/lib/reporting-periods'
 import { lyd, pct } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
-// Local date, not UTC — toISOString() shifted dates a day back (Libya UTC+2)
-const ymd = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
-
 function defaultPeriod() {
-  const { from, to } = completedRange('7d')
-  return { preset: '7d', from: ymd(from), to: ymd(to) }
-}
-
-function completedRange(preset) {
-  // Business "now" (5 AM cutoff) so completed-period math ignores the
-  // post-midnight tail of the current trading day.
-  const now = businessToday()
-  const to = new Date(now)
-  const from = new Date(now)
-  if (preset === '30d') {
-    to.setDate(0)
-    from.setFullYear(to.getFullYear(), to.getMonth(), 1)
-    return { from, to }
-  }
-  if (preset === '90d') {
-    to.setDate(to.getDate() - 1)
-    from.setDate(to.getDate() - 89)
-    return { from, to }
-  }
-  // Monday–Sunday: select the last fully completed week.
-  const daysSinceSunday = now.getDay() || 7
-  to.setDate(now.getDate() - daysSinceSunday)
-  from.setTime(to.getTime())
-  from.setDate(to.getDate() - 6)
-  return { from, to }
+  return completedExecutivePeriod('7d')
 }
 
 function shortDate(value) {
@@ -66,26 +38,36 @@ export default function ExecutiveSummaryTab() {
         getLiquiditySummary(),
       ])
       setSummary({ ...health, liquidity })
-    } catch (err) {
-      toast.error(err.message || 'Failed to load executive summary')
+    } catch (error) {
+      toast.error(error.message || 'Failed to load executive summary')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [period.from, period.to, netOfRefunds]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period.from, period.to, netOfRefunds])
 
-  if (loading && !summary) return <p className="text-noch-muted text-center py-12">Loading…</p>
+  if (loading && !summary) {
+    return <p className="text-noch-muted text-center py-12">Loading…</p>
+  }
 
   const total = summary?.total
   const settings = summary?.settings || {}
   const liquidity = summary?.liquidity || {}
   const rows = summary?.branches || []
-  const statusCounts = rows.reduce((acc, row) => {
-    acc[row.status] = (acc[row.status] || 0) + 1
-    return acc
+  const reconciliation = summary?.reconciliation
+  const dataQuality = total?.dataQuality || {}
+  const statusCounts = rows.reduce((accumulator, row) => {
+    accumulator[row.status] = (accumulator[row.status] || 0) + 1
+    return accumulator
   }, {})
   const attentionRows = rows.filter(row => !['healthy', 'pre_opening'].includes(row.status))
+  const hasCompletenessIssue = Number(dataQuality.missing_product_cost_count || 0) > 0
+    || Number(dataQuality.unallocated_expense_count || 0) > 0
+    || reconciliation?.status === 'warning'
 
   return (
     <div className="flex flex-col gap-4">
@@ -101,10 +83,18 @@ export default function ExecutiveSummaryTab() {
             value={period}
             onChange={setPeriod}
             labels={{ today: 'Today', '7d': 'Weekly', '30d': 'Monthly', '90d': '90 days' }}
-            rangeOverrides={{ '7d': toYmdRange(completedRange('7d')), '30d': toYmdRange(completedRange('30d')), '90d': toYmdRange(completedRange('90d')) }}
+            rangeOverrides={{
+              '7d': completedExecutivePeriod('7d'),
+              '30d': completedExecutivePeriod('30d'),
+              '90d': completedExecutivePeriod('90d'),
+            }}
           />
           <label className="flex items-center gap-1.5 text-xs text-noch-muted cursor-pointer">
-            <input type="checkbox" checked={netOfRefunds} onChange={e => setNetOfRefunds(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={netOfRefunds}
+              onChange={event => setNetOfRefunds(event.target.checked)}
+            />
             Net of refunds
           </label>
           <button onClick={load} className="btn-secondary p-2" title="Refresh" aria-label="Refresh">
@@ -115,27 +105,86 @@ export default function ExecutiveSummaryTab() {
 
       <div className="bg-noch-card border border-noch-border rounded-xl px-3 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
         <span className="text-white font-semibold">Data trust</span>
-        <span className="text-noch-muted">Cash counted: <b className="text-white">{shortDate(liquidity.cashUpdatedAt)}</b></span>
-        <span className="text-noch-muted">Bank as of: <b className="text-white">{shortDate(liquidity.bankUpdatedAt)}</b></span>
+        <span className="text-noch-muted">
+          Refreshed: <b className="text-white">{summary?.generatedAt ? new Date(summary.generatedAt).toLocaleString('en-GB') : 'not available'}</b>
+        </span>
+        <span className={reconciliation?.status === 'reconciled' ? 'text-noch-green' : 'text-yellow-300'}>
+          Branch reconciliation: {reconciliation?.status === 'reconciled' ? 'reconciled' : 'review differences'}
+        </span>
+        <span className="text-noch-muted">
+          Cash counted: <b className="text-white">{shortDate(liquidity.cashUpdatedAt)}</b>
+        </span>
+        <span className="text-noch-muted">
+          Bank as of: <b className="text-white">{shortDate(liquidity.bankUpdatedAt)}</b>
+        </span>
         <span className="text-yellow-300">Bank reconciliation: not available</span>
       </div>
 
+      {hasCompletenessIssue && (
+        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3">
+          <div className="flex items-center gap-2 text-yellow-300 text-xs font-semibold mb-2">
+            <TriangleAlert size={14} /> Report completeness
+          </div>
+          <div className="space-y-1 text-noch-muted text-xs">
+            {Number(dataQuality.missing_product_cost_count || 0) > 0 && (
+              <p>{dataQuality.missing_product_cost_count} sold product(s) have no cost; COGS and profit are understated.</p>
+            )}
+            {Number(dataQuality.unallocated_expense_count || 0) > 0 && (
+              <p>{dataQuality.unallocated_expense_count} approved expense(s) are consolidated-only until assigned to a cost center.</p>
+            )}
+            {reconciliation?.material?.map(row => (
+              <p key={row.id}>
+                {row.id}: consolidated {lyd(row.consolidated)} vs branch total {lyd(row.branchTotal)}; difference {lyd(row.delta)}.
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Stream title="Profit">
-          <Metric label="Sales after refunds" value={lyd(total?.revenue)} onClick={() => setBreakdown({ kind: 'revenue', branchId: null, branchName: null })} />
-          <Metric label="Product costs (COGS)" value={lyd(total?.cogs)} onClick={() => setBreakdown({ kind: 'cogs', branchId: null, branchName: null })} />
-          <Metric label="Profit after operating costs" value={lyd(total?.net)} onClick={() => setBreakdown({ kind: 'net', branchId: null, branchName: null })} />
-          <Metric label="Products + staff" value={pct(total?.primeRatio)} onClick={() => setBreakdown({ kind: 'prime', branchId: null, branchName: null })} />
+        <Stream title="Operating performance">
+          <Metric
+            label="Net sales"
+            value={lyd(total?.revenue)}
+            onClick={() => setBreakdown({ kind: 'revenue', branchId: null, branchName: null })}
+          />
+          <Metric
+            label="Product costs (COGS)"
+            value={lyd(total?.cogs)}
+            onClick={() => setBreakdown({ kind: 'cogs', branchId: null, branchName: null })}
+          />
+          <Metric
+            label="Fully loaded operating profit"
+            value={lyd(total?.net)}
+            onClick={() => setBreakdown({ kind: 'net', branchId: null, branchName: null })}
+          />
+          <Metric
+            label="Products + staff"
+            value={pct(total?.primeRatio)}
+            onClick={() => setBreakdown({ kind: 'prime', branchId: null, branchName: null })}
+          />
         </Stream>
         <Stream title="Cash available">
           <Metric label="Cash on hand" value={lyd(liquidity.cashOnHand)} />
-          <Metric label="Bank balance" value={liquidity.bankBalance == null ? 'Not imported' : lyd(liquidity.bankBalance)} />
-          <Metric label="Total available cash" value={liquidity.totalLiquidity == null ? '—' : lyd(liquidity.totalLiquidity)} />
-          <Metric label="Weeks of cash left" value={liquidity.runwayWeeks == null ? '—' : `${liquidity.runwayWeeks.toFixed(1)} weeks`} />
+          <Metric
+            label="Bank balance"
+            value={liquidity.bankBalance == null ? 'Not imported' : lyd(liquidity.bankBalance)}
+          />
+          <Metric
+            label="Total available cash"
+            value={liquidity.totalLiquidity == null ? '—' : lyd(liquidity.totalLiquidity)}
+          />
+          <Metric
+            label="Weeks of cash left"
+            value={liquidity.runwayWeeks == null ? '—' : `${liquidity.runwayWeeks.toFixed(1)} weeks`}
+          />
         </Stream>
         <Stream title="What needs attention">
           <Metric label="Branches to review" value={`${attentionRows.length} / ${rows.length}`} />
-          <Metric label="Prime cost target" value={`${settings.prime_cost_min_pct ?? 55}–${settings.prime_cost_max_pct ?? 65}%`} />
+          <Metric
+            label="Prime cost target"
+            value={`${settings.prime_cost_min_pct ?? 55}–${settings.prime_cost_max_pct ?? 65}%`}
+          />
           <Metric label="30d fixed outflows" value={lyd(liquidity.upcoming30dOutflows)} />
         </Stream>
       </div>
@@ -153,19 +202,27 @@ export default function ExecutiveSummaryTab() {
               <tr className="text-left text-noch-muted text-[10px] uppercase tracking-wide border-b border-noch-border">
                 <th className="px-4 py-2.5 font-medium">Branch</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium text-right">Sales after refunds</th>
+                <th className="px-4 py-2.5 font-medium text-right">Net sales</th>
                 <th className="px-4 py-2.5 font-medium text-right">Product costs</th>
                 <th className="px-4 py-2.5 font-medium text-right">Products + staff</th>
-                <th className="px-4 py-2.5 font-medium text-right">Running costs</th>
-                <th className="px-4 py-2.5 font-medium text-right">Profit after operating costs</th>
+                <th className="px-4 py-2.5 font-medium text-right">Operating costs</th>
+                <th className="px-4 py-2.5 font-medium text-right">Fully loaded operating profit</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(row => <BranchRow key={row.id} row={row} onBreakdown={kind => setBreakdown({ kind, branchId: row.id, branchName: row.name })} />)}
+              {rows.map(row => (
+                <BranchRow
+                  key={row.id}
+                  row={row}
+                  onBreakdown={kind => setBreakdown({ kind, branchId: row.id, branchName: row.name })}
+                />
+              ))}
             </tbody>
           </table>
         </div>
-        {rows.length === 0 && <p className="text-noch-muted text-center py-8 text-sm">No active branches found.</p>}
+        {rows.length === 0 && (
+          <p className="text-noch-muted text-center py-8 text-sm">No active branches found.</p>
+        )}
       </div>
 
       {attentionRows.length > 0 && (
@@ -176,7 +233,9 @@ export default function ExecutiveSummaryTab() {
           <div className="space-y-1">
             {attentionRows.map(row => (
               <p key={row.id} className="text-noch-muted text-xs">
-                <span className="text-white">{row.name}:</span> {row.reasons.join(' · ') || (row.status === 'at_risk' ? 'Prime cost or net contribution is outside target.' : 'Prime cost is near target limit.')}
+                <span className="text-white">{row.name}:</span> {row.reasons.join(' · ') || (row.status === 'at_risk'
+                  ? 'Prime cost or operating profit is outside target.'
+                  : 'Prime cost is near target limit.')}
               </p>
             ))}
           </div>
@@ -211,10 +270,6 @@ function Metric({ label, value, onClick }) {
   )
 }
 
-function toYmdRange(range) {
-  return { from: ymd(range.from), to: ymd(range.to) }
-}
-
 function Stream({ title, children }) {
   return (
     <div className="bg-noch-card border border-noch-border rounded-xl p-3">
@@ -235,18 +290,25 @@ function BranchRow({ row, onBreakdown }) {
       {label}
     </button>
   )
-  const netClass = row.status === 'pre_opening' ? 'text-noch-muted' : row.net < 0 ? 'text-red-300' : 'text-white'
+  const netClass = row.status === 'pre_opening'
+    ? 'text-noch-muted'
+    : row.net < 0
+      ? 'text-red-300'
+      : 'text-white'
+
   return (
     <tr className="border-b border-noch-border/70 last:border-0">
       <td className="px-4 py-3 text-white font-medium">{row.name}</td>
       <td className="px-4 py-3">
         <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] font-semibold ${status.className}`}>
-          {row.status === 'healthy' ? <ShieldCheck size={12} /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+          {row.status === 'healthy'
+            ? <ShieldCheck size={12} />
+            : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
           {status.label}
         </span>
       </td>
       <td className="px-4 py-3 text-right text-white font-mono">
-        {cellButton('revenue', lyd(row.revenue), 'View revenue breakdown')}
+        {cellButton('revenue', lyd(row.revenue), 'View net sales breakdown')}
       </td>
       <td className="px-4 py-3 text-right text-white font-mono">
         {cellButton('cogs', lyd(row.cogs), 'View COGS breakdown')}
@@ -254,11 +316,11 @@ function BranchRow({ row, onBreakdown }) {
       <td className="px-4 py-3 text-right text-white font-mono">
         {cellButton('prime', pct(row.primeRatio), 'View prime cost breakdown')}
       </td>
-      <td className="px-4 py-3 text-right text-white font-mono">{lyd(row.opex)}</td>
+      <td className="px-4 py-3 text-right text-white font-mono">{lyd(row.opexTotal)}</td>
       <td className="px-4 py-3 text-right font-mono">
         {row.status === 'pre_opening'
           ? <span className="text-noch-muted">—</span>
-          : cellButton('net', lyd(row.net), 'View net contribution breakdown', netClass)}
+          : cellButton('net', lyd(row.net), 'View operating profit breakdown', netClass)}
       </td>
     </tr>
   )
