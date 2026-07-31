@@ -346,7 +346,7 @@ To find if something's been done:
 ## 2026-07-31 — Enterprise Sales and Inventory Reporting Accuracy
 
 - **Agent**: Codex
-- **Status**: Release validated; deployment pending
+- **Status**: Complete and live
 - **Files**:
   - `apps/pos/src/modules/pos/lib/business-time.js`
   - `apps/pos/src/modules/pos/lib/pos-supabase.js`
@@ -359,7 +359,8 @@ To find if something's been done:
 - **Description**: Replaced the misleading inventory “runout prediction” and arbitrary fixed-deduction health score with an auditable control report built from the last physical count, completed-order recipe usage, theoretical on-hand quantity, minimum thresholds, and count freshness. Added explicit data provenance, threshold coverage, risk-sorted evidence, accurate Arabic labels, error/empty/loading states, and a complete CSV export. Reworked Sales to report completed sales, refunds, net sales, average order, and a payment reconciliation covering cash, card, split, Presto, and unmapped tenders.
 - **Accuracy and privacy**: Sales screen and CSV now use the same 5 AM–5 AM Africa/Tripoli business-day window independent of the viewer device timezone. CSV exports include completed orders only, label Tripoli dates/hours explicitly, and expose only the last four customer-phone digits.
 - **Verification**: 26 focused reporting, finance, expense, inventory, and loyalty tests passed; targeted ESLint passed with zero errors; POS production build passed; `git diff --check` passed.
-- **Deployment**: Pending.
+- **Commit**: `6e39df6` (`feat(reporting): make sales and inventory evidence auditable`)
+- **Deployment**: GitHub Actions run `30606772561` succeeded for `apps.noch.cloud`. The production index serves `index-Ds1TGSLy.js`, which links `Sales-5M4eoXvq.js` and `InventoryIntelligence-Rv7vyjuk.js`; independent no-cache HTTP checks confirmed the new payment reconciliation, privacy-safe export, inventory control report, and inventory evidence UI are live.
 
 ---
 
