@@ -41,6 +41,22 @@ Deno.serve(async (req: Request) => {
     const event = EVENT_META[type]
     if (!event) return json({ error: 'Unknown notification type' }, 400)
 
+    const serviceTypes = new Set(['reward_earned'])
+    const { data: eligibility, error: eligibilityError } = await admin.rpc(
+      'loyalty_contact_eligibility_v2',
+      {
+        p_customer_id: customer_id,
+        p_channel: 'whatsapp',
+        p_purpose: serviceTypes.has(type) ? 'loyalty_service' : 'marketing',
+      },
+    )
+    if (eligibilityError || eligibility?.allowed !== true) {
+      return json({
+        error: 'Verified consent is required',
+        reason: eligibility?.reason || 'consent_check_failed',
+      }, 409)
+    }
+
     const { data: customer, error } = await admin
       .from('loyalty_customers')
       .select('id, full_name, phone, phone_normalised, preferred_language, whatsapp_opt_in')

@@ -356,6 +356,40 @@ export async function dispatchNotification(
     }
   }
 
+  if (row.audience === 'customer') {
+    if (!row.customer_id) {
+      return {
+        status: 'skipped',
+        providerStatus: 'missing_customer_consent_subject',
+        errorText: 'Customer WhatsApp delivery requires a loyalty customer ID.',
+      }
+    }
+    const serviceEvents = new Set([
+      'reward_earned',
+      'loyalty_reward_ready',
+      'stamp_grant',
+      'feedback_thank_you',
+    ])
+    const purpose = serviceEvents.has(row.event_key || row.template_key || '')
+      ? 'loyalty_service'
+      : 'marketing'
+    const { data: eligibility, error: eligibilityError } = await admin.rpc(
+      'loyalty_contact_eligibility_v2',
+      {
+        p_customer_id: row.customer_id,
+        p_channel: 'whatsapp',
+        p_purpose: purpose,
+      },
+    )
+    if (eligibilityError || eligibility?.allowed !== true) {
+      return {
+        status: 'skipped',
+        providerStatus: eligibility?.reason || 'consent_check_failed',
+        errorText: eligibilityError?.message || 'Verified customer consent is required.',
+      }
+    }
+  }
+
   const template = await getNotificationTemplate(admin, row.template_key)
   if (row.template_key && !template) {
     return {

@@ -80,6 +80,7 @@ const OpsSettings      = lazy(() => import('./modules/ops/pages/OpsSettings'))
 const OpsDashboard     = lazy(() => import('./modules/ops/pages/OpsDashboard'))
 
 const LoyaltyDashboard = lazy(() => import('./modules/loyalty/pages/LoyaltyV2Dashboard'))
+const LoyaltyCustomersV2 = lazy(() => import('./modules/loyalty/pages/LoyaltyCustomersV2'))
 const LoyaltyV1Archive = lazy(() => import('./modules/loyalty/pages/LoyaltyV1Archive'))
 const LoyaltyMissionsV2 = lazy(() => import('./modules/loyalty/pages/LoyaltyMissionsV2'))
 const LoyaltyCheckoutClaim = lazy(() => import('./modules/loyalty/pages/LoyaltyCheckoutClaim'))
@@ -287,10 +288,10 @@ export default function App() {
         <Route path="/analytics-legacy" element={<LegacyRedirect to="/finance" />} />
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
-        <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
+        <Route path="/loyalty" element={<ProtectedRoute><OwnerRoute><LoyaltyDashboard /></OwnerRoute></ProtectedRoute>} />
         <Route path="/loyalty/archive-v1" element={<ProtectedRoute><OwnerRoute><LoyaltyV1Archive /></OwnerRoute></ProtectedRoute>} />
         <Route path="/loyalty/missions" element={<ProtectedRoute><OwnerRoute><LoyaltyMissionsV2 /></OwnerRoute></ProtectedRoute>} />
-        <Route path="/loyalty/customers/*" element={<Navigate to="/loyalty/archive-v1" replace />} />
+        <Route path="/loyalty/customers" element={<ProtectedRoute><OwnerRoute><LoyaltyCustomersV2 /></OwnerRoute></ProtectedRoute>} />
         <Route path="/loyalty/rewards" element={<Navigate to="/loyalty/archive-v1" replace />} />
         <Route path="/loyalty/qr" element={<Navigate to="/loyalty" replace />} />
         <Route path="/loyalty/settings" element={<Navigate to="/loyalty" replace />} />

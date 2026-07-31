@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import Layout from '../../../components/Layout'
 import { useAuth } from '../../../contexts/AuthContext'
 import { supabase } from '../../../lib/supabase'
+import { useLanguage } from '../../../contexts/LanguageContext'
 
 const localDateTime = (offsetDays) => {
   const value = new Date(Date.now() + offsetDays * 86400000)
@@ -14,7 +15,9 @@ const localDateTime = (offsetDays) => {
 
 const initialForm = {
   title: '',
+  title_ar: '',
   description: '',
+  description_ar: '',
   mission_type: 'repeat_visit',
   target_count: 2,
   reward_points: 50,
@@ -33,6 +36,8 @@ const selectedValues = event => Array.from(event.target.selectedOptions, option 
 
 export default function LoyaltyMissionsV2() {
   const navigate = useNavigate()
+  const { lang } = useLanguage()
+  const ar = lang === 'ar'
   const { profile } = useAuth()
   const [missions, setMissions] = useState([])
   const [branches, setBranches] = useState([])
@@ -92,7 +97,10 @@ export default function LoyaltyMissionsV2() {
 
   const save = async event => {
     event.preventDefault()
-    if (!form.title.trim()) return
+    if (!form.title.trim() || !form.title_ar.trim()) {
+      toast.error(ar ? 'العنوان مطلوب بالإنجليزية والعربية' : 'English and Arabic titles are required')
+      return
+    }
     if (new Date(form.ends_at) <= new Date(form.starts_at)) {
       toast.error('Mission expiry must be after its start')
       return
@@ -101,7 +109,9 @@ export default function LoyaltyMissionsV2() {
     const payload = {
       ...form,
       title: form.title.trim(),
+      title_ar: form.title_ar.trim(),
       description: form.description.trim() || null,
+      description_ar: form.description_ar.trim() || null,
       target_count: Number(form.target_count),
       reward_points: Number(form.reward_points),
       max_completions: Number(form.max_completions),
@@ -112,10 +122,12 @@ export default function LoyaltyMissionsV2() {
     }
     let result
     if (editingId) {
-      result = await supabase.rpc('create_loyalty_mission_version_v2', {
+      result = await supabase.rpc('create_loyalty_mission_version_v3', {
         p_mission_id: editingId,
         p_title: payload.title,
+        p_title_ar: payload.title_ar,
         p_description: payload.description,
+        p_description_ar: payload.description_ar,
         p_mission_type: payload.mission_type,
         p_target_count: payload.target_count,
         p_reward_points: payload.reward_points,
@@ -177,14 +189,14 @@ export default function LoyaltyMissionsV2() {
         <div className="flex items-start gap-3">
           <button className="btn-secondary p-2.5" onClick={() => navigate('/loyalty')}><ArrowLeft size={17} /></button>
           <div>
-            <h1 className="text-xl font-bold text-white">V2 missions</h1>
-            <p className="mt-1 text-sm text-noch-muted">Create simple, paid-order missions; customers see at most two</p>
+            <h1 className="text-xl font-bold text-white">{ar ? 'مهمات V2' : 'V2 missions'}</h1>
+            <p className="mt-1 text-sm text-noch-muted">{ar ? 'مهمات طلبات مدفوعة بسيطة؛ يظهر للعميل مهمتان كحد أقصى' : 'Create simple, paid-order missions; customers see at most two'}</p>
           </div>
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary p-2.5" onClick={load}><RefreshCw size={16} /></button>
           <button className="btn-primary flex items-center gap-2" onClick={() => { setEditingId(null); setForm(initialForm); setShowForm(true) }}>
-            <Plus size={16} /> New mission
+            <Plus size={16} /> {ar ? 'مهمة جديدة' : 'New mission'}
           </button>
         </div>
       </div>
@@ -196,7 +208,8 @@ export default function LoyaltyMissionsV2() {
             <button type="button" className="text-noch-muted hover:text-white" onClick={resetForm}><X size={17} /></button>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="label">Title<input className="input mt-1 w-full" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} required /></label>
+            <label className="label">English title<input className="input mt-1 w-full" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} required /></label>
+            <label className="label">العنوان العربي<input dir="rtl" className="input mt-1 w-full" value={form.title_ar} onChange={event => setForm({ ...form, title_ar: event.target.value })} required /></label>
             <label className="label">Mission type
               <select className="input mt-1 w-full" value={form.mission_type} onChange={event => setForm({ ...form, mission_type: event.target.value })}>
                 <option value="repeat_visit">Repeat visit</option>
@@ -205,7 +218,8 @@ export default function LoyaltyMissionsV2() {
                 <option value="quiet_hours">Quiet hours</option>
               </select>
             </label>
-            <label className="label md:col-span-2">Customer task<input className="input mt-1 w-full" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} /></label>
+            <label className="label">English customer task<input className="input mt-1 w-full" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} /></label>
+            <label className="label">مهمة العميل بالعربية<input dir="rtl" className="input mt-1 w-full" value={form.description_ar} onChange={event => setForm({ ...form, description_ar: event.target.value })} /></label>
             <label className="label">Progress target<input className="input mt-1 w-full" type="number" min="1" value={form.target_count} onChange={event => setForm({ ...form, target_count: event.target.value })} /></label>
             <label className="label">Bonus points<input className="input mt-1 w-full" type="number" min="1" value={form.reward_points} onChange={event => setForm({ ...form, reward_points: event.target.value })} /></label>
             <label className="label">Starts<input className="input mt-1 w-full" type="datetime-local" value={form.starts_at} onChange={event => setForm({ ...form, starts_at: event.target.value })} /></label>

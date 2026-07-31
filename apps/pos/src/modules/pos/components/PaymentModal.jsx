@@ -12,7 +12,7 @@ import {
   createLoyaltyCheckoutV2,
   getAvailableLoyaltyRewardsV2,
   getLoyaltyCheckoutV2,
-  lookupLoyaltyQR,
+  lookupCustomerByPassportToken,
   lookupOrCreateLoyaltyMemberV2,
 } from '../../loyalty/lib/loyalty-supabase'
 import { translations } from '../../../lib/i18n'
@@ -91,6 +91,11 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
   const [checkoutSession, setCheckoutSession] = useState(null)
   const [checkoutQr, setCheckoutQr] = useState('')
   const [checkoutError, setCheckoutError] = useState('')
+  const [loyaltyDecision, setLoyaltyDecision] = useState(
+    initialLoyalty
+      ? { outcome: 'linked', captureMethod: 'existing_card', skipReason: null }
+      : null,
+  )
   const [availableRewards, setAvailableRewards] = useState([])
   const [selectedRewardId, setSelectedRewardId] = useState(null)
 
@@ -127,11 +132,12 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
     parseFloat(cardAmount) > 0 &&
     parseFloat(cardAmount) < payableTotal
 
-  const canComplete =
+  const paymentValid =
     (method === 'cash' && parseFloat(cashTendered || 0) >= payableTotal) ||
     method === 'card' ||
     method === 'presto' ||
     splitValid
+  const canComplete = paymentValid && loyaltyDecision !== null
 
   const handleComplete = useCallback(() => {
     if (!canComplete) return
@@ -145,9 +151,12 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
       loyalty_checkout_session_id: checkoutSession?.session_id || null,
       loyalty_reward_entitlement_id: selectedReward?.entitlement_id || null,
       loyalty_reward_discount: rewardDiscount,
+      loyalty_capture_outcome: loyaltyDecision.outcome,
+      loyalty_capture_method: loyaltyDecision.captureMethod,
+      loyalty_skip_reason: loyaltyDecision.skipReason,
     }
     onComplete(paymentData)
-  }, [canComplete, method, cashTendered, changeDue, cardAmount, payableTotal, loyaltyCustomer, checkoutSession, selectedReward, rewardDiscount, onComplete])
+  }, [canComplete, method, cashTendered, changeDue, cardAmount, payableTotal, loyaltyCustomer, checkoutSession, selectedReward, rewardDiscount, loyaltyDecision, onComplete])
 
   useEffect(() => {
     if (!branchId || loyaltyCustomer) return undefined
@@ -176,6 +185,11 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                 full_name: status.full_name,
                 points_balance: status.points_balance,
                 available_rewards: status.available_rewards,
+              })
+              setLoyaltyDecision({
+                outcome: 'linked',
+                captureMethod: 'customer_qr',
+                skipReason: null,
               })
               window.clearInterval(pollTimer)
               toast.success(`Loyalty linked: ${status.full_name}`)
@@ -218,7 +232,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
   const handleLoyaltyScan = async (token) => {
     setShowQRScanner(false)
     try {
-      const customer = await lookupLoyaltyQR(token)
+      const customer = await lookupCustomerByPassportToken(token)
       if (customer) {
         if (checkoutSession?.session_id) {
           closeLoyaltyCheckoutV2(checkoutSession.session_id, null, true).catch(() => {})
@@ -226,6 +240,11 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
           setCheckoutQr('')
         }
         setLoyaltyCustomer(customer)
+        setLoyaltyDecision({
+          outcome: 'linked',
+          captureMethod: 'existing_card',
+          skipReason: null,
+        })
         toast.success(`Loyalty card linked: ${customer.full_name}`)
       } else {
         toast.error('QR code not recognized')
@@ -252,6 +271,11 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
         setCheckoutQr('')
       }
       setLoyaltyCustomer(customer)
+      setLoyaltyDecision({
+        outcome: 'linked',
+        captureMethod: 'phone_fallback',
+        skipReason: null,
+      })
       toast.success(`Loyalty linked: ${customer.full_name}`)
     } catch (err) {
       toast.error(err.message || 'Could not attach loyalty customer')
@@ -268,6 +292,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
     setCheckoutSession(null)
     setCheckoutQr('')
     setCartToken(newCartToken())
+    setLoyaltyDecision(null)
   }
 
   return (
@@ -508,9 +533,48 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                       </button>
                     </div>
                   )}
+
+                  <div className="rounded-xl border border-noch-border bg-noch-dark/40 p-3">
+                    <p className="mb-2 text-xs font-semibold text-white">
+                      {posLang === 'ar' ? 'إذا لم يربط العميل الطلب، اختر السبب' : 'If the customer does not link, choose why'}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        ['declined', posLang === 'ar' ? 'رفض' : 'Declined'],
+                        ['not_member', posLang === 'ar' ? 'ليس عضواً' : 'Not a member'],
+                        ['qr_unavailable', posLang === 'ar' ? 'QR غير متاح' : 'QR unavailable'],
+                        ['timeout', posLang === 'ar' ? 'انتهى الوقت' : 'Timed out'],
+                      ].map(([reason, label]) => (
+                        <button
+                          key={reason}
+                          type="button"
+                          onClick={() => setLoyaltyDecision({
+                            outcome: 'skipped',
+                            captureMethod: null,
+                            skipReason: reason,
+                          })}
+                          className={`rounded-lg border px-2 py-2 text-xs ${
+                            loyaltyDecision?.skipReason === reason
+                              ? 'border-orange-300/60 bg-orange-300/10 text-orange-200'
+                              : 'border-noch-border text-noch-muted hover:text-white'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
+
+            {paymentValid && !loyaltyDecision && (
+              <p className="mt-3 rounded-lg border border-orange-300/30 bg-orange-300/10 px-3 py-2 text-center text-xs text-orange-200">
+                {posLang === 'ar'
+                  ? 'اربط العضوية أو اختر سبب التخطي قبل إتمام البيع'
+                  : 'Link loyalty or choose a skip reason before completing the sale'}
+              </p>
+            )}
 
             {/* Complete button — disabled while a charge is in flight to
                 prevent double-submit (also guarded server-side by the

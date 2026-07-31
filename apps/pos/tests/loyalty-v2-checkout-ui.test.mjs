@@ -22,14 +22,14 @@ test('transaction QR is the primary loyalty action and phone lookup is collapsed
   assert.match(source, /No phone number is spoken or shown to the cashier/)
 })
 
-test('claimed checkout is attached to the paid order and settled once', async () => {
+test('every paid order records one explicit loyalty capture outcome', async () => {
   const [terminalSource, appSource] = await Promise.all([
     readFile(terminalUrl, 'utf8'),
     readFile(appUrl, 'utf8'),
   ])
 
   assert.match(terminalSource, /loyalty_checkout_session_id:\s*loyaltyCheckoutSessionId/)
-  assert.match(terminalSource, /await createPOSOrder\(orderData,\s*items\)[\s\S]*await closeLoyaltyCheckoutV2\(loyaltyCheckoutSessionId,\s*order\.id,\s*false\)/)
+  assert.match(terminalSource, /await createPOSOrder\(orderData,\s*items\)[\s\S]*await recordLoyaltyCaptureDecisionV2\(\{[\s\S]*orderId:\s*order\.id,[\s\S]*sessionId:\s*loyaltyCheckoutSessionId,[\s\S]*outcome:\s*loyaltyCaptureOutcome/)
   assert.match(appSource, /path="\/loyalty\/checkout\/:token"/)
   assert.doesNotMatch(appSource, /path="\/loyalty\/checkout\/:token" element=\{<ProtectedRoute>/)
 })
@@ -64,7 +64,10 @@ test('owner mission management covers launch mission types and campaign controls
   assert.match(missionSource, /quiet_hours/)
   assert.match(missionSource, /Only two live missions can be active at once/)
   assert.match(missionSource, /mission\.status === 'active' \? 'suspended' : 'active'/)
-  assert.match(missionSource, /create_loyalty_mission_version_v2/)
+  assert.match(missionSource, /create_loyalty_mission_version_v3/)
+  assert.match(missionSource, /English and Arabic titles are required/)
+  assert.match(missionSource, /p_title_ar:\s*payload\.title_ar/)
+  assert.match(missionSource, /p_description_ar:\s*payload\.description_ar/)
   assert.match(missionSource, /New mission version created/)
 })
 

@@ -6,8 +6,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import {
-  closeLoyaltyCheckoutV2,
   lookupCustomerByPassportToken,
+  recordLoyaltyCaptureDecisionV2,
   recordPosCustomerVisit,
 } from '../../loyalty/lib/loyalty-supabase'
 import { format, round, sum, lineTotal } from '../lib/money'
@@ -733,6 +733,9 @@ export default function POSTerminal() {
       loyalty_customer: attachedLoyaltyCustomer,
       loyalty_reward_entitlement_id: loyaltyRewardEntitlementId,
       loyalty_reward_discount: loyaltyRewardDiscount,
+      loyalty_capture_outcome: loyaltyCaptureOutcome,
+      loyalty_capture_method: loyaltyCaptureMethod,
+      loyalty_skip_reason: loyaltySkipReason,
       ...orderPaymentData
     } = paymentData
     const discountAmount = round((showPayment.discountAmount || 0) + (loyaltyRewardDiscount || 0))
@@ -815,12 +818,18 @@ export default function POSTerminal() {
         toast('Order saved offline. Will sync when online.', { icon: '📴' })
       }
 
-      if (loyaltyCheckoutSessionId && !String(order.id || '').startsWith('offline-')) {
+      if (!String(order.id || '').startsWith('offline-')) {
         try {
-          await closeLoyaltyCheckoutV2(loyaltyCheckoutSessionId, order.id, false)
+          await recordLoyaltyCaptureDecisionV2({
+            orderId: order.id,
+            sessionId: loyaltyCheckoutSessionId,
+            outcome: loyaltyCaptureOutcome,
+            captureMethod: loyaltyCaptureMethod,
+            skipReason: loyaltySkipReason,
+          })
         } catch (err) {
-          console.warn('Loyalty checkout close failed:', err)
-          toast.error('Sale completed, but loyalty QR needs reconciliation')
+          console.warn('Loyalty capture evidence failed:', err)
+          toast.error('Sale completed; loyalty decision is flagged for reconciliation')
         }
       }
 

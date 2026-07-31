@@ -302,6 +302,78 @@ export async function getLoyaltyV2Dashboard() {
   return data
 }
 
+export async function getLoyaltyV2OwnerSummary(from = null, to = null) {
+  const { data, error } = await supabase.rpc('loyalty_v2_owner_summary', {
+    p_from: from,
+    p_to: to,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function getLoyaltyV2Customers(query = '', limit = 100, offset = 0) {
+  const { data, error } = await supabase.rpc('loyalty_v2_customer_directory', {
+    p_query: query || null,
+    p_limit: limit,
+    p_offset: offset,
+  })
+  if (error) throw error
+  return data || []
+}
+
+export async function searchLoyaltyMembersV2(query, limit = 12) {
+  const { data, error } = await supabase.rpc('search_loyalty_members_v2', {
+    p_query: query,
+    p_limit: limit,
+  })
+  if (error) throw error
+  return data || []
+}
+
+export async function recordLoyaltyCaptureDecisionV2({
+  orderId,
+  sessionId = null,
+  outcome,
+  captureMethod = null,
+  skipReason = null,
+}) {
+  const { data, error } = await supabase.rpc('record_loyalty_capture_decision_v2', {
+    p_order_id: orderId,
+    p_session_id: sessionId,
+    p_outcome: outcome,
+    p_capture_method: captureMethod,
+    p_skip_reason: skipReason,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function joinAndClaimLoyaltyCheckoutV2(token, fullName) {
+  const { data, error } = await supabase.rpc('join_and_claim_loyalty_checkout_v2', {
+    p_token: token,
+    p_full_name: fullName,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function getMyLoyaltyCardV2() {
+  const { data, error } = await supabase.rpc('get_my_loyalty_card_v2')
+  if (error) throw error
+  return data
+}
+
+export async function updateMyLoyaltyProfileV2(updates = {}) {
+  const { data, error } = await supabase.rpc('update_my_loyalty_profile_v2', {
+    p_full_name: updates.fullName ?? null,
+    p_preferred_language: updates.preferredLanguage ?? null,
+    p_whatsapp_opt_in: updates.whatsappOptIn ?? null,
+    p_marketing_opt_in: updates.marketingOptIn ?? null,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function getLoyaltyV1Archive() {
   const { data, error } = await supabase
     .from('loyalty_v1_customer_archive')

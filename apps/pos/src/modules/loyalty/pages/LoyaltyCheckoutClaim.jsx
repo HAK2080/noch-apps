@@ -2,9 +2,16 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, Loader2, LockKeyhole, Mail, Phone } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
+import { useLanguage } from '../../../contexts/LanguageContext'
+import {
+  joinAndClaimLoyaltyCheckoutV2,
+  updateMyLoyaltyProfileV2,
+} from '../lib/loyalty-supabase'
 
 export default function LoyaltyCheckoutClaim() {
   const { token } = useParams()
+  const { lang } = useLanguage()
+  const ar = lang === 'ar'
   const [channel, setChannel] = useState('phone')
   const [identifier, setIdentifier] = useState('')
   const [otp, setOtp] = useState('')
@@ -14,6 +21,7 @@ export default function LoyaltyCheckoutClaim() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
+  const [consentBusy, setConsentBusy] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -83,20 +91,33 @@ export default function LoyaltyCheckoutClaim() {
     setBusy(true)
     setError('')
     try {
-      const { error: registrationError } = await supabase.rpc('register_loyalty_member_v2', {
-        p_full_name: fullName.trim(),
-      })
-      if (registrationError) throw registrationError
-
-      const { data, error: claimError } = await supabase.rpc('claim_loyalty_checkout_v2', {
-        p_token: token,
-      })
-      if (claimError) throw claimError
-      setResult(data)
+      setResult(await joinAndClaimLoyaltyCheckoutV2(token, fullName.trim()))
     } catch (err) {
       setError(err.message || 'Could not link this transaction')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const updateConsent = async (whatsappOptIn, marketingOptIn) => {
+    setConsentBusy(true)
+    setError('')
+    try {
+      await updateMyLoyaltyProfileV2({
+        whatsappOptIn,
+        marketingOptIn,
+        preferredLanguage: ar ? 'ar' : 'en',
+      })
+      setResult(current => ({
+        ...current,
+        consentSaved: true,
+        whatsappOptIn,
+        marketingOptIn,
+      }))
+    } catch (consentError) {
+      setError(consentError.message || (ar ? 'تعذر حفظ الموافقة' : 'Could not save consent'))
+    } finally {
+      setConsentBusy(false)
     }
   }
 
@@ -107,9 +128,9 @@ export default function LoyaltyCheckoutClaim() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-noch-green/15 text-noch-green">
             {result ? <CheckCircle2 size={30} /> : <LockKeyhole size={28} />}
           </div>
-          <h1 className="text-2xl font-bold">Noch Loyalty V2</h1>
+          <h1 className="text-2xl font-bold">{ar ? 'ولاء نوتش V2' : 'Noch Loyalty V2'}</h1>
           <p className="mt-2 text-sm text-noch-muted">
-            Link this purchase privately. The cashier never sees or hears your phone number.
+            {ar ? 'اربط هذا الطلب بخصوصية. الباريستا لا يرى ولا يسمع رقم هاتفك.' : 'Link this purchase privately. The cashier never sees or hears your phone number.'}
           </p>
         </div>
 
@@ -117,7 +138,7 @@ export default function LoyaltyCheckoutClaim() {
           {result ? (
             <div className="py-4 text-center">
               <h2 className="text-xl font-bold text-noch-green">
-                {result.status === 'settled' ? 'Points added' : 'Purchase linked'}
+                {result.status === 'settled' ? (ar ? 'تمت إضافة النقاط' : 'Points added') : (ar ? 'تم ربط الطلب' : 'Purchase linked')}
               </h2>
               <p className="mt-2 text-white">{result.full_name}</p>
               {result.status === 'settled' ? (
@@ -128,7 +149,7 @@ export default function LoyaltyCheckoutClaim() {
                 </p>
               )}
               <p className="mt-1 text-sm text-noch-muted">
-                Current balance: <span className="font-semibold text-white">{result.points_balance} points</span>
+                {ar ? 'الرصيد الحالي:' : 'Current balance:'} <span className="font-semibold text-white">{result.points_balance} {ar ? 'نقطة' : 'points'}</span>
               </p>
               {result.status === 'settled' && result.available_rewards > 0 && (
                 <p className="mt-3 rounded-lg bg-yellow-300/10 px-3 py-2 text-sm text-yellow-200">
@@ -145,8 +166,30 @@ export default function LoyaltyCheckoutClaim() {
                   ))}
                 </div>
               )}
+              {result.status === 'settled' && !result.consentSaved && (
+                <div className="mt-5 rounded-xl border border-noch-border p-3 text-start">
+                  <p className="text-sm font-semibold text-white">{ar ? 'اختيار التواصل' : 'Contact choice'}</p>
+                  <p className="mt-1 text-xs text-noch-muted">
+                    {ar ? 'لن نرسل أي رسالة دون موافقة موثقة هنا.' : 'We send nothing unless you give verified consent here.'}
+                  </p>
+                  <div className="mt-3 grid gap-2">
+                    <button disabled={consentBusy} className="btn-primary text-sm" onClick={() => updateConsent(true, true)}>
+                      {ar ? 'رسائل الخدمة والعروض عبر واتساب' : 'WhatsApp service updates and offers'}
+                    </button>
+                    <button disabled={consentBusy} className="btn-secondary text-sm" onClick={() => updateConsent(true, false)}>
+                      {ar ? 'رسائل الخدمة فقط' : 'Service updates only'}
+                    </button>
+                    <button disabled={consentBusy} className="text-xs text-noch-muted underline" onClick={() => updateConsent(false, false)}>
+                      {ar ? 'لا رسائل' : 'No messages'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {result.consentSaved && (
+                <p className="mt-4 text-xs text-noch-green">{ar ? 'تم حفظ اختيارك ويمكن تغييره لاحقاً.' : 'Your choice is saved and can be changed later.'}</p>
+              )}
               <p className="mt-5 text-sm text-noch-muted">
-                {result.status === 'settled' ? 'Done — you can close this page.' : 'Keep this page open until payment completes.'}
+                {result.status === 'settled' ? (ar ? 'تم — يمكنك إغلاق الصفحة.' : 'Done — you can close this page.') : (ar ? 'اترك الصفحة مفتوحة حتى اكتمال الدفع.' : 'Keep this page open until payment completes.')}
               </p>
             </div>
           ) : !verified ? (
@@ -157,18 +200,18 @@ export default function LoyaltyCheckoutClaim() {
                   onClick={() => { setChannel('phone'); setCodeSent(false); setOtp(''); setError('') }}
                   className={channel === 'phone' ? 'btn-primary' : 'btn-secondary'}
                 >
-                  <Phone size={15} className="mr-2 inline" /> Phone
+                  <Phone size={15} className="me-2 inline" /> {ar ? 'هاتف' : 'Phone'}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setChannel('email'); setCodeSent(false); setOtp(''); setError('') }}
                   className={channel === 'email' ? 'btn-primary' : 'btn-secondary'}
                 >
-                  <Mail size={15} className="mr-2 inline" /> Email
+                  <Mail size={15} className="me-2 inline" /> {ar ? 'بريد' : 'Email'}
                 </button>
               </div>
               <label className="block text-sm text-noch-muted">
-                {channel === 'phone' ? 'Your phone number' : 'Your email'}
+                {channel === 'phone' ? (ar ? 'رقم هاتفك' : 'Your phone number') : (ar ? 'بريدك الإلكتروني' : 'Your email')}
                 <input
                   className="input mt-2 w-full"
                   type={channel === 'phone' ? 'tel' : 'email'}
@@ -181,12 +224,12 @@ export default function LoyaltyCheckoutClaim() {
               </label>
               {!codeSent ? (
                 <button type="button" className="btn-primary w-full" disabled={busy || !identifier.trim()} onClick={sendCode}>
-                  {busy ? <Loader2 size={17} className="mx-auto animate-spin" /> : 'Send private code'}
+                  {busy ? <Loader2 size={17} className="mx-auto animate-spin" /> : (ar ? 'إرسال رمز خاص' : 'Send private code')}
                 </button>
               ) : (
                 <>
                   <label className="block text-sm text-noch-muted">
-                    Verification code
+                    {ar ? 'رمز التحقق' : 'Verification code'}
                     <input
                       className="input mt-2 w-full text-center tracking-[0.3em]"
                       inputMode="numeric"
@@ -197,7 +240,7 @@ export default function LoyaltyCheckoutClaim() {
                     />
                   </label>
                   <button type="button" className="btn-primary w-full" disabled={busy || otp.trim().length < 6} onClick={verifyCode}>
-                    {busy ? <Loader2 size={17} className="mx-auto animate-spin" /> : 'Verify'}
+                    {busy ? <Loader2 size={17} className="mx-auto animate-spin" /> : (ar ? 'تحقق' : 'Verify')}
                   </button>
                 </>
               )}
@@ -205,17 +248,17 @@ export default function LoyaltyCheckoutClaim() {
           ) : (
             <>
               <label className="block text-sm text-noch-muted">
-                Your name
+                {ar ? 'اسمك' : 'Your name'}
                 <input
                   className="input mt-2 w-full"
                   autoComplete="name"
                   value={fullName}
                   onChange={event => setFullName(event.target.value)}
-                  placeholder="Name shown on your loyalty card"
+                  placeholder={ar ? 'الاسم الظاهر في بطاقة الولاء' : 'Name shown on your loyalty card'}
                 />
               </label>
               <button type="button" className="btn-primary w-full" disabled={busy || !fullName.trim()} onClick={claimCheckout}>
-                {busy ? <Loader2 size={17} className="mx-auto animate-spin" /> : 'Collect points for this purchase'}
+                {busy ? <Loader2 size={17} className="mx-auto animate-spin" /> : (ar ? 'اجمع نقاط هذا الطلب' : 'Collect points for this purchase')}
               </button>
             </>
           )}
@@ -224,7 +267,7 @@ export default function LoyaltyCheckoutClaim() {
         </section>
 
         <p className="mt-4 text-center text-xs text-noch-muted">
-          This one-time transaction code expires in five minutes and cannot be reused.
+          {ar ? 'رمز الطلب لمرة واحدة وينتهي خلال خمس دقائق.' : 'This one-time transaction code expires in five minutes and cannot be reused.'}
         </p>
       </div>
     </main>
