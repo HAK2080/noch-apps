@@ -161,8 +161,12 @@ function translateTextNodes(root) {
   let node = walker.nextNode()
   while (node) {
     if (!shouldSkipTextNode(node)) {
-      if (!originalText.has(node)) originalText.set(node, node.nodeValue)
-      node.nodeValue = translateExact(originalText.get(node))
+      const source = originalText.get(node) ?? node.nodeValue
+      const translated = translateExact(source)
+      if (translated !== source) {
+        if (!originalText.has(node)) originalText.set(node, source)
+        node.nodeValue = translated
+      }
     }
     node = walker.nextNode()
   }
@@ -182,9 +186,11 @@ function translateAttributes(root) {
     ;['placeholder', 'title', 'aria-label'].forEach(attr => {
       if (!el.hasAttribute(attr)) return
       const key = `i18nOriginal${attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase())}`
-      if (!el.dataset[key]) el.dataset[key] = el.getAttribute(attr)
-      const original = el.dataset[key]
-      el.setAttribute(attr, PLACEHOLDERS[original] || PHRASES[original] || original)
+      const current = el.dataset[key] || el.getAttribute(attr)
+      const translated = PLACEHOLDERS[current] || PHRASES[current]
+      if (!translated) return
+      if (!el.dataset[key]) el.dataset[key] = current
+      el.setAttribute(attr, translated)
     })
   })
 }
