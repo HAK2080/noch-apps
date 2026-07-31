@@ -8,6 +8,7 @@ import { Banknote, CheckCircle, HandCoins, Plus, RefreshCw, Trash2 } from 'lucid
 import { Link } from 'react-router-dom'
 import {
   listPayrollRuns, getPayrollRunItems, updatePayrollRunItem,
+  updatePayrollRunItemHours,
   generatePayrollRun, completePayrollRun, deletePayrollRun,
   listStaffLoans, createStaffLoan, cancelStaffLoan, listLoanRepayments, listBranches,
 } from '../lib/finance-supabase'
@@ -165,10 +166,39 @@ export default function PayrollTab({ readOnly = false }) {
     if (field !== 'note' && !Number.isFinite(value)) { toast.error('Invalid number'); return }
     if (original && String(original[field] ?? '') === String(item[field] ?? '')) return
     try {
-      await updatePayrollRunItem(item.id, { [field]: value })
-      loadedItems.current = loadedItems.current.map(it => (it.id === item.id ? { ...it, [field]: item[field] } : it))
+      const updated = await updatePayrollRunItem(item.id, { [field]: value })
+      const previous = items.find(row => row.id === item.id)
+      const nextTotal = runTotal - netOf(previous || item) + netOf(updated)
+      setItems(list => list.map(row => row.id === item.id ? updated : row))
+      setSelected(run => run ? { ...run, total_lyd: nextTotal } : run)
+      loadedItems.current = loadedItems.current.map(it => (it.id === item.id ? updated : it))
     } catch (err) {
       toast.error(err.message || 'Save failed')
+      openRun(selected)
+    }
+  }
+
+  const persistHours = async item => {
+    const toNumber = value => value === '' || value === null || value === undefined ? null : Number(value)
+    const updates = {
+      hoursPerDay: toNumber(item.manual_hours_per_day),
+      workedDays: toNumber(item.manual_worked_days),
+      scheduledHours: toNumber(item.manual_scheduled_hours),
+      overtimeHours: toNumber(item.manual_overtime_hours),
+    }
+    if (Object.values(updates).some(value => value !== null && !Number.isFinite(value))) {
+      toast.error('Invalid payroll hours')
+      return
+    }
+    try {
+      const updated = await updatePayrollRunItemHours(item.id, updates)
+      const previous = items.find(row => row.id === item.id)
+      const nextTotal = runTotal - netOf(previous || item) + netOf(updated)
+      setItems(list => list.map(row => row.id === item.id ? updated : row))
+      setSelected(run => run ? { ...run, total_lyd: nextTotal } : run)
+      loadedItems.current = loadedItems.current.map(row => row.id === item.id ? updated : row)
+    } catch (err) {
+      toast.error(err.message || 'Failed to save payroll hours')
       openRun(selected)
     }
   }
@@ -178,10 +208,10 @@ export default function PayrollTab({ readOnly = false }) {
   const runTotal = selected
     ? (isDraft ? items.reduce((s, it) => s + netOf(it), 0) : Number(selected.total_lyd || 0))
     : 0
-  const storedVariance = selected ? Number(selected.total_lyd || 0) - runTotal : 0
+  const evidenceBlocked = selected?.evidence_status === 'blocked'
+    || items.some(item => item.data_status === 'blocked')
   const canComplete = isDraft
     && ['ready', 'warning'].includes(selected?.evidence_status)
-    && Math.abs(storedVariance) <= 0.005
   const issueCounts = items.reduce((counts, item) => {
     for (const issue of itemIssues(item)) counts[issue] = (counts[issue] || 0) + 1
     return counts
@@ -251,10 +281,9 @@ export default function PayrollTab({ readOnly = false }) {
               </div>
             )}
           </div>
-          {isDraft && !canComplete && (
+          {isDraft && evidenceBlocked && (
             <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
               <p className="font-semibold text-amber-100">Payroll is blocked until the employee evidence is ready.</p>
-              {Math.abs(storedVariance) > 0.005 ? ` Current variance: ${lyd(storedVariance)}.` : ''}
               {Object.keys(issueCounts).length > 0 && (
                 <ul className="mt-2 list-disc space-y-1 ps-4">
                   {Object.entries(issueCounts).map(([issue, count]) => (
@@ -268,6 +297,11 @@ export default function PayrollTab({ readOnly = false }) {
               </div>
             </div>
           )}
+          {isDraft && (
+            <p className="mb-3 text-xs text-noch-muted">
+              Attendance and schedules are optional evidence. For hourly staff, enter hours per day and worked days; scheduled hours can be filled from the published schedule or entered manually. Overtime hours are optional and use the employee hourly rate.
+            </p>
+          )}
           {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
             <p className="text-noch-muted text-sm py-3 text-center">No items in this run.</p>
           ) : (
@@ -277,6 +311,10 @@ export default function PayrollTab({ readOnly = false }) {
                   <th className="text-left py-1 pr-2">Staff</th>
                   <th className="text-left py-1 pr-2">Branch</th>
                   <th className="text-left py-1 pr-2">Evidence</th>
+                  <th className="text-right py-1 pr-2">Hours/day</th>
+                  <th className="text-right py-1 pr-2">Days</th>
+                  <th className="text-right py-1 pr-2">Scheduled h</th>
+                  <th className="text-right py-1 pr-2">Overtime h</th>
                   <th className="text-right py-1 pr-2">Base</th>
                   <th className="text-right py-1 pr-2">Overtime</th>
                   <th className="text-right py-1 pr-2">Bonus</th>
@@ -298,6 +336,29 @@ export default function PayrollTab({ readOnly = false }) {
                       </span>
                       {itemIssues(it).length > 0 && <span className="block max-w-52 whitespace-normal text-[10px] text-noch-muted">{itemIssues(it).map(issue => ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')).join(', ')}</span>}
                     </td>
+                    {[
+                      ['manual_hours_per_day', 'Hours/day'],
+                      ['manual_worked_days', 'Days'],
+                      ['manual_scheduled_hours', 'Scheduled h'],
+                      ['manual_overtime_hours', 'Overtime h'],
+                    ].map(([field, label]) => (
+                      <td key={field} className="py-1.5 pr-2 text-right">
+                        {editable ? (
+                          <input
+                            aria-label={`${label} for ${nameOf(it.profile_id)}`}
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '' : '')}
+                            onChange={event => setLocal(it.id, field, event.target.value)}
+                            onBlur={() => persistHours(it)}
+                            className="input py-0.5 px-1.5 text-xs w-20 text-right"
+                          />
+                        ) : (
+                          <span className="text-white">{it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '—' : '—')}</span>
+                        )}
+                      </td>
+                    ))}
                     {MONEY_FIELDS.map(f => (
                       <td key={f} className="py-1.5 pr-2 text-right">
                         {editable ? (

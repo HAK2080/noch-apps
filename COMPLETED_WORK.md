@@ -1,14 +1,16 @@
 ## 2026-07-31 — Payroll Readiness Guidance
 
 - **Agent**: Codex
-- **Status**: Implemented; deployment pending
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
-  - `apps/pos/src/index.css`
+  - `apps/pos/src/modules/finance/lib/finance-supabase.js`
   - `apps/pos/tests/workforce-control.test.mjs`
+  - `supabase/migrations/20260801090000_payroll_manual_hours.sql`
 - **Description**: Reproduced the disabled July payroll approval state. The draft is correctly blocked by nine employee records missing employment start dates; attendance is also unavailable, but it is not silently converted into paid hours. Payroll now shows each blocking/warning issue, counts, evidence status per employee, and direct links to the team directory and attendance/schedule controls.
 - **Verification**: Workforce control tests passed, targeted PayrollTab ESLint passed, and the POS production build passed.
-- **Deployment**: Pending commit and production release.
+- **Deployment**: POS release and migration verification recorded with the commit below.
+- **Follow-up**: Warning-only payroll drafts no longer use the stale client variance gate. Attendance and schedules remain optional evidence; owners can enter hours/day, worked days, scheduled hours, overtime, deductions, and loan repayments manually. Hourly pay is calculated by the owner-only draft RPC.
 
 ---
 

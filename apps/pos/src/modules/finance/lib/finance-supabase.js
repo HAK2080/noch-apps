@@ -587,6 +587,23 @@ export async function updatePayrollRunItem(id, updates) {
   return data
 }
 
+export async function updatePayrollRunItemHours(id, {
+  hoursPerDay,
+  workedDays,
+  scheduledHours,
+  overtimeHours,
+}) {
+  const { data, error } = await supabase.rpc('payroll_update_item_hours_v2', {
+    p_item_id: id,
+    p_hours_per_day: hoursPerDay,
+    p_worked_days: workedDays,
+    p_scheduled_hours: scheduledHours,
+    p_overtime_hours: overtimeHours,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function generatePayrollRun(periodMonth) {
   const { data, error } = await supabase.rpc('payroll_generate_run', { p_month: periodMonth })
   if (error) throw error

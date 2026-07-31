@@ -11,6 +11,10 @@ const hubUrl = new URL('../src/modules/workforce/pages/WorkforceHub.jsx', import
 const profilesUrl = new URL('../src/lib/profiles.js', import.meta.url)
 const financeUrl = new URL('../src/modules/finance/FinanceDashboard.jsx', import.meta.url)
 const payrollUrl = new URL('../src/modules/finance/tabs/PayrollTab.jsx', import.meta.url)
+const manualHoursMigrationUrl = new URL(
+  '../../../supabase/migrations/20260801090000_payroll_manual_hours.sql',
+  import.meta.url,
+)
 
 test('workforce identity is explicit and owner login profiles are not employees', async () => {
   const sql = await readFile(migrationUrl, 'utf8')
@@ -57,4 +61,25 @@ test('normal owner journey is consolidated under staff workforce control', async
   assert.match(payroll, /Open team directory to add dates/)
   assert.match(payroll, /missing_start_date/)
   assert.match(payroll, /Evidence/)
+  assert.match(payroll, /updatePayrollRunItemHours/)
+  assert.match(payroll, /Hours\/day/)
+  assert.match(payroll, /Attendance and schedules are optional evidence/)
+  assert.match(payroll, /updatePayrollRunItemHours/)
+  assert.doesNotMatch(payroll, /Math\.abs\(storedVariance\) <= 0\.005/)
+  assert.match(payroll, /MONEY_FIELDS = \['base_lyd', 'overtime_lyd'.*'deduction_lyd'.*'loan_repayment_lyd'/s)
+})
+
+test('manual payroll hours are stored and calculated without attendance evidence', async () => {
+  const sql = await readFile(manualHoursMigrationUrl, 'utf8')
+  assert.match(sql, /manual_hours_per_day numeric/)
+  assert.match(sql, /manual_worked_days numeric/)
+  assert.match(sql, /manual_scheduled_hours numeric/)
+  assert.match(sql, /manual_overtime_hours numeric/)
+  assert.match(sql, /payroll_update_item_hours_v2/)
+  assert.match(sql, /p_hours_per_day numeric default null/)
+  assert.match(sql, /p_worked_days numeric default null/)
+  assert.match(sql, /worked_hours := case/)
+  assert.match(sql, /then round\(worked_hours \* profile_rate, 2\)/)
+  assert.match(sql, /payroll hours cannot be negative/)
+  assert.match(sql, /run\.status = 'draft'/)
 })
