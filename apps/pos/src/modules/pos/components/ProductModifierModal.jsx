@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
-import { getModifierGroupsForProduct } from '../lib/pos-supabase'
+import { getModifierGroupsForProduct } from '../lib/pos-modifiers-supabase'
 import { format, round, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
 
