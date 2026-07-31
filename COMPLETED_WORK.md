@@ -72,7 +72,7 @@
 ## 2026-07-31 — Staff Skin Dark and Bright Modes
 
 - **Agent**: Codex
-- **Status**: Complete; deployment recorded below
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/components/Layout.jsx`
   - `apps/pos/src/components/shared/ThemeToggle.jsx`
@@ -82,8 +82,8 @@
   - `apps/pos/tests/staff-skin-handoff.test.mjs`
 - **Description**: Restored the saved dark/bright preference without removing the newsprint redesign. Added accessible bilingual theme controls to the desktop shell, mobile header, login, and full-screen POS terminal. The bright mode retains the cream/ink palette; the dark mode uses an ink/cream palette with theme-aware surfaces, fields, borders, product cards, alerts, and login contrast.
 - **Verification**: Focused theme regression tests, targeted ESLint, production build, and `git diff --check` passed. Local browser checks confirmed exact dark and bright computed colors, persistent control labels, login contrast, and a 390×844 mobile viewport without horizontal overflow.
-- **Commit**: This entry's `feat(ui): restore dark and bright staff themes` commit.
-- **Deployment**: Pending commit and production workflow verification.
+- **Commit**: `752d21a` (`feat(ui): restore dark and bright staff themes`)
+- **Deployment**: GitHub Actions run `30639407570` deployed commit `752d21a` successfully to `apps.noch.cloud`. An authenticated production dashboard check confirmed the dark and bright palettes, the sidebar palette, and preference persistence after reload.
 
 ---
 
