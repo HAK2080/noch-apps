@@ -14,7 +14,7 @@ const posT = (key, lang) =>
 
 function CartItem({ item, onUpdateQty, onRemove }) {
   return (
-    <div className="flex items-start gap-2 py-2.5 border-b border-noch-border/50 last:border-0 staff-cart-item">
+    <div className="flex items-start gap-2 py-2.5 border-b border-noch-border/50 last:border-0">
       <div className="flex-1 min-w-0">
         <p className="text-white text-sm font-medium truncate">{item.name}</p>
         {item.name_ar && (
@@ -38,7 +38,7 @@ function CartItem({ item, onUpdateQty, onRemove }) {
           {format(parseFloat(item.price) * item.quantity)}
         </p>
 
-        <div className="flex items-center gap-1 staff-qty">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => item.quantity > 1 ? onUpdateQty(item.id, item.quantity - 1) : onRemove(item.id)}
             className={`w-7 h-7 rounded-lg flex items-center justify-center active:scale-95 ${
@@ -50,7 +50,7 @@ function CartItem({ item, onUpdateQty, onRemove }) {
             <Minus size={12} />
           </button>
 
-          <span className="w-7 text-center text-sm text-white font-semibold select-none staff-qty-value">
+          <span className="w-7 text-center text-sm text-white font-semibold select-none">
             {item.quantity}
           </span>
 
@@ -132,7 +132,7 @@ function CartPanel({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 staff-cart-panel">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <h2 className="text-white font-bold text-base">{t('posCart')}</h2>
@@ -253,7 +253,7 @@ function CartPanel({
               value={customerName}
               onChange={e => setCustomerName(e.target.value)}
               placeholder="Customer first name (for the drink ticket)"
-              className="input w-full py-2 text-sm staff-cart-input"
+              className="input w-full py-2 text-sm"
               maxLength={20}
               autoComplete="off"
               autoCapitalize="words"
@@ -267,7 +267,7 @@ function CartPanel({
               value={customerPhone}
               onChange={e => setCustomerPhone(e.target.value)}
               placeholder="WhatsApp number (optional — for loyalty)"
-              className="input w-full py-2 text-sm staff-cart-input"
+              className="input w-full py-2 text-sm"
               maxLength={20}
               autoComplete="off"
               inputMode="tel"
@@ -287,7 +287,7 @@ function CartPanel({
                   override_by: overrideBy?.id || null,
                   subtotal, total,
                 })}
-                className="btn-secondary shrink-0 px-4 py-4 rounded-xl flex items-center justify-center gap-1.5 font-bold staff-hold-button"
+                className="btn-secondary shrink-0 px-4 py-4 rounded-xl flex items-center justify-center gap-1.5 font-bold"
                 disabled={items.length === 0}
                 title={t('posHold')}
               >
@@ -303,7 +303,7 @@ function CartPanel({
                 customer_name: customerName.trim() || null,
                 customer_phone: customerPhone.trim() || null,
               })}
-              className="btn-primary flex-1 py-4 text-lg font-bold rounded-xl staff-charge-button"
+              className="btn-primary flex-1 py-4 text-lg font-bold rounded-xl"
               disabled={items.length === 0}
             >
               {t('posCharge')} {format(total)} LYD

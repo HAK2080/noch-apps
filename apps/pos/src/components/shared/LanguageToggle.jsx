@@ -1,15 +1,7 @@
 import { useLanguage } from '../../contexts/LanguageContext'
 
-export default function LanguageToggle({ className = '', variant = 'compact' }) {
-  const { lang, setLang, toggleLang } = useLanguage()
-  if (variant === 'staff') {
-    return (
-      <div className={`skin-language-toggle ${className}`} role="group" aria-label="Language">
-        <button type="button" onClick={() => setLang('en')} aria-pressed={lang === 'en'}>EN</button>
-        <button type="button" onClick={() => setLang('ar')} aria-pressed={lang === 'ar'} lang="ar">عربي</button>
-      </div>
-    )
-  }
+export default function LanguageToggle({ className = '' }) {
+  const { lang, toggleLang } = useLanguage()
   return (
     <button
       onClick={toggleLang}

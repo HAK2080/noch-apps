@@ -3,7 +3,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from '../components/shared/LanguageToggle'
-import ThemeToggle from '../components/shared/ThemeToggle'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -56,73 +55,67 @@ export default function Login() {
   }
 
   return (
-    <div className="skin-login">
-      <section className="skin-login-left">
-        <div className="skin-login-content">
-          <div className="skin-login-brand">
-            <h1><span>noch</span><span>apps</span></h1>
-            <p>{t('appTagline')}</p>
-          </div>
+    <div className="min-h-screen bg-noch-dark flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-noch-green font-bold text-5xl tracking-tight mb-1">noch.apps</h1>
+          <p className="text-noch-muted text-sm">{t('appTagline')}</p>
+        </div>
 
-          <div className="skin-login-form">
-            <div className="skin-login-form-title">{t('login')}</div>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div>
-                <label className="label">{t('email')}</label>
-                <input
-                  type="email"
-                  className="input"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  autoComplete="email"
-                  autoFocus
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">{t('password')}</label>
-                <input
-                  type="password"
-                  className="input"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                  minLength={6}
-                />
-              </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
-                {loading ? t('loading') : t('loginBtn')}
-              </button>
-            </form>
+        <div className="card">
+          <h2 className="text-white font-semibold text-center mb-5">{t('login')}</h2>
 
-            <div className="skin-login-links">
-              <button type="button" onClick={handleForgotPassword} disabled={resetting}>
-                {resetting
-                  ? (lang === 'ar' ? 'جاري الإرسال...' : 'Sending...')
-                  : (lang === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot password?')}
-              </button>
-              <Link to="/staff/request-access">
-                {lang === 'ar' ? 'طلب وصول →' : 'Request access →'}
-              </Link>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label className="label">{t('email')}</label>
+              <input
+                type="email"
+                className="input"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                autoFocus
+                required
+              />
             </div>
-          </div>
+            <div>
+              <label className="label">{t('password')}</label>
+              <input
+                type="password"
+                className="input"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+                minLength={6}
+              />
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
+              {loading ? t('loading') : t('loginBtn')}
+            </button>
+          </form>
 
-          <div className="skin-login-language">
-            <LanguageToggle variant="staff" />
-            <ThemeToggle compact />
+          <div className="flex justify-between items-center mt-4 text-xs">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetting}
+              className="text-noch-muted hover:text-white transition-colors disabled:opacity-50"
+            >
+              {resetting
+                ? (lang === 'ar' ? 'جاري الإرسال...' : 'Sending...')
+                : (lang === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot password?')}
+            </button>
+            <Link to="/staff/request-access" className="text-noch-green hover:underline">
+              {lang === 'ar' ? 'طلب وصول →' : 'Request access →'}
+            </Link>
           </div>
         </div>
-      </section>
 
-      <aside className="skin-login-right" aria-hidden="true">
-        <p className="skin-login-eyebrow">NOCH / STAFF OPERATING SYSTEM</p>
-        <h2>{lang === 'ar' ? 'كل يوم، بوضوح أكبر.' : 'RUN THE DAY\nWITH BOTH EYES OPEN.'}</h2>
-        <p>{lang === 'ar'
-          ? 'المبيعات والمخزون والفريق في مكان واحد. قرارات أقل ضجيجاً، ووقت أكثر للمقهى.'
-          : 'Sales, stock, and the team in one place. Less noise in the numbers, more time for the café.'}</p>
-        <footer>apps.noch.cloud · staff console</footer>
-      </aside>
+        <div className="flex justify-center mt-6">
+          <LanguageToggle />
+        </div>
+      </div>
     </div>
   )
 }

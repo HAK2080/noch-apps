@@ -87,6 +87,30 @@
 
 ---
 
+## 2026-07-31 — Classic NOCH Skin Restoration
+
+- **Agent**: Codex
+- **Status**: Complete; deployment recorded below
+- **Files**:
+  - `apps/pos/index.html`
+  - `apps/pos/src/components/Layout.jsx`
+  - `apps/pos/src/components/dashboard/StatsBar.jsx`
+  - `apps/pos/src/components/shared/LanguageToggle.jsx`
+  - `apps/pos/src/components/shared/ThemeToggle.jsx`
+  - `apps/pos/src/index.css`
+  - `apps/pos/src/modules/pos/components/CartPanel.jsx`
+  - `apps/pos/src/modules/pos/components/ProductGrid.jsx`
+  - `apps/pos/src/modules/pos/pages/POSTerminal.jsx`
+  - `apps/pos/src/pages/Dashboard.jsx`
+  - `apps/pos/src/pages/Login.jsx`
+  - `apps/pos/tests/classic-skin-restoration.test.mjs`
+- **Description**: Removed the Oatly/newsprint presentation from every production entry surface and restored the original NOCH dark/light shell, navigation, dashboard cards, login, and POS presentation. Later payroll, loyalty, inventory, privacy, and POS behavior remains intact. The redesign audit remains as archived historical evidence only.
+- **Verification**: Classic-skin regression tests, targeted ESLint, production build, and `git diff --check` passed. Local browser inspection confirmed the original centered `noch.apps` login card and classic green/dark styling.
+- **Commit**: This entry's `revert(ui): restore classic NOCH skin` commit.
+- **Deployment**: Pending commit and production verification.
+
+---
+
 ## 2026-07-31 — Navigation, Roles, Permissions, and Bilingual Consistency
 
 - **Agent**: Codex

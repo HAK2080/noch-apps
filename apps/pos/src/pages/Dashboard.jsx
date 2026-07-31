@@ -232,11 +232,13 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="skin-dashboard">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 skin-dashboard-header">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-white font-bold text-xl">{l.title}</h1>
+          <p className="text-noch-muted text-sm">
+            {new Date().toLocaleDateString(lang === 'ar' ? 'ar-LY' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="btn-secondary p-2.5" title={l.refresh}><RefreshCw size={16} /></button>
@@ -246,10 +248,6 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
-      <p className="text-noch-muted text-sm skin-dashboard-date">
-        {new Date().toLocaleDateString(lang === 'ar' ? 'ar-LY' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-      </p>
-
       {/* Pending access requests — owner only, top priority */}
       {isOwner && accessRequests.length > 0 && (
         <div className="card mb-4 border-noch-green/40 bg-noch-green/5">
@@ -328,7 +326,7 @@ export default function Dashboard() {
         const profit = revenue - cogs - labor - opex
         const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(0) : 0
         return (
-          <div className="card mb-4 cursor-pointer hover:border-noch-green/30 transition-colors skin-pnl" onClick={() => navigate('/finance')}>
+          <div className="card mb-4 cursor-pointer hover:border-noch-green/30 transition-colors" onClick={() => navigate('/finance')}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-noch-muted text-[10px] font-bold uppercase tracking-widest">
                 {lang === 'ar' ? 'أداء اليوم' : "Today's profit"}
@@ -562,7 +560,6 @@ export default function Dashboard() {
       {showForm && (
         <TaskForm onSave={handleSave} onCancel={() => setShowForm(false)} />
       )}
-      </div>
     </Layout>
   )
 }
