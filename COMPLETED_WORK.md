@@ -1,16 +1,17 @@
 ## 2026-07-31 — Payroll No-Scroll Employee Cards
 
 - **Agent**: Codex
-- **Status**: Verified locally; deployment pending
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
   - `apps/pos/src/modules/workforce/pages/WorkforceHub.jsx`
   - `apps/pos/tests/workforce-control.test.mjs`
 - **Description**: Replaced the 15-column payroll table and bottom-only horizontal scrollbar with one responsive card per employee. Identity, branch, evidence, and net pay stay visible above a labeled grid containing hours/day, days, scheduled hours, overtime hours, all six manual pay adjustments, and note. The grid uses all available payroll width and wraps inside the card on narrower screens.
 - **Behavior preserved**: Manual hours and adjustments still save on blur, draft net pay recalculates immediately, evidence remains visible, and completed payroll remains read-only.
-- **Verification**: Payroll regression test passed after first reproducing the old overflow failure; classic-skin tests, targeted ESLint, POS production build, and `git diff --check` passed.
+- **Verification**: Payroll regression test passed after first reproducing the old overflow failure; classic-skin tests, targeted ESLint, POS production build, and `git diff --check` passed. Authenticated production checks found 10 cards with 11 inputs each, no document/card horizontal overflow at 1960 px, 1274 px, or 384 px, and no console errors. The wide layout renders all 11 fields in one row; narrower layouts wrap them within the employee card.
 - **Migration**: None.
-- **Commit / deployment**: Pending.
+- **Commit**: `fec37e2` (`fix(payroll): replace scrolling table with responsive cards`)
+- **Deployment**: GitHub Actions run `30641389210` deployed successfully to `apps.noch.cloud`; authenticated live smoke checks passed afterward.
 
 ---
 
