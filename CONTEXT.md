@@ -110,6 +110,36 @@ _Avoid_: Net profit, accounting profit
 The declared state of every source and required cost input used by a report: complete, warning, or unavailable.
 _Avoid_: Treating unavailable data as zero
 
+## Workforce language
+
+**Employee**:
+A profile explicitly marked as part of the workforce. An owner login is not automatically an employee.
+_Avoid_: Treating every authenticated profile as payroll staff
+
+**Attendance segment**:
+One clock-in and clock-out interval tied to an employee and POS shift. Multiple closed segments preserve breaks and re-entry.
+_Avoid_: Reopening and overwriting an earlier interval
+
+**Open attendance**:
+An attendance segment without a clock-out. It is an exception and contributes no payroll hours until closed.
+_Avoid_: Counting time through the current moment as paid labor
+
+**Published schedule shift**:
+An approved work plan for an employee, branch, start, and end time. It supports planning but is not attendance evidence.
+_Avoid_: Using a schedule as proof that work occurred
+
+**Payroll draft**:
+A calculated proposal with per-employee evidence status. It has no accounting effect.
+_Avoid_: Including draft payroll in actual profit
+
+**Payroll approval**:
+The point when a reconciled payroll becomes wages expense and wages payable.
+_Avoid_: Treating approval as proof of payment
+
+**Payroll payment**:
+A separate audited settlement of approved wages from cash or bank to wages payable.
+_Avoid_: Posting payroll net pay directly as wages expense
+
 ## Sales and cash-control language
 
 **Tender**:

@@ -24,22 +24,15 @@ export async function getProfile(id) {
 }
 
 export async function getStaffProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'staff')
-    .order('full_name')
+  const { data, error } = await supabase.rpc('workforce_team_v2')
   if (error) throw error
-  return data
+  return (data || []).filter(profile => profile.is_active !== false)
 }
 
 export async function getAllTeamMembers() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('full_name')
+  const { data, error } = await supabase.rpc('workforce_team_v2')
   if (error) throw error
-  return data
+  return data || []
 }
 
 export async function createStaffProfile(nameOrPayload, telegramChatId) {
@@ -47,7 +40,7 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
   const payload = typeof nameOrPayload === 'string'
     ? { full_name: nameOrPayload, telegram_chat_id: telegramChatId || null }
     : { ...nameOrPayload }
-  const row = { id, role: 'staff', ...payload }
+  const row = { id, role: 'staff', is_employee: true, ...payload }
   const { error } = await supabase.from('profiles').insert(row)
   if (error) throw error
   return row
@@ -55,7 +48,8 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
 
 export async function updateProfile(id, updates) {
   // Filter out pin_code from direct updates; it must be set via RPC
-  const { pin_code, ...safeUpdates } = updates
+  const safeUpdates = { ...updates }
+  delete safeUpdates.pin_code
 
   const { data, error } = await supabase
     .from('profiles')

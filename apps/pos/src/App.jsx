@@ -31,6 +31,7 @@ import Feedback from './pages/storefront/Feedback'
 const Tasks            = lazy(() => import('./pages/Tasks'))
 const TaskDetail       = lazy(() => import('./pages/TaskDetail'))
 const Staff            = lazy(() => import('./pages/Staff'))
+const WorkforceHub     = lazy(() => import('./modules/workforce/pages/WorkforceHub'))
 const MyProfile        = lazy(() => import('./pages/staff/MyProfile'))
 const RoleManager      = lazy(() => import('./pages/staff/RoleManager'))
 const Report           = lazy(() => import('./pages/Report'))
@@ -195,6 +196,10 @@ export default function App() {
         } />
 
         <Route path="/staff" element={
+          <ProtectedRoute><OwnerRoute><WorkforceHub /></OwnerRoute></ProtectedRoute>
+        } />
+
+        <Route path="/staff/team" element={
           <ProtectedRoute><OwnerRoute><Staff /></OwnerRoute></ProtectedRoute>
         } />
 

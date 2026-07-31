@@ -28,6 +28,11 @@ root `.env`.
   drawer cash from an immutable tender-event ledger and keep missing counts
   visibly missing. Card settlement remains unavailable until an external
   processor or bank statement source is connected.
+- **Workforce control:** `/staff` is the owner control point for the employee
+  directory, attendance evidence, weekly schedules, and payroll. Open
+  attendance is excluded from paid hours, draft payroll is excluded from actual
+  profit, and payroll approval is separated from payment.
+
 
 ```
 Jul 26 release/

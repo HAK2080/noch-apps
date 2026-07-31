@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import {
-  TrendingUp, BarChart3, Coffee, Wallet, Receipt, Clock, Upload, Link2, Target, Wrench, Banknote, Network,
+  TrendingUp, BarChart3, Coffee, Wallet, Receipt, Upload, Link2, Target, Wrench, Network,
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { usePermission } from '../../lib/usePermission'
@@ -17,8 +17,6 @@ import DailyPnLTab from './tabs/DailyPnLTab'
 import MenuProfitabilityTab from './tabs/MenuProfitabilityTab'
 import CashRunwayTab from './tabs/CashRunwayTab'
 import ExpensesTab from './tabs/ExpensesTab'
-import ShiftsTab from './tabs/ShiftsTab'
-import PayrollTab from './tabs/PayrollTab'
 import BankTab from './tabs/BankTab'
 import RecipeLinkerTab from './tabs/RecipeLinkerTab'
 import VarianceTab from './tabs/VarianceTab'
@@ -41,9 +39,7 @@ const TABS = [
   { id: 'menu',        label: 'Menu item profit',    icon: Coffee,     level: 'view' },
   { id: 'cash',        label: 'Cash position',       icon: Wallet,     level: 'view' },
   { id: 'expenses',    label: 'Expenses',           icon: Receipt,    level: 'view' },
-  { id: 'shifts',      label: 'Shifts',             icon: Clock,      level: 'view' },
   { id: 'allocations', label: 'Shared costs',        icon: Network,    level: 'owner' },
-  { id: 'payroll',     label: 'Payroll',            icon: Banknote,   level: 'view' },
   { id: 'bank',        label: 'Bank activity',       icon: Upload,     level: 'edit' },
   { id: 'recipes',     label: 'Product costs',       icon: Link2,      level: 'edit' },
   { id: 'variance',    label: 'Budget vs actual',    icon: Target,     level: 'view' },
@@ -101,9 +97,7 @@ export default function FinanceDashboard() {
           {activeTab === 'menu'     && <MenuProfitabilityTab readOnly={readOnly} />}
           {activeTab === 'cash'     && <CashRunwayTab readOnly={readOnly} />}
           {activeTab === 'expenses' && <ExpensesTab readOnly={readOnly} />}
-          {activeTab === 'shifts'   && <ShiftsTab readOnly={readOnly} />}
           {activeTab === 'allocations' && <AllocationsTab />}
-          {activeTab === 'payroll'  && <PayrollTab readOnly={readOnly} />}
           {activeTab === 'bank'     && <BankTab />}
           {activeTab === 'recipes'  && <RecipeLinkerTab />}
           {activeTab === 'variance' && <VarianceTab readOnly={readOnly} />}
