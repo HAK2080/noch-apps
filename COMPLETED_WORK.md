@@ -453,3 +453,33 @@ To find if something's been done:
 - **Known limitation**: Card and Presto settlement cannot be proven until external processor/statement feeds are connected. POS tender is deliberately labeled as payment evidence, not settlement.
 
 ---
+
+## 2026-07-31 — Inventory, Purchasing, Stock Movement, and Waste
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `CONTEXT.md`
+  - `README.md`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/pages/POSInventory.jsx`
+  - `apps/pos/src/modules/pos/pages/POSTerminal.jsx`
+  - `apps/pos/src/modules/pos/pages/POSWaste.jsx`
+  - `apps/pos/src/modules/reports/lib/management-report-model.js`
+  - `apps/pos/src/modules/reports/lib/management-report.js`
+  - `apps/pos/src/pages/inventory/`
+  - `apps/pos/tests/inventory-control-authority.test.mjs`
+  - `apps/pos/tests/inventory-intelligence-report.test.mjs`
+  - `apps/pos/tests/pos-product-inventory-update.test.mjs`
+  - `docs/audit/2026-07-31-inventory-purchasing-stock-waste-module.md`
+  - `supabase/migrations/20260731203000_inventory_control_authority.sql`
+  - `supabase/migrations/20260731213000_inventory_owner_access.sql`
+- **Description**: Established one operational authority per inventory state, created the missing ingredient-location balance and immutable movement evidence, and added authorized atomic location counts. POS receiving and adjustments now use the currently open branch. Warehouse receipts, transfer legs, waste, and future tracked-product sale/refund/void movements converge on location evidence. The unsupported generic recipe fallback was removed: theoretical usage is unavailable until an explicit recipe exists. `/inventory` is now the bilingual control hub, `/inventory/intelligence` is the owner evidence report, and physical counting is a focused workflow; the former mixed Stock Manager is archived without deleting records.
+- **Data reconciliation**: The live control report has 79 active ingredient rows, all visibly stale and missing location counts; all 79 correctly report recipe usage as unavailable instead of the former false 3,409,320-unit deduction. Five existing negative product-location balances remain visible as missing-receipt exceptions. There are no open procurement orders or transfers, no historical balances were rewritten, and the rollout left zero count or location-movement rows behind after its permission test rollback.
+- **Verification**: Both migrations compiled against production inside explicit rollback transactions. The final live owner permission test passed and rolled back. All 102 Node tests passed; targeted ESLint passed with zero warnings/errors; the POS production build and `git diff --check` passed. Supabase database lint reported only six pre-existing unrelated function findings.
+- **Commits**: `7670a80` (`feat(inventory): unify stock control and movement evidence`), `1a87813` (`fix(inventory): preserve owner stock authority`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migrations `20260731203000` and `20260731213000` are applied and recorded on Noch Production. GitHub Actions run `30616535996` deployed commit `1a87813`; server verification and a fresh no-cache HTTP check confirmed `index-CtlR5RmQ.js` live at `apps.noch.cloud`.
+- **Remaining business work**: Complete physical location counts, build explicit recipes, deliberately opt products into inventory tracking, reconcile business-wide ingredient balances to locations, and begin recording real procurement evidence.
+
+---

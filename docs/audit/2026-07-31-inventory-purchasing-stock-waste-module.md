@@ -111,9 +111,13 @@ are preserved. The prior multi-purpose Stock Manager remains archived at
   inventory tests.
 - Targeted ESLint passed with zero warnings or errors.
 - POS production build passed.
-- Production database application, release deployment, authenticated
-  English/Arabic desktop/mobile smoke tests, and final live reconciliation are
-  recorded in `COMPLETED_WORK.md`.
+- Production migrations `20260731203000` and `20260731213000` were applied and
+  recorded after rollback validation. Owner count authority was transaction
+  tested against the live database and rolled back without leaving count rows.
+- GitHub Actions run `30616535996` deployed commit `1a87813`; its server-side
+  verification confirmed `index-CtlR5RmQ.js` live at `apps.noch.cloud`.
+- A fresh no-cache production request returned HTTP 200 and the same deployed
+  application bundle.
 
 ## Remaining business backlog
 
