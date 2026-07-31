@@ -343,6 +343,26 @@ To find if something's been done:
 
 ---
 
+## 2026-07-31 — Enterprise Sales and Inventory Reporting Accuracy
+
+- **Agent**: Codex
+- **Status**: Release validated; deployment pending
+- **Files**:
+  - `apps/pos/src/modules/pos/lib/business-time.js`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/pages/Sales.jsx`
+  - `apps/pos/src/pages/sales/salesReporting.js`
+  - `apps/pos/src/pages/inventory/InventoryIntelligence.jsx`
+  - `apps/pos/src/pages/inventory/lib/inventoryIntelligence.js`
+  - `apps/pos/tests/sales-reporting-accuracy.test.mjs`
+  - `apps/pos/tests/inventory-intelligence-report.test.mjs`
+- **Description**: Replaced the misleading inventory “runout prediction” and arbitrary fixed-deduction health score with an auditable control report built from the last physical count, completed-order recipe usage, theoretical on-hand quantity, minimum thresholds, and count freshness. Added explicit data provenance, threshold coverage, risk-sorted evidence, accurate Arabic labels, error/empty/loading states, and a complete CSV export. Reworked Sales to report completed sales, refunds, net sales, average order, and a payment reconciliation covering cash, card, split, Presto, and unmapped tenders.
+- **Accuracy and privacy**: Sales screen and CSV now use the same 5 AM–5 AM Africa/Tripoli business-day window independent of the viewer device timezone. CSV exports include completed orders only, label Tripoli dates/hours explicitly, and expose only the last four customer-phone digits.
+- **Verification**: 26 focused reporting, finance, expense, inventory, and loyalty tests passed; targeted ESLint passed with zero errors; POS production build passed; `git diff --check` passed.
+- **Deployment**: Pending.
+
+---
+
 ## 2026-07-31 — Loyalty V2, Owner Finance Labels, Expenses, and POS Inventory Repair
 
 - **Agent**: Codex

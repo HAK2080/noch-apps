@@ -10,7 +10,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListOrdered, Clock, Download, TrendingUp } from 'lucide-react'
 import {
-  getPOSBranches, getDailySalesRange, getSalesExportRows, businessToday, localYmd,
+  addYmdDays,
+  businessDayWindow,
+  businessHour,
+  businessYmd,
+  getDailySalesRange,
+  getPOSBranches,
+  getSalesExportRows,
 } from '../modules/pos/lib/pos-supabase'
 import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,6 +24,11 @@ import { usePermissions } from '../contexts/PermissionsContext'
 import Layout from '../components/Layout'
 import BusinessRangePicker from '../components/shared/BusinessRangePicker'
 import { downloadCsv } from '../lib/exportCsv'
+import {
+  combineSalesSummaries,
+  maskCustomerPhone,
+  summarizeDailySales,
+} from './sales/salesReporting'
 import toast from 'react-hot-toast'
 
 const PRESETS = [
@@ -27,9 +38,8 @@ const PRESETS = [
 ]
 
 function rangeFor(days) {
-  const to = businessToday()
-  const from = businessToday(); from.setDate(from.getDate() - days)
-  return { fromDate: localYmd(from), toDate: localYmd(to) }
+  const toDate = businessYmd()
+  return { fromDate: addYmdDays(toDate, -days), toDate }
 }
 
 const fmt = n => Number(n || 0).toLocaleString('en', { maximumFractionDigits: 2 })
@@ -51,10 +61,13 @@ export default function Sales() {
   const [exportBranchId, setExportBranchId] = useState('all')
   const [exporting, setExporting] = useState(false)
 
-  const choosePreset = (p) => {
-    if (p === 'custom') { setRange(r => ({ ...r, preset: 'custom' })); return }
-    const meta = PRESETS.find(x => x.key === p)
-    setRange({ preset: p, ...rangeFor(meta?.days ?? 0) })
+  const choosePreset = (preset) => {
+    if (preset === 'custom') {
+      setRange(current => ({ ...current, preset: 'custom' }))
+      return
+    }
+    const metadata = PRESETS.find(option => option.key === preset)
+    setRange({ preset, ...rangeFor(metadata?.days ?? 0) })
   }
 
   useEffect(() => {
@@ -72,28 +85,14 @@ export default function Sales() {
     Promise.all(
       branches.map(b =>
         getDailySalesRange(b.id, range.fromDate, range.toDate)
-          .then(rows => {
-            const t = { gross: 0, orders: 0, cash: 0, card: 0, presto: 0 }
-            for (const r of rows) {
-              t.gross  += Number(r.gross) || 0
-              t.orders += Number(r.orders) || 0
-              t.cash   += Number(r.cash_sales) || 0
-              t.card   += Number(r.card_sales) || 0
-              t.presto += Number(r.presto_sales) || 0
-            }
-            return [b.id, t]
-          })
+          .then(rows => [b.id, summarizeDailySales(rows)])
           .catch(() => [b.id, null])
       )
     ).then(entries => { if (!cancelled) setTotalsByBranch(Object.fromEntries(entries)) })
     return () => { cancelled = true }
   }, [branches, canViewSessions, range.fromDate, range.toDate])
 
-  const grand = Object.values(totalsByBranch).reduce((a, t) => {
-    if (!t) return a
-    a.gross += t.gross; a.orders += t.orders; a.cash += t.cash; a.card += t.card
-    return a
-  }, { gross: 0, orders: 0, cash: 0, card: 0 })
+  const grand = combineSalesSummaries(Object.values(totalsByBranch))
 
   const handleExport = async () => {
     if (!range.fromDate || !range.toDate || range.fromDate > range.toDate) {
@@ -106,11 +105,14 @@ export default function Sales() {
       const selectedBranches = exportBranchId === 'all'
         ? branches
         : branches.filter(branch => branch.id === exportBranchId)
-      const fromIso = new Date(`${range.fromDate}T00:00:00`).toISOString()
-      const toIso = new Date(`${range.toDate}T23:59:59.999`).toISOString()
+      const { fromIso, toIso } = businessDayWindow(range.fromDate, range.toDate)
       const chunks = await Promise.all(
         selectedBranches.map(branch =>
-          getSalesExportRows(branch.id, { from: fromIso, to: toIso })
+          getSalesExportRows(branch.id, {
+            from: fromIso,
+            to: toIso,
+            status: 'completed',
+          })
             .then(rows => rows.map(row => ({ branch, row }))),
         ),
       )
@@ -125,15 +127,15 @@ export default function Sales() {
         const netLineTotal = quantity > 0 ? lineTotal * (netQty / quantity) : lineTotal
         return [
           order.created_at || '',
-          created ? localYmd(created) : '',
-          created ? String(created.getHours()).padStart(2, '0') : '',
+          created ? businessYmd(created) : '',
+          created ? businessHour(created) : '',
           branch.name || order.pos_branches?.name || '',
           order.order_number || '',
           order.status || '',
           order.source || 'pos',
           order.payment_method || '',
           order.customer_name || '',
-          order.customer_phone || '',
+          maskCustomerPhone(order.customer_phone),
           order.table_number || '',
           order.pickup_code || '',
           order.served_by_profile?.full_name || '',
@@ -158,8 +160,8 @@ export default function Sales() {
       downloadCsv(
         `sales_detail_${exportBranchId === 'all' ? 'all_branches' : selectedBranches[0]?.name || 'branch'}_${range.fromDate}_${range.toDate}`,
         [
-          'timestamp', 'date', 'hour', 'branch', 'order_number', 'order_status', 'source',
-          'payment_method', 'customer_name', 'customer_phone', 'table_number', 'pickup_code',
+          'timestamp_utc', 'business_date_tripoli', 'hour_tripoli', 'branch', 'order_number', 'order_status', 'source',
+          'payment_method', 'customer_name', 'customer_phone_last4', 'table_number', 'pickup_code',
           'served_by', 'product_id', 'product_name', 'product_name_ar', 'quantity',
           'refunded_qty', 'net_quantity', 'unit_price_lyd', 'line_total_lyd',
           'net_line_total_lyd', 'order_subtotal_lyd', 'order_discount_lyd',
@@ -185,7 +187,7 @@ export default function Sales() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto py-6">
+      <div className="max-w-4xl mx-auto py-6">
         <h1 className="text-white font-bold text-2xl mb-2">Sales</h1>
         <p className="text-noch-muted text-sm mb-4">
           Business days run 5 AM → 5 AM, so late-night sales count toward the evening&apos;s day.
@@ -266,26 +268,48 @@ export default function Sales() {
                   All branches · {range.fromDate} → {range.toDate}
                 </p>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Gross</p>
-                  <p className="text-noch-green font-bold text-lg leading-tight">{fmt(grand.gross)}</p>
-                  <p className="text-noch-muted text-[10px]">LYD</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Net sales</p>
+                  <p className="text-noch-green font-bold text-lg leading-tight">{fmt(grand.netSales)}</p>
+                  <p className="text-noch-muted text-[10px]">completed sales less refunds · LYD</p>
                 </div>
                 <div>
                   <p className="text-noch-muted text-[10px] uppercase tracking-wider">Orders</p>
                   <p className="text-white font-bold text-lg leading-tight">{grand.orders}</p>
-                  <p className="text-noch-muted text-[10px]">tickets</p>
+                  <p className="text-noch-muted text-[10px]">
+                    avg {fmt(grand.orders ? grand.netSales / grand.orders : 0)} LYD
+                  </p>
                 </div>
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Cash</p>
-                  <p className="text-white font-bold text-lg leading-tight">{fmt(grand.cash)}</p>
-                  <p className="text-noch-muted text-[10px]">LYD</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Refunds</p>
+                  <p className="text-red-300 font-bold text-lg leading-tight">{fmt(grand.refunds)}</p>
+                  <p className="text-noch-muted text-[10px]">deducted from completed sales · LYD</p>
                 </div>
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Card</p>
-                  <p className="text-white font-bold text-lg leading-tight">{fmt(grand.card)}</p>
-                  <p className="text-noch-muted text-[10px]">LYD</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Completed sales</p>
+                  <p className="text-white font-bold text-lg leading-tight">{fmt(grand.completedSales)}</p>
+                  <p className="text-noch-muted text-[10px]">after discounts · before refunds</p>
+                </div>
+              </div>
+              <div className="border-t border-noch-border mt-4 pt-3">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <p className="text-white text-xs font-semibold">Payment reconciliation</p>
+                  <p className="text-noch-muted text-[10px]">Equals completed sales, before refunds</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    ['Cash', grand.cash],
+                    ['Card', grand.card],
+                    ['Split', grand.split],
+                    ['Presto', grand.presto],
+                    ['Other / unmapped', grand.unclassified],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-black/20 px-3 py-2">
+                      <p className="text-noch-muted text-[10px]">{label}</p>
+                      <p className="text-white text-sm font-semibold">{fmt(value)} LYD</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -304,8 +328,15 @@ export default function Sales() {
                   </div>
                   {canViewSessions && t && (
                     <div className="text-right">
-                      <p className="text-noch-green font-bold text-lg leading-tight">{fmt(t.gross)} <span className="text-xs">LYD</span></p>
-                      <p className="text-noch-muted text-xs">{t.orders} orders · cash {fmt(t.cash)} · card {fmt(t.card)}</p>
+                      <p className="text-noch-green font-bold text-lg leading-tight">
+                        {fmt(t.netSales)} <span className="text-xs">LYD net</span>
+                      </p>
+                      <p className="text-noch-muted text-xs">
+                        {t.orders} orders · refunds {fmt(t.refunds)}
+                      </p>
+                      <p className="text-noch-muted text-[10px] mt-0.5">
+                        cash {fmt(t.cash)} · card {fmt(t.card)} · split {fmt(t.split)} · Presto {fmt(t.presto)}
+                      </p>
                     </div>
                   )}
                 </div>

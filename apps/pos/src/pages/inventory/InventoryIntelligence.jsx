@@ -1,190 +1,384 @@
-import { useEffect, useState } from 'react'
-import { Brain, AlertTriangle, TrendingDown, Package, Zap, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  Loader2,
+  Package,
+  RefreshCw,
+  Settings,
+} from 'lucide-react'
 import Layout from '../../components/Layout'
 import BackButton from '../../components/shared/BackButton'
-import { supabase } from '../../lib/supabase'
 import { useLanguage } from '../../contexts/LanguageContext'
-import toast from 'react-hot-toast'
+import { downloadCsv } from '../../lib/exportCsv'
+import { supabase } from '../../lib/supabase'
+import {
+  buildInventoryControlReport,
+  inventoryControlExportRows,
+} from './lib/inventoryIntelligence'
 
-function daysToOut(qty, rate) {
-  if (!rate || rate <= 0 || qty == null) return null
-  if (qty <= 0) return 0
-  return Math.round(qty / rate)
+const STATUS_META = {
+  out: {
+    en: 'Out of stock',
+    ar: 'نفد المخزون',
+    className: 'border-red-500/30 bg-red-500/10 text-red-300',
+  },
+  below_minimum: {
+    en: 'Below minimum',
+    ar: 'أقل من الحد الأدنى',
+    className: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
+  },
+  near_minimum: {
+    en: 'Near minimum',
+    ar: 'قريب من الحد الأدنى',
+    className: 'border-yellow-300/30 bg-yellow-300/10 text-yellow-200',
+  },
+  unconfigured: {
+    en: 'Threshold missing',
+    ar: 'الحد الأدنى غير محدد',
+    className: 'border-slate-400/30 bg-slate-400/10 text-slate-300',
+  },
+  healthy: {
+    en: 'Healthy',
+    ar: 'سليم',
+    className: 'border-noch-green/30 bg-noch-green/10 text-noch-green',
+  },
 }
 
-function healthScore(items) {
-  if (!items.length) return 100
-  let score = 100
-  for (const it of items) {
-    if (it.qty_available <= 0) score -= 10
-    else if (it.flag === 'low') score -= 5
-    else if (it.flag === 'urgent') score -= 3
-    else if (it.flag === 'watch') score -= 1
-  }
-  return Math.max(0, Math.min(100, score))
+function formatQuantity(value) {
+  return Number(value || 0).toLocaleString('en-GB', {
+    maximumFractionDigits: 3,
+  })
+}
+
+function MetricCard({ label, value, detail, tone = 'text-white', icon }) {
+  const MetricIcon = icon
+  return (
+    <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-noch-muted text-[11px] uppercase tracking-wider">{label}</p>
+          <p className={`text-2xl font-bold mt-1 ${tone}`}>{value}</p>
+          <p className="text-noch-muted text-xs mt-1">{detail}</p>
+        </div>
+        <MetricIcon size={18} className={tone} />
+      </div>
+    </div>
+  )
+}
+
+function StatusBadge({ status, arabic }) {
+  const meta = STATUS_META[status] || STATUS_META.unconfigured
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-1 text-[11px] font-semibold ${meta.className}`}>
+      {arabic ? meta.ar : meta.en}
+    </span>
+  )
 }
 
 export default function InventoryIntelligence() {
   const { lang } = useLanguage()
-  const ar = lang === 'ar'
-  const [items, setItems] = useState([])
+  const arabic = lang === 'ar'
+  const copy = (english, arabicText) => arabic ? arabicText : english
+  const [sourceRows, setSourceRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [refreshedAt, setRefreshedAt] = useState(null)
 
-  useEffect(() => {
-    async function load() {
-      try {
-        // `stock` only has qty_available + min_threshold; name/unit live on
-        // the joined `ingredients` row. consumption_rate and manual_daily_rate
-        // don't exist on this DB — port assumed a different schema. We skip
-        // days-to-out prediction here and just flag out/low/ok from threshold.
-        const { data, error } = await supabase
-          .from('stock')
-          .select('id, qty_available, min_threshold, ingredient:ingredients(id, name, name_ar, base_unit)')
-          .gt('min_threshold', 0)
-        if (error) throw error
-
-        const enriched = (data || []).map(it => {
-          let flag = 'ok'
-          if (it.qty_available <= 0) flag = 'out'
-          else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold) flag = 'low'
-          else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold * 1.5) flag = 'urgent'
-          else if (it.min_threshold > 0 && it.qty_available <= it.min_threshold * 2)   flag = 'watch'
-          return {
-            ...it,
-            name:      it.ingredient?.name    || '—',
-            name_ar:   it.ingredient?.name_ar || '',
-            unit:      it.ingredient?.base_unit || '',
-            daysToOut: null,
-            flag,
-          }
-        })
-        setItems(enriched)
-      } catch (e) {
-        toast.error(e.message || 'Failed to load stock')
-      } finally {
-        setLoading(false)
-      }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    const { data, error: queryError } = await supabase.rpc('inventory_theoretical_status')
+    if (queryError) {
+      setError(queryError.message || 'Inventory report could not be loaded')
+      setLoading(false)
+      return
     }
-    load()
+    setSourceRows(data || [])
+    setRefreshedAt(new Date())
+    setLoading(false)
   }, [])
 
-  const score = healthScore(items)
-  const outItems    = items.filter(i => i.flag === 'out')
-  const lowItems    = items.filter(i => i.flag === 'low')
-  const urgentItems = items.filter(i => i.flag === 'urgent')
-  const watchItems  = items.filter(i => i.flag === 'watch')
-  const okItems     = items.filter(i => i.flag === 'ok')
+  useEffect(() => {
+    let active = true
+    supabase.rpc('inventory_theoretical_status').then(({ data, error: queryError }) => {
+      if (!active) return
+      if (queryError) {
+        setError(queryError.message || 'Inventory report could not be loaded')
+      } else {
+        setSourceRows(data || [])
+        setRefreshedAt(new Date())
+      }
+      setLoading(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
 
-  const scoreColor = score >= 80 ? 'text-noch-green' : score >= 50 ? 'text-amber-400' : 'text-red-400'
-  const scoreBg    = score >= 80 ? 'bg-noch-green/10 border-noch-green/30' : score >= 50 ? 'bg-amber-400/10 border-amber-400/30' : 'bg-red-500/10 border-red-500/30'
+  const report = useMemo(
+    () => buildInventoryControlReport(sourceRows),
+    [sourceRows],
+  )
+
+  const exportReport = () => {
+    downloadCsv(
+      `inventory_control_report_${new Date().toISOString().slice(0, 10)}`,
+      [
+        'ingredient',
+        'status',
+        'last_counted_qty',
+        'recipe_usage_since_count',
+        'estimated_on_hand',
+        'minimum_threshold',
+        'threshold_configured',
+        'count_freshness',
+        'last_counted_at',
+        'unit',
+      ],
+      inventoryControlExportRows(report.rows),
+    )
+  }
+
+  const locale = arabic ? 'ar-LY' : 'en-GB'
+  const belowOrNear = report.statusCounts.below_minimum + report.statusCounts.near_minimum
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-6">
         <BackButton to="/inventory" />
 
-        <div className="flex items-center gap-3 mb-6 mt-2">
-          <div className="w-10 h-10 rounded-xl bg-noch-green/10 text-noch-green flex items-center justify-center">
-            <Brain size={20} />
-          </div>
+        <div className="flex flex-col gap-4 mt-3 mb-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-white font-bold text-xl">
-              {ar ? 'ذكاء المخزون' : 'Inventory Intelligence'}
+            <h1 className="text-white font-bold text-2xl">
+              {copy('Inventory Control Report', 'تقرير الرقابة على المخزون')}
             </h1>
-            <p className="text-noch-muted text-sm">
-              {ar ? 'تحليل المخزون وتوقع النفاد' : 'Stock analysis and runout prediction'}
+            <p className="text-noch-muted text-sm mt-1 max-w-3xl">
+              {copy(
+                'Estimated on-hand quantity equals the last physical count minus recipe usage from completed POS orders.',
+                'الكمية التقديرية المتاحة تساوي آخر جرد فعلي ناقص استهلاك الوصفات من طلبات نقاط البيع المكتملة.',
+              )}
             </p>
+            <p className="text-noch-muted text-xs mt-2">
+              {refreshedAt
+                ? `${copy('Data refreshed', 'تم تحديث البيانات')}: ${refreshedAt.toLocaleString(locale)}`
+                : copy('Waiting for current data', 'بانتظار البيانات الحالية')}
+            </p>
+          </div>
+          <div className="flex gap-2 no-print">
+            <button
+              onClick={exportReport}
+              disabled={loading || report.total === 0}
+              className="btn-secondary text-sm flex items-center gap-2 disabled:opacity-50"
+            >
+              <Download size={15} />
+              {copy('Export evidence', 'تصدير البيانات')}
+            </button>
+            <button
+              onClick={load}
+              disabled={loading}
+              className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+            >
+              {loading
+                ? <Loader2 size={15} className="animate-spin" />
+                : <RefreshCw size={15} />}
+              {copy('Refresh', 'تحديث')}
+            </button>
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-20 text-noch-muted">
-            <Loader2 size={24} className="animate-spin" />
+        {error ? (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5">
+            <p className="text-red-300 font-semibold">
+              {copy('Inventory data is unavailable', 'بيانات المخزون غير متاحة')}
+            </p>
+            <p className="text-red-200/70 text-sm mt-1">{error}</p>
+            <button onClick={load} className="btn-secondary text-sm mt-4">
+              {copy('Try again', 'إعادة المحاولة')}
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="flex items-center justify-center gap-2 py-24 text-noch-muted">
+            <Loader2 size={22} className="animate-spin" />
+            {copy('Calculating inventory controls…', 'جارٍ احتساب مؤشرات المخزون…')}
+          </div>
+        ) : report.total === 0 ? (
+          <div className="rounded-xl border border-noch-border bg-noch-card p-8 text-center">
+            <Package size={24} className="text-noch-muted mx-auto mb-3" />
+            <p className="text-white font-semibold">
+              {copy('No tracked ingredient stock', 'لا يوجد مخزون مكونات متابع')}
+            </p>
+            <p className="text-noch-muted text-sm mt-1">
+              {copy(
+                'Add ingredients and record a physical count before using this report.',
+                'أضف المكونات وسجل جرداً فعلياً قبل استخدام هذا التقرير.',
+              )}
+            </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {/* Health Score */}
-            <div className={`rounded-2xl border p-5 flex items-center gap-4 ${scoreBg}`}>
-              <div className={`text-4xl font-black ${scoreColor}`}>{score}</div>
-              <div>
-                <p className="text-white font-semibold">{ar ? 'نقاط صحة المخزون' : 'Inventory Health Score'}</p>
-                <p className="text-noch-muted text-sm">
-                  {score >= 80
-                    ? (ar ? 'المخزون بحالة جيدة' : 'Stock is in good shape')
-                    : score >= 50
-                    ? (ar ? 'بعض الأصناف تحتاج انتباه' : 'Some items need attention')
-                    : (ar ? 'تحذير: مشاكل حرجة في المخزون' : 'Warning: critical stock issues')}
-                </p>
-              </div>
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <MetricCard
+                label={copy('Tracked ingredients', 'المكونات المتابعة')}
+                value={report.total}
+                detail={copy('Included in this report', 'مدرجة في هذا التقرير')}
+                icon={Package}
+              />
+              <MetricCard
+                label={copy('Out of stock', 'نفد المخزون')}
+                value={report.statusCounts.out}
+                detail={copy('Estimated on hand is zero', 'المتاح التقديري يساوي صفراً')}
+                tone="text-red-300"
+                icon={AlertTriangle}
+              />
+              <MetricCard
+                label={copy('Needs attention', 'يحتاج متابعة')}
+                value={belowOrNear}
+                detail={copy('Below or near minimum', 'أقل من الحد الأدنى أو قريب منه')}
+                tone="text-amber-300"
+                icon={AlertTriangle}
+              />
+              <MetricCard
+                label={copy('Stale counts', 'جرد قديم')}
+                value={report.staleCount}
+                detail={copy('Last physical count is over 7 days old', 'آخر جرد فعلي أقدم من 7 أيام')}
+                tone={report.staleCount ? 'text-yellow-200' : 'text-noch-green'}
+                icon={CheckCircle2}
+              />
             </div>
 
-            {/* Summary row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <SummaryTile count={outItems.length}    label={ar ? 'نفد' : 'Out'}    color="red"   icon={AlertTriangle} />
-              <SummaryTile count={lowItems.length}    label={ar ? 'منخفض' : 'Low'}  color="yellow" icon={TrendingDown} />
-              <SummaryTile count={urgentItems.length} label={ar ? 'عاجل' : 'Urgent'} color="orange" icon={Zap} />
-              <SummaryTile count={okItems.length}     label={ar ? 'جيد' : 'OK'}    color="green"  icon={Package} />
-            </div>
-
-            {/* Item groups */}
-            {[
-              { items: outItems,    title: ar ? 'نفد المخزون' : 'Out of stock',    color: 'border-red-500/40 bg-red-500/5' },
-              { items: urgentItems, title: ar ? 'ينفد قريباً (أقل من 7 أيام)' : 'Running out soon (< 7 days)', color: 'border-orange-400/40 bg-orange-400/5' },
-              { items: lowItems,    title: ar ? 'تحت الحد الأدنى' : 'Below minimum threshold', color: 'border-yellow-400/40 bg-yellow-400/5' },
-              { items: watchItems,  title: ar ? 'تحت المراقبة (7-14 يوم)' : 'Watch (7-14 days left)', color: 'border-amber-400/40 bg-amber-400/5' },
-            ].map(group => group.items.length > 0 && (
-              <section key={group.title} className={`rounded-2xl border overflow-hidden ${group.color}`}>
-                <p className="text-white font-semibold text-sm px-4 py-3 border-b border-noch-border/50">
-                  {group.title} — {group.items.length}
-                </p>
-                <div className="divide-y divide-noch-border/30">
-                  {group.items.map(it => (
-                    <div key={it.id} className="flex items-center justify-between px-4 py-2.5">
-                      <p className="text-white text-sm">{ar && it.name_ar ? it.name_ar : it.name}</p>
-                      <div className="text-right">
-                        <p className="text-noch-muted text-xs">
-                          {it.qty_available ?? '?'} {it.unit || ''}
-                        </p>
-                        {it.daysToOut !== null && (
-                          <p className="text-noch-muted text-xs">
-                            {it.daysToOut === 0
-                              ? (ar ? 'نفد الآن' : 'gone now')
-                              : `~${it.daysToOut}d left`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-white font-semibold text-sm">
+                      {copy('Threshold coverage', 'تغطية حدود إعادة الطلب')}
+                    </p>
+                    <p className="text-noch-muted text-xs mt-1">
+                      {report.configuredCount} / {report.total} {copy('ingredients configured', 'مكونات تم إعدادها')}
+                    </p>
+                  </div>
+                  <p className="text-white font-bold text-xl">
+                    {report.thresholdCoveragePct ?? '—'}%
+                  </p>
                 </div>
-              </section>
-            ))}
-
-            {outItems.length === 0 && urgentItems.length === 0 && lowItems.length === 0 && watchItems.length === 0 && (
-              <div className="rounded-2xl border border-noch-green/30 bg-noch-green/5 p-6 text-center">
-                <p className="text-noch-green font-semibold">{ar ? 'كل شيء على ما يرام!' : 'All good!'}</p>
-                <p className="text-noch-muted text-sm mt-1">{ar ? 'لا توجد مشاكل في المخزون حالياً' : 'No stock issues detected right now'}</p>
+                <div className="h-2 rounded-full bg-black/30 mt-3 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-400"
+                    style={{ width: `${report.thresholdCoveragePct || 0}%` }}
+                  />
+                </div>
               </div>
-            )}
-          </div>
+              <div className="rounded-xl border border-noch-border bg-noch-card p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-white font-semibold text-sm">
+                      {copy('Healthy configured stock', 'المخزون السليم المهيأ')}
+                    </p>
+                    <p className="text-noch-muted text-xs mt-1">
+                      {copy(
+                        'Share of threshold-configured items safely above 150% of minimum',
+                        'نسبة العناصر المهيأة التي تتجاوز 150٪ من الحد الأدنى بأمان',
+                      )}
+                    </p>
+                  </div>
+                  <p className="text-noch-green font-bold text-xl">
+                    {report.healthyConfiguredPct ?? '—'}{report.healthyConfiguredPct == null ? '' : '%'}
+                  </p>
+                </div>
+                <div className="h-2 rounded-full bg-black/30 mt-3 overflow-hidden">
+                  <div
+                    className="h-full bg-noch-green"
+                    style={{ width: `${report.healthyConfiguredPct || 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-noch-border bg-noch-card overflow-hidden">
+              <div className="p-4 border-b border-noch-border">
+                <h2 className="text-white font-semibold">
+                  {copy('Inventory evidence', 'أدلة المخزون')}
+                </h2>
+                <p className="text-noch-muted text-xs mt-1">
+                  {copy(
+                    'Rows are sorted by operational risk. “Estimated on hand” is not a physical count.',
+                    'تم ترتيب الصفوف حسب المخاطر التشغيلية. «المتاح التقديري» ليس جرداً فعلياً.',
+                  )}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-black/20 text-noch-muted">
+                    <tr>
+                      <th className="text-left px-4 py-3">{copy('Ingredient', 'المكون')}</th>
+                      <th className="text-left px-3 py-3">{copy('Status', 'الحالة')}</th>
+                      <th className="text-right px-3 py-3">{copy('Last count', 'آخر جرد')}</th>
+                      <th className="text-right px-3 py-3">{copy('Recipe usage', 'استهلاك الوصفات')}</th>
+                      <th className="text-right px-3 py-3">{copy('Estimated on hand', 'المتاح التقديري')}</th>
+                      <th className="text-right px-3 py-3">{copy('Minimum', 'الحد الأدنى')}</th>
+                      <th className="text-right px-4 py-3">{copy('Counted at', 'تاريخ الجرد')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.rows.map(row => (
+                      <tr key={row.ingredientId || row.name} className="border-t border-noch-border/50">
+                        <td className="px-4 py-3 text-white font-medium min-w-44">
+                          {row.name}
+                          <span className="block text-noch-muted text-[10px] mt-0.5">{row.unit || '—'}</span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <StatusBadge status={row.status} arabic={arabic} />
+                        </td>
+                        <td className="px-3 py-3 text-right text-white tabular-nums">
+                          {formatQuantity(row.countedQty)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-noch-muted tabular-nums">
+                          {formatQuantity(row.consumedSinceCount)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-white font-semibold tabular-nums">
+                          {formatQuantity(row.theoreticalQty)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-noch-muted tabular-nums">
+                          {row.thresholdConfigured ? formatQuantity(row.minThreshold) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <p className={row.countIsStale ? 'text-yellow-200' : 'text-noch-muted'}>
+                            {row.lastCountedAt
+                              ? new Date(row.lastCountedAt).toLocaleDateString(locale)
+                              : copy('Never', 'لم يتم')}
+                          </p>
+                          {row.countIsStale && (
+                            <p className="text-yellow-200/70 text-[10px] mt-0.5">
+                              {copy('Stale', 'قديم')}
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-blue-400/20 bg-blue-400/5 p-4 mt-4 flex gap-3">
+              <Settings size={17} className="text-blue-300 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-blue-200 font-semibold text-sm">
+                  {copy('How to interpret this report', 'كيفية قراءة هذا التقرير')}
+                </p>
+                <p className="text-blue-200/70 text-xs mt-1 leading-relaxed">
+                  {copy(
+                    'Completed POS orders reduce theoretical stock through configured recipes. Refunds, waste, transfers, missing recipes, and unrecorded physical movements can create differences, so stale or high-risk rows should be physically counted before purchasing decisions.',
+                    'تخفض طلبات نقاط البيع المكتملة المخزون النظري عبر الوصفات المهيأة. قد تؤدي المرتجعات والهدر والتحويلات والوصفات الناقصة والحركات غير المسجلة إلى فروقات، لذلك يجب جرد الصفوف القديمة أو عالية المخاطر فعلياً قبل اتخاذ قرارات الشراء.',
+                  )}
+                </p>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </Layout>
-  )
-}
-
-// eslint-disable-next-line no-unused-vars
-function SummaryTile({ count, label, color, icon: IconComp }) {
-  const styles = {
-    red:    'bg-red-500/10 border-red-500/30 text-red-400',
-    yellow: 'bg-yellow-400/10 border-yellow-400/30 text-yellow-400',
-    orange: 'bg-orange-400/10 border-orange-400/30 text-orange-400',
-    green:  'bg-noch-green/10 border-noch-green/30 text-noch-green',
-  }
-  return (
-    <div className={`rounded-xl border p-3 flex flex-col gap-1 ${styles[color]}`}>
-      <IconComp size={16} />
-      <p className="text-white font-bold text-xl">{count}</p>
-      <p className="text-xs opacity-70">{label}</p>
-    </div>
   )
 }
