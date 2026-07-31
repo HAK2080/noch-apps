@@ -11,6 +11,8 @@
 - **Verification**: Workforce control tests passed, targeted PayrollTab ESLint passed, and the POS production build passed.
 - **Deployment**: POS release and migration verification recorded with the commit below.
 - **Follow-up**: Warning-only payroll drafts no longer use the stale client variance gate. Attendance and schedules remain optional evidence; owners can enter hours/day, worked days, scheduled hours, overtime, deductions, and loan repayments manually. Hourly pay is calculated by the owner-only draft RPC.
+- **Commit**: `83c51c9` (`feat(payroll): support manual hours and adjustments`)
+- **Deployment**: GitHub Actions run `30638444999` deployed the POS bundle successfully; migration `20260801090000_payroll_manual_hours.sql` was applied in the production SQL editor. Live Payroll smoke check shows optional evidence guidance, hours fields, and an enabled Complete payroll action for warning-only data.
 
 ---
 
