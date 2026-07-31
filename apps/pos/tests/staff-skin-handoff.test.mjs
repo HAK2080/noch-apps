@@ -41,3 +41,8 @@ test('storefront is not part of the staff skin seam', () => {
   assert.doesNotMatch(css, /skin-login.*Menu|skin-pos.*Menu/i)
   assert.doesNotMatch(layout, /Menu\.css|storefront/i)
 })
+
+test('the shared authenticated staff shell keeps the skin on every staff route', () => {
+  assert.match(layout, /const staffSkinEnabled = true/)
+  assert.doesNotMatch(layout, /location\.pathname === '\/dashboard'/)
+})

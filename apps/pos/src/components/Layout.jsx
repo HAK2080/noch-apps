@@ -92,10 +92,12 @@ export default function Layout({ children }) {
     .toUpperCase() || '?'
 
   const pageLabel = navLinkItems.find(item => item.to === location.pathname)?.label || (ar ? 'مساحة العمل' : 'Workspace')
-  const skinRoute = location.pathname === '/dashboard' || location.pathname.startsWith('/pos')
+  // Layout is exclusive to authenticated staff routes; keep the shared skin
+  // active across the whole staff workspace, including finance and inventory.
+  const staffSkinEnabled = true
 
   return (
-    <div className={`flex min-h-screen bg-[var(--bg)] text-[var(--text)] ${skinRoute ? 'staff-skin' : ''}`}>
+    <div className={`flex min-h-screen bg-[var(--bg)] text-[var(--text)] ${staffSkinEnabled ? 'staff-skin' : ''}`}>
       <aside className="hidden md:flex md:w-[248px] fixed inset-y-0 start-0 flex-col border-e border-white/[0.07] bg-[#0b0b0d]">
         <div className="px-3 pt-3">
           <button
@@ -140,7 +142,7 @@ export default function Layout({ children }) {
           </div>
           <div className="flex items-center justify-between gap-1 px-1">
             <LanguageToggle className="justify-start" />
-            {!skinRoute && <ThemeToggle />}
+            {!staffSkinEnabled && <ThemeToggle />}
             <button onClick={handleSignOut} aria-label={t('logout')} className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /></button>
           </div>
         </div>

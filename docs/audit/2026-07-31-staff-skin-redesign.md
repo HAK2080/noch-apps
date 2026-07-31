@@ -8,7 +8,7 @@ The handoff scope is deliberately limited to the authenticated staff experience:
 
 - `/dashboard` owner reporting
 - `/pos/:branchId` terminal, product grid, and cart
-- shared authenticated shell and login
+- shared authenticated shell and login across every staff route
 
 The customer storefront (`/menu/:branchId`) was not changed. Existing routes, permissions, data access, loyalty capture, inventory behavior, and POS handlers remain authoritative.
 
@@ -23,7 +23,7 @@ The customer storefront (`/menu/:branchId`) was not changed. Existing routes, pe
 
 ## Verification
 
-- `node --test` across `tests/` and `apps/pos/tests/`: 129 passed
+- `node --test` across `tests/` and `apps/pos/tests/`: 130 passed
 - Targeted ESLint for all changed JSX files: passed with zero warnings/errors
 - `npm run build` in `apps/pos`: passed
 - `git diff --check`: passed (only normal CRLF conversion notices)
