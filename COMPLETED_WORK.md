@@ -30,7 +30,7 @@
 ## 2026-07-31 — Staff Newsprint Skin Redesign
 
 - **Agent**: Codex
-- **Status**: Implemented and committed; deployment pending verification
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/index.html`
   - `apps/pos/src/components/Layout.jsx`
@@ -47,7 +47,7 @@
 - **Description**: Applied the supplied Oatly/newsprint handoff as a scoped cream/ink staff skin for the owner dashboard, POS, shared shell, and login. Storefront routes and operational behavior remain unchanged. The staff theme toggle is hidden because this release selects cream-first until a deliberate dark variant is designed.
 - **Verification**: 129 repository tests passed, targeted ESLint passed, POS production build passed, and staged diff validation passed.
 - **Commit**: `57c837b` (`feat(ui): apply staff newsprint skin`)
-- **Deployment**: Pending push and production release verification.
+- **Deployment**: GitHub Actions run `30636296458` deployed commit `76a45a3` successfully to `apps.noch.cloud`; the live bundle and CSS were checked for the staff-skin token, cream palette, and Anton font.
 
 ---
 
