@@ -32,12 +32,6 @@ import { downloadCsv } from '../lib/exportCsv'
 import { maskCustomerPhone } from './sales/salesReporting'
 import toast from 'react-hot-toast'
 
-const PRESETS = [
-  { key: 'today', label: 'Today', days: 0 },
-  { key: '7d',    label: '7 days', days: 6 },
-  { key: 'month', label: 'Month', days: 29 },
-]
-
 const SALES_COPY = {
   en: {
     title: 'Sales and payment control',
@@ -65,6 +59,25 @@ const SALES_COPY = {
     orderEvidence: 'Orders',
     shifts: 'Shifts',
     currency: 'LYD',
+    today: 'Today',
+    sevenDays: '7 days',
+    month: 'Month',
+    exportDetailed: 'Export detailed sales',
+    exportDetailDescription: 'One CSV row per sold item for the selected business-date range.',
+    allBranches: 'All branches',
+    exportCsv: 'Export CSV',
+    exporting: 'Exporting...',
+    netSalesHelp: 'completed sales less refunds',
+    average: 'avg',
+    linkedRefundsHelp: 'deducted from completed sales',
+    completedSalesHelp: 'after discounts · before refunds',
+    reconstructed: count => `${count} historical tender legs were reconstructed and are visibly identified.`,
+    untracked: count => `${count} orders have no tender event. Financial control is incomplete.`,
+    unavailableBranches: names => `Unavailable branch data: ${names}. Consolidated totals exclude these branches.`,
+    prestoOutstanding: (amount, count) => `Presto outstanding: ${amount} LYD across ${count} orders.`,
+    branchNet: amount => `${amount} LYD net`,
+    branchOrders: (orders, refunds) => `${orders} orders · refunds ${refunds}`,
+    branchTenders: (cash, card, presto) => `cash ${cash} · card ${card} · Presto ${presto}`,
   },
   ar: {
     title: 'رقابة المبيعات والمدفوعات',
@@ -92,6 +105,25 @@ const SALES_COPY = {
     orderEvidence: 'الطلبات',
     shifts: 'الورديات',
     currency: 'د.ل',
+    today: 'اليوم',
+    sevenDays: '7 أيام',
+    month: 'شهر',
+    exportDetailed: 'تصدير تفاصيل المبيعات',
+    exportDetailDescription: 'صف واحد في ملف CSV لكل صنف مباع ضمن نطاق أيام العمل المحدد.',
+    allBranches: 'كل الفروع',
+    exportCsv: 'تصدير CSV',
+    exporting: 'جارٍ التصدير...',
+    netSalesHelp: 'المبيعات المكتملة ناقص المرتجعات',
+    average: 'المتوسط',
+    linkedRefundsHelp: 'مخصومة من المبيعات المكتملة',
+    completedSalesHelp: 'بعد الخصومات وقبل المرتجعات',
+    reconstructed: count => `أُعيد بناء ${count} حركة دفع تاريخية وتم تمييزها بوضوح.`,
+    untracked: count => `${count} طلب بلا حركة دفع. الرقابة المالية غير مكتملة.`,
+    unavailableBranches: names => `بيانات الفروع غير المتاحة: ${names}. لا تشملها الإجماليات المجمعة.`,
+    prestoOutstanding: (amount, count) => `بريستو غير المحصل: ${amount} د.ل عبر ${count} طلب.`,
+    branchNet: amount => `${amount} د.ل صافي`,
+    branchOrders: (orders, refunds) => `${orders} طلب · المرتجعات ${refunds}`,
+    branchTenders: (cash, card, presto) => `نقدي ${cash} · بطاقة ${card} · بريستو ${presto}`,
   },
 }
 
@@ -106,6 +138,11 @@ export default function Sales() {
   const navigate = useNavigate()
   const { lang } = useLanguage()
   const copy = SALES_COPY[lang] || SALES_COPY.en
+  const localizedPresets = [
+    { key: 'today', label: copy.today, days: 0 },
+    { key: '7d', label: copy.sevenDays, days: 6 },
+    { key: 'month', label: copy.month, days: 29 },
+  ]
   const { profile } = useAuth()
   const { isOwner, hasAccess } = usePermissions()
   // Session/shift totals: 'sales' permission for the logged-in profile, OR a
@@ -254,23 +291,23 @@ export default function Sales() {
           <>
             {/* Range presets */}
             <div className="mb-4">
-              <BusinessRangePicker presets={PRESETS} value={{ preset: range.preset, from: range.fromDate, to: range.toDate }} onChange={next => setRange({ preset: next.preset, fromDate: next.from, toDate: next.to })} />
+              <BusinessRangePicker presets={localizedPresets} value={{ preset: range.preset, from: range.fromDate, to: range.toDate }} onChange={next => setRange({ preset: next.preset, fromDate: next.from, toDate: next.to })} />
             </div>
             <div className="card p-4 mb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h2 className="text-white font-semibold text-sm flex items-center gap-2">
-                    <Download size={15} className="text-noch-green" /> Export detailed sales
+                    <Download size={15} className="text-noch-green" /> {copy.exportDetailed}
                   </h2>
-                  <p className="text-noch-muted text-xs mt-1">One CSV row per sold item for the selected business-date range.</p>
+                  <p className="text-noch-muted text-xs mt-1">{copy.exportDetailDescription}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <select value={exportBranchId} onChange={event => setExportBranchId(event.target.value)} className="input text-sm">
-                    <option value="all">All branches</option>
-                    {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                    <option value="all">{copy.allBranches}</option>
+                    {branches.map(branch => <option key={branch.id} value={branch.id}>{lang === 'ar' ? (branch.name_ar || branch.name) : branch.name}</option>)}
                   </select>
                   <button onClick={handleExport} disabled={exporting || branches.length === 0} className="btn-primary text-sm px-3 py-2 flex items-center justify-center gap-2 whitespace-nowrap">
-                    <Download size={14} /> {exporting ? 'Exporting...' : 'Export CSV'}
+                    <Download size={14} /> {exporting ? copy.exporting : copy.exportCsv}
                   </button>
                 </div>
               </div>
@@ -280,31 +317,31 @@ export default function Sales() {
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp size={14} className="text-noch-green" />
                 <p className="text-noch-muted text-xs">
-                  All branches · {range.fromDate} → {range.toDate}
+                  {copy.allBranches} · {range.fromDate} → {range.toDate}
                 </p>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.netSales}</p>
                   <p className="text-noch-green font-bold text-lg leading-tight">{fmt(grand.net_sales)}</p>
-                  <p className="text-noch-muted text-[10px]">completed sales less refunds · LYD</p>
+                  <p className="text-noch-muted text-[10px]">{copy.netSalesHelp} · {copy.currency}</p>
                 </div>
                 <div>
                   <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.orders}</p>
                   <p className="text-white font-bold text-lg leading-tight">{grand.order_count}</p>
                   <p className="text-noch-muted text-[10px]">
-                    avg {fmt(grand.order_count ? grand.net_sales / grand.order_count : 0)} LYD
+                    {copy.average} {fmt(grand.order_count ? grand.net_sales / grand.order_count : 0)} {copy.currency}
                   </p>
                 </div>
                 <div>
                   <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.linkedRefunds}</p>
                   <p className="text-red-300 font-bold text-lg leading-tight">{fmt(grand.linked_refunds)}</p>
-                  <p className="text-noch-muted text-[10px]">deducted from completed sales · LYD</p>
+                  <p className="text-noch-muted text-[10px]">{copy.linkedRefundsHelp} · {copy.currency}</p>
                 </div>
                 <div>
                   <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.completedSales}</p>
                   <p className="text-white font-bold text-lg leading-tight">{fmt(grand.completed_sales)}</p>
-                  <p className="text-noch-muted text-[10px]">after discounts · before refunds</p>
+                  <p className="text-noch-muted text-[10px]">{copy.completedSalesHelp}</p>
                 </div>
               </div>
               <div className="border-t border-noch-border mt-4 pt-3">
@@ -359,22 +396,24 @@ export default function Sales() {
               {(grand.reconstructed_event_count > 0 || grand.untracked_order_count > 0) && (
                 <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 mt-3 text-xs text-yellow-100">
                   {grand.reconstructed_event_count > 0 && (
-                    <p>{grand.reconstructed_event_count} historical tender legs were reconstructed and are visibly identified.</p>
+                    <p>{copy.reconstructed(grand.reconstructed_event_count)}</p>
                   )}
                   {grand.untracked_order_count > 0 && (
-                    <p>{grand.untracked_order_count} orders have no tender event. Financial control is incomplete.</p>
+                    <p>{copy.untracked(grand.untracked_order_count)}</p>
                   )}
                 </div>
               )}
               {failedBranches.length > 0 && (
                 <div className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 mt-3 text-xs text-red-200">
-                  Unavailable branch data: {failedBranches.map(branch => branch.name).join(', ')}. Consolidated totals exclude these branches.
+                  {copy.unavailableBranches(failedBranches.map(branch => (
+                    lang === 'ar' ? (branch.name_ar || branch.name) : branch.name
+                  )).join(', '))}
                 </div>
               )}
               <div className="rounded-lg border border-blue-400/20 bg-blue-400/5 px-3 py-2 mt-3 text-[11px] text-blue-100">
                 {copy.settlementUnavailable}
                 {grand.presto_unsettled_count > 0 && (
-                  <> Presto outstanding: {fmt(grand.presto_unsettled_amount)} LYD across {grand.presto_unsettled_count} orders.</>
+                  <> {copy.prestoOutstanding(fmt(grand.presto_unsettled_amount), grand.presto_unsettled_count)}</>
                 )}
               </div>
             </div>
@@ -395,13 +434,13 @@ export default function Sales() {
                   {canViewSessions && t && (
                     <div className="text-right">
                       <p className="text-noch-green font-bold text-lg leading-tight">
-                        {fmt(t.net_sales)} <span className="text-xs">LYD net</span>
+                        <span className="text-xs">{copy.branchNet(fmt(t.net_sales))}</span>
                       </p>
                       <p className="text-noch-muted text-xs">
-                        {t.order_count} orders · refunds {fmt(t.linked_refunds)}
+                        {copy.branchOrders(t.order_count, fmt(t.linked_refunds))}
                       </p>
                       <p className="text-noch-muted text-[10px] mt-0.5">
-                        cash {fmt(t.gross_cash_tender)} · card {fmt(t.gross_card_tender)} · Presto {fmt(t.gross_presto_tender)}
+                        {copy.branchTenders(fmt(t.gross_cash_tender), fmt(t.gross_card_tender), fmt(t.gross_presto_tender))}
                       </p>
                     </div>
                   )}

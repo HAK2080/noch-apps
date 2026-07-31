@@ -170,5 +170,8 @@ test('owner sales, refund, shift, and closeout controls have explicit Arabic cop
   assert.match(orders, /إرجاع المبلغ عبر/)
   assert.match(sessions, /رقابة النقدية والورديات/)
   assert.match(sales, /رقابة المبيعات والمدفوعات/)
+  assert.match(sales, /صف واحد في ملف CSV لكل صنف مباع/)
+  assert.match(sales, /أُعيد بناء/)
+  assert.match(sales, /بريستو غير المحصل/)
   assert.match(endOfDay, /useLanguage/)
 })
