@@ -9,8 +9,9 @@ import {
 } from 'lucide-react'
 import {
   getPOSBranch, getOpenShift, closeShift, getShiftSummary,
-  getCashMovements, recordCashMovement,
+  getCashMovements, getShiftControl, recordCashMovement,
 } from '../lib/pos-supabase'
+import { normalizeShiftControl } from '../lib/sales-control'
 import { printReceipt } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
 import Layout from '../../../components/Layout'
@@ -197,6 +198,7 @@ export default function POSEndOfDay() {
   const [branch, setBranch] = useState(null)
   const [shift, setShift] = useState(null)
   const [summary, setSummary] = useState(null)
+  const [shiftControl, setShiftControl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actualCash, setActualCash] = useState('')
   const [closing, setClosing] = useState(false)
@@ -215,12 +217,14 @@ export default function POSEndOfDay() {
         setBranch(b)
         setShift(s)
         if (s) {
-          const [sum, movs] = await Promise.all([
+          const [sum, movs, control] = await Promise.all([
             getShiftSummary(s.id),
             getCashMovements(s.id),
+            getShiftControl(s.id),
           ])
           setSummary(sum)
           setCashMovements(movs)
+          setShiftControl(normalizeShiftControl(control))
         }
       } catch (err) {
         toast.error(err.message || t('eodLoadFailed'))
@@ -231,9 +235,10 @@ export default function POSEndOfDay() {
     load()
   }, [branchId, t])
 
-  const expectedCash = shift ? parseFloat(shift.expected_cash) : 0
+  const expectedCash = shiftControl?.expected_drawer_cash
+    ?? (shift ? parseFloat(shift.expected_cash) : 0)
   const cashCloseState = getCashCloseState(actualCash, expectedCash)
-  const actualCashNum = cashCloseState.closingCash
+  const actualCashNum = cashCloseState.isMissing ? null : cashCloseState.closingCash
   const cashDiff = cashCloseState.difference
 
   const handleCloseShift = async (allowMissing = false) => {
@@ -256,6 +261,7 @@ export default function POSEndOfDay() {
         : notes
       const result = await closeShift(shift.id, {
         closing_cash: actualCashNum,
+        cash_counted: !cashCloseState.isMissing,
         cash_difference: cashDiff,
         notes: auditNotes,
         closed_by: getServedBy()?.id || null,
@@ -340,30 +346,41 @@ export default function POSEndOfDay() {
 
         {shift && summary && (
           <>
+            {shiftControl && (
+              shiftControl.counterStatus === 'warning'
+              || shiftControl.dataStatus !== 'complete'
+              || shiftControl.paymentStatus !== 'reconciled'
+            ) && (
+              <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                {lang === 'ar'
+                  ? 'توجد فروقات أو بيانات تاريخية مُعاد بناؤها. راجع تفاصيل الوردية قبل الإقفال.'
+                  : 'This shift contains a variance or reconstructed history. Review the shift details before closing.'}
+              </div>
+            )}
             {/* Shared by Bloom and Noch: make closeout numbers visually distinct. */}
             <div className="grid grid-cols-2 gap-3 mb-5">
               <CloseoutMetric
                 label={t('eodTotalSales')}
-                value={format(shift.total_sales)}
+                value={format(shiftControl?.net_sales ?? shift.total_sales)}
                 suffix={t('eodCurrency')}
                 icon={ReceiptText}
                 tone="green"
               />
               <CloseoutMetric
                 label={t('eodOrders')}
-                value={shift.total_orders}
+                value={shiftControl?.order_count ?? shift.total_orders}
                 icon={ReceiptText}
               />
               <CloseoutMetric
                 label={t('eodCashSales')}
-                value={format(shift.total_cash_sales)}
+                value={format(shiftControl?.net_cash_tender ?? shift.total_cash_sales)}
                 suffix={t('eodCurrency')}
                 icon={Banknote}
                 tone="amber"
               />
               <CloseoutMetric
                 label={t('eodCardSales')}
-                value={format(shift.total_card_sales)}
+                value={format(shiftControl?.net_card_tender ?? shift.total_card_sales)}
                 suffix={t('eodCurrency')}
                 icon={CreditCard}
                 tone="blue"

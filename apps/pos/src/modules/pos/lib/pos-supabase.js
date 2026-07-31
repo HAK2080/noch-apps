@@ -392,13 +392,21 @@ export async function listShifts(branchId, { limit = 30, fromIso, toIso } = {}) 
 // Refunds are deducted from shift revenue but legacy payment buckets remain
 // gross. The sessions report applies these to the cash leg so the totals
 // reconcile to net revenue.
-export async function getShiftRefundTotals(shiftIds = []) {
-  if (!shiftIds.length) return {}
-  const { data, error } = await supabase.rpc('pos_shift_refund_totals', {
-    p_shift_ids: shiftIds,
+export async function getShiftControls(branchId, fromDate, toDate, shiftId = null) {
+  const { data, error } = await supabase.rpc('pos_shift_control', {
+    p_branch_id: branchId || null,
+    p_shift_id: shiftId || null,
+    p_from: fromDate,
+    p_to: toDate,
   })
   if (error) throw error
-  return Object.fromEntries((data || []).map(row => [row.shift_id, Number(row.refunded_total) || 0]))
+  return data || []
+}
+
+export async function getShiftControl(shiftId) {
+  const today = localYmd(businessToday())
+  const rows = await getShiftControls(null, today, today, shiftId)
+  return rows[0] || null
 }
 
 export async function openShift(branchId, openingCash, userId) {
@@ -418,14 +426,13 @@ export async function openShift(branchId, openingCash, userId) {
 }
 
 export async function closeShift(shiftId, closeData) {
-  // Routes through close_pos_shift RPC which:
-  //   - locks the shift row (blocks double-close races)
-  //   - rejects with 'shift is already closed' if already closed
-  //   - reconciles shift totals against pos_orders sum
-  //   - writes audit log
-  const { data, error } = await supabase.rpc('close_pos_shift', {
+  const cashCounted = closeData.cash_counted !== false
+    && closeData.closing_cash !== null
+    && closeData.closing_cash !== undefined
+  const { data, error } = await supabase.rpc('close_pos_shift_v2', {
     p_shift_id: shiftId,
-    p_actual_cash: Number(closeData.closing_cash) || 0,
+    p_actual_cash: cashCounted ? Number(closeData.closing_cash) : null,
+    p_cash_counted: cashCounted,
     p_notes: closeData.notes || null,
   })
   if (error) throw error
@@ -498,11 +505,20 @@ export async function getShiftAttendees(shiftId) {
 }
 
 // ── Partial refunds ───────────────────────────────────────────────
-export async function refundPOSOrderLines(orderId, lines, reason, servedBy = null) {
-  const { data, error } = await supabase.rpc('refund_pos_order_lines', {
+export async function refundPOSOrderLines(
+  orderId,
+  lines,
+  reason,
+  servedBy = null,
+  refundMethod = 'original',
+  refundShiftId = null,
+) {
+  const { data, error } = await supabase.rpc('refund_pos_order_lines_v2', {
     p_order_id: orderId,
     p_lines: lines,
     p_reason: reason || null,
+    p_refund_method: refundMethod,
+    p_refund_shift_id: refundShiftId,
     p_served_by: servedBy,
   })
   if (error) throw error
@@ -578,6 +594,16 @@ export async function getDailySalesRange(branchId, fromDate, toDate) {
     .order('day', { ascending: true })
   if (error) throw error
   return data || []
+}
+
+export async function getSalesControlSummary(branchId, fromDate, toDate) {
+  const { data, error } = await supabase.rpc('pos_sales_control_summary', {
+    p_branch_id: branchId || null,
+    p_from: fromDate,
+    p_to: toDate,
+  })
+  if (error) throw error
+  return data?.[0] || null
 }
 
 // ── Modifiers ─────────────────────────────────────────────────────

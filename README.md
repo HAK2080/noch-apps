@@ -21,6 +21,11 @@ root `.env`.
   approval; Receipt Snap and Telegram follow the same accounting workflow.
 - **Finance:** owner-facing navigation and headline metrics use plain business
   language while retaining accounting terms such as COGS where useful.
+- **Sales and cash control:** `/sales` is the owner control view for Tripoli
+  business-day sales and tender reconciliation; shift closeouts derive expected
+  drawer cash from an immutable tender-event ledger and keep missing counts
+  visibly missing. Card settlement remains unavailable until an external
+  processor or bank statement source is connected.
 
 ```
 Jul 26 release/

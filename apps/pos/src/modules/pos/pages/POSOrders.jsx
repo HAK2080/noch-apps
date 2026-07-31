@@ -7,15 +7,18 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, RotateCcw, CheckCircle2, Bike, Search, X, Minus, Plus, Coffee, CreditCard, DollarSign, ArrowLeftRight } from 'lucide-react'
 import {
-  annotatePOSOrderOverride, getPOSBranch, getPOSOrders, voidPOSOrder, markPrestoCollected,
+  annotatePOSOrderOverride, businessDayWindow, businessYmd, getOpenShift,
+  getPOSBranch, getPOSOrders, voidPOSOrder, markPrestoCollected,
   refundPOSOrderLines, switchPOSOrderPayment,
 } from '../lib/pos-supabase'
-import { printReceipt, printDrinkTicket, isPrinterConnected } from '../lib/escpos'
+import { refundTenderOptions } from '../lib/sales-control'
+import { printReceipt, printDrinkTicket } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
 import { getPOSSettings } from '../lib/pos-settings'
 import ManagerOverrideModal from '../components/ManagerOverrideModal'
 import { usePermissions } from '../../../contexts/PermissionsContext'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useLanguage } from '../../../contexts/LanguageContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'
@@ -23,6 +26,39 @@ import { format } from '../lib/money'
 // Roles allowed to see top-line totals (Revenue / Cash / Card / Presto).
 // Staff and limited_staff are scoped to per-order detail only.
 const TOTALS_ROLES = ['owner', 'supervisor']
+
+const REFUND_COPY = {
+  en: {
+    title: 'Refund',
+    full: 'Refund full order',
+    returned: 'refunded',
+    returnThrough: 'Return money through',
+    originalTender: 'Original tender',
+    openShift: 'Open a shift before returning cash so the drawer movement is recorded.',
+    reason: 'Reason',
+    reasonPlaceholder: 'e.g. wrong drink made, customer changed mind',
+    total: 'Refund total',
+    cancel: 'Cancel',
+    submit: 'Refund',
+    submitting: 'Refunding…',
+    currency: 'LYD',
+  },
+  ar: {
+    title: 'استرداد',
+    full: 'استرداد الطلب بالكامل',
+    returned: 'مسترد',
+    returnThrough: 'إرجاع المبلغ عبر',
+    originalTender: 'وسيلة الدفع الأصلية',
+    openShift: 'افتح وردية قبل رد المبلغ نقداً حتى تُسجّل حركة الصندوق.',
+    reason: 'السبب',
+    reasonPlaceholder: 'مثال: تم إعداد مشروب خاطئ أو غيّر الزبون رأيه',
+    total: 'إجمالي الاسترداد',
+    cancel: 'إلغاء',
+    submit: 'استرداد',
+    submitting: 'جارٍ الاسترداد…',
+    currency: 'د.ل',
+  },
+}
 
 // CancelModal — proper in-app dialog replacing the unreliable window.prompt.
 // window.prompt() returns null silently on Android tablets / kiosk WebViews,
@@ -106,7 +142,9 @@ function CancelModal({ order, managerApproval, onClose, onSaved }) {
   )
 }
 
-function RefundModal({ order, managerApproval, onClose, onSaved }) {
+function RefundModal({ order, activeShift, managerApproval, onClose, onSaved }) {
+  const { lang } = useLanguage()
+  const copy = REFUND_COPY[lang] || REFUND_COPY.en
   // Initial state: 0 refund qty per line; the operator dials up the
   // lines they want to refund. "Refund full" sets all to remaining qty.
   const [qtys, setQtys] = useState(() => {
@@ -115,10 +153,16 @@ function RefundModal({ order, managerApproval, onClose, onSaved }) {
     return o
   })
   const [reason, setReason] = useState('')
+  const [refundMethod, setRefundMethod] = useState('original')
   const [saving, setSaving] = useState(false)
 
   const totalToRefund = (order.pos_order_items || [])
     .reduce((s, it) => s + (qtys[it.id] || 0) * Number(it.unit_price), 0)
+  const originalMethod = String(order.payment_method || '').toLowerCase()
+  const cashRefundNeedsShift = (
+    refundMethod === 'cash'
+    || (refundMethod === 'original' && ['cash', 'split'].includes(originalMethod))
+  ) && !activeShift
 
   const setQty = (id, value, max) => {
     const n = Math.max(0, Math.min(value, max))
@@ -144,7 +188,14 @@ function RefundModal({ order, managerApproval, onClose, onSaved }) {
     setSaving(true)
     try {
       const servedBy = getServedBy()?.id || null
-      await refundPOSOrderLines(order.id, lines, reason, servedBy)
+      await refundPOSOrderLines(
+        order.id,
+        lines,
+        reason,
+        servedBy,
+        refundMethod,
+        activeShift?.id || null,
+      )
       let auditWarning = null
       if (managerApproval?.id) {
         try {
@@ -175,7 +226,7 @@ function RefundModal({ order, managerApproval, onClose, onSaved }) {
       <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-noch-border">
           <div>
-            <h2 className="text-white font-bold">Refund</h2>
+            <h2 className="text-white font-bold">{copy.title}</h2>
             <p className="text-noch-muted text-xs">{order.order_number}</p>
           </div>
           <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
@@ -187,7 +238,7 @@ function RefundModal({ order, managerApproval, onClose, onSaved }) {
             </div>
           )}
           <div className="flex justify-end mb-2">
-            <button onClick={refundFull} className="text-xs text-noch-green underline">Refund full order</button>
+            <button onClick={refundFull} className="text-xs text-noch-green underline">{copy.full}</button>
           </div>
           <div className="flex flex-col gap-2 mb-3">
             {(order.pos_order_items || []).map(it => {
@@ -198,7 +249,7 @@ function RefundModal({ order, managerApproval, onClose, onSaved }) {
                     <p className="text-white text-sm truncate">{it.product_name}</p>
                     <p className="text-noch-muted text-xs">
                       {Number(it.quantity || 0).toLocaleString('en-US')} × {format(it.unit_price)}
-                      {it.refunded_qty > 0 && ` · ${it.refunded_qty} refunded`}
+                      {it.refunded_qty > 0 && ` · ${it.refunded_qty} ${copy.returned}`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -218,25 +269,44 @@ function RefundModal({ order, managerApproval, onClose, onSaved }) {
               )
             })}
           </div>
+          <label className="label block mb-1 text-xs">{copy.returnThrough}</label>
+          <select
+            value={refundMethod}
+            onChange={event => setRefundMethod(event.target.value)}
+            className="input w-full text-sm mb-3"
+          >
+            {refundTenderOptions(order.payment_method).map(option => (
+              <option key={option} value={option}>
+                {option === 'original'
+                  ? `${copy.originalTender} (${String(order.payment_method || 'other').toUpperCase()})`
+                  : option.toUpperCase()}
+              </option>
+            ))}
+          </select>
+          {cashRefundNeedsShift && (
+            <p className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300 mb-3">
+              {copy.openShift}
+            </p>
+          )}
 
-          <label className="label block mb-1">Reason</label>
+          <label className="label block mb-1">{copy.reason}</label>
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
             rows={2}
             className="input w-full resize-none mb-3"
-            placeholder="e.g. wrong drink made, customer changed mind"
+            placeholder={copy.reasonPlaceholder}
           />
 
           <div className="flex justify-between items-center bg-noch-dark/50 rounded-lg px-3 py-2 mb-3">
-            <span className="text-noch-muted text-sm">Refund total</span>
-            <span className="text-noch-green font-bold">{format(totalToRefund)} LYD</span>
+            <span className="text-noch-muted text-sm">{copy.total}</span>
+            <span className="text-noch-green font-bold">{format(totalToRefund)} {copy.currency}</span>
           </div>
 
           <div className="flex gap-3">
-            <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button onClick={handleSubmit} disabled={saving || totalToRefund <= 0} className="btn-primary flex-1">
-              {saving ? 'Refunding…' : 'Refund'}
+            <button onClick={onClose} className="btn-secondary flex-1">{copy.cancel}</button>
+            <button onClick={handleSubmit} disabled={saving || totalToRefund <= 0 || cashRefundNeedsShift} className="btn-primary flex-1">
+              {saving ? copy.submitting : copy.submit}
             </button>
           </div>
         </div>
@@ -263,6 +333,7 @@ export default function POSOrders() {
 
   const [branch, setBranch] = useState(null)
   const [posSettings, setPosSettings] = useState(null)
+  const [activeShift, setActiveShift] = useState(null)
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -276,35 +347,23 @@ export default function POSOrders() {
   // at 1am Tripoli/Saudi, the picker defaults to yesterday-UTC and the
   // date-picker constraints lock the operator out of picking the real
   // "today".
-  const today = () => {
-    const d = new Date()
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}`
-  }
-  const [fromDate, setFromDate] = useState(today())
-  const [toDate, setToDate] = useState(today())
-  // Late-night (00:00–06:00) exclusion toggle — café operates evenings
-  // that cross midnight, so the calendar boundary splits one trading
-  // session in two. When ON, the summary AND list exclude any orders
-  // made between 00:00 and 06:00 of the visible range.
-  const [excludeLateNight, setExcludeLateNight] = useState(false)
-  const LATE_NIGHT_CUTOFF_HOUR = 6
+  const [fromDate, setFromDate] = useState(() => businessYmd())
+  const [toDate, setToDate] = useState(() => businessYmd())
 
   const load = async () => {
     setLoading(true)
     try {
-      const fromIso = new Date(`${fromDate}T00:00:00`).toISOString()
-      const toIso   = new Date(`${toDate}T23:59:59.999`).toISOString()
-      const [b, list, settings] = await Promise.all([
+      const { fromIso, toIso } = businessDayWindow(fromDate, toDate)
+      const [b, list, settings, shift] = await Promise.all([
         getPOSBranch(branchId),
         getPOSOrders(branchId, { from: fromIso, to: toIso, limit: 500 }),
         getPOSSettings(branchId),
+        getOpenShift(branchId),
       ])
       setBranch(b)
       setOrders(list || [])
       setPosSettings(settings)
+      setActiveShift(shift)
     } catch (err) {
       toast.error(err.message || 'Failed to load orders')
     } finally {
@@ -419,13 +478,6 @@ export default function POSOrders() {
   }
 
   const filtered = orders.filter(o => {
-    // Late-night exclusion — skip orders whose local hour is 00..05
-    // when the toggle is ON. Applies to both summary and visible list
-    // so the numbers always reconcile with what's on screen.
-    if (excludeLateNight) {
-      const h = new Date(o.created_at).getHours()
-      if (h < LATE_NIGHT_CUTOFF_HOUR) return false
-    }
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -525,19 +577,9 @@ export default function POSOrders() {
         {/* Executive summary — totals for the visible (filtered) range */}
         {!loading && canViewTotals && (
           <div className="card p-4 mb-4">
-            {/* Late-night toggle — keeps the calendar boundary from
-                lumping yesterday's late shift into "today's" numbers. */}
-            <label className="flex items-center gap-2 cursor-pointer mb-3 text-xs select-none">
-              <input
-                type="checkbox"
-                checked={excludeLateNight}
-                onChange={e => setExcludeLateNight(e.target.checked)}
-                className="w-3.5 h-3.5 accent-noch-green"
-              />
-              <span className="text-noch-muted">
-                Exclude late-night sales (00:00–{String(LATE_NIGHT_CUTOFF_HOUR).padStart(2, '0')}:00)
-              </span>
-            </label>
+            <p className="text-noch-muted text-xs mb-3">
+              Tripoli business day: 05:00 to the following 05:00.
+            </p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div>
                 <p className="text-noch-muted text-[10px] uppercase tracking-wider">Revenue</p>
@@ -736,6 +778,7 @@ export default function POSOrders() {
       {refundContext && (
         <RefundModal
           order={refundContext.order}
+          activeShift={activeShift}
           managerApproval={refundContext.managerApproval}
           onClose={() => setRefundContext(null)}
           onSaved={load}

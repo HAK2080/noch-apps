@@ -8,27 +8,28 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ListOrdered, Clock, Download, TrendingUp } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ListOrdered, Clock, Download, TrendingUp } from 'lucide-react'
 import {
   addYmdDays,
   businessDayWindow,
   businessHour,
   businessYmd,
-  getDailySalesRange,
   getPOSBranches,
+  getSalesControlSummary,
   getSalesExportRows,
 } from '../modules/pos/lib/pos-supabase'
+import {
+  combineSalesControls,
+  normalizeSalesControl,
+} from '../modules/pos/lib/sales-control'
 import { getServedBy } from '../modules/pos/lib/pos-session'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { usePermissions } from '../contexts/PermissionsContext'
 import Layout from '../components/Layout'
 import BusinessRangePicker from '../components/shared/BusinessRangePicker'
 import { downloadCsv } from '../lib/exportCsv'
-import {
-  combineSalesSummaries,
-  maskCustomerPhone,
-  summarizeDailySales,
-} from './sales/salesReporting'
+import { maskCustomerPhone } from './sales/salesReporting'
 import toast from 'react-hot-toast'
 
 const PRESETS = [
@@ -36,6 +37,63 @@ const PRESETS = [
   { key: '7d',    label: '7 days', days: 6 },
   { key: 'month', label: 'Month', days: 29 },
 ]
+
+const SALES_COPY = {
+  en: {
+    title: 'Sales and payment control',
+    businessDay: 'Business days run 05:00 to 05:00 in Africa/Tripoli.',
+    netSales: 'Net sales',
+    orders: 'Orders',
+    linkedRefunds: 'Linked refunds',
+    completedSales: 'Completed sales',
+    paymentReconciliation: 'Payment reconciliation',
+    reconciled: 'Reconciled to completed sales',
+    variance: 'Variance',
+    cash: 'Cash',
+    card: 'Card',
+    presto: 'Presto',
+    other: 'Other / unmapped',
+    periodMovement: 'Tender movement processed in this period',
+    timingDifference: 'Order/refund timing difference',
+    cashNet: 'Cash net',
+    cardNet: 'Card net',
+    prestoNet: 'Presto net',
+    refunded: 'Refunded',
+    voids: 'Voids',
+    settlementUnavailable: 'Card settlement evidence is unavailable. POS card tender is not proof of bank settlement.',
+    dataUnavailable: 'Data unavailable',
+    orderEvidence: 'Orders',
+    shifts: 'Shifts',
+    currency: 'LYD',
+  },
+  ar: {
+    title: 'رقابة المبيعات والمدفوعات',
+    businessDay: 'يمتد يوم العمل من 05:00 إلى 05:00 بتوقيت أفريقيا/طرابلس.',
+    netSales: 'صافي المبيعات',
+    orders: 'الطلبات',
+    linkedRefunds: 'المرتجعات المرتبطة',
+    completedSales: 'المبيعات المكتملة',
+    paymentReconciliation: 'مطابقة المدفوعات',
+    reconciled: 'متطابق مع المبيعات المكتملة',
+    variance: 'الفرق',
+    cash: 'نقدي',
+    card: 'بطاقة',
+    presto: 'بريستو',
+    other: 'أخرى / غير مصنفة',
+    periodMovement: 'حركة وسائل الدفع المنفذة خلال الفترة',
+    timingDifference: 'فرق توقيت الطلبات والمرتجعات',
+    cashNet: 'صافي النقدي',
+    cardNet: 'صافي البطاقة',
+    prestoNet: 'صافي بريستو',
+    refunded: 'مرتجع',
+    voids: 'ملغي',
+    settlementUnavailable: 'دليل تسوية البطاقات غير متاح. تسجيل الدفع بالبطاقة في نقطة البيع لا يثبت وصوله إلى البنك.',
+    dataUnavailable: 'البيانات غير متاحة',
+    orderEvidence: 'الطلبات',
+    shifts: 'الورديات',
+    currency: 'د.ل',
+  },
+}
 
 function rangeFor(days) {
   const toDate = businessYmd()
@@ -46,6 +104,8 @@ const fmt = n => Number(n || 0).toLocaleString('en', { maximumFractionDigits: 2 
 
 export default function Sales() {
   const navigate = useNavigate()
+  const { lang } = useLanguage()
+  const copy = SALES_COPY[lang] || SALES_COPY.en
   const { profile } = useAuth()
   const { isOwner, hasAccess } = usePermissions()
   // Session/shift totals: 'sales' permission for the logged-in profile, OR a
@@ -61,15 +121,6 @@ export default function Sales() {
   const [exportBranchId, setExportBranchId] = useState('all')
   const [exporting, setExporting] = useState(false)
 
-  const choosePreset = (preset) => {
-    if (preset === 'custom') {
-      setRange(current => ({ ...current, preset: 'custom' }))
-      return
-    }
-    const metadata = PRESETS.find(option => option.key === preset)
-    setRange({ preset, ...rangeFor(metadata?.days ?? 0) })
-  }
-
   useEffect(() => {
     getPOSBranches()
       .then(list => { setBranches(list || []) })
@@ -84,15 +135,21 @@ export default function Sales() {
     let cancelled = false
     Promise.all(
       branches.map(b =>
-        getDailySalesRange(b.id, range.fromDate, range.toDate)
-          .then(rows => [b.id, summarizeDailySales(rows)])
-          .catch(() => [b.id, null])
+        getSalesControlSummary(b.id, range.fromDate, range.toDate)
+          .then(row => [b.id, { status: 'complete', data: normalizeSalesControl(row) }])
+          .catch(error => [b.id, { status: 'unavailable', data: null, error: error.message }])
       )
     ).then(entries => { if (!cancelled) setTotalsByBranch(Object.fromEntries(entries)) })
     return () => { cancelled = true }
   }, [branches, canViewSessions, range.fromDate, range.toDate])
 
-  const grand = combineSalesSummaries(Object.values(totalsByBranch))
+  const availableControls = Object.values(totalsByBranch)
+    .filter(result => result?.status === 'complete' && result.data)
+    .map(result => result.data)
+  const failedBranches = branches.filter(
+    branch => totalsByBranch[branch.id]?.status === 'unavailable',
+  )
+  const grand = combineSalesControls(availableControls)
 
   const handleExport = async () => {
     if (!range.fromDate || !range.toDate || range.fromDate > range.toDate) {
@@ -187,10 +244,10 @@ export default function Sales() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto py-6">
-        <h1 className="text-white font-bold text-2xl mb-2">Sales</h1>
+      <div className="max-w-4xl mx-auto py-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+        <h1 className="text-white font-bold text-2xl mb-2">{copy.title}</h1>
         <p className="text-noch-muted text-sm mb-4">
-          Business days run 5 AM → 5 AM, so late-night sales count toward the evening&apos;s day.
+          {copy.businessDay}
         </p>
 
         {canViewSessions && (
@@ -218,48 +275,6 @@ export default function Sales() {
                 </div>
               </div>
             </div>
-            {/* eslint-disable-next-line no-constant-binary-expression */}
-            {false && <div className="flex flex-wrap items-center gap-2 mb-4">
-              {PRESETS.map(p => (
-                <button
-                  key={p.key}
-                  onClick={() => choosePreset(p.key)}
-                  className={`text-sm px-3 py-1.5 rounded-lg border ${
-                    range.preset === p.key
-                      ? 'bg-noch-green/15 border-noch-green/50 text-noch-green'
-                      : 'border-noch-border text-noch-muted hover:text-white'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-              <button
-                onClick={() => choosePreset('custom')}
-                className={`text-sm px-3 py-1.5 rounded-lg border ${
-                  range.preset === 'custom'
-                    ? 'bg-noch-green/15 border-noch-green/50 text-noch-green'
-                    : 'border-noch-border text-noch-muted hover:text-white'
-                }`}
-              >
-                Custom
-              </button>
-              {range.preset === 'custom' && (
-                <>
-                  <input
-                    type="date" value={range.fromDate}
-                    onChange={e => setRange(r => ({ ...r, fromDate: e.target.value }))}
-                    className="input text-sm py-1.5"
-                  />
-                  <span className="text-noch-muted text-sm">→</span>
-                  <input
-                    type="date" value={range.toDate}
-                    onChange={e => setRange(r => ({ ...r, toDate: e.target.value }))}
-                    className="input text-sm py-1.5"
-                  />
-                </>
-              )}
-            </div>}
-
             {/* Grand total across branches */}
             <div className="card p-4 mb-4">
               <div className="flex items-center gap-2 mb-2">
@@ -270,47 +285,97 @@ export default function Sales() {
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Net sales</p>
-                  <p className="text-noch-green font-bold text-lg leading-tight">{fmt(grand.netSales)}</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.netSales}</p>
+                  <p className="text-noch-green font-bold text-lg leading-tight">{fmt(grand.net_sales)}</p>
                   <p className="text-noch-muted text-[10px]">completed sales less refunds · LYD</p>
                 </div>
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Orders</p>
-                  <p className="text-white font-bold text-lg leading-tight">{grand.orders}</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.orders}</p>
+                  <p className="text-white font-bold text-lg leading-tight">{grand.order_count}</p>
                   <p className="text-noch-muted text-[10px]">
-                    avg {fmt(grand.orders ? grand.netSales / grand.orders : 0)} LYD
+                    avg {fmt(grand.order_count ? grand.net_sales / grand.order_count : 0)} LYD
                   </p>
                 </div>
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Refunds</p>
-                  <p className="text-red-300 font-bold text-lg leading-tight">{fmt(grand.refunds)}</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.linkedRefunds}</p>
+                  <p className="text-red-300 font-bold text-lg leading-tight">{fmt(grand.linked_refunds)}</p>
                   <p className="text-noch-muted text-[10px]">deducted from completed sales · LYD</p>
                 </div>
                 <div>
-                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">Completed sales</p>
-                  <p className="text-white font-bold text-lg leading-tight">{fmt(grand.completedSales)}</p>
+                  <p className="text-noch-muted text-[10px] uppercase tracking-wider">{copy.completedSales}</p>
+                  <p className="text-white font-bold text-lg leading-tight">{fmt(grand.completed_sales)}</p>
                   <p className="text-noch-muted text-[10px]">after discounts · before refunds</p>
                 </div>
               </div>
               <div className="border-t border-noch-border mt-4 pt-3">
                 <div className="flex items-center justify-between gap-3 mb-2">
-                  <p className="text-white text-xs font-semibold">Payment reconciliation</p>
-                  <p className="text-noch-muted text-[10px]">Equals completed sales, before refunds</p>
+                  <p className="text-white text-xs font-semibold">{copy.paymentReconciliation}</p>
+                  {grand.paymentStatus === 'reconciled' ? (
+                    <p className="text-noch-green text-[10px] flex items-center gap-1">
+                      <CheckCircle2 size={11} /> {copy.reconciled}
+                    </p>
+                  ) : (
+                    <p className="text-yellow-300 text-[10px] flex items-center gap-1">
+                      <AlertTriangle size={11} /> {copy.variance} {fmt(grand.payment_reconciliation_variance)} {copy.currency}
+                    </p>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    ['Cash', grand.cash],
-                    ['Card', grand.card],
-                    ['Split', grand.split],
-                    ['Presto', grand.presto],
-                    ['Other / unmapped', grand.unclassified],
+                    [copy.cash, grand.gross_cash_tender],
+                    [copy.card, grand.gross_card_tender],
+                    [copy.presto, grand.gross_presto_tender],
+                    [copy.other, grand.gross_other_tender],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg bg-black/20 px-3 py-2">
                       <p className="text-noch-muted text-[10px]">{label}</p>
-                      <p className="text-white text-sm font-semibold">{fmt(value)} LYD</p>
+                      <p className="text-white text-sm font-semibold">{fmt(value)} {copy.currency}</p>
                     </div>
                   ))}
                 </div>
+              </div>
+              <div className="border-t border-noch-border mt-4 pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <p className="text-white text-xs font-semibold">{copy.periodMovement}</p>
+                  <p className="text-noch-muted text-[10px]">
+                    {copy.timingDifference} {fmt(grand.timing_variance)} {copy.currency}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    [copy.cashNet, grand.period_cash_movement],
+                    [copy.cardNet, grand.period_card_movement],
+                    [copy.prestoNet, grand.period_presto_movement],
+                    [copy.refunded, grand.period_refunds],
+                    [copy.voids, grand.period_void_reversals],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-black/20 px-3 py-2">
+                      <p className="text-noch-muted text-[10px]">{label}</p>
+                      <p className="text-white text-sm font-semibold">{fmt(value)} {copy.currency}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {(grand.reconstructed_event_count > 0 || grand.untracked_order_count > 0) && (
+                <div className="rounded-lg border border-yellow-400/30 bg-yellow-400/10 px-3 py-2 mt-3 text-xs text-yellow-100">
+                  {grand.reconstructed_event_count > 0 && (
+                    <p>{grand.reconstructed_event_count} historical tender legs were reconstructed and are visibly identified.</p>
+                  )}
+                  {grand.untracked_order_count > 0 && (
+                    <p>{grand.untracked_order_count} orders have no tender event. Financial control is incomplete.</p>
+                  )}
+                </div>
+              )}
+              {failedBranches.length > 0 && (
+                <div className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 mt-3 text-xs text-red-200">
+                  Unavailable branch data: {failedBranches.map(branch => branch.name).join(', ')}. Consolidated totals exclude these branches.
+                </div>
+              )}
+              <div className="rounded-lg border border-blue-400/20 bg-blue-400/5 px-3 py-2 mt-3 text-[11px] text-blue-100">
+                {copy.settlementUnavailable}
+                {grand.presto_unsettled_count > 0 && (
+                  <> Presto outstanding: {fmt(grand.presto_unsettled_amount)} LYD across {grand.presto_unsettled_count} orders.</>
+                )}
               </div>
             </div>
           </>
@@ -318,25 +383,31 @@ export default function Sales() {
 
         <div className="flex flex-col gap-4">
           {branches.map(b => {
-            const t = totalsByBranch[b.id]
+            const result = totalsByBranch[b.id]
+            const t = result?.data
             return (
               <div key={b.id} className="card p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="text-white font-semibold">{b.name}</p>
+                    <p className="text-white font-semibold">{lang === 'ar' ? (b.name_ar || b.name) : b.name}</p>
                     {b.address && <p className="text-noch-muted text-sm mt-0.5">{b.address}</p>}
                   </div>
                   {canViewSessions && t && (
                     <div className="text-right">
                       <p className="text-noch-green font-bold text-lg leading-tight">
-                        {fmt(t.netSales)} <span className="text-xs">LYD net</span>
+                        {fmt(t.net_sales)} <span className="text-xs">LYD net</span>
                       </p>
                       <p className="text-noch-muted text-xs">
-                        {t.orders} orders · refunds {fmt(t.refunds)}
+                        {t.order_count} orders · refunds {fmt(t.linked_refunds)}
                       </p>
                       <p className="text-noch-muted text-[10px] mt-0.5">
-                        cash {fmt(t.cash)} · card {fmt(t.card)} · split {fmt(t.split)} · Presto {fmt(t.presto)}
+                        cash {fmt(t.gross_cash_tender)} · card {fmt(t.gross_card_tender)} · Presto {fmt(t.gross_presto_tender)}
                       </p>
+                    </div>
+                  )}
+                  {canViewSessions && result?.status === 'unavailable' && (
+                    <div className="text-right text-red-300 text-xs">
+                      {copy.dataUnavailable}
                     </div>
                   )}
                 </div>
@@ -345,14 +416,14 @@ export default function Sales() {
                     onClick={() => navigate(`/pos/${b.id}/orders`)}
                     className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
                   >
-                    <ListOrdered size={14} /> Orders
+                    <ListOrdered size={14} /> {copy.orderEvidence}
                   </button>
                   {canViewSessions && (
                     <button
                       onClick={() => navigate(`/pos/${b.id}/sessions`)}
                       className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
                     >
-                      <Clock size={14} /> Sessions
+                      <Clock size={14} /> {copy.shifts}
                     </button>
                   )}
                 </div>

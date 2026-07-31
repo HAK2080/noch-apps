@@ -82,6 +82,56 @@ _Avoid_: Net profit, accounting profit
 The declared state of every source and required cost input used by a report: complete, warning, or unavailable.
 _Avoid_: Treating unavailable data as zero
 
+## Sales and cash-control language
+
+**Tender**:
+Customer value recorded against one payment method. Split payments are decomposed into their cash and card legs.
+_Avoid_: Payment type when a split order is being counted as a third tender
+
+**Tender event**:
+An immutable sale, refund, void reversal, or payment correction that changes the recorded balance of one tender.
+_Avoid_: Recomputing historical payment movement only from an order's latest state
+
+**Gross tender collected**:
+Positive sale tender events before refunds, void reversals, or payment corrections.
+_Avoid_: Net sales
+
+**Tender returned**:
+Value returned through a stated tender by a refund or void reversal.
+_Avoid_: Deducting every refund from cash without recording how it was returned
+
+**Net tender movement**:
+Gross tender collected minus tender returned, including tender-to-tender payment corrections, for the selected event period.
+_Avoid_: Settlement
+
+**Shift**:
+One branch drawer-control interval from opening to closing.
+_Avoid_: Business day; a business day can contain more than one shift
+
+**Expected drawer cash**:
+Opening cash plus net cash tender events and signed cash movements recorded in the shift.
+_Avoid_: Cash sales alone
+
+**Counted drawer cash**:
+The physical cash count entered when a shift is closed.
+_Avoid_: Expected drawer cash
+
+**Cash variance**:
+Counted drawer cash minus expected drawer cash. Positive is over; negative is short.
+_Avoid_: Payment reconciliation variance
+
+**Payment reconciliation variance**:
+Net sales events minus net tender events for the same scope. Zero means every recorded sale change has an equal tender change.
+_Avoid_: Cash variance
+
+**Settlement**:
+External evidence that a card or Presto receivable reached its destination. Recording a POS tender does not prove settlement.
+_Avoid_: Completed order
+
+**Inferred tender event**:
+A historical event reconstructed from order state because the original tender-event evidence was not recorded.
+_Avoid_: Presenting reconstructed history as directly observed
+
 ## Loyalty language
 
 **Loyalty member**:
