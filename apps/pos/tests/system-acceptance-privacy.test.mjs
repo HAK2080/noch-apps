@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const migration = fs.readFileSync(path.join(testDir, '../../../supabase/migrations/20260731235500_system_acceptance_privacy.sql'), 'utf8')
 const alignmentMigration = fs.readFileSync(path.join(testDir, '../../../supabase/migrations/20260731235600_auth_identity_alignment.sql'), 'utf8')
+const workforceBoundaryMigration = fs.readFileSync(path.join(testDir, '../../../supabase/migrations/20260731235700_workforce_directory_boundary.sql'), 'utf8')
 const profiles = fs.readFileSync(path.join(testDir, '../src/lib/profiles.js'), 'utf8')
 const pinLogin = fs.readFileSync(path.join(testDir, '../src/modules/pos/pages/POSPinLogin.jsx'), 'utf8')
 const attendees = fs.readFileSync(path.join(testDir, '../src/modules/pos/components/ShiftAttendees.jsx'), 'utf8')
@@ -36,7 +37,14 @@ test('profile and POS callers use the safe self/directory interfaces', () => {
 test('task people are hydrated through the safe directory instead of profile joins', () => {
   assert.match(tasks, /supabase\.rpc\('profile_directory_v2'/)
   assert.match(tasks, /ownerDirectory\.error \? \[\] : ownerDirectory\.data/)
+  assert.match(tasks, /return hydrateTasks\(data \|\| \[\]\)/)
   assert.doesNotMatch(tasks, /assignee:profiles|author:profiles/)
+})
+
+test('the owner workforce directory returns no rows to non-managers', () => {
+  assert.match(workforceBoundaryMigration, /and public\.workforce_can_manage\(\)/)
+  assert.match(workforceBoundaryMigration, /daily staff pickers use profile_directory_v2/i)
+  assert.doesNotMatch(workforceBoundaryMigration, /update public\.profiles|delete from public\.profiles/i)
 })
 
 test('future auth links cannot bypass legacy id-based policy assumptions', () => {

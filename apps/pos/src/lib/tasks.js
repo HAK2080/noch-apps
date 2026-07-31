@@ -60,7 +60,7 @@ export async function getMyTasks(userId) {
   const { data, error } = await supabase
     .rpc('get_user_tasks', { user_id: userId })
   if (error) throw error
-  return (await hydrateTasks([data]))[0]
+  return hydrateTasks(data || [])
 }
 
 export async function getTask(id) {
