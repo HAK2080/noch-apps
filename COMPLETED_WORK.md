@@ -346,7 +346,7 @@ To find if something's been done:
 ## 2026-07-31 — Loyalty V2, Owner Finance Labels, Expenses, and POS Inventory Repair
 
 - **Agent**: Codex
-- **Status**: Release validated; production deployment pending
+- **Status**: Complete & Live
 - **Files**:
   - `CONTEXT.md`
   - `docs/adr/0001-loyalty-v2-ledger-and-v1-archive.md`
@@ -369,9 +369,11 @@ To find if something's been done:
   - `supabase/migrations/20260730170000_atomic_pos_product_updates.sql`
   - `supabase/migrations/20260730180000_loyalty_v2.sql`
 - **Description**: Added Loyalty V2 with a reconciled, read-only V1 snapshot; transferred member IDs, names, existing points, proportional incomplete-stamp value, and pending rewards; froze V1 stamp award paths; added an immutable/idempotent points ledger, paid-order earning, partial-refund and void reversal, guaranteed rewards, validated POS redemption, four mission types, and owner mission controls. Replaced phone-first checkout with a one-time customer-scanned transaction QR as the primary path while retaining a collapsed, masked phone fallback. Added a public phone/email OTP claim page and post-payment confirmation. Repaired POS product/inventory updates by loading hidden products in management, making manual stock adjustment atomic/audited, and refreshing shared-branch terminal state plus offline cache. Added submitter-declared expense payment status across web, Receipt Snap, and Telegram, and simplified finance labels for owners.
-- **Commit**: Pending release commit
-- **Deployment**: Pending after release commit
-- **Verification**: 21 focused Node tests passed; targeted ESLint completed with zero errors and seven warnings; both changed Edge Functions bundled successfully; POS production build passed; `git diff --check` passed. All three new migrations were executed successfully against the production schema inside an explicit transaction and rolled back.
-- **Notes**: Generated Supabase state files and stale/destructive Bloom deployment helpers were reviewed and intentionally excluded from the release. Production already records Bloom migrations `20260725100000`, `20260725101000`, `20260725102000`, and `20260725110000`; they must not be replayed.
+- **Commit**: `0cf5bed`
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migrations `20260725121000`, `20260730170000`, and `20260730180000` applied and recorded on Noch Production. `expense-snap` and `telegram-webhook` redeployed from the committed source. `apps.noch.cloud` deployed by GitHub Actions run `30596862145`.
+- **Verification**: 21 focused Node tests passed; targeted ESLint completed with zero errors and seven warnings; both changed Edge Functions bundled successfully; POS production build passed; `git diff --check` passed. All three new migrations first succeeded against the production schema inside an explicit transaction and were rolled back before the live application. Production serves the new lazy-loaded loyalty, finance, inventory, and expense bundles; the public QR checkout route renders correctly; and unauthenticated `expense-snap` calls return HTTP 401.
+- **Data Reconciliation**: Archived and transferred 60 customer identities and 42 stamp records. Expected opening value was 1,130 points, recorded opening value was 1,130 points, and 0 members were unreconciled.
+- **Notes**: Generated Supabase state files and stale/destructive Bloom deployment helpers were reviewed and intentionally excluded from the release. Production already records Bloom migrations `20260725100000`, `20260725101000`, `20260725102000`, and `20260725110000`; they were not replayed.
 
 ---
