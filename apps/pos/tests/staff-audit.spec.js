@@ -16,9 +16,7 @@ test.describe('Staff — route audit (Mohamed)', () => {
   test('my-tasks page loads', async ({ page }) => {
     await page.goto('/my-tasks');
     await assertPageLoaded(page, '/my-tasks');
-    await page.waitForTimeout(2000);
-    const body = await page.content();
-    expect(body).toMatch(/task|Task|مهام/i);
+    await expect(page.getByRole('heading', { name: 'My Tasks' })).toBeVisible({ timeout: 10000 });
   });
 
   test('recipes loads for staff', async ({ page }) => {

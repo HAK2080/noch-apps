@@ -66,14 +66,15 @@ Snapshot business end date: 2026-07-31 under the 05:00 Africa/Tripoli rule.
 - 76/76 supported role/feature rows exist; 0 edit grants exist without module access.
 - A live staff JWT can read exactly 1 full profile (self) and a 10-row active safe directory.
 - The directory exposes no phone, Telegram, PIN, salary, hourly-rate, or access-control columns.
+- The same staff JWT receives 0 rows from the owner workforce administration RPC and 29 preserved name/role rows from the non-active-filtered safe directory.
 - Current linked identities all satisfy `profiles.id = profiles.auth_user_id`; a validated database constraint prevents future drift while historical policies remain ID-based.
 
 ## Owner and staff acceptance walkthrough
 
 - Owner route audit: 32/32 passed, covering dashboard, tasks, workforce, reports, recipes, cost calculator, Content Studio, expenses, products, inventory, finance, loyalty, ideas, Vestaboard, POS, task creation/deletion, and task detail.
-- Staff route audit: 14/14 passed, covering granted landing, tasks, recipes, inventory, stock check, ideas, Vestaboard, and POS; loyalty admin/customer data, dashboard, and finance are explicitly denied.
+- Staff route audit: all 13 route journeys passed, covering granted landing, tasks, recipes, inventory, stock check, ideas, Vestaboard, and POS; loyalty admin/customer data, dashboard, and finance are explicitly denied.
 - Module 7 focused walkthrough: owner Role Manager passed in English/LTR and Arabic/RTL; staff mobile “More” navigation and direct-route denial passed.
-- POS build, targeted lint, full Node suite, production database probes, and authenticated production smoke checks are required again on the final committed release.
+- Final release verification passed: 126/126 Node tests, targeted ESLint, production build, and diff checks. GitHub Actions run `30634460804` deployed commit `43284ad`; the final authenticated production suite passed 17/17 setup and journey checks. The first production pass exposed a blank `/my-tasks` render, which was repaired and reverified before acceptance.
 
 ## Good, bad, and ugly
 
@@ -100,7 +101,7 @@ Snapshot business end date: 2026-07-31 under the 05:00 Africa/Tripoli rule.
 
 ## Rollback
 
-The final application commit can be reverted independently. Migration `20260731235500` is additive except for replacing the broad profile SELECT policy; rollback must restore that policy only after reverting directory callers. Migration `20260731235600` can drop the alignment constraint without touching profile rows. Export access audit evidence before dropping any access-control table. No rollback step deletes business records.
+The final application commits can be reverted independently. Migration `20260731235500` is additive except for replacing the broad profile SELECT policy; rollback must restore that policy only after reverting directory callers. Migration `20260731235600` can drop the alignment constraint without touching profile rows. Migration `20260731235700` can restore the prior workforce function definition without changing employee records. Export access audit evidence before dropping any access-control table. No rollback step deletes business records.
 
 ## Ongoing owner cadence
 

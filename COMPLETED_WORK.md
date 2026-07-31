@@ -1,3 +1,32 @@
+## 2026-07-31 — Whole-System Reconciliation and Owner Acceptance
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `README.md`
+  - `apps/pos/src/lib/profiles.js`
+  - `apps/pos/src/lib/tasks.js`
+  - `apps/pos/src/modules/pos/components/ShiftAttendees.jsx`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/pages/POSPinLogin.jsx`
+  - `apps/pos/src/modules/pos/pages/POSStockCheck.jsx`
+  - `apps/pos/src/pages/TaskDetail.jsx`
+  - `apps/pos/tests/staff-audit.spec.js`
+  - `apps/pos/tests/system-acceptance-privacy.test.mjs`
+  - `docs/audit/2026-07-31-whole-system-owner-acceptance.md`
+  - `supabase/migrations/20260731235500_system_acceptance_privacy.sql`
+  - `supabase/migrations/20260731235600_auth_identity_alignment.sql`
+  - `supabase/migrations/20260731235700_workforce_directory_boundary.sql`
+- **Description**: Completed the eight-module owner acceptance pass and preserved each module's authoritative source instead of adding another dashboard. Replaced broad full-profile reads with owner-or-self access and safe daily directories, preserved task assignee names without exposing contact/payroll data, constrained Auth/profile identity alignment, and restricted the workforce administration directory to workforce managers.
+- **Reconciliation**: The 30-day Finance and Sales controls both report 176,336.75 LYD net sales with 0.00 LYD payment, tender-event, timing, and untracked-order variance. All 29 profiles, 60 loyalty members, 1,130 opening points, 79 ingredients, and historical operational records remain preserved. Missing counts, recipes, attendance, schedules, settlement evidence, publication evidence, and the 199.98 LYD payroll variance remain visible owner actions rather than zeroes.
+- **Verification**: Full Node suite 126/126 passed; targeted ESLint, production build, and diff checks passed. Local owner route audit passed 32/32. A real production staff JWT sees 1 full self profile, 0 owner-workforce rows, and 29 safe directory rows. The final authenticated production suite passed 17/17 setup and journey checks, including `/my-tasks`, bilingual owner access, mobile navigation, and direct-route denial.
+- **Commits**: `d386f85` (`fix(system): close owner acceptance privacy gaps`), `43284ad` (`fix(tasks): preserve staff task rendering`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migrations `20260731235500`, `20260731235600`, and `20260731235700` are applied and recorded on Noch Production. GitHub Actions run `30634460804` deployed commit `43284ad` successfully to `apps.noch.cloud`; authenticated production checks passed afterward.
+- **Required owner work**: Follow the daily/weekly/monthly cadence in the acceptance audit to complete physical counts and recipes, supply attendance/schedule/payroll evidence, connect processor settlement evidence, and begin measured loyalty/content operation.
+
+---
+
 ## 2026-07-31 — Navigation, Roles, Permissions, and Bilingual Consistency
 
 - **Agent**: Codex
