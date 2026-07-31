@@ -10,6 +10,7 @@ const appUrl = new URL('../src/App.jsx', import.meta.url)
 const hubUrl = new URL('../src/modules/workforce/pages/WorkforceHub.jsx', import.meta.url)
 const profilesUrl = new URL('../src/lib/profiles.js', import.meta.url)
 const financeUrl = new URL('../src/modules/finance/FinanceDashboard.jsx', import.meta.url)
+const payrollUrl = new URL('../src/modules/finance/tabs/PayrollTab.jsx', import.meta.url)
 
 test('workforce identity is explicit and owner login profiles are not employees', async () => {
   const sql = await readFile(migrationUrl, 'utf8')
@@ -38,11 +39,12 @@ test('schedule is separate evidence and payroll has approval and payment states'
 })
 
 test('normal owner journey is consolidated under staff workforce control', async () => {
-  const [app, hub, profiles, finance] = await Promise.all([
+  const [app, hub, profiles, finance, payroll] = await Promise.all([
     readFile(appUrl, 'utf8'),
     readFile(hubUrl, 'utf8'),
     readFile(profilesUrl, 'utf8'),
     readFile(financeUrl, 'utf8'),
+    readFile(payrollUrl, 'utf8'),
   ])
   assert.match(app, /path="\/staff".*WorkforceHub/s)
   assert.match(app, /path="\/staff\/team".*Staff/s)
@@ -50,4 +52,6 @@ test('normal owner journey is consolidated under staff workforce control', async
   assert.match(hub, /الفريق والحضور والرواتب/)
   assert.match(profiles, /rpc\('workforce_team_v2'\)/)
   assert.doesNotMatch(finance, /ShiftsTab|PayrollTab/)
+  assert.match(payroll, /getAllTeamMembers\(\)/)
+  assert.match(payroll, /disabled=\{busy \|\| !canComplete\}/)
 })

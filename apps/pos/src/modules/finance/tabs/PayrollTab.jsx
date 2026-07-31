@@ -10,7 +10,7 @@ import {
   generatePayrollRun, completePayrollRun, deletePayrollRun,
   listStaffLoans, createStaffLoan, cancelStaffLoan, listLoanRepayments, listBranches,
 } from '../lib/finance-supabase'
-import { supabase } from '../../../lib/supabase'
+import { getAllTeamMembers } from '../../../lib/profiles'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
@@ -59,11 +59,11 @@ export default function PayrollTab({ readOnly = false }) {
     try {
       const [list, st, bs] = await Promise.all([
         listPayrollRuns(12),
-        supabase.from('profiles').select('id, full_name').order('full_name'),
+        getAllTeamMembers(),
         listBranches(),
       ])
       setRuns(list)
-      setStaff(st.data || [])
+      setStaff(st.filter(person => person.is_active !== false))
       setBranches(bs)
       return list
     } catch (err) {
@@ -160,6 +160,10 @@ export default function PayrollTab({ readOnly = false }) {
   const runTotal = selected
     ? (isDraft ? items.reduce((s, it) => s + netOf(it), 0) : Number(selected.total_lyd || 0))
     : 0
+  const storedVariance = selected ? Number(selected.total_lyd || 0) - runTotal : 0
+  const canComplete = isDraft
+    && ['ready', 'warning'].includes(selected?.evidence_status)
+    && Math.abs(storedVariance) <= 0.005
 
   return (
     <div className="flex flex-col gap-4">
@@ -206,6 +210,7 @@ export default function PayrollTab({ readOnly = false }) {
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <h3 className="text-white text-sm font-semibold">{String(selected.period_month).slice(0, 7)}</h3>
             <StatusBadge status={selected.status} />
+            <StatusBadge status={selected.evidence_status || 'legacy'} />
             <span className="text-noch-green font-mono text-sm">{lyd(runTotal)}</span>
             {!readOnly && isDraft && (
               <div className="flex items-center gap-2 ml-auto">
@@ -217,13 +222,20 @@ export default function PayrollTab({ readOnly = false }) {
                   className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 text-red-300">
                   <Trash2 size={12} /> Delete draft
                 </button>
-                <button onClick={complete} disabled={busy}
+                <button onClick={complete} disabled={busy || !canComplete}
                   className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5">
                   <CheckCircle size={12} /> {busy ? 'Working…' : 'Complete payroll'}
                 </button>
               </div>
             )}
           </div>
+          {isDraft && !canComplete && (
+            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+              This draft cannot be approved until its employee evidence is ready and its stored total reconciles with its items.
+              {Math.abs(storedVariance) > 0.005 ? ` Current variance: ${lyd(storedVariance)}.` : ''}
+              {' '}Regenerate after completing employee start dates and allocations.
+            </div>
+          )}
           {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
             <p className="text-noch-muted text-sm py-3 text-center">No items in this run.</p>
           ) : (
