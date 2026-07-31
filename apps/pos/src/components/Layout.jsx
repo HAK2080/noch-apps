@@ -142,7 +142,7 @@ export default function Layout({ children }) {
           </div>
           <div className="flex items-center justify-between gap-1 px-1">
             <LanguageToggle className="justify-start" />
-            {!staffSkinEnabled && <ThemeToggle />}
+            <ThemeToggle />
             <button onClick={handleSignOut} aria-label={t('logout')} className="rounded-md p-1.5 text-zinc-600 transition-colors hover:bg-red-400/10 hover:text-red-300"><LogOut size={14} /></button>
           </div>
         </div>
@@ -172,6 +172,7 @@ export default function Layout({ children }) {
           <div className="flex items-center gap-2">
             <button onClick={() => setSearchOpen(true)} aria-label={ar ? 'بحث' : 'Search'} className="rounded-md p-1.5 text-zinc-500"><Search size={17} /></button>
             <OpsPersistentBadge />
+            <ThemeToggle compact />
             <LanguageToggle />
             <button onClick={handleSignOut} aria-label={t('logout')} className="rounded-md p-1.5 text-zinc-500"><LogOut size={17} /></button>
           </div>

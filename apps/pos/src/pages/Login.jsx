@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import LanguageToggle from '../components/shared/LanguageToggle'
+import ThemeToggle from '../components/shared/ThemeToggle'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -107,7 +108,10 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="skin-login-language"><LanguageToggle variant="staff" /></div>
+          <div className="skin-login-language">
+            <LanguageToggle variant="staff" />
+            <ThemeToggle compact />
+          </div>
         </div>
       </section>
 

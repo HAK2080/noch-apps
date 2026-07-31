@@ -11,6 +11,7 @@ import {
   recordPosCustomerVisit,
 } from '../../loyalty/lib/loyalty-supabase'
 import { format, round, sum, lineTotal } from '../lib/money'
+import ThemeToggle from '../../../components/shared/ThemeToggle'
 // Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
 const QRScanner      = lazy(() => import('../components/QRScanner'))
@@ -1021,6 +1022,8 @@ export default function POSTerminal() {
           {online ? <Wifi size={14} /> : <WifiOff size={14} />}
           {offlineQueue > 0 && <span className="bg-yellow-500 text-black rounded-full px-1 text-[10px]">{offlineQueue}</span>}
         </div>
+
+        <ThemeToggle compact />
 
         {/* ⋮ More menu — secondary actions */}
         <div className="relative">

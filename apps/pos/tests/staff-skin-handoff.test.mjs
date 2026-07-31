@@ -14,6 +14,7 @@ const terminal = read('src/modules/pos/pages/POSTerminal.jsx')
 const cart = read('src/modules/pos/components/CartPanel.jsx')
 const login = read('src/pages/Login.jsx')
 const languageToggle = read('src/components/shared/LanguageToggle.jsx')
+const themeToggle = read('src/components/shared/ThemeToggle.jsx')
 
 test('staff skin keeps one scoped cream/ink visual seam', () => {
   for (const token of ['#F4EFE1', '#EDE6D4', '#141412', '#0F7A3D', '#8A6B10', '#A03219', '#1F4FA0']) {
@@ -45,4 +46,15 @@ test('storefront is not part of the staff skin seam', () => {
 test('the shared authenticated staff shell keeps the skin on every staff route', () => {
   assert.match(layout, /const staffSkinEnabled = true/)
   assert.doesNotMatch(layout, /location\.pathname === '\/dashboard'/)
+})
+
+test('dark and bright themes remain available across staff entry surfaces', () => {
+  assert.match(layout, /<ThemeToggle \/>/)
+  assert.match(layout, /<ThemeToggle compact \/>/)
+  assert.doesNotMatch(layout, /!staffSkinEnabled\s*&&\s*<ThemeToggle/)
+  assert.match(login, /<ThemeToggle compact \/>/)
+  assert.match(terminal, /<ThemeToggle compact \/>/)
+  assert.match(themeToggle, /aria-label=\{label\}/)
+  assert.match(css, /:root\[data-theme="dark"\] \.staff-skin/)
+  assert.match(css, /--staff-bg:\s*#0B0B0D/)
 })
