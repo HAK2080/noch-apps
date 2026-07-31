@@ -1,3 +1,35 @@
+## 2026-07-31 — Navigation, Roles, Permissions, and Bilingual Consistency
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `CONTEXT.md`
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/components/Layout.jsx`
+  - `apps/pos/src/components/shared/LanguageToggle.jsx`
+  - `apps/pos/src/contexts/PermissionsContext.jsx`
+  - `apps/pos/src/lib/access-control.js`
+  - `apps/pos/src/lib/features.js`
+  - `apps/pos/src/lib/profiles.js`
+  - `apps/pos/src/pages/staff/RoleManager.jsx`
+  - `apps/pos/playwright.config.js`
+  - `apps/pos/tests/access-control-navigation.test.mjs`
+  - `apps/pos/tests/access-control-owner.spec.js`
+  - `apps/pos/tests/access-control-staff.spec.js`
+  - `docs/PAGES.md`
+  - `docs/audit/2026-07-31-navigation-access-bilingual-module.md`
+  - `supabase/migrations/20260731235000_access_control_navigation.sql`
+  - `supabase/functions/approve-staff-request/index.ts`
+- **Description**: Replaced sidebar role fallbacks, competing route guards, and hard-coded landing redirects with one policy evaluator used by both navigation and direct routes. Added explicit fail-closed access states, full mobile page discovery, consistent English/Arabic owner controls, audited account/role/permission RPCs, and a separate login-access state that does not misuse employee activity. The unsupported `data_entry` role is archived and hidden while its records remain preserved.
+- **Data reconciliation**: All 29 profiles remain preserved. Seven owner accounts are enabled; no linked former employee remains enabled. The supported permission matrix contains all 76 role/feature rows and has zero edit-without-access grants.
+- **Verification**: Full Node suite 121/121 passed; targeted ESLint, production build, and diff checks passed. Local Playwright owner and staff journeys passed. Rollback-only production JWT probes proved that staff cannot self-promote or request owner/archived roles, and that owner permission changes write audit evidence. Production Playwright passed 4/4 login, English/Arabic Role Manager, mobile full-navigation, and direct-route denial checks.
+- **Commit**: `065238d` (`feat(access): unify navigation and role controls`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migration `20260731235000` is applied and recorded on Noch Production. `approve-staff-request` was redeployed. GitHub Actions run `30631580065` deployed commit `065238d` successfully to `apps.noch.cloud`; authenticated production smoke checks passed afterward.
+- **Module 8 backlog**: Reconcile every module's RLS against the active grants, replace broad base-profile reads with purpose-specific safe RPCs, test both auth-link shapes and all supported roles, and complete the whole-system owner acceptance walkthrough.
+
+---
+
 ## 2026-07-25 — Submitter-Reported Expense Payment
 
 - **Agent**: Codex
