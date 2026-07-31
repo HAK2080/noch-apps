@@ -74,6 +74,26 @@ _Avoid_: Directly changing a customer's stamp balance
 An earned, unredeemed customer benefit with explicit issue, expiry, redemption, and reversal states.
 _Avoid_: Coupon when referring to an earned loyalty obligation
 
+**Loyalty program version**:
+A named set of earning, mission, and reward rules under which member value is accumulated.
+_Avoid_: Tier
+
+**Point event**:
+An immutable increase or decrease in a member's loyalty value with a unique business cause.
+_Avoid_: Directly changing a points balance
+
+**Loyalty checkout session**:
+A short-lived claim that allows one loyalty member to identify themselves to one open checkout without exposing contact information to staff.
+_Avoid_: Customer QR when the code identifies a person rather than a checkout
+
+**Mission**:
+A time-bounded offer with explicit eligibility, qualifying behavior, progress target, completion limit, and guaranteed reward.
+_Avoid_: Challenge, game
+
+**Opening balance**:
+The customer value carried into a new loyalty program version and recorded as the first auditable event in that version.
+_Avoid_: Bonus when the value was earned under an earlier program
+
 ## Content language
 
 **Content campaign**:

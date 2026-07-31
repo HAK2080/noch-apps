@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Package, Download, AlertTriangle, CheckCircle } from 'lucide-react'
-import { getPOSBranch, getPOSProducts, updateProductStock, createInventoryMovement } from '../lib/pos-supabase'
+import { adjustProductStock, getPOSBranch, getPOSProducts } from '../lib/pos-supabase'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 import { formatStockQuantity, fromBaseQuantity, toBaseQuantity } from '../lib/inventory-units'
@@ -101,23 +101,14 @@ export default function POSInventory() {
   const [filterLow, setFilterLow] = useState(false)
 
   useEffect(() => {
-    Promise.all([getPOSBranch(branchId), getPOSProducts(branchId)])
+    Promise.all([getPOSBranch(branchId), getPOSProducts(branchId, { includeHidden: true })])
       .then(([b, p]) => { setBranch(b); setProducts(p) })
       .catch(err => toast.error(err.message || 'Failed to load'))
       .finally(() => setLoading(false))
   }, [branchId])
 
   const handleAdjust = async (productId, branchId, stockBefore, newQty) => {
-    await updateProductStock(productId, newQty)
-    await createInventoryMovement({
-      branch_id: branchId,
-      product_id: productId,
-      movement_type: 'adjustment',
-      quantity: newQty - stockBefore,
-      stock_before: stockBefore,
-      stock_after: newQty,
-      notes: 'Manual adjustment',
-    })
+    await adjustProductStock(productId, branchId, newQty)
     setProducts(prev => prev.map(p =>
       p.id === productId ? { ...p, stock_qty: newQty } : p
     ))

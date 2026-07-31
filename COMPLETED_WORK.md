@@ -342,3 +342,36 @@ To find if something's been done:
 - **Verification**: The exact ambiguous query reproduced HTTP 300 / `PGRST201`, while the deployed branch-free query returned HTTP 200. Five focused tests, targeted ESLint, and the POS production build passed. A fresh signed-in production page displayed all 216 products with no relationship error.
 
 ---
+
+## 2026-07-31 — Loyalty V2, Owner Finance Labels, Expenses, and POS Inventory Repair
+
+- **Agent**: Codex
+- **Status**: Release validated; production deployment pending
+- **Files**:
+  - `CONTEXT.md`
+  - `docs/adr/0001-loyalty-v2-ledger-and-v1-archive.md`
+  - `docs/loyalty/2026-07-30-loyalty-v2-proposal-review.md`
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/modules/loyalty/lib/loyalty-supabase.js`
+  - `apps/pos/src/modules/loyalty/lib/loyalty-v2.js`
+  - `apps/pos/src/modules/loyalty/pages/LoyaltyCheckoutClaim.jsx`
+  - `apps/pos/src/modules/loyalty/pages/LoyaltyMissionsV2.jsx`
+  - `apps/pos/src/modules/loyalty/pages/LoyaltyV1Archive.jsx`
+  - `apps/pos/src/modules/loyalty/pages/LoyaltyV2Dashboard.jsx`
+  - `apps/pos/src/modules/pos/components/PaymentModal.jsx`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/pages/POSInventory.jsx`
+  - `apps/pos/src/modules/pos/pages/POSProducts.jsx`
+  - `apps/pos/src/modules/pos/pages/POSTerminal.jsx`
+  - `apps/pos/tests/loyalty-v2-checkout-ui.test.mjs`
+  - `apps/pos/tests/loyalty-v2-migration.test.mjs`
+  - `apps/pos/tests/pos-product-inventory-update.test.mjs`
+  - `supabase/migrations/20260730170000_atomic_pos_product_updates.sql`
+  - `supabase/migrations/20260730180000_loyalty_v2.sql`
+- **Description**: Added Loyalty V2 with a reconciled, read-only V1 snapshot; transferred member IDs, names, existing points, proportional incomplete-stamp value, and pending rewards; froze V1 stamp award paths; added an immutable/idempotent points ledger, paid-order earning, partial-refund and void reversal, guaranteed rewards, validated POS redemption, four mission types, and owner mission controls. Replaced phone-first checkout with a one-time customer-scanned transaction QR as the primary path while retaining a collapsed, masked phone fallback. Added a public phone/email OTP claim page and post-payment confirmation. Repaired POS product/inventory updates by loading hidden products in management, making manual stock adjustment atomic/audited, and refreshing shared-branch terminal state plus offline cache. Added submitter-declared expense payment status across web, Receipt Snap, and Telegram, and simplified finance labels for owners.
+- **Commit**: Pending release commit
+- **Deployment**: Pending after release commit
+- **Verification**: 21 focused Node tests passed; targeted ESLint completed with zero errors and seven warnings; both changed Edge Functions bundled successfully; POS production build passed; `git diff --check` passed. All three new migrations were executed successfully against the production schema inside an explicit transaction and rolled back.
+- **Notes**: Generated Supabase state files and stale/destructive Bloom deployment helpers were reviewed and intentionally excluded from the release. Production already records Bloom migrations `20260725100000`, `20260725101000`, `20260725102000`, and `20260725110000`; they must not be replayed.
+
+---

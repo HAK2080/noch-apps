@@ -121,19 +121,19 @@ export default function ExecutiveSummaryTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Stream title="Profitability">
-          <Metric label="Revenue" value={lyd(total?.revenue)} onClick={() => setBreakdown({ kind: 'revenue', branchId: null, branchName: null })} />
-          <Metric label="COGS" value={lyd(total?.cogs)} onClick={() => setBreakdown({ kind: 'cogs', branchId: null, branchName: null })} />
-          <Metric label="Net contribution" value={lyd(total?.net)} onClick={() => setBreakdown({ kind: 'net', branchId: null, branchName: null })} />
-          <Metric label="Prime cost" value={pct(total?.primeRatio)} onClick={() => setBreakdown({ kind: 'prime', branchId: null, branchName: null })} />
+        <Stream title="Profit">
+          <Metric label="Sales after refunds" value={lyd(total?.revenue)} onClick={() => setBreakdown({ kind: 'revenue', branchId: null, branchName: null })} />
+          <Metric label="Product costs (COGS)" value={lyd(total?.cogs)} onClick={() => setBreakdown({ kind: 'cogs', branchId: null, branchName: null })} />
+          <Metric label="Profit after operating costs" value={lyd(total?.net)} onClick={() => setBreakdown({ kind: 'net', branchId: null, branchName: null })} />
+          <Metric label="Products + staff" value={pct(total?.primeRatio)} onClick={() => setBreakdown({ kind: 'prime', branchId: null, branchName: null })} />
         </Stream>
-        <Stream title="Liquidity">
-          <Metric label="Cash" value={lyd(liquidity.cashOnHand)} />
-          <Metric label="Bank" value={liquidity.bankBalance == null ? 'Not imported' : lyd(liquidity.bankBalance)} />
-          <Metric label="Total liquid" value={liquidity.totalLiquidity == null ? '—' : lyd(liquidity.totalLiquidity)} />
-          <Metric label="Runway" value={liquidity.runwayWeeks == null ? '—' : `${liquidity.runwayWeeks.toFixed(1)} weeks`} />
+        <Stream title="Cash available">
+          <Metric label="Cash on hand" value={lyd(liquidity.cashOnHand)} />
+          <Metric label="Bank balance" value={liquidity.bankBalance == null ? 'Not imported' : lyd(liquidity.bankBalance)} />
+          <Metric label="Total available cash" value={liquidity.totalLiquidity == null ? '—' : lyd(liquidity.totalLiquidity)} />
+          <Metric label="Weeks of cash left" value={liquidity.runwayWeeks == null ? '—' : `${liquidity.runwayWeeks.toFixed(1)} weeks`} />
         </Stream>
-        <Stream title="Review now">
+        <Stream title="What needs attention">
           <Metric label="Branches to review" value={`${attentionRows.length} / ${rows.length}`} />
           <Metric label="Prime cost target" value={`${settings.prime_cost_min_pct ?? 55}–${settings.prime_cost_max_pct ?? 65}%`} />
           <Metric label="30d fixed outflows" value={lyd(liquidity.upcoming30dOutflows)} />
@@ -153,11 +153,11 @@ export default function ExecutiveSummaryTab() {
               <tr className="text-left text-noch-muted text-[10px] uppercase tracking-wide border-b border-noch-border">
                 <th className="px-4 py-2.5 font-medium">Branch</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium text-right">Revenue</th>
-                <th className="px-4 py-2.5 font-medium text-right">COGS</th>
-                <th className="px-4 py-2.5 font-medium text-right">Prime cost</th>
-                <th className="px-4 py-2.5 font-medium text-right">Operating expenses</th>
-                <th className="px-4 py-2.5 font-medium text-right">Net contribution</th>
+                <th className="px-4 py-2.5 font-medium text-right">Sales after refunds</th>
+                <th className="px-4 py-2.5 font-medium text-right">Product costs</th>
+                <th className="px-4 py-2.5 font-medium text-right">Products + staff</th>
+                <th className="px-4 py-2.5 font-medium text-right">Running costs</th>
+                <th className="px-4 py-2.5 font-medium text-right">Profit after operating costs</th>
               </tr>
             </thead>
             <tbody>

@@ -330,25 +330,25 @@ export default function Dashboard() {
           <div className="card mb-4 cursor-pointer hover:border-noch-green/30 transition-colors" onClick={() => navigate('/finance')}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-noch-muted text-[10px] font-bold uppercase tracking-widest">
-                {lang === 'ar' ? 'أداء اليوم' : "Today's P&L"}
+                {lang === 'ar' ? 'أداء اليوم' : "Today's profit"}
               </h2>
               <ChevronRight size={14} className="text-noch-muted" />
             </div>
             <div className="grid grid-cols-5 gap-3">
               <div>
-                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'الإيرادات' : 'Revenue'}</p>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'الإيرادات' : 'Sales'}</p>
                 <p className="text-white font-bold text-sm">{revenue.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
               </div>
               <div>
-                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'التكلفة' : 'COGS'}</p>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'التكلفة' : 'Product costs'}</p>
                 <p className="text-red-400 font-bold text-sm">{cogs.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
               </div>
               <div>
-                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'العمالة' : 'Labor'}</p>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'العمالة' : 'Staff cost'}</p>
                 <p className="text-orange-400 font-bold text-sm">{labor.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
               </div>
               <div>
-                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'المصاريف' : 'OpEx'}</p>
+                <p className="text-noch-muted text-[10px]">{lang === 'ar' ? 'المصاريف' : 'Running costs'}</p>
                 <p className="text-yellow-400 font-bold text-sm">{opex.toLocaleString('en', { maximumFractionDigits: 0 })}</p>
               </div>
               <div>

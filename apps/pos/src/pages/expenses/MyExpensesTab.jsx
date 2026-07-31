@@ -4,6 +4,7 @@ import { Loader2, Eye, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { fmt, amtLyd, loadExpenses, loadApprovals, deleteExpense } from './lib/expensesData'
 import StatusBadge from './StatusBadge'
+import PaymentDeclarationBadge from './PaymentDeclarationBadge'
 
 // Local YYYY-MM-DD bounds — expense_date is a date column, string compare works
 function periodRange(p) {
@@ -134,6 +135,7 @@ export default function MyExpensesTab({ userId, refreshKey }) {
                         <span className="text-white font-semibold text-sm">{fmt(exp.amount, exp.currency)}</span>
                         {exp.currency !== 'LYD' && <span className="text-noch-muted text-xs">≈ {fmt(exp.amount_lyd)}</span>}
                         <StatusBadge status={exp.status} />
+                        <PaymentDeclarationBadge expense={exp} />
                       </div>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-xs text-noch-muted">{exp.cost_centers?.id} — {exp.cost_centers?.name}</span>

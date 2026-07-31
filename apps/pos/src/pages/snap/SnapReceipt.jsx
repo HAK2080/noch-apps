@@ -4,7 +4,7 @@
 // Installable to the Android home screen (manifest: /snap-manifest.webmanifest).
 
 import { useState, useRef, useEffect } from 'react'
-import { Camera, Loader2, CheckCircle2, AlertTriangle, Scale, PenLine, RotateCcw } from 'lucide-react'
+import { Camera, Loader2, CheckCircle2, AlertTriangle, Scale, PenLine, RotateCcw, Banknote, CreditCard, Clock3 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 
@@ -38,7 +38,7 @@ export default function SnapReceipt() {
   const { user } = useAuth()
   const fileRef = useRef(null)
 
-  // phase: idle | reading | pick | custom | saving | done | error
+  // phase: idle | reading | payment | pick | custom | saving | done | error
   const [phase, setPhase] = useState('idle')
   const [snap, setSnap] = useState(null)          // { snap_id, extracted, cost_centers, suggested_code }
   const [summary, setSummary] = useState('')
@@ -75,6 +75,24 @@ export default function SnapReceipt() {
         submitted_by: user.id,
       })
       if (!res?.snap_id) throw new Error(res?.error || 'extract failed')
+      setSnap(res)
+      setPhase('payment')
+    } catch (err) {
+      setErrorMsg(err.message || 'unknown')
+      setPhase('error')
+    }
+  }
+
+  const reportPayment = async (status, method = null) => {
+    setPhase('saving')
+    try {
+      const res = await callSnap({
+        action: 'set_payment',
+        snap_id: snap.snap_id,
+        status,
+        method,
+      })
+      if (!res?.ok) throw new Error(res?.error || 'payment choice failed')
       setSnap(res)
       setPhase('pick')
     } catch (err) {
@@ -148,6 +166,41 @@ export default function SnapReceipt() {
         <div className="flex flex-col items-center gap-4">
           <Loader2 size={56} className="animate-spin text-noch-green" />
           <p className="text-noch-muted">{phase === 'reading' ? 'جاري قراءة الفاتورة...' : 'جاري التسجيل...'}</p>
+        </div>
+      )}
+
+      {phase === 'payment' && snap && (
+        <div className="w-full max-w-sm flex flex-col gap-4">
+          <div className="bg-white/5 rounded-2xl p-4 text-center">
+            <p className="font-bold text-lg">{ex.vendor || 'فاتورة / Receipt'}</p>
+            <p className="text-noch-green text-2xl font-bold">
+              {ex.amount ? `${ex.amount} ${ex.currency || 'LYD'}` : 'المبلغ غير واضح / Amount unclear'}
+            </p>
+          </div>
+          <div className="text-center">
+            <p className="font-semibold">هل تم دفع هذا المصروف؟</p>
+            <p className="text-sm text-noch-muted">Has this expense been paid?</p>
+          </div>
+          <button
+            onClick={() => reportPayment('unpaid')}
+            className="py-4 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-300 font-bold flex items-center justify-center gap-2 active:scale-95"
+          >
+            <Clock3 size={20} /> غير مدفوع / Unpaid
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => reportPayment('paid', 'cash')}
+              className="py-4 rounded-xl bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 font-bold flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Banknote size={20} /> نقداً / Cash
+            </button>
+            <button
+              onClick={() => reportPayment('paid', 'card')}
+              className="py-4 rounded-xl bg-blue-400/10 border border-blue-400/30 text-blue-300 font-bold flex items-center justify-center gap-2 active:scale-95"
+            >
+              <CreditCard size={20} /> بطاقة / Card
+            </button>
+          </div>
         </div>
       )}
 

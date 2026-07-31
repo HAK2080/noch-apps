@@ -79,17 +79,10 @@ const OpsChecklist     = lazy(() => import('./modules/ops/pages/OpsChecklist'))
 const OpsSettings      = lazy(() => import('./modules/ops/pages/OpsSettings'))
 const OpsDashboard     = lazy(() => import('./modules/ops/pages/OpsDashboard'))
 
-const LoyaltyDashboard = lazy(() => import('./modules/loyalty/pages/LoyaltyDashboard'))
-const LoyaltyCustomers = lazy(() => import('./modules/loyalty/pages/LoyaltyCustomers'))
-const CustomerDetail   = lazy(() => import('./modules/loyalty/pages/CustomerDetail'))
-const LoyaltyRewards   = lazy(() => import('./modules/loyalty/pages/LoyaltyRewards'))
-const LoyaltyQR        = lazy(() => import('./modules/loyalty/pages/LoyaltyQR'))
-const LoyaltySettings  = lazy(() => import('./modules/loyalty/pages/LoyaltySettings'))
-const LoyaltyLeaderboard = lazy(() => import('./modules/loyalty/pages/LoyaltyLeaderboard'))
-const LoyaltyStamp     = lazy(() => import('./modules/loyalty/pages/LoyaltyStamp'))
-const LoyaltyGestures  = lazy(() => import('./modules/loyalty/pages/LoyaltyGestures'))
-const LoyaltySpinWheel = lazy(() => import('./modules/loyalty/pages/LoyaltySpinWheel'))
-const LoyaltyFeedback  = lazy(() => import('./modules/loyalty/pages/LoyaltyFeedback'))
+const LoyaltyDashboard = lazy(() => import('./modules/loyalty/pages/LoyaltyV2Dashboard'))
+const LoyaltyV1Archive = lazy(() => import('./modules/loyalty/pages/LoyaltyV1Archive'))
+const LoyaltyMissionsV2 = lazy(() => import('./modules/loyalty/pages/LoyaltyMissionsV2'))
+const LoyaltyCheckoutClaim = lazy(() => import('./modules/loyalty/pages/LoyaltyCheckoutClaim'))
 
 const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 const SnapReceipt      = lazy(() => import('./pages/snap/SnapReceipt'))
@@ -186,6 +179,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/staff/request-access" element={<StaffAccessRequest />} />
+        <Route path="/loyalty/checkout/:token" element={<LoyaltyCheckoutClaim />} />
 
         <Route path="/" element={<ProtectedRoute><RootRedirect /></ProtectedRoute>} />
 
@@ -290,16 +284,17 @@ export default function App() {
 
         {/* Loyalty — Nochi V3.01 (owner + staff) */}
         <Route path="/loyalty" element={<ProtectedRoute><LoyaltyDashboard /></ProtectedRoute>} />
-        <Route path="/loyalty/customers" element={<ProtectedRoute><LoyaltyCustomers /></ProtectedRoute>} />
-        <Route path="/loyalty/customers/:id" element={<ProtectedRoute><CustomerDetail /></ProtectedRoute>} />
-        <Route path="/loyalty/rewards" element={<ProtectedRoute><LoyaltyRewards /></ProtectedRoute>} />
-        <Route path="/loyalty/qr" element={<ProtectedRoute><LoyaltyQR /></ProtectedRoute>} />
-        <Route path="/loyalty/settings" element={<ProtectedRoute><LoyaltySettings /></ProtectedRoute>} />
-        <Route path="/loyalty/leaderboard" element={<ProtectedRoute><LoyaltyLeaderboard /></ProtectedRoute>} />
-        <Route path="/loyalty/stamp" element={<ProtectedRoute><LoyaltyStamp /></ProtectedRoute>} />
-        <Route path="/loyalty/gestures" element={<ProtectedRoute><LoyaltyGestures /></ProtectedRoute>} />
-        <Route path="/loyalty/spin" element={<ProtectedRoute><LoyaltySpinWheel /></ProtectedRoute>} />
-        <Route path="/loyalty/feedback" element={<ProtectedRoute><LoyaltyFeedback /></ProtectedRoute>} />
+        <Route path="/loyalty/archive-v1" element={<ProtectedRoute><OwnerRoute><LoyaltyV1Archive /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/loyalty/missions" element={<ProtectedRoute><OwnerRoute><LoyaltyMissionsV2 /></OwnerRoute></ProtectedRoute>} />
+        <Route path="/loyalty/customers/*" element={<Navigate to="/loyalty/archive-v1" replace />} />
+        <Route path="/loyalty/rewards" element={<Navigate to="/loyalty/archive-v1" replace />} />
+        <Route path="/loyalty/qr" element={<Navigate to="/loyalty" replace />} />
+        <Route path="/loyalty/settings" element={<Navigate to="/loyalty" replace />} />
+        <Route path="/loyalty/leaderboard" element={<Navigate to="/loyalty" replace />} />
+        <Route path="/loyalty/stamp" element={<Navigate to="/loyalty" replace />} />
+        <Route path="/loyalty/gestures" element={<Navigate to="/loyalty" replace />} />
+        <Route path="/loyalty/spin" element={<Navigate to="/loyalty" replace />} />
+        <Route path="/loyalty/feedback" element={<Navigate to="/loyalty" replace />} />
         <Route path="/loyalty/intelligence" element={<ProtectedRoute><OwnerRoute><LoyaltyIntelligence /></OwnerRoute></ProtectedRoute>} />
 
         {/* Experience OS — Experiments + Messages */}

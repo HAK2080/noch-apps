@@ -101,7 +101,7 @@ export async function deletePOSCategory(id) {
 // PRODUCTS
 // ============================================================
 
-export async function getPOSProducts(branchId) {
+export async function getPOSProducts(branchId, { includeHidden = false } = {}) {
   // Returns products visible at the given branch — array model OR legacy
   // single branch_id column. Mirrors what the storefront Menu.jsx does so
   // both surfaces show the same set.
@@ -109,9 +109,9 @@ export async function getPOSProducts(branchId) {
     .from('pos_products')
     .select('*, pos_categories(name, name_ar, color)')
     .eq('is_active', true)
-    .eq('visible_on_menu', true)
     .order('menu_sort', { ascending: true, nullsFirst: false })
     .order('name')
+  if (!includeHidden) q = q.eq('visible_on_menu', true)
   if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
   const { data, error } = await q
   if (error) throw error
@@ -721,7 +721,10 @@ export async function createPOSOrder(orderData, items) {
     track_inventory: !!item.track_inventory,
   }))
 
-  const { data, error } = await supabase.rpc('create_pos_order', {
+  const rpcName = orderData.loyalty_reward_entitlement_id
+    ? 'create_pos_order_with_loyalty_reward_v2'
+    : 'create_pos_order'
+  const rpcArgs = {
     p_idempotency_key: idempotencyKey,
     p_branch_id: orderData.branch_id,
     p_shift_id: orderData.shift_id || null,
@@ -740,7 +743,12 @@ export async function createPOSOrder(orderData, items) {
     p_items: itemsPayload,
     p_customer_name: orderData.customer_name || null,
     p_customer_phone: orderData.customer_phone || null,
-  })
+  }
+  if (orderData.loyalty_reward_entitlement_id) {
+    rpcArgs.p_loyalty_reward_entitlement_id = orderData.loyalty_reward_entitlement_id
+  }
+
+  const { data, error } = await supabase.rpc(rpcName, rpcArgs)
   if (error) throw error
 
   if (orderData.override_by && data?.order?.id) {
@@ -935,6 +943,17 @@ export async function receiveProductStock(productId, quantity, unit, actorProfil
     p_source_ref: sourceRef,
     p_actor_profile_id: actorProfileId,
     p_unit: unit,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function adjustProductStock(productId, branchId, newQuantity, notes = 'Manual adjustment') {
+  const { data, error } = await supabase.rpc('adjust_pos_product_stock', {
+    p_product_id: productId,
+    p_branch_id: branchId,
+    p_new_quantity: Number(newQuantity),
+    p_notes: notes,
   })
   if (error) throw error
   return data

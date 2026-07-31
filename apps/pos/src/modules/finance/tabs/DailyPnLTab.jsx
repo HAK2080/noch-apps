@@ -166,7 +166,7 @@ export default function DailyPnLTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KPICard
-          label="Prime Cost"
+          label="Products + staff"
           value={pct(k.primeR, 1)}
           ratio={k.primeR}
           status={primeStat}
@@ -176,14 +176,14 @@ export default function DailyPnLTab() {
           emphasis
         />
         <KPICard
-          label="Revenue (net)"
+          label="Sales after discounts/refunds"
           value={lyd(k.rev)}
           status={STATUS.NEUTRAL}
           sub={`-${lyd(pnl.discounts || 0)} disc`}
           onClick={() => setBreakdown('revenue')}
         />
         <KPICard
-          label="COGS"
+          label="Product costs (COGS)"
           value={pct(k.cogsR, 1)}
           ratio={k.cogsR}
           status={cogsStat}
@@ -192,7 +192,7 @@ export default function DailyPnLTab() {
           onClick={() => setBreakdown('cogs')}
         />
         <KPICard
-          label="Direct Labor"
+          label="Staff cost"
           value={pct(k.laborR, 1)}
           ratio={k.laborR}
           status={laborStat}
@@ -200,13 +200,13 @@ export default function DailyPnLTab() {
           sub={lyd(k.labor)}
           onClick={() => setBreakdown('labor')}
         />
-        <KPICard label="Direct OpEx" value={lyd(k.opex)} onClick={() => setBreakdown('opex')} />
-        <KPICard label="Shared costs allocated" value={lyd(k.shared)} sub="Included in fully loaded profit" />
-        <KPICard label="Contribution before shared" value={lyd(k.netBeforeShared)} onClick={() => setBreakdown('net')} />
-        <KPICard label="Fully loaded profit" value={lyd(k.net)} sub={pct(k.netR, 1)} onClick={() => setBreakdown('net')} />
-        <KPICard label="Gross margin" value={pct(k.grossR, 1)} />
+        <KPICard label="Branch running costs" value={lyd(k.opex)} onClick={() => setBreakdown('opex')} />
+        <KPICard label="Shared business costs" value={lyd(k.shared)} sub="Included in profit after operating costs" />
+        <KPICard label="Profit before shared costs" value={lyd(k.netBeforeShared)} onClick={() => setBreakdown('net')} />
+        <KPICard label="Profit after operating costs" value={lyd(k.net)} sub={pct(k.netR, 1)} onClick={() => setBreakdown('net')} />
+        <KPICard label="Sales margin" value={pct(k.grossR, 1)} />
         <KPICard
-          label="Avg ticket"
+          label="Average order"
           value={k.orders ? lyd(k.rev / k.orders) : '—'}
         />
       </div>

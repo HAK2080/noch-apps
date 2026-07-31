@@ -9,6 +9,19 @@ root `.env`.
 | **POS + dashboard** | [`apps/pos/`](apps/pos) | `apps.noch.cloud` | Staff (POS, inventory, finance, loyalty, …) + customers (menu/checkout pages) |
 | **Storefront** | [`apps/storefront/`](apps/storefront) | `noch.cloud` | Customers (Hub, Menu, Shop, Loyalty landing) |
 
+## Current release highlights
+
+- **Loyalty V2:** privacy-first transaction QR capture, retained cashier
+  lookup fallback, auditable opening balances from V1, missions, reward
+  entitlements, refund/void reversals, and a read-only V1 archive.
+- **POS inventory:** management screens include menu-hidden products, shared
+  branch terminals refresh product data, and manual stock adjustments write
+  the balance change and audit movement atomically.
+- **Expenses:** submitters report unpaid, paid cash, or paid card before owner
+  approval; Receipt Snap and Telegram follow the same accounting workflow.
+- **Finance:** owner-facing navigation and headline metrics use plain business
+  language while retaining accounting terms such as COGS where useful.
+
 ```
 Jul 26 release/
 ├── apps/
@@ -48,8 +61,11 @@ day-to-day loop.
 
 ## Build & deploy
 
-Deployment is handled by [`deploy.py`](deploy.py) (requires Python +
-`paramiko`). It builds the app and uploads `dist/` to the VPS.
+Production deployment is handled by GitHub Actions on pushes to `main` that
+change `apps/pos/**`, or by manually running the **Deploy apps.noch.cloud**
+workflow. The workflow builds the POS app and invokes [`deploy.py`](deploy.py)
+with repository secrets. Maintainers can also run `deploy.py` locally when
+the required SSH credentials are configured.
 
 ```bash
 python deploy.py apps         # build + deploy apps.noch.cloud
@@ -65,8 +81,9 @@ python deploy.py apps --no-build   # upload an existing dist/ without rebuilding
   transpiles its app ahead of time so the browser doesn't ship/run a JSX
   transpiler at runtime.
 
-`git push` only saves code to GitHub — it does **not** deploy. Deploys go
-through `deploy.py`.
+Feature branches and pull requests do not deploy automatically. A push to
+`main` deploys applicable POS changes; a manual workflow dispatch can deploy
+a selected branch for controlled verification.
 
 ## Database
 

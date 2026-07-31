@@ -1,12 +1,20 @@
 // PaymentModal.jsx — Payment collection modal
 
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike, Phone, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
+import { X, DollarSign, CreditCard, Shuffle, QrCode, Bike, Phone, Loader2, ChevronDown, Gift } from 'lucide-react'
+import QRCode from 'qrcode'
 // Scanners are heavy (@zxing/html5-qrcode). Lazy so the eager POSTerminal
 // import chain doesn't drag them into the cold bundle.
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 const QRScanner      = lazy(() => import('./QRScanner'))
-import { lookupLoyaltyQR, lookupOrCreateLoyaltyCustomer } from '../../loyalty/lib/loyalty-supabase'
+import {
+  closeLoyaltyCheckoutV2,
+  createLoyaltyCheckoutV2,
+  getAvailableLoyaltyRewardsV2,
+  getLoyaltyCheckoutV2,
+  lookupLoyaltyQR,
+  lookupOrCreateLoyaltyMemberV2,
+} from '../../loyalty/lib/loyalty-supabase'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'
@@ -46,7 +54,29 @@ function Numpad({ value, onChange }) {
   )
 }
 
-export default function PaymentModal({ total, onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'en', prestoEnabled = false }) {
+const newCartToken = () => (
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : '00000000-0000-4000-8000-' + Math.random().toString(16).slice(2, 14).padEnd(12, '0')
+)
+
+const calculateRewardDiscount = (reward, cart, total) => {
+  if (!reward) return 0
+  if (reward.reward_type === 'fixed_discount') {
+    return Math.min(total, Math.max(0, Number(reward.reward_value_lyd || 0)))
+  }
+  const productIds = reward.product_ids || []
+  const categoryIds = reward.category_ids || []
+  const eligibleLines = cart.filter(line => (
+    (productIds.length === 0 && categoryIds.length === 0)
+    || productIds.includes(line.product_id)
+    || categoryIds.includes(line.category_id)
+  ))
+  if (eligibleLines.length === 0) return 0
+  return Math.min(total, Math.min(...eligibleLines.map(line => Number(line.price || 0))))
+}
+
+export default function PaymentModal({ total, branchId, cart = [], onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'en', prestoEnabled = false }) {
   const t = (k) => posT(k, posLang)
   const [method, setMethod] = useState('cash') // cash | card | split | presto
   const [cashTendered, setCashTendered] = useState(total.toFixed(2))
@@ -56,18 +86,49 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
   const [loyaltyCustomer, setLoyaltyCustomer] = useState(initialLoyalty || null)
   const [loyaltyPhone, setLoyaltyPhone] = useState('')
   const [linkingPhone, setLinkingPhone] = useState(false)
+  const [showPhoneFallback, setShowPhoneFallback] = useState(false)
+  const [cartToken, setCartToken] = useState(newCartToken)
+  const [checkoutSession, setCheckoutSession] = useState(null)
+  const [checkoutQr, setCheckoutQr] = useState('')
+  const [checkoutError, setCheckoutError] = useState('')
+  const [availableRewards, setAvailableRewards] = useState([])
+  const [selectedRewardId, setSelectedRewardId] = useState(null)
+
+  useEffect(() => {
+    if (!loyaltyCustomer?.id || !branchId) {
+      setAvailableRewards([])
+      setSelectedRewardId(null)
+      return
+    }
+    let active = true
+    getAvailableLoyaltyRewardsV2(loyaltyCustomer.id, branchId)
+      .then(rewards => {
+        if (active) setAvailableRewards(rewards)
+      })
+      .catch(() => {
+        if (active) setAvailableRewards([])
+      })
+    return () => { active = false }
+  }, [branchId, loyaltyCustomer?.id])
+
+  const selectedReward = availableRewards.find(reward => reward.entitlement_id === selectedRewardId) || null
+  const rewardDiscount = useMemo(
+    () => calculateRewardDiscount(selectedReward, cart, total),
+    [cart, selectedReward, total],
+  )
+  const payableTotal = Math.max(0, total - rewardDiscount)
 
   const changeDue = method === 'cash'
-    ? Math.max(0, parseFloat(cashTendered || 0) - total)
+    ? Math.max(0, parseFloat(cashTendered || 0) - payableTotal)
     : 0
 
-  const splitCash = total - parseFloat(cardAmount || 0)
+  const splitCash = payableTotal - parseFloat(cardAmount || 0)
   const splitValid = method === 'split' &&
     parseFloat(cardAmount) > 0 &&
-    parseFloat(cardAmount) < total
+    parseFloat(cardAmount) < payableTotal
 
   const canComplete =
-    (method === 'cash' && parseFloat(cashTendered || 0) >= total) ||
+    (method === 'cash' && parseFloat(cashTendered || 0) >= payableTotal) ||
     method === 'card' ||
     method === 'presto' ||
     splitValid
@@ -78,27 +139,92 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
       payment_method: method,
       cash_tendered: method === 'cash' ? parseFloat(cashTendered) : null,
       change_due: changeDue,
-      card_amount: (method === 'card' || method === 'presto') ? total : method === 'split' ? parseFloat(cardAmount) : 0,
+      card_amount: (method === 'card' || method === 'presto') ? payableTotal : method === 'split' ? parseFloat(cardAmount) : 0,
       loyalty_customer_id: loyaltyCustomer?.id || null,
+      loyalty_customer: loyaltyCustomer,
+      loyalty_checkout_session_id: checkoutSession?.session_id || null,
+      loyalty_reward_entitlement_id: selectedReward?.entitlement_id || null,
+      loyalty_reward_discount: rewardDiscount,
     }
     onComplete(paymentData)
-  }, [canComplete, method, cashTendered, changeDue, cardAmount, total, loyaltyCustomer, onComplete])
+  }, [canComplete, method, cashTendered, changeDue, cardAmount, payableTotal, loyaltyCustomer, checkoutSession, selectedReward, rewardDiscount, onComplete])
+
+  useEffect(() => {
+    if (!branchId || loyaltyCustomer) return undefined
+    let active = true
+    let pollTimer
+
+    const startCheckout = async () => {
+      try {
+        setCheckoutError('')
+        const session = await createLoyaltyCheckoutV2(branchId, cartToken)
+        if (!active) return
+        const claimUrl = `${window.location.origin}/loyalty/checkout/${encodeURIComponent(session.token)}`
+        const qr = await QRCode.toDataURL(claimUrl, { width: 240, margin: 1 })
+        if (!active) return
+        setCheckoutSession(session)
+        setCheckoutQr(qr)
+
+        pollTimer = window.setInterval(async () => {
+          try {
+            const status = await getLoyaltyCheckoutV2(session.session_id)
+            if (!active) return
+            setCheckoutSession(current => ({ ...current, ...status }))
+            if (status.status === 'claimed' && status.customer_id) {
+              setLoyaltyCustomer({
+                id: status.customer_id,
+                full_name: status.full_name,
+                points_balance: status.points_balance,
+                available_rewards: status.available_rewards,
+              })
+              window.clearInterval(pollTimer)
+              toast.success(`Loyalty linked: ${status.full_name}`)
+            } else if (['expired', 'cancelled', 'settled'].includes(status.status)) {
+              window.clearInterval(pollTimer)
+            }
+          } catch {
+            // Transient polling failures must not interrupt payment.
+          }
+        }, 2000)
+      } catch (err) {
+        if (active) setCheckoutError(err.message || 'Transaction QR unavailable')
+      }
+    }
+
+    startCheckout()
+    return () => {
+      active = false
+      if (pollTimer) window.clearInterval(pollTimer)
+    }
+  }, [branchId, cartToken, loyaltyCustomer])
+
+  const handleClose = useCallback(() => {
+    if (checkoutSession?.session_id) {
+      closeLoyaltyCheckoutV2(checkoutSession.session_id, null, true).catch(() => {})
+    }
+    onClose()
+  }, [checkoutSession, onClose])
 
   // Enter key shortcut
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Enter' && canComplete) handleComplete()
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleClose()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [canComplete, handleComplete, onClose])
+  }, [canComplete, handleComplete, handleClose])
 
   const handleLoyaltyScan = async (token) => {
     setShowQRScanner(false)
     try {
       const customer = await lookupLoyaltyQR(token)
       if (customer) {
+        if (checkoutSession?.session_id) {
+          closeLoyaltyCheckoutV2(checkoutSession.session_id, null, true).catch(() => {})
+          setCheckoutSession(null)
+          setCheckoutQr('')
+        }
         setLoyaltyCustomer(customer)
         toast.success(`Loyalty card linked: ${customer.full_name}`)
       } else {
@@ -119,7 +245,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
     if (loyaltyPhone.replace(/\D/g, '').length < 7) return toast.error('Enter at least 7 phone digits')
     setLinkingPhone(true)
     try {
-      const customer = await lookupOrCreateLoyaltyCustomer(loyaltyPhone)
+      const customer = await lookupOrCreateLoyaltyMemberV2(loyaltyPhone)
+      if (checkoutSession?.session_id) {
+        closeLoyaltyCheckoutV2(checkoutSession.session_id, null, true).catch(() => {})
+        setCheckoutSession(null)
+        setCheckoutQr('')
+      }
       setLoyaltyCustomer(customer)
       toast.success(`Loyalty linked: ${customer.full_name}`)
     } catch (err) {
@@ -127,6 +258,16 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
     } finally {
       setLinkingPhone(false)
     }
+  }
+
+  const handleDetachLoyalty = () => {
+    if (checkoutSession?.session_id) {
+      closeLoyaltyCheckoutV2(checkoutSession.session_id, null, true).catch(() => {})
+    }
+    setLoyaltyCustomer(null)
+    setCheckoutSession(null)
+    setCheckoutQr('')
+    setCartToken(newCartToken())
   }
 
   return (
@@ -154,9 +295,12 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
               <h2 className="text-white font-bold text-xl">{t('posPayment')}</h2>
-              <p className="text-noch-green text-2xl font-bold mt-1">{format(total)} LYD</p>
+              <p className="text-noch-green text-2xl font-bold mt-1">{format(payableTotal)} LYD</p>
+              {rewardDiscount > 0 && (
+                <p className="text-xs text-yellow-300">Reward applied: −{format(rewardDiscount)} LYD</p>
+              )}
             </div>
-            <button onClick={onClose} className="text-noch-muted hover:text-white p-1">
+            <button onClick={handleClose} className="text-noch-muted hover:text-white p-1">
               <X size={20} />
             </button>
           </div>
@@ -200,7 +344,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 )}
                 {/* Quick amounts — big tappable buttons, shown first */}
                 <div className="grid grid-cols-3 gap-2 mt-3">
-                  {[total, Math.ceil(total), Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10, Math.ceil(total / 20) * 20].filter((v, i, a) => v > 0 && a.indexOf(v) === i).slice(0, 6).map(amt => (
+                  {[payableTotal, Math.ceil(payableTotal), Math.ceil(payableTotal / 5) * 5, Math.ceil(payableTotal / 10) * 10, Math.ceil(payableTotal / 20) * 20].filter((v, i, a) => v > 0 && a.indexOf(v) === i).slice(0, 6).map(amt => (
                     <button
                       key={amt}
                       onClick={() => setCashTendered(amt.toFixed(2))}
@@ -225,7 +369,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 <p className="text-white font-semibold mb-1">{t('posVerifoneHint')}</p>
                 <p className="text-noch-muted text-sm mb-4">{t('posVerifoneSub')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{format(total)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(payableTotal)} LYD</p>
                 </div>
               </div>
             )}
@@ -255,7 +399,7 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
                 <p className="text-noch-muted text-sm mb-1">{t('posPrestoSub')}</p>
                 <p className="text-yellow-400 text-xs mb-4">{t('posPrestoNote')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{format(total)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(payableTotal)} LYD</p>
                 </div>
               </div>
             )}
@@ -263,37 +407,107 @@ export default function PaymentModal({ total, onComplete, onClose, submitting = 
             {/* Loyalty */}
             <div className="mt-4 pt-4 border-t border-noch-border">
               {loyaltyCustomer ? (
-                <div className="flex items-center gap-2 bg-noch-green/10 border border-noch-green/20 rounded-xl px-3 py-2">
-                  <span className="text-noch-green text-sm">♥ {loyaltyCustomer.full_name || loyaltyCustomer.name || t('posLoyaltyCard')}</span>
-                  <button onClick={() => setLoyaltyCustomer(null)} className="ml-auto text-noch-muted hover:text-white">
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
-                      <input
-                        inputMode="tel"
-                        value={loyaltyPhone}
-                        onChange={e => setLoyaltyPhone(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handlePhoneAttach() } }}
-                        placeholder="Phone — find or create member"
-                        className="input w-full pl-9 text-sm"
-                      />
-                    </div>
-                    <button onClick={handlePhoneAttach} disabled={linkingPhone} className="btn-secondary px-3">
-                      {linkingPhone ? <Loader2 size={14} className="animate-spin" /> : 'Attach'}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 bg-noch-green/10 border border-noch-green/20 rounded-xl px-3 py-2">
+                    <span className="text-noch-green text-sm">♥ {loyaltyCustomer.full_name || loyaltyCustomer.name || t('posLoyaltyCard')}</span>
+                    <button onClick={handleDetachLoyalty} className="ml-auto text-noch-muted hover:text-white">
+                      <X size={14} />
                     </button>
                   </div>
+                  {availableRewards.length > 0 && (
+                    <div>
+                      <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-yellow-300">
+                        <Gift size={14} /> Available rewards
+                      </p>
+                      <div className="space-y-2">
+                        {availableRewards.map(reward => {
+                          const discount = calculateRewardDiscount(reward, cart, total)
+                          const selected = selectedRewardId === reward.entitlement_id
+                          return (
+                            <button
+                              key={reward.entitlement_id}
+                              type="button"
+                              disabled={discount <= 0}
+                              onClick={() => setSelectedRewardId(selected ? null : reward.entitlement_id)}
+                              className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                                selected
+                                  ? 'border-yellow-300/60 bg-yellow-300/10'
+                                  : discount > 0
+                                    ? 'border-noch-border hover:border-yellow-300/30'
+                                    : 'cursor-not-allowed border-noch-border opacity-50'
+                              }`}
+                            >
+                              <span className="block text-sm font-medium text-white">{reward.title}</span>
+                              <span className="text-xs text-noch-muted">
+                                {discount > 0 ? `Apply ${format(discount)} LYD reward` : 'No eligible item in this order'}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-noch-green/30 bg-noch-green/5 p-3 text-center">
+                    <div className="flex items-center justify-center gap-2 text-noch-green font-semibold text-sm">
+                      <QrCode size={16} />
+                      Customer scans to collect points
+                    </div>
+                    {checkoutQr ? (
+                      <img
+                        src={checkoutQr}
+                        alt="Customer loyalty transaction QR"
+                        className="mx-auto mt-3 h-40 w-40 rounded-lg bg-white p-1"
+                      />
+                    ) : checkoutError ? (
+                      <p className="mt-3 text-xs text-red-300">{checkoutError}</p>
+                    ) : (
+                      <div className="mt-5 flex items-center justify-center gap-2 text-xs text-noch-muted">
+                        <Loader2 size={14} className="animate-spin" />
+                        Preparing private transaction code…
+                      </div>
+                    )}
+                    <p className="mt-2 text-xs text-noch-muted">
+                      No phone number is spoken or shown to the cashier.
+                    </p>
+                  </div>
+
                   <button
                     onClick={() => setShowQRScanner(true)}
                     className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
                   >
                     <QrCode size={14} />
-                    {t('posScanLoyalty')}
+                    Scan an existing membership card
                   </button>
+
+                  <button
+                    onClick={() => setShowPhoneFallback(value => !value)}
+                    className="flex w-full items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
+                  >
+                    <Phone size={14} />
+                    Cashier phone lookup
+                    <ChevronDown size={14} className={`ml-auto transition-transform ${showPhoneFallback ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showPhoneFallback && (
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
+                        <input
+                          inputMode="tel"
+                          value={loyaltyPhone}
+                          onChange={e => setLoyaltyPhone(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handlePhoneAttach() } }}
+                          placeholder="Phone — fallback only"
+                          className="input w-full pl-9 text-sm"
+                        />
+                      </div>
+                      <button onClick={handlePhoneAttach} disabled={linkingPhone} className="btn-secondary px-3">
+                        {linkingPhone ? <Loader2 size={14} className="animate-spin" /> : 'Attach'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

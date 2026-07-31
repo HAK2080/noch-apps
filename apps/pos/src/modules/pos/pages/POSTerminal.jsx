@@ -5,7 +5,11 @@ import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, QrCode, MoreVertical, PauseCircle, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
-import { recordPosCustomerVisit, lookupCustomerByPassportToken } from '../../loyalty/lib/loyalty-supabase'
+import {
+  closeLoyaltyCheckoutV2,
+  lookupCustomerByPassportToken,
+  recordPosCustomerVisit,
+} from '../../loyalty/lib/loyalty-supabase'
 import { format, round, sum, lineTotal } from '../lib/money'
 // Scanner components are heavy (@zxing / html5-qrcode) — keep them out of the
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
@@ -412,27 +416,42 @@ export default function POSTerminal() {
     }
   }, [branchId])
 
-  // Keep product stock live across POS devices and Telegram receipts.
+  // Keep product data live across POS devices and Telegram receipts. Product
+  // rows can be shared through visible_branch_ids while their legacy
+  // branch_id points elsewhere, so a branch_id Realtime filter misses valid
+  // updates. Refreshing the branch projection also keeps IndexedDB current.
   useEffect(() => {
+    let refreshTimer = null
+    const refreshProducts = () => {
+      clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(async () => {
+        try {
+          const prods = await getPOSProducts(branchId)
+          setProducts(prods)
+          setStockProduct(current => {
+            if (!current?.id) return current
+            return prods.find(product => product.id === current.id) || null
+          })
+          cacheProducts(branchId, prods).catch(() => {})
+        } catch {
+          // Initial load and online recovery remain the fallback.
+        }
+      }, 100)
+    }
+
     const channel = supabase
       .channel(`pos-product-stock-${branchId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'pos_products',
-        filter: `branch_id=eq.${branchId}`,
-      }, payload => {
-        if (!payload.new?.id) return
-        setProducts(current => current.map(product =>
-          product.id === payload.new.id ? { ...product, ...payload.new } : product
-        ))
-        setStockProduct(current =>
-          current?.id === payload.new.id ? { ...current, ...payload.new } : current
-        )
-      })
+      }, refreshProducts)
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      clearTimeout(refreshTimer)
+      supabase.removeChannel(channel)
+    }
   }, [branchId])
 
   // Fetch pending online orders (initial load + after actions)
@@ -504,6 +523,7 @@ export default function POSTerminal() {
       return [...prev, {
         id: newItemId(),
         product_id: product.id,
+        category_id: product.category_id,
         name: product.name,
         name_ar: product.name_ar,
         price: overrides.unit_price != null ? Number(overrides.unit_price) : parseFloat(product.price),
@@ -708,10 +728,18 @@ export default function POSTerminal() {
     setSubmitting(true)
 
     const subtotal = sum(cart.map(i => lineTotal(i.price, i.quantity)))
-    const discountAmount = round(showPayment.discountAmount || 0)
+    const {
+      loyalty_checkout_session_id: loyaltyCheckoutSessionId,
+      loyalty_customer: attachedLoyaltyCustomer,
+      loyalty_reward_entitlement_id: loyaltyRewardEntitlementId,
+      loyalty_reward_discount: loyaltyRewardDiscount,
+      ...orderPaymentData
+    } = paymentData
+    const discountAmount = round((showPayment.discountAmount || 0) + (loyaltyRewardDiscount || 0))
     const total = round(Math.max(0, subtotal - discountAmount))
 
     const servedByProfile = getServedBy()
+    const effectiveLoyaltyCustomer = attachedLoyaltyCustomer || loyaltyCustomer
 
     // Idempotency key: stable across retries within this charge attempt.
     // Generated client-side so a network retry of the same submit hits the
@@ -725,11 +753,11 @@ export default function POSTerminal() {
 
     // Pick customer name: staff-typed in cart wins; fall back to loyalty
     // card's full name (first word only, to keep the drink ticket short).
-    const loyaltyFirstName = (loyaltyCustomer?.full_name || '').trim().split(/\s+/)[0] || null
+    const loyaltyFirstName = (effectiveLoyaltyCustomer?.full_name || '').trim().split(/\s+/)[0] || null
     const customerName = showPayment.customer_name || loyaltyFirstName || null
     // WhatsApp / phone — staff-typed at cart wins; fall back to loyalty
     // card's phone if a card was scanned. Trim whitespace; null when empty.
-    const rawPhone = showPayment.customer_phone || loyaltyCustomer?.phone || null
+    const rawPhone = showPayment.customer_phone || effectiveLoyaltyCustomer?.phone || null
     const customerPhone = rawPhone ? String(rawPhone).trim() || null : null
 
     const orderData = {
@@ -744,7 +772,8 @@ export default function POSTerminal() {
       discount_amount: discountAmount,
       discount_pct: showPayment.discountType === 'pct' ? (showPayment.discountValue || 0) : 0,
       total,
-      ...paymentData,
+      loyalty_reward_entitlement_id: loyaltyRewardEntitlementId,
+      ...orderPaymentData,
       customer_name: customerName,
       customer_phone: customerPhone,
       synced: isOnline(),
@@ -764,6 +793,9 @@ export default function POSTerminal() {
 
     try {
       let order
+      if (loyaltyRewardEntitlementId && !isOnline()) {
+        throw new Error('Reward redemption requires an internet connection')
+      }
       if (isOnline()) {
         order = await createPOSOrder(orderData, items)
       } else {
@@ -783,10 +815,19 @@ export default function POSTerminal() {
         toast('Order saved offline. Will sync when online.', { icon: '📴' })
       }
 
+      if (loyaltyCheckoutSessionId && !String(order.id || '').startsWith('offline-')) {
+        try {
+          await closeLoyaltyCheckoutV2(loyaltyCheckoutSessionId, order.id, false)
+        } catch (err) {
+          console.warn('Loyalty checkout close failed:', err)
+          toast.error('Sale completed, but loyalty QR needs reconciliation')
+        }
+      }
+
       // Passport Phase 1 — bump last_visit_at, total_visits, and
       // backfill favorite_drink only if currently null. Non-fatal:
       // never block sale completion on the memory update.
-      const visitCustomerId = paymentData.loyalty_customer_id || loyaltyCustomer?.id || null
+      const visitCustomerId = orderPaymentData.loyalty_customer_id || effectiveLoyaltyCustomer?.id || null
       if (visitCustomerId && !String(order.id || '').startsWith('offline-')) {
         try {
           const firstItemName = items[0]?.product_name || null
@@ -797,7 +838,7 @@ export default function POSTerminal() {
       }
 
       setShowPayment(null)
-      setShowReceipt({ order, items, loyaltyCustomer })
+      setShowReceipt({ order, items, loyaltyCustomer: effectiveLoyaltyCustomer })
       setCart([])
       setLoyaltyCustomer(null)
 
@@ -1194,6 +1235,8 @@ export default function POSTerminal() {
       {showPayment && (
         <PaymentModal
           total={showPayment.total}
+          branchId={branchId}
+          cart={cart}
           submitting={submitting}
           onComplete={handlePaymentComplete}
           onClose={() => !submitting && setShowPayment(null)}
