@@ -2,7 +2,7 @@
 
 **Module:** 1 of 8
 **Active scope:** Owner reporting and financial accuracy
-**Status:** Release candidate; production verification pending
+**Status:** Complete and live
 
 ## Purpose and users
 
@@ -80,15 +80,18 @@ No records or historical features are deleted by this module.
 
 ## Evidence and remaining Module 1 risks
 
-Automated coverage includes Tripoli period boundaries, P&L normalization, payment and branch reconciliation, unavailable-source behavior, SQL contracts, owner terminology, POS inventory regressions, and loyalty value preservation. Targeted lint and the production build must pass on the exact committed source.
+Automated coverage includes Tripoli period boundaries, P&L normalization, payment and branch reconciliation, unavailable-source behavior, SQL contracts, owner terminology, POS inventory regressions, and loyalty value preservation. All 32 focused tests, targeted lint, the production build, and `git diff --check` passed on the committed source.
 
-Remaining production checks before Module 1 can close:
+Migration `20260731100000` was first executed in a production transaction with contract assertions and rolled back. It was then applied and recorded. For 2026-07-25 through 2026-07-31:
 
-1. Apply and record migration `20260731100000`.
-2. Verify a live all-branch report returns payment variance at or below 0.01 LYD, or capture the exact explained variance.
-3. Verify consolidated-versus-branch deltas and confirm any difference is attributable to visibly unallocated costs.
-4. Smoke-test English and Arabic desktop/mobile layouts with an owner session.
-5. Verify deployed source hashes and data-freshness indicators on `apps.noch.cloud`.
+- Payment net sales and Finance P&L net sales both equal 43,333.75 LYD; payment variance is 0.00 LYD.
+- Sales, COGS, labor, and shared-cost branch deltas are 0.00 LYD.
+- One unallocated expense creates a 2,333.33 LYD consolidated operating-expense difference and the corresponding -2,333.33 LYD profit difference. The report balances this through a visible `Corporate / unallocated` row and separately warns that the expense needs a cost center.
+- Seven sold products have no configured cost. The report identifies this explicitly because COGS and profit remain understated until the owner supplies those costs.
+
+GitHub Actions run `30609745944` deployed the application. Authenticated production smoke checks passed on the Management Report and Finance Owner Overview. The report displayed source freshness, completeness warnings, zero payment variance, the balancing row, and branch detail. Arabic used explicit finance terminology with `dir="rtl"`; desktop and a 390×844 mobile viewport were visually checked.
+
+The missing product costs and unallocated expense are business-data remediation items, not hidden software failures. They remain visible owner actions and are not silently repaired because their correct values/classification require business judgment.
 
 ## Prioritized backlog outside the active module
 

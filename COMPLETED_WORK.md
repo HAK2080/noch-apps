@@ -402,7 +402,7 @@ To find if something's been done:
 ## 2026-07-31 — Enterprise Finance Reporting Controls
 
 - **Agent**: Codex
-- **Status**: Verified locally; production deployment pending
+- **Status**: Complete & Live
 - **Files**:
   - `CONTEXT.md`
   - `apps/pos/src/modules/reports/lib/reporting-periods.js`
@@ -417,10 +417,11 @@ To find if something's been done:
   - `apps/pos/tests/finance-owner-labels.test.mjs`
   - `docs/audit/2026-07-31-owner-reporting-module.md`
   - `supabase/migrations/20260731100000_enterprise_finance_reporting.sql`
-- **Description**: Established one authoritative management-reporting model built on Finance P&L rather than independently recalculated sales. Standardized the 05:00 Africa/Tripoli business day, net sales, direct operating profit, shared operating costs, and fully loaded operating profit. Added data-source provenance, freshness, completeness controls, unavailable-state handling, product-cost and expense-allocation warnings, branch-to-consolidated reconciliation, and auditable inventory scope.
+- **Description**: Established one authoritative management-reporting model built on Finance P&L rather than independently recalculated sales. Standardized the 05:00 Africa/Tripoli business day, net sales, direct operating profit, shared operating costs, and fully loaded operating profit. Added exact cash, card, split-tender, Presto, and other-payment reconciliation; data-source provenance; freshness; completeness controls; unavailable-state handling; product-cost and expense-allocation warnings; branch-to-consolidated reconciliation; a visible corporate/unallocated balancing row; and auditable inventory scope. The primary owner view has explicit English/Arabic terminology and a responsive mobile layout.
 - **Database correction**: Restored shared-cost fields that a later payroll migration had dropped from `finance_pnl`, preserved consolidated costs exactly once, allocated shared payroll and operating costs under explicit policies, and returned structured data-quality evidence.
-- **Verification**: 31 focused reporting, inventory, POS, loyalty, expense, and finance tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed. The migration compiled and passed its field/timezone assertions against Noch Production inside an explicit transaction that was rolled back.
-- **Commit**: Pending
-- **Deployment**: Pending
+- **Verification**: 32 focused reporting, inventory, POS, loyalty, expense, and finance tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed. The final migration compiled and passed P&L, payment, field, and timezone assertions against Noch Production inside an explicit transaction that was rolled back before live application. Authenticated production smoke tests passed for the Management Report and Finance Owner Overview in English, Arabic RTL, desktop, and 390×844 mobile layouts.
+- **Data reconciliation**: For 2026-07-25 through 2026-07-31, payment net sales and Finance P&L net sales both equal 43,333.75 LYD, with 0.00 LYD payment variance. Sales, COGS, labor, and shared-cost branch deltas are 0.00 LYD. One unallocated expense produces a visible 2,333.33 LYD corporate balancing row; seven sold products without cost remain prominently flagged because COGS and profit are understated until their costs are supplied.
+- **Commits**: `4e4f302` (`feat(reporting): unify owner finance controls`), `f703d50` (`fix(reporting): balance consolidated branch costs`)
+- **Deployment**: Migration `20260731100000` applied and recorded on Noch Production. `apps.noch.cloud` deployed successfully by GitHub Actions run `30609745944`; production serves `Report--reEIe5F.js` with the payment, completeness, bilingual, and corporate-adjustment controls.
 
 ---
