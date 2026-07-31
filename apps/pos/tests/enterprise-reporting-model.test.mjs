@@ -193,6 +193,58 @@ test('unavailable optional sources stay unavailable instead of becoming zero', (
   )
 })
 
+test('corporate unallocated costs are a visible balancing row, not a hidden branch variance', () => {
+  const report = buildManagementReport({
+    period,
+    currentPnl: {
+      revenue_net: 1000,
+      cogs: 200,
+      labor: 200,
+      opex: 300,
+      shared_costs_allocated: 0,
+      net_contribution_before_shared: 300,
+      net_contribution: 300,
+      data_quality: { unallocated_expense_count: 1 },
+    },
+    previousPnl: {
+      shared_costs_allocated: 0,
+      net_contribution_before_shared: 0,
+    },
+    branchPnls: [{
+      branch: { id: 'branch-1', name: 'Hay Alandlous' },
+      pnl: {
+        revenue_net: 1000,
+        cogs: 200,
+        labor: 200,
+        opex: 100,
+        shared_costs_allocated: 0,
+        net_contribution_before_shared: 500,
+        net_contribution: 500,
+      },
+    }],
+    optionalSources: [
+      completeSource('payments', [{
+        completed_sales: 1000,
+        cash_collected: 1000,
+        net_sales: 1000,
+      }]),
+      completeSource('inventory'),
+      completeSource('expenses'),
+      completeSource('loyalty'),
+      completeSource('messaging'),
+    ],
+  })
+
+  assert.equal(report.branchPerformance.reconciliation.status, 'reconciled_with_adjustment')
+  assert.equal(report.branchPerformance.adjustment.operatingExpenses, 200)
+  assert.equal(report.branchPerformance.adjustment.fullyLoadedOperatingProfit, -200)
+  assert.equal(
+    report.branchPerformance.rows[0].fullyLoadedOperatingProfit
+      + report.branchPerformance.adjustment.fullyLoadedOperatingProfit,
+    report.metrics.fullyLoadedOperatingProfit,
+  )
+})
+
 test('executive summary reconciliation identifies material branch differences', () => {
   const total = {
     revenue: 300,

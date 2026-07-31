@@ -81,6 +81,7 @@ const REPORT_COPY = {
     difference: 'Difference',
     branches: 'Branch performance',
     branchesReconciled: 'Consolidated totals reconcile',
+    branchesAdjusted: 'Reconciled with corporate / unallocated adjustment',
     branchesReview: 'Review consolidated differences',
     branch: 'Branch',
     orderVolume: 'Orders',
@@ -138,6 +139,7 @@ const REPORT_COPY = {
     difference: 'الفرق',
     branches: 'أداء الفروع',
     branchesReconciled: 'الإجمالي الموحد مطابق',
+    branchesAdjusted: 'مطابق بعد إظهار تعديل الشركة / غير الموزع',
     branchesReview: 'راجع فروق التجميع',
     branch: 'الفرع',
     orderVolume: 'الطلبات',
@@ -624,6 +626,8 @@ export default function Report() {
               }`}>
                 {report?.branchPerformance?.reconciliation?.status === 'reconciled'
                   ? copy.branchesReconciled
+                  : report?.branchPerformance?.reconciliation?.status === 'reconciled_with_adjustment'
+                    ? copy.branchesAdjusted
                   : copy.branchesReview}
               </span>
             )}
@@ -655,6 +659,19 @@ export default function Report() {
                       </td>
                     </tr>
                   ))}
+                  {report?.branchPerformance?.adjustment && (
+                    <tr className="border-t border-yellow-400/30 bg-yellow-400/5">
+                      <td className="px-2 py-2 text-yellow-200">
+                        {lang === 'ar' ? 'الشركة / غير موزع' : report.branchPerformance.adjustment.name}
+                      </td>
+                      <td className="px-2 py-2 text-right font-mono text-yellow-200">{fmtLyd(report.branchPerformance.adjustment.netSales)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-noch-muted">—</td>
+                      <td className="px-2 py-2 text-right font-mono text-yellow-200">{fmtLyd(report.branchPerformance.adjustment.cogs)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-yellow-200">{fmtLyd(report.branchPerformance.adjustment.labor)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-yellow-200">{fmtLyd(report.branchPerformance.adjustment.operatingExpenses)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-yellow-200">{fmtLyd(report.branchPerformance.adjustment.fullyLoadedOperatingProfit)}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

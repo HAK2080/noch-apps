@@ -65,6 +65,7 @@ function normalizePnl(pnl = {}) {
     directOperatingProfit,
     fullyLoadedOperatingProfit,
     capitalExpenses: money(pnl.capex),
+    dataQuality: pnl.data_quality || {},
   }
 }
 
@@ -181,11 +182,32 @@ function buildBranchPerformance(branchPnls, consolidatedFinance, branchId) {
     delta: consolidated - branchTotals[id],
   }))
   const material = comparisons.filter(row => Math.abs(row.delta) > 0.01)
+  const unallocatedExpenseCount = money(consolidatedFinance.dataQuality?.unallocated_expense_count)
+  const adjustmentIsExplained = unallocatedExpenseCount > 0
+    && material.length > 0
+    && material.every(row => ['operatingExpenses', 'fullyLoadedOperatingProfit'].includes(row.id))
+    && Math.abs(
+      money(comparisons.find(row => row.id === 'operatingExpenses')?.delta)
+      + money(comparisons.find(row => row.id === 'fullyLoadedOperatingProfit')?.delta),
+    ) <= 0.01
+  const adjustment = Object.fromEntries(
+    comparisons.map(row => [row.id, row.delta]),
+  )
 
   return {
     rows,
+    adjustment: material.length
+      ? {
+          id: 'corporate-unallocated',
+          name: 'Corporate / unallocated',
+          orders: 0,
+          ...adjustment,
+        }
+      : null,
     reconciliation: {
-      status: material.length ? 'warning' : 'reconciled',
+      status: material.length
+        ? adjustmentIsExplained ? 'reconciled_with_adjustment' : 'warning'
+        : 'reconciled',
       comparisons,
       material,
     },
