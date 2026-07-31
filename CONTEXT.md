@@ -200,6 +200,14 @@ _Avoid_: Loyalty user, account
 A completed customer order attributed to one loyalty member at checkout.
 _Avoid_: Loyalty visit when no order attribution exists
 
+**Capture decision**:
+The explicit checkout outcome that records whether a member was linked or why identification was skipped.
+_Avoid_: Assuming an unlinked order means the customer declined
+
+**Capture method**:
+The privacy-relevant way a member was identified: customer transaction QR, existing membership card, or cashier phone fallback.
+_Avoid_: Treating every linked order as the same customer journey
+
 **Stamp event**:
 An auditable unit of loyalty progress issued for one qualifying action and capable of being reversed.
 _Avoid_: Directly changing a customer's stamp balance
@@ -207,6 +215,22 @@ _Avoid_: Directly changing a customer's stamp balance
 **Reward entitlement**:
 An earned, unredeemed customer benefit with explicit issue, expiry, redemption, and reversal states.
 _Avoid_: Coupon when referring to an earned loyalty obligation
+
+**Verified consent**:
+A current channel-and-purpose permission recorded with the member's action time and source. A legacy default without provenance is unverified.
+_Avoid_: Treating a true preference flag as proof of permission
+
+**Identity exception**:
+Two or more customer records that may represent the same person but cannot be merged without reviewed evidence.
+_Avoid_: Duplicate customer when identity equivalence has not been proven
+
+**Loyalty obligation**:
+The expected business cost of issued, unexpired reward entitlements, based on configured reward cost evidence.
+_Avoid_: Points outstanding, which are progress rather than an issued reward
+
+**Loyalty launch cohort**:
+Members and eligible orders observed after the active program version's launch time.
+_Avoid_: Using pre-launch history to judge the new checkout journey
 
 **Loyalty program version**:
 A named set of earning, mission, and reward rules under which member value is accumulated.
@@ -245,3 +269,27 @@ _Avoid_: Published content
 **Published content**:
 An approved asset released on an external channel with verifiable channel, time, campaign, and outcome evidence.
 _Avoid_: Approved content
+
+**Publication record**:
+The authoritative link between one approved asset and one external publishing event, including platform, objective, planned and actual time, product scope, spend, and evidence identity.
+_Avoid_: Editing performance fields directly on the content asset
+
+**Performance snapshot**:
+A comparable observation captured at a fixed horizon: 24 hours, 7 days, or final.
+_Avoid_: Combining measurements taken at unknown ages
+
+**Evidence completeness**:
+Whether a published item has a verifiable post identity, required product mapping for sales objectives, and both 24-hour and 7-day snapshots.
+_Avoid_: Treating missing evidence as zero performance
+
+**Approved-use rate**:
+The percentage of approved assets at least 30 days old that have a recorded publication.
+_Avoid_: Counting approval itself as use
+
+**Associated result**:
+Orders or revenue observed in a declared post-publication window.
+_Avoid_: Incremental lift or causal impact
+
+**Causal lift**:
+The incremental result supported by a recorded experiment, comparison group, and measurement plan.
+_Avoid_: Calling a before/after association an increase caused by content

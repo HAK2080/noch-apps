@@ -11,9 +11,11 @@ root `.env`.
 
 ## Current release highlights
 
-- **Loyalty V2:** privacy-first transaction QR capture, retained cashier
-  lookup fallback, auditable opening balances from V1, missions, reward
-  entitlements, refund/void reversals, and a read-only V1 archive.
+- **Loyalty V2:** privacy-first transaction QR capture with retained masked
+  cashier lookup fallback, an explicit linked/skipped decision for every
+  online order, verified channel consent, owner-only masked customer
+  management, auditable opening balances from V1, missions, reward
+  obligations, refund/void reversals, and a read-only V1 archive.
 - **Inventory control:** branch and warehouse product quantities use the
   location stock ledger; POS receiving, adjustments, sales reversals,
   transfers, and waste create auditable location movements. Ingredient
@@ -32,6 +34,11 @@ root `.env`.
   directory, attendance evidence, weekly schedules, and payroll. Open
   attendance is excluded from paid hours, draft payroll is excluded from actual
   profit, and payroll approval is separated from payment.
+- **Content Studio measurement:** `/content-studio/performance` is the
+  owner-only publishing and evidence workflow. Approved assets become explicit
+  publication records with objective, product, campaign, spend, and fixed
+  24-hour/7-day snapshots. Associated orders and revenue are never presented as
+  causal lift without a recorded experiment and control.
 
 
 ```
