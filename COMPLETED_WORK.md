@@ -425,3 +425,31 @@ To find if something's been done:
 - **Deployment**: Migration `20260731100000` applied and recorded on Noch Production. `apps.noch.cloud` deployed successfully by GitHub Actions run `30609745944`; production serves `Report--reEIe5F.js` with the payment, completeness, bilingual, and corporate-adjustment controls.
 
 ---
+
+## 2026-07-31 — Sales, Payments, and Cash Control
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `CONTEXT.md`
+  - `README.md`
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/lib/sales-control.js`
+  - `apps/pos/src/modules/pos/pages/POSEndOfDay.jsx`
+  - `apps/pos/src/modules/pos/pages/POSOrders.jsx`
+  - `apps/pos/src/modules/pos/pages/POSSessions.jsx`
+  - `apps/pos/src/modules/pos/pages/POSSettings.jsx`
+  - `apps/pos/src/pages/Sales.jsx`
+  - `apps/pos/tests/sales-cash-control.test.mjs`
+  - `docs/audit/2026-07-31-sales-payments-cash-control-module.md`
+  - `supabase/migrations/20260731170000_sales_cash_control.sql`
+- **Description**: Established an immutable tender-event ledger and one authoritative sales/cash-control model. Refunds now record the actual return tender and processing shift; cash refunds require an open drawer and only their cash leg affects expected cash. Voids and payment corrections operate on remaining unrefunded value and cannot mutate closed shifts. Shift close derives expected cash from tender events and cash movements, preserves missing physical counts as missing, and exposes reconstructed history and stored-counter differences. `/sales` is the consolidated owner control view; the legacy branch report route redirects there.
+- **Data reconciliation**: The live ledger contains 10,591 tender events, including 169 reconstructed historical legs and 11 in the tested 30-day period. The 30-day owner control has 0 untracked orders, 0.000 LYD order-payment variance, 0.000 LYD event variance, and 0.000 LYD timing variance. Two open shifts were archived before compatibility-counter repair. Seventeen closed historical expected-cash differences were preserved and remain visible rather than rewritten.
+- **Verification**: Seven focused tests passed; targeted ESLint, POS production build, and `git diff --check` passed. The migration first compiled and reconciled inside a production transaction that was rolled back, then was applied and recorded as `20260731170000`. Authenticated production checks passed for monthly sales/payment reconciliation, order and shift evidence, English/Arabic RTL, and a 390×844 mobile viewport with no horizontal overflow.
+- **Commits**: `148f5df` (`feat(pos): unify sales and cash control`) through `ae39cf7` (`fix(pos): keep shift scope status deterministic`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: `apps.noch.cloud` deployed from commit `ae39cf7` by GitHub Actions run `30614197039`; production serves the deterministic Arabic shift scope, localized duration labels, tender-specific controls, and settlement warnings.
+- **Known limitation**: Card and Presto settlement cannot be proven until external processor/statement feeds are connected. POS tender is deliberately labeled as payment evidence, not settlement.
+
+---
