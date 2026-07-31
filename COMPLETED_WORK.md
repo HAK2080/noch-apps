@@ -22,6 +22,108 @@
 
 ---
 
+## 2026-07-31 — Loyalty and Customer Management
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `CONTEXT.md`
+  - `README.md`
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/lib/uiAutoTranslate.js`
+  - `apps/pos/src/modules/loyalty/`
+  - `apps/pos/src/modules/pos/components/PaymentModal.jsx`
+  - `apps/pos/src/modules/pos/pages/POSTerminal.jsx`
+  - `apps/pos/tests/bilingual-auto-translate.test.mjs`
+  - `apps/pos/tests/loyalty-customer-control.test.mjs`
+  - `apps/pos/tests/loyalty-v2-checkout-ui.test.mjs`
+  - `docs/audit/2026-07-31-loyalty-customer-management-module.md`
+  - `supabase/migrations/20260731233000_loyalty_customer_control.sql`
+  - `supabase/functions/_shared/notifications.ts`
+  - `supabase/functions/loyalty-notify/index.ts`
+- **Description**: Made customer-scanned transaction QR the primary private
+  capture path while retaining existing-card and masked cashier phone
+  alternatives. Every online paid order now records an immutable linked or
+  skipped decision; synced offline orders remain visibly unknown. Added
+  verified channel/purpose consent, fail-closed notifications, owner-only
+  masked customer management, audited searches, preserved identity exceptions,
+  reward-cost obligations, bilingual mission versioning, and one Tripoli
+  business-day owner summary.
+- **Data reconciliation**: All 60 member names and 1,130 opening points remain
+  preserved. Three ambiguous identity groups remain unmerged. The V2 launch
+  cohort is awaiting its first eligible order; the separate historical baseline
+  is 1 linked order of 3,664 (0.03%). Sixty legacy WhatsApp flags remain
+  classified as unverified and suppressed.
+- **Verification**: The migration compiled and reconciled against production in
+  an explicit rollback transaction before application. The final repository
+  suite passed 84/84 Node tests, targeted ESLint passed, the production build
+  passed, and `git diff --check` passed. Authenticated production checks passed
+  in English/LTR and Arabic/RTL with no document overflow at the tested browser
+  width. The public QR route renders the privacy promise without requiring a
+  staff-visible phone number.
+- **Commits**: `e98ad0b` (`feat(loyalty): enforce private capture and customer control`), `9c8586e` (`fix(i18n): preserve explicit bilingual component text`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migration `20260731233000` is applied and recorded on Noch
+  Production. `loyalty-notify`, `send-notification`, and
+  `process-notification-outbox` were redeployed from committed source. GitHub
+  Actions run `30622166304` deployed commit `9c8586e` successfully to
+  `apps.noch.cloud`.
+- **Required owner work**: Review checkout capture and skip reasons daily
+  against the 30% day-30 and 50% day-90 goals, resolve the three identity cases
+  only with sufficient evidence, and ask members to verify consent
+  self-service.
+
+---
+
+## 2026-07-31 — Content Studio and Marketing Measurement
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `CONTEXT.md`
+  - `README.md`
+  - `apps/pos/src/lib/uiAutoTranslate.js`
+  - `apps/pos/src/modules/contentStudio/`
+  - `apps/pos/tests/bilingual-auto-translate.test.mjs`
+  - `apps/pos/tests/content-measurement-control.test.mjs`
+  - `apps/pos/tests/post-performance-evaluator.test.mjs`
+  - `docs/audit/2026-07-31-content-studio-marketing-measurement-module.md`
+  - `supabase/migrations/20260731234000_content_measurement_control.sql`
+  - `supabase/functions/cs-generate-drafts/index.ts`
+  - `supabase/functions/cs-humanize-draft/index.ts`
+- **Description**: Consolidated publishing and measurement under
+  `/content-studio/performance`. Approved assets now become explicit
+  publication records with platform, objective, campaign, product, spend,
+  attribution window, experiment reference, planned time, and external
+  evidence. Scheduled records can be marked published, the same asset can be
+  used on multiple platforms, and comparable 24-hour, 7-day, and final
+  snapshots replace the duplicate inline Content Bank editor. Associated
+  orders/revenue are explicitly observational, never causal lift without a
+  recorded experiment and control. Humanization now has Anthropic-to-Gemini
+  fallback, and draft generation uses both good and bad training examples.
+- **Production baseline**: 122 inspirations, 122 concepts, 1 brief, 60 drafts,
+  and 23 approved assets are preserved. The new publication authority starts
+  with zero scheduled/published records, so approved-use is 0%; evidence
+  completeness remains unavailable rather than a misleading zero.
+- **Verification**: The migration exposed and corrected a live-schema
+  inheritance mismatch during the rollback gate, then compiled successfully.
+  Owner summaries, two owner-only Content Studio policies, and both migration
+  ledger entries were verified after deployment. Production passed
+  English/LTR and Arabic/RTL switching, source baselines, causal-warning, and
+  no-overflow checks at the tested browser width. The final 84-test suite,
+  targeted ESLint, build, and diff checks pass.
+- **Commits**: `36f017b` (`feat(content-studio): unify publishing and measurement`), `9c8586e` (`fix(i18n): preserve explicit bilingual component text`)
+- **Pull Request**: Draft PR `#6`
+- **Deployment**: Migration `20260731234000` is applied and recorded on Noch
+  Production. `cs-generate-drafts` and `cs-humanize-draft` were redeployed.
+  GitHub Actions run `30622166304` deployed commit `9c8586e` successfully to
+  `apps.noch.cloud`.
+- **Required owner work**: Begin using publication plans and capture both
+  24-hour and 7-day snapshots. Do not use the 80% approved-use or 90% evidence
+  targets as trend evidence until the workflow has a mature observation window.
+
+---
+
 ## 2026-07-30 - Loyalty and Content Studio Business Audit
 
 - **Agent**: Codex
