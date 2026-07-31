@@ -17,7 +17,6 @@ import { useLanguage } from '../../../contexts/LanguageContext'
 import { usePermissions } from '../../../contexts/PermissionsContext'
 import {
   businessToday,
-  getPOSBranch,
   getShiftControls,
   localYmd,
 } from '../lib/pos-supabase'
@@ -37,6 +36,7 @@ const COPY = {
     today: 'Today',
     sevenDays: '7 days',
     thirtyDays: '30 days',
+    businessRange: 'Business-day range',
     refresh: 'Refresh',
     loading: 'Loading shifts…',
     loadFailed: 'Failed to load shift controls',
@@ -79,6 +79,7 @@ const COPY = {
     today: 'اليوم',
     sevenDays: '7 أيام',
     thirtyDays: '30 يوماً',
+    businessRange: 'نطاق أيام العمل',
     refresh: 'تحديث',
     loading: 'جارٍ تحميل الورديات…',
     loadFailed: 'تعذر تحميل رقابة الورديات',
@@ -168,7 +169,6 @@ export default function POSSessions() {
     || ['owner', 'supervisor'].includes(getServedBy()?.role)
     || profile?.role === 'supervisor'
 
-  const [branch, setBranch] = useState(null)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
   const presets = [
@@ -192,11 +192,7 @@ export default function POSSessions() {
     // replacing valid evidence with an indefinite loading state on a slow RPC.
     setLoading(shifts.length === 0)
     try {
-      const [branchRow, controlRows] = await Promise.all([
-        getPOSBranch(branchId),
-        getShiftControls(branchId, range.fromDate, range.toDate),
-      ])
-      setBranch(branchRow)
+      const controlRows = await getShiftControls(branchId, range.fromDate, range.toDate)
       setShifts((controlRows || []).map(normalizeShiftControl))
     } catch (error) {
       toast.error(error.message || copy.loadFailed)
@@ -236,9 +232,7 @@ export default function POSSessions() {
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl">{copy.title}</h1>
             <p className="text-noch-muted text-sm">
-              {loading
-                ? copy.loading
-                : `${lang === 'ar' ? (branch?.name_ar || branch?.name) : branch?.name} · ${range.fromDate} → ${range.toDate} · ${totals.shiftCount} ${copy.shifts}`}
+              {copy.businessRange}: {range.fromDate} → {range.toDate}
             </p>
           </div>
           <button onClick={load} className="btn-secondary text-sm px-3 py-1 flex items-center gap-1">
