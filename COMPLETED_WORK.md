@@ -1,7 +1,7 @@
 ## 2026-08-01 — Payroll PDF exports
 
 - **Agent**: Codex
-- **Status**: Implemented locally; deployment pending
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/modules/finance/lib/payroll-pdf.js`
   - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
@@ -9,7 +9,8 @@
 - **Description**: Added a professional bilingual payroll report preview that the finance team can save as one combined PDF, plus an individual pay-stub export action on every employee card. Each stub includes the pay period, branch, evidence status, base pay, hours/days, scheduled hours, overtime hours and x1 cost, bonuses, deductions, loan repayment, other adjustments, notes, and net pay. Approval/signature fields are intentionally excluded.
 - **Follow-up reminder**: Add company legal/header details (logo, legal name, address, registration/tax details, and contact information) in a later pass as requested.
 - **Verification**: Focused workforce tests 9/9 passed, targeted ESLint passed, POS production build passed, `git diff --check` passed, and the bilingual combined/single-stub preview was visually inspected for spacing, table alignment, Arabic rendering, and page separation.
-- **Commit / deployment**: Pending.
+- **Commit**: `8e66d74` (`feat(payroll): add finance and employee PDF exports`)
+- **Deployment**: GitHub Actions run `30687663357` deployed successfully to `apps.noch.cloud`. Authenticated live verification found one combined finance export button, 10 employee pay-stub buttons, 10 payroll cards, and no horizontal overflow.
 
 ---
 
