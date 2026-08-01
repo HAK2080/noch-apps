@@ -823,3 +823,19 @@ To find if something's been done:
 - **Verification**: Navigation order assertion passed; 31 POS Node tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed.
 - **Commit**: `39439b0` (`feat(pos): separate payroll from team navigation`)
 - **Deployment**: `apps.noch.cloud` deployed via `deploy.py apps` on 2026-08-01. Production serves `index-BZDhUD8-.js`; no-cache HTTP verification returned 200 and confirmed the new `/payroll`, `/sales`, and separator navigation code. Unrelated local Bloom/RBAC files remain unstaged.
+
+---
+
+## 2026-08-01 — Branch availability control
+
+- **Agent**: Codex
+- **Status**: Complete & live
+- **Files**:
+  - `apps/pos/src/modules/pos/pages/POSHome.jsx`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/lib/branch-availability.js`
+  - `apps/pos/tests/branch-availability.test.mjs`
+- **Description**: Added an owner-only branch availability control to the POS branch selector. Owners can turn a branch off for a temporary closure or turn it back on; inactive branches remain visible to owners for reactivation, are hidden from normal POS/customer-menu flows, and cannot be disabled while an open shift exists. Existing branch records are preserved.
+- **Verification**: Branch availability tests passed, targeted ESLint passed, POS production build passed, `git diff --check` passed, and no-cache production HTTP verification returned 200 for `index-DrS2gWgZ.js` containing the toggle and open-shift guard.
+- **Commit**: `7d44cbb` (`feat(pos): add branch availability toggle`)
+- **Deployment**: Deployed to `apps.noch.cloud` via `deploy.py apps` on 2026-08-01. Unrelated local Bloom/RBAC files remain unstaged.
