@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import {
-  TrendingUp, BarChart3, Coffee, Wallet, Receipt, Clock, Upload, Link2, Target, Wrench, Banknote, Network,
+  TrendingUp, BarChart3, Coffee, Wallet, Receipt, Clock, Upload, Link2, Target, Wrench, Network,
 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { usePermission } from '../../lib/usePermission'
@@ -18,7 +18,6 @@ import MenuProfitabilityTab from './tabs/MenuProfitabilityTab'
 import CashRunwayTab from './tabs/CashRunwayTab'
 import ExpensesTab from './tabs/ExpensesTab'
 import ShiftsTab from './tabs/ShiftsTab'
-import PayrollTab from './tabs/PayrollTab'
 import BankTab from './tabs/BankTab'
 import RecipeLinkerTab from './tabs/RecipeLinkerTab'
 import VarianceTab from './tabs/VarianceTab'
@@ -43,7 +42,6 @@ const TABS = [
   { id: 'expenses',    label: 'Expenses',           icon: Receipt,    level: 'view' },
   { id: 'shifts',      label: 'Shifts',             icon: Clock,      level: 'view' },
   { id: 'allocations', label: 'Allocations',        icon: Network,    level: 'owner' },
-  { id: 'payroll',     label: 'Payroll',            icon: Banknote,   level: 'view' },
   { id: 'bank',        label: 'Bank',               icon: Upload,     level: 'edit' },
   { id: 'recipes',     label: 'Cost mapping',       icon: Link2,      level: 'edit' },
   { id: 'variance',    label: 'Variance',           icon: Target,     level: 'view' },
@@ -103,7 +101,6 @@ export default function FinanceDashboard() {
           {activeTab === 'expenses' && <ExpensesTab readOnly={readOnly} />}
           {activeTab === 'shifts'   && <ShiftsTab readOnly={readOnly} />}
           {activeTab === 'allocations' && <AllocationsTab />}
-          {activeTab === 'payroll'  && <PayrollTab readOnly={readOnly} />}
           {activeTab === 'bank'     && <BankTab />}
           {activeTab === 'recipes'  && <RecipeLinkerTab />}
           {activeTab === 'variance' && <VarianceTab readOnly={readOnly} />}
