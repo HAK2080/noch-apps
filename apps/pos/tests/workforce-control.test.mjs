@@ -123,3 +123,16 @@ test('manual overtime hours calculate overtime cost at the snapshotted hourly ra
   assert.match(payroll, /overtimeHours: item\.manual_overtime_hours === '' \? 0/)
   assert.match(payroll, /data-testid="overtime-cost"/)
 })
+
+test('selecting a previous payroll month opens its existing draft for editing', async () => {
+  const [payroll, workforceSql] = await Promise.all([
+    readFile(payrollUrl, 'utf8'),
+    readFile(migrationUrl, 'utf8'),
+  ])
+
+  assert.match(payroll, /const selectMonth = value =>/)
+  assert.match(payroll, /runs\.find\(run => String\(run\.period_month\)\.slice\(0, 7\) === value\)/)
+  assert.match(payroll, /if \(existingRun\) openRun\(existingRun\)/)
+  assert.match(payroll, /onChange=\{event => selectMonth\(event\.target\.value\)\}/)
+  assert.doesNotMatch(workforceSql, /month_start\s*[<>=]+\s*current_date/)
+})

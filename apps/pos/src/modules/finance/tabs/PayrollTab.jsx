@@ -110,6 +110,7 @@ export default function PayrollTab({ readOnly = false }) {
 
   const openRun = async (run) => {
     if (!run) { setSelected(null); setItems([]); return }
+    setMonth(String(run.period_month).slice(0, 7))
     setSelected(run)
     setItemsLoading(true)
     try {
@@ -119,6 +120,13 @@ export default function PayrollTab({ readOnly = false }) {
       setItems(sorted)
     } catch (err) { toast.error(err.message || 'Failed to load run items') }
     finally { setItemsLoading(false) }
+  }
+
+  const selectMonth = value => {
+    setMonth(value)
+    const existingRun = runs.find(run => String(run.period_month).slice(0, 7) === value)
+    if (existingRun) openRun(existingRun)
+    else { setSelected(null); setItems([]) }
   }
 
   const generate = async (targetMonth) => {
@@ -224,6 +232,7 @@ export default function PayrollTab({ readOnly = false }) {
     for (const issue of itemIssues(item)) counts[issue] = (counts[issue] || 0) + 1
     return counts
   }, {})
+  const selectedMonthRun = runs.find(run => String(run.period_month).slice(0, 7) === month)
 
   return (
     <div className="flex flex-col gap-4">
@@ -231,16 +240,24 @@ export default function PayrollTab({ readOnly = false }) {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-center gap-2">
           <Banknote size={14} className="text-noch-green" />
-          <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="input py-1 px-2 text-xs" />
+          <input type="month" value={month} onChange={event => selectMonth(event.target.value)} className="input py-1 px-2 text-xs" />
         </div>
-        {!readOnly && (
+        {!readOnly && !selectedMonthRun && (
           <button onClick={() => generate()} disabled={generating}
             className="btn-secondary text-xs px-4 py-1.5 flex items-center gap-1.5">
             <RefreshCw size={12} className={generating ? 'animate-spin' : ''} />
             {generating ? 'Generating…' : 'Generate draft'}
           </button>
         )}
+        {selectedMonthRun && (
+          <span className="text-xs text-noch-muted">
+            {selectedMonthRun.status === 'draft' ? 'Draft opened — edit below' : 'Completed payroll — view only'}
+          </span>
+        )}
       </div>
+      <p className="-mt-2 text-[11px] text-noch-muted">
+        Select any previous month. Existing drafts open for editing; completed payroll remains locked.
+      </p>
 
       {/* Recent runs */}
       <div className="card">

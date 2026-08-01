@@ -7,7 +7,7 @@
   - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
   - `apps/pos/tests/workforce-control.test.mjs`
   - `supabase/migrations/20260801110000_payroll_overtime_hours_x1.sql`
-- **Description**: Made overtime hours an explicit editable draft-payroll input for every employee. The system calculates overtime cost as manually entered OT hours × the payroll item's snapshotted hourly rate ×1, adds that cost to employee net pay and the payroll total, and shows the calculated cost separately from owner-entered hours. The calculation now applies to salary and hourly pay bases; completed runs remain locked.
+- **Description**: Made overtime hours an explicit editable draft-payroll input for every employee. The system calculates overtime cost as manually entered OT hours × the payroll item's snapshotted hourly rate ×1, adds that cost to employee net pay and the payroll total, and shows the calculated cost separately from owner-entered hours. The calculation now applies to salary and hourly pay bases. Selecting any previous month now opens its existing run immediately; July remains editable while its run is draft, while completed runs remain locked.
 - **Data safety**: Existing overtime money is preserved until an owner enters OT hours. Entering zero clears the calculated overtime cost. The migration replaces only the owner-only draft-hours RPC and does not rewrite historical payroll rows.
 - **Verification**: Runtime calculation tests cover 3.5 hours × 20 LYD = 70 LYD, zero/clear behavior, legacy overtime preservation, and net-total inclusion. Workforce and classic-skin tests, targeted ESLint, POS production build, and `git diff --check` passed.
 - **Commit / migration / deployment**: Pending.
