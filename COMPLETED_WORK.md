@@ -1,7 +1,7 @@
 ## 2026-08-01 — Manual Overtime Hours at ×1
 
 - **Agent**: Codex
-- **Status**: Verified locally; deployment pending
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/modules/finance/lib/payroll-calculations.js`
   - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
@@ -9,8 +9,10 @@
   - `supabase/migrations/20260801110000_payroll_overtime_hours_x1.sql`
 - **Description**: Made overtime hours an explicit editable draft-payroll input for every employee. The system calculates overtime cost as manually entered OT hours × the payroll item's snapshotted hourly rate ×1, adds that cost to employee net pay and the payroll total, and shows the calculated cost separately from owner-entered hours. The calculation now applies to salary and hourly pay bases. Selecting any previous month now opens its existing run immediately; July remains editable while its run is draft, while completed runs remain locked.
 - **Data safety**: Existing overtime money is preserved until an owner enters OT hours. Entering zero clears the calculated overtime cost. The migration replaces only the owner-only draft-hours RPC and does not rewrite historical payroll rows.
-- **Verification**: Runtime calculation tests cover 3.5 hours × 20 LYD = 70 LYD, zero/clear behavior, legacy overtime preservation, and net-total inclusion. Workforce and classic-skin tests, targeted ESLint, POS production build, and `git diff --check` passed.
-- **Commit / migration / deployment**: Pending.
+- **Verification**: Runtime calculation tests cover 3.5 hours × 20 LYD = 70 LYD, zero/clear behavior, legacy overtime preservation, and net-total inclusion. Workforce and classic-skin tests, targeted ESLint, POS production build, and `git diff --check` passed. Production database checks confirmed the manual-hours branch, ×1 formula, draft-only guard, and editable July 2026 draft. Authenticated production UI checks confirmed July opens for editing, all 10 overtime-hours inputs are enabled and writable, all 10 calculated overtime-cost fields render, Complete payroll is enabled, and the page has no horizontal overflow. No payroll values were changed during verification.
+- **Commits**: `fdc9d05` (`feat(payroll): calculate manual overtime hours at x1`), `bd99bf8` (`fix(payroll): open previous draft months for editing`)
+- **Migration**: `20260801110000_payroll_overtime_hours_x1.sql` was applied directly in the production SQL editor because the repository has an older Supabase migration-history mismatch; the committed migration remains the authoritative deployment artifact.
+- **Deployment**: GitHub Actions run `30687015164` deployed commit `bd99bf8` successfully to `apps.noch.cloud`; authenticated production checks passed afterward.
 
 ---
 
