@@ -11,8 +11,13 @@ const hubUrl = new URL('../src/modules/workforce/pages/WorkforceHub.jsx', import
 const profilesUrl = new URL('../src/lib/profiles.js', import.meta.url)
 const financeUrl = new URL('../src/modules/finance/FinanceDashboard.jsx', import.meta.url)
 const payrollUrl = new URL('../src/modules/finance/tabs/PayrollTab.jsx', import.meta.url)
+const payrollCalculationsUrl = new URL('../src/modules/finance/lib/payroll-calculations.js', import.meta.url)
 const manualHoursMigrationUrl = new URL(
   '../../../supabase/migrations/20260801090000_payroll_manual_hours.sql',
+  import.meta.url,
+)
+const overtimeHoursMigrationUrl = new URL(
+  '../../../supabase/migrations/20260801110000_payroll_overtime_hours_x1.sql',
   import.meta.url,
 )
 
@@ -66,7 +71,9 @@ test('normal owner journey is consolidated under staff workforce control', async
   assert.match(payroll, /Attendance and schedules are optional evidence/)
   assert.match(payroll, /updatePayrollRunItemHours/)
   assert.doesNotMatch(payroll, /Math\.abs\(storedVariance\) <= 0\.005/)
-  assert.match(payroll, /MONEY_FIELDS = \['base_lyd', 'overtime_lyd'.*'deduction_lyd'.*'loan_repayment_lyd'/s)
+  assert.match(payroll, /MANUAL_MONEY_FIELDS = \['base_lyd', 'bonus_lyd'.*'deduction_lyd'.*'loan_repayment_lyd'/s)
+  assert.doesNotMatch(payroll, /MANUAL_MONEY_FIELDS = \[[^\]]*'overtime_lyd'/s)
+  assert.match(payroll, /OT cost \(×1\)/)
 })
 
 test('manual payroll hours are stored and calculated without attendance evidence', async () => {
@@ -96,4 +103,23 @@ test('payroll employee fields wrap inside cards without a horizontal table scrol
   assert.match(payroll, /2xl:grid-cols-11/)
   assert.match(payroll, /className="input[^\"]*w-full[^\"]*min-w-0/)
   assert.match(hub, /tab === 'payroll' \? 'max-w-none' : 'max-w-7xl'/)
+})
+
+test('manual overtime hours calculate overtime cost at the snapshotted hourly rate times one', async () => {
+  const [sql, payroll, calculations] = await Promise.all([
+    readFile(overtimeHoursMigrationUrl, 'utf8'),
+    readFile(payrollUrl, 'utf8'),
+    import(payrollCalculationsUrl),
+  ])
+
+  assert.match(sql, /profile_rate := coalesce\(item_row\.source_rate_lyd, profile_rate, 0\)/)
+  assert.match(sql, /when p_overtime_hours is not null\s+then round\(p_overtime_hours \* profile_rate \* 1, 2\)/s)
+  assert.match(sql, /manual_overtime_hours = p_overtime_hours/)
+  assert.match(payroll, /\['manual_overtime_hours', 'OT hours \(×1\)'\]/)
+  assert.equal(calculations.overtimeCostOf({ manual_overtime_hours: 3.5, source_rate_lyd: 20 }), 70)
+  assert.equal(calculations.overtimeCostOf({ manual_overtime_hours: '', source_rate_lyd: 20, overtime_lyd: 90 }), 0)
+  assert.equal(calculations.overtimeCostOf({ manual_overtime_hours: null, overtime_lyd: 90 }), 90)
+  assert.equal(calculations.netOf({ base_lyd: 1000, manual_overtime_hours: 3, source_rate_lyd: 20 }), 1060)
+  assert.match(payroll, /overtimeHours: item\.manual_overtime_hours === '' \? 0/)
+  assert.match(payroll, /data-testid="overtime-cost"/)
 })

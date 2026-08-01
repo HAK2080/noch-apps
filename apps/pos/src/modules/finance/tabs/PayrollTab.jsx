@@ -13,13 +13,13 @@ import {
   listStaffLoans, createStaffLoan, cancelStaffLoan, listLoanRepayments, listBranches,
 } from '../lib/finance-supabase'
 import { getAllTeamMembers } from '../../../lib/profiles'
+import { netOf, overtimeCostOf } from '../lib/payroll-calculations'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
-const MONEY_FIELDS = ['base_lyd', 'overtime_lyd', 'bonus_lyd', 'deduction_lyd', 'loan_repayment_lyd', 'other_lyd']
+const MANUAL_MONEY_FIELDS = ['base_lyd', 'bonus_lyd', 'deduction_lyd', 'loan_repayment_lyd', 'other_lyd']
 const MONEY_LABELS = {
   base_lyd: 'Base',
-  overtime_lyd: 'Overtime',
   bonus_lyd: 'Bonus',
   deduction_lyd: 'Deduction',
   loan_repayment_lyd: 'Loan repayment',
@@ -29,18 +29,12 @@ const HOURS_FIELDS = [
   ['manual_hours_per_day', 'Hours/day'],
   ['manual_worked_days', 'Days'],
   ['manual_scheduled_hours', 'Scheduled h'],
-  ['manual_overtime_hours', 'Overtime h'],
+  ['manual_overtime_hours', 'OT hours (×1)'],
 ]
 
 function currentMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-// Client-side mirror of the generated net_lyd column so edits feel instant.
-function netOf(it) {
-  return Number(it.base_lyd || 0) + Number(it.overtime_lyd || 0) + Number(it.bonus_lyd || 0)
-    + Number(it.other_lyd || 0) - Number(it.deduction_lyd || 0) - Number(it.loan_repayment_lyd || 0)
 }
 
 const ISSUE_LABELS = {
@@ -198,7 +192,7 @@ export default function PayrollTab({ readOnly = false }) {
       hoursPerDay: toNumber(item.manual_hours_per_day),
       workedDays: toNumber(item.manual_worked_days),
       scheduledHours: toNumber(item.manual_scheduled_hours),
-      overtimeHours: toNumber(item.manual_overtime_hours),
+      overtimeHours: item.manual_overtime_hours === '' ? 0 : toNumber(item.manual_overtime_hours),
     }
     if (Object.values(updates).some(value => value !== null && !Number.isFinite(value))) {
       toast.error('Invalid payroll hours')
@@ -313,7 +307,7 @@ export default function PayrollTab({ readOnly = false }) {
           )}
           {isDraft && (
             <p className="mb-3 text-xs text-noch-muted">
-              Attendance and schedules are optional evidence. For hourly staff, enter hours per day and worked days; scheduled hours can be filled from the published schedule or entered manually. Overtime hours are optional and use the employee hourly rate.
+              Attendance and schedules are optional evidence. Enter overtime hours manually; OT cost = overtime hours × employee hourly rate × 1 and is added to net pay.
             </p>
           )}
           {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
@@ -370,7 +364,16 @@ export default function PayrollTab({ readOnly = false }) {
                         )}
                       </label>
                     ))}
-                    {MONEY_FIELDS.map(field => (
+                    <div className="min-w-0 text-[10px] text-noch-muted">
+                      <span className="mb-1 block truncate">OT cost (×1)</span>
+                      <span
+                        data-testid="overtime-cost"
+                        className="block rounded border border-noch-border/60 bg-noch-dark/40 px-2 py-1 text-right font-mono text-noch-green"
+                      >
+                        {Number(overtimeCostOf(it)).toFixed(2)}
+                      </span>
+                    </div>
+                    {MANUAL_MONEY_FIELDS.map(field => (
                       <label key={field} className="min-w-0 text-[10px] text-noch-muted">
                         <span className="mb-1 block truncate">{MONEY_LABELS[field]}</span>
                         {editable ? (
