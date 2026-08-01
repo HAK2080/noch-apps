@@ -4,7 +4,7 @@
 // payroll_delete_run); draft items and loans are plain table CRUD (owner RLS).
 
 import { useEffect, useRef, useState } from 'react'
-import { Banknote, CheckCircle, HandCoins, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Banknote, CheckCircle, FileDown, HandCoins, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
   listPayrollRuns, getPayrollRunItems, updatePayrollRunItem,
@@ -14,6 +14,7 @@ import {
 } from '../lib/finance-supabase'
 import { getAllTeamMembers } from '../../../lib/profiles'
 import { netOf, overtimeCostOf } from '../lib/payroll-calculations'
+import { openPayrollPdf } from '../lib/payroll-pdf'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
@@ -171,6 +172,14 @@ export default function PayrollTab({ readOnly = false }) {
     finally { setBusy(false) }
   }
 
+  const exportPayrollPdf = (employeeId = null) => {
+    try {
+      openPayrollPdf({ run: selected, items, nameOf, branchOf, employeeId })
+    } catch (err) {
+      toast.error(err.message || 'Unable to open the payroll PDF')
+    }
+  }
+
   // Editable draft cells: update local state on change, persist on blur.
   const setLocal = (id, field, value) =>
     setItems(list => list.map(it => (it.id === id ? { ...it, [field]: value } : it)))
@@ -289,8 +298,16 @@ export default function PayrollTab({ readOnly = false }) {
             <StatusBadge status={selected.status} />
             <StatusBadge status={selected.evidence_status || 'legacy'} />
             <span className="text-noch-green font-mono text-sm">{lyd(runTotal)}</span>
+            <button
+              data-testid="export-payroll-pdf"
+              onClick={() => exportPayrollPdf()}
+              disabled={items.length === 0}
+              className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 ml-auto"
+            >
+              <FileDown size={12} /> Export finance PDF / تصدير تقرير المالية
+            </button>
             {!readOnly && isDraft && (
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-2">
                 <button onClick={regenerate} disabled={generating || busy}
                   className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
                   <RefreshCw size={12} className={generating ? 'animate-spin' : ''} /> Regenerate
@@ -356,6 +373,13 @@ export default function PayrollTab({ readOnly = false }) {
                     <div className="shrink-0 text-right">
                       <p className="text-[10px] uppercase tracking-wide text-noch-muted">Net pay</p>
                       <p className="font-mono text-sm text-noch-green">{lyd(netOf(it))}</p>
+                      <button
+                        data-testid="export-paystub-pdf"
+                        onClick={() => exportPayrollPdf(it.profile_id)}
+                        className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-noch-green hover:underline"
+                      >
+                        <FileDown size={11} /> Export payslip / تصدير القسيمة
+                      </button>
                     </div>
                   </div>
 

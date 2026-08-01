@@ -12,6 +12,7 @@ const profilesUrl = new URL('../src/lib/profiles.js', import.meta.url)
 const financeUrl = new URL('../src/modules/finance/FinanceDashboard.jsx', import.meta.url)
 const payrollUrl = new URL('../src/modules/finance/tabs/PayrollTab.jsx', import.meta.url)
 const payrollCalculationsUrl = new URL('../src/modules/finance/lib/payroll-calculations.js', import.meta.url)
+const payrollPdfUrl = new URL('../src/modules/finance/lib/payroll-pdf.js', import.meta.url)
 const manualHoursMigrationUrl = new URL(
   '../../../supabase/migrations/20260801090000_payroll_manual_hours.sql',
   import.meta.url,
@@ -135,4 +136,45 @@ test('selecting a previous payroll month opens its existing draft for editing', 
   assert.match(payroll, /if \(existingRun\) openRun\(existingRun\)/)
   assert.match(payroll, /onChange=\{event => selectMonth\(event\.target\.value\)\}/)
   assert.doesNotMatch(workforceSql, /month_start\s*[<>=]+\s*current_date/)
+})
+
+test('payroll provides combined and per-employee professional PDF exports', async () => {
+  const [payroll, pdf] = await Promise.all([
+    readFile(payrollUrl, 'utf8'),
+    import(payrollPdfUrl),
+  ])
+  const item = {
+    id: 'item-1',
+    profile_id: 'profile-1',
+    branch_id: 'branch-1',
+    base_lyd: 1000,
+    manual_hours_per_day: 8,
+    manual_worked_days: 20,
+    manual_overtime_hours: 3,
+    source_rate_lyd: 20,
+    bonus_lyd: 50,
+    deduction_lyd: 10,
+    loan_repayment_lyd: 25,
+    other_lyd: 5,
+    data_status: 'warning',
+    note: 'Manual payroll entry',
+  }
+  const context = {
+    run: { period_month: '2026-07-01', status: 'draft' },
+    items: [item],
+    nameOf: () => 'Amina Hassan',
+    branchOf: () => 'City Walk',
+  }
+  const combined = pdf.buildPayrollPdfHtml(context)
+  const single = pdf.buildPayrollPdfHtml({ ...context, employeeId: item.profile_id })
+  assert.match(payroll, /data-testid="export-payroll-pdf"/)
+  assert.match(payroll, /data-testid="export-paystub-pdf"/)
+  assert.match(payroll, /openPayrollPdf/)
+  assert.match(combined, /Payroll report/)
+  assert.match(combined, /Finance team copy/)
+  assert.match(combined, /Amina Hassan/)
+  assert.match(combined, /Overtime x1/)
+  assert.match(combined, /60\.00 LYD/)
+  assert.match(single, /Employee pay stub/)
+  assert.doesNotMatch(combined, /Approval|Signature|توقيع|اعتماد/)
 })

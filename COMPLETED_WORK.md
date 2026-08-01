@@ -1,3 +1,18 @@
+## 2026-08-01 — Payroll PDF exports
+
+- **Agent**: Codex
+- **Status**: Implemented locally; deployment pending
+- **Files**:
+  - `apps/pos/src/modules/finance/lib/payroll-pdf.js`
+  - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
+  - `apps/pos/tests/workforce-control.test.mjs`
+- **Description**: Added a professional bilingual payroll report preview that the finance team can save as one combined PDF, plus an individual pay-stub export action on every employee card. Each stub includes the pay period, branch, evidence status, base pay, hours/days, scheduled hours, overtime hours and x1 cost, bonuses, deductions, loan repayment, other adjustments, notes, and net pay. Approval/signature fields are intentionally excluded.
+- **Follow-up reminder**: Add company legal/header details (logo, legal name, address, registration/tax details, and contact information) in a later pass as requested.
+- **Verification**: Focused workforce tests 9/9 passed, targeted ESLint passed, POS production build passed, `git diff --check` passed, and the bilingual combined/single-stub preview was visually inspected for spacing, table alignment, Arabic rendering, and page separation.
+- **Commit / deployment**: Pending.
+
+---
+
 ## 2026-08-01 — Manual Overtime Hours at ×1
 
 - **Agent**: Codex
