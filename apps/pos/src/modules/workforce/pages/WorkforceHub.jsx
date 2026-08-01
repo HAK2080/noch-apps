@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 import Layout from '../../../components/Layout'
 import { useLanguage } from '../../../contexts/LanguageContext'
 import { getAllTeamMembers } from '../../../lib/profiles'
-import PayrollTab from '../../finance/tabs/PayrollTab'
 import {
   getWorkforceSummary,
   listActiveBranches,
@@ -105,21 +104,19 @@ export default function WorkforceHub() {
     overview: ar ? 'نظرة عامة' : 'Overview',
     attendance: ar ? 'الحضور' : 'Attendance',
     schedule: ar ? 'الجدول' : 'Schedule',
-    payroll: ar ? 'الرواتب' : 'Payroll',
   }
   const teamSummary = summary?.team || {}
   const attendanceSummary = summary?.attendance || {}
   const scheduleSummary = summary?.schedule || {}
-  const payrollSummary = summary?.payroll || {}
 
   return (
     <Layout>
-      <div className={`p-4 md:p-6 mx-auto space-y-5 ${tab === 'payroll' ? 'max-w-none' : 'max-w-7xl'}`} dir={ar ? 'rtl' : 'ltr'}>
+      <div className="p-4 md:p-6 mx-auto space-y-5 max-w-7xl" dir={ar ? 'rtl' : 'ltr'}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-white">{ar ? 'الفريق والحضور والرواتب' : 'Team, attendance & payroll'}</h1>
+            <h1 className="text-2xl font-bold text-white">{ar ? 'الفريق والحضور والجدول' : 'Team, attendance & schedule'}</h1>
             <p className="text-sm text-noch-muted mt-1">
-              {ar ? 'مصدر واحد للموظفين، الحضور، الجدول، واعتماد الرواتب.' : 'One control point for employees, attendance, schedules, and payroll approval.'}
+              {ar ? 'نقطة تحكم واحدة للموظفين والحضور والجداول.' : 'One control point for employees, attendance, and schedules.'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -140,12 +137,11 @@ export default function WorkforceHub() {
 
         {!loading && tab === 'overview' && (
           <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {[
                 [ar ? 'الموظفون النشطون' : 'Active employees', teamSummary.active_employees],
                 [ar ? 'سجلات حضور مفتوحة' : 'Open attendance', attendanceSummary.open_attendance],
                 [ar ? 'ساعات منشورة' : 'Published hours', scheduleSummary.published_hours],
-                [ar ? 'حالة الرواتب' : 'Payroll evidence', payrollSummary.evidence_status || payrollSummary.status],
               ].map(([label, value]) => (
                 <div key={label} className="bg-noch-card border border-noch-border rounded-xl p-4">
                   <p className="text-xs text-noch-muted">{label}</p>
@@ -211,7 +207,6 @@ export default function WorkforceHub() {
           </div>
         )}
 
-        {tab === 'payroll' && <PayrollTab />}
       </div>
     </Layout>
   )

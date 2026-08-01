@@ -807,3 +807,19 @@ To find if something's been done:
 - **Required owner data work**: Enter the nine missing employment start dates, record real attendance, publish the schedule, then regenerate and review the July payroll draft before approval.
 
 ---
+
+## 2026-08-01 — Separate payroll from Team navigation
+
+- **Agent**: Codex
+- **Status**: Complete locally; not deployed
+- **Files**:
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/components/Layout.jsx`
+  - `apps/pos/src/lib/features.js`
+  - `apps/pos/src/modules/workforce/pages/WorkforceHub.jsx`
+  - `apps/pos/src/pages/PayrollPage.jsx`
+  - `docs/PAGES.md`
+- **Description**: Reordered the primary navigation to Sales, POS, Expenses, Payroll, Reports, Finance, Products, and Accounting; separated Team, Marketing, Content Studio, Loyalty, and Vestaboard with visual breaks; removed Payroll from the Team/Workforce module; and documented the standalone payroll route.
+- **Verification**: Navigation order assertion passed; 31 POS Node tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed.
+- **Commit**: `8a77a20` (`feat(pos): separate payroll from team navigation`)
+- **Deployment**: Not deployed; unrelated local Bloom/RBAC files remain unstaged.

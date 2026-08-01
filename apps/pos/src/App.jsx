@@ -89,6 +89,8 @@ const LoyaltyCheckoutClaim = lazy(() => import('./modules/loyalty/pages/LoyaltyC
 const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 const SnapReceipt      = lazy(() => import('./pages/snap/SnapReceipt'))
 
+const PayrollPage      = lazy(() => import('./pages/PayrollPage'))
+
 // Experience OS — Phase 1-10
 const InventoryIntelligence = lazy(() => import('./pages/inventory/InventoryIntelligence'))
 const LoyaltyIntelligence   = lazy(() => import('./modules/loyalty/pages/LoyaltyIntelligence'))
@@ -233,6 +235,10 @@ export default function App() {
 
         <Route path="/staff/roles" element={
           <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><RoleManager /></AccessRoute></ProtectedRoute>
+        } />
+
+        <Route path="/payroll" element={
+          <ProtectedRoute><AccessRoute policy={OWNER_POLICY}><PayrollPage /></AccessRoute></ProtectedRoute>
         } />
 
         <Route path="/report" element={

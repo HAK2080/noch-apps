@@ -4,7 +4,7 @@ import {
   LayoutDashboard, CheckSquare, Users, BarChart2, Coffee, Calculator,
   Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor,
   ShoppingBag, Receipt, Settings, ListOrdered, ClipboardList, BookOpen,
-  MoreHorizontal,
+  Banknote, MoreHorizontal,
 } from 'lucide-react'
 import { AUTH_POLICY, OWNER_POLICY, featurePolicy } from './access-control'
 
@@ -57,27 +57,36 @@ export const FEATURE_GROUPS = [
 export const ALL_FEATURES = FEATURE_GROUPS.flatMap(group => group.features.map(feature => feature.key))
 
 export const NAV_ITEMS = [
-  { to: '/dashboard', icon: LayoutDashboard, labelEn: 'Dashboard', labelAr: 'لوحة الأعمال', policy: featurePolicy('dashboard'), end: true, mobilePriority: 2 },
+  // Primary owner/staff journey. Keep these in the requested order.
+  { to: '/sales', icon: ListOrdered, labelEn: 'Sales', labelAr: 'المبيعات', policy: featurePolicy('sales') },
+  { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', policy: featurePolicy('pos'), mobilePriority: 1 },
+  { to: '/expenses', icon: Receipt, labelEn: 'Expenses', labelAr: 'المصروفات', policy: featurePolicy('expenses') },
+  { to: '/payroll', icon: Banknote, labelEn: 'Payroll', labelAr: 'الرواتب', policy: OWNER_POLICY },
+  { to: '/report', icon: BarChart2, labelEn: 'Reports', labelAr: 'التقارير', policy: featurePolicy('reports') },
+  { to: '/finance', icon: BarChart3, labelEn: 'Finance', labelAr: 'المالية', policy: featurePolicy('finance') },
+  { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', policy: featurePolicy('products') },
+  { to: '/accounting', icon: BookOpen, labelEn: 'Accounting', labelAr: 'المحاسبة', policy: featurePolicy('accounting') },
+
+  { type: 'separator' },
+
+  // People and customer-facing growth tools are separate from payroll.
+  { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', policy: OWNER_POLICY },
+  { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', policy: featurePolicy('marketing') },
+  { to: '/content-studio', icon: Sparkles, labelEn: 'Content Studio', labelAr: 'استوديو المحتوى', policy: OWNER_POLICY },
+  { to: '/loyalty', icon: Heart, labelEn: 'Loyalty', labelAr: 'الولاء', policy: OWNER_POLICY },
   { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', policy: featurePolicy('vestaboard') },
+
+  { type: 'separator' },
+
+  // Remaining workspace, operations, and utility pages.
+  { type: 'group', labelEn: 'Workspace', labelAr: 'مساحة العمل' },
+  { to: '/dashboard', icon: LayoutDashboard, labelEn: 'Dashboard', labelAr: 'لوحة الأعمال', policy: featurePolicy('dashboard'), end: true, mobilePriority: 2 },
   { to: '/staff/my-profile', icon: Settings, labelEn: 'My profile', labelAr: 'ملفي', policy: AUTH_POLICY, end: true },
 
   { type: 'group', labelEn: 'Operations', labelAr: 'العمليات' },
   { to: '/tasks', icon: CheckSquare, labelEn: 'Task management', labelAr: 'إدارة المهام', policy: OWNER_POLICY },
   { to: '/my-tasks', icon: CheckSquare, labelEn: 'My tasks', labelAr: 'مهامي', policy: AUTH_POLICY, hideForOwner: true, mobilePriority: 4 },
-  { to: '/expenses', icon: Receipt, labelEn: 'Expenses', labelAr: 'المصروفات', policy: featurePolicy('expenses') },
   { to: '/inventory', icon: Package, labelEn: 'Inventory', labelAr: 'المخزون', policy: featurePolicy('inventory'), mobilePriority: 3 },
-  { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', policy: featurePolicy('pos'), mobilePriority: 1 },
-  { to: '/sales', icon: ListOrdered, labelEn: 'Sales', labelAr: 'المبيعات', policy: featurePolicy('sales') },
-  { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', policy: featurePolicy('products') },
-  { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', policy: OWNER_POLICY },
-  { to: '/loyalty', icon: Heart, labelEn: 'Nochi loyalty', labelAr: 'برنامج ولاء نوتشي', policy: OWNER_POLICY },
-
-  { type: 'group', labelEn: 'Management', labelAr: 'الإدارة' },
-  { to: '/report', icon: BarChart2, labelEn: 'Reports', labelAr: 'التقارير', policy: featurePolicy('reports') },
-  { to: '/finance', icon: BarChart3, labelEn: 'Finance', labelAr: 'المالية', policy: featurePolicy('finance') },
-  { to: '/accounting', icon: BookOpen, labelEn: 'Accounting', labelAr: 'المحاسبة', policy: featurePolicy('accounting') },
-  { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', policy: featurePolicy('marketing') },
-  { to: '/content-studio', icon: Sparkles, labelEn: 'Content Studio', labelAr: 'استوديو المحتوى', policy: OWNER_POLICY },
 
   { type: 'group', labelEn: 'Operations checklist', labelAr: 'قائمة مهام التشغيل', requiresOpsEnabled: true },
   { to: '/ops', icon: ClipboardList, labelEn: 'Checklist', labelAr: 'القائمة', policy: featurePolicy('ops'), requiresOpsEnabled: true },

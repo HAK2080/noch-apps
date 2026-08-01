@@ -67,6 +67,11 @@ export default function Layout({ children }) {
   const navItems = []
   let pendingGroup = null
   for (const item of NAV_ITEMS) {
+    if (item.type === 'separator') {
+      pendingGroup = null
+      if (navItems.length && navItems.at(-1)?.type !== 'separator') navItems.push({ type: 'separator' })
+      continue
+    }
     if (item.type === 'group') {
       if (item.requiresOpsEnabled && !opsEnabled) { pendingGroup = null; continue }
       pendingGroup = item
@@ -123,7 +128,9 @@ export default function Layout({ children }) {
         </div>
 
         <nav className="mt-3 flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 pb-3">
-          {navItems.map((item, index) => item.type === 'group' ? (
+          {navItems.map((item, index) => item.type === 'separator' ? (
+            <div key={`s-${index}`} className="my-2 border-t border-white/[0.08]" aria-hidden="true" />
+          ) : item.type === 'group' ? (
             <div key={`g-${index}`} className="px-2.5 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-700">{item.label}</div>
           ) : <NavItem key={item.to} {...item} />)}
         </nav>

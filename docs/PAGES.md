@@ -91,6 +91,12 @@ Legend: 🟢 public · 🔒 logged-in any role · 👑 owner only
 | 👑 `/staff/roles` | `src/pages/staff/RoleManager.jsx` | Role/permission matrix |
 | 👑 `/report` | `src/pages/Report.jsx` | Owner business report |
 
+### Payroll
+
+| Route | Page file | Purpose |
+|---|---|---|
+| `/payroll` | `src/pages/PayrollPage.jsx` | Separate payroll runs, manual adjustments, completion, and pay-stub exports |
+
 ### Recipes & costing
 
 | Route | Page file | Purpose |
