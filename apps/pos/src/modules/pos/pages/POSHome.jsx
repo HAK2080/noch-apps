@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, MapPin, Plus, Clock, Trash2 } from 'lucide-react'
-import { getPOSBranches, getOpenShift, openShift } from '../lib/pos-supabase'
+import { ShoppingCart, MapPin, Plus, Clock, Trash2, Power, AlertTriangle } from 'lucide-react'
+import { getPOSBranches, getOpenShift, openShift, updatePOSBranch } from '../lib/pos-supabase'
+import { branchAvailabilityUpdate, isBranchSelectable } from '../lib/branch-availability'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import { isKioskMode } from '../lib/pos-kiosk'
@@ -16,9 +17,10 @@ function KioskWrapper({ children }) {
   return <div className="min-h-screen bg-noch-dark px-4 py-8 sm:py-12">{children}</div>
 }
 
-function BranchCard({ branch, onOpen, onSelect, onWaste }) {
+function BranchCard({ branch, onOpen, onSelect, onWaste, onToggle, canManage }) {
   const [shift, setShift] = useState(null)
   const [loading, setLoading] = useState(true)
+  const isActive = isBranchSelectable(branch)
 
   useEffect(() => {
     getOpenShift(branch.id)
@@ -28,11 +30,11 @@ function BranchCard({ branch, onOpen, onSelect, onWaste }) {
   }, [branch.id])
 
   const handleClick = () => {
-    if (!loading) onSelect(branch)
+    if (!loading && isActive) onSelect(branch)
   }
 
   return (
-    <div className="card hover:border-noch-green/30 transition-all cursor-pointer" onClick={handleClick}>
+    <div className={`card transition-all ${isActive ? 'hover:border-noch-green/30 cursor-pointer' : 'opacity-75 border-amber-400/30'}`} onClick={handleClick}>
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="text-white font-bold text-lg">{branch.name}</h3>
@@ -40,7 +42,9 @@ function BranchCard({ branch, onOpen, onSelect, onWaste }) {
             <p className="text-noch-muted text-sm" dir="rtl">{branch.name_ar}</p>
           )}
         </div>
-        <ShoppingCart size={20} className="text-noch-green shrink-0 mt-1" />
+        {isActive
+          ? <ShoppingCart size={20} className="text-noch-green shrink-0 mt-1" />
+          : <Power size={20} className="text-amber-400 shrink-0 mt-1" />}
       </div>
 
       {branch.location && (
@@ -50,8 +54,23 @@ function BranchCard({ branch, onOpen, onSelect, onWaste }) {
         </div>
       )}
 
-      {/* Shift status */}
-      <div className="border-t border-noch-border pt-3">
+      {!isActive ? (
+        <div className="border-t border-noch-border pt-3">
+          <div className="flex items-start gap-2 text-amber-300 text-sm">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>Branch is off for now. It is hidden from the POS and customer menu.</span>
+          </div>
+          {canManage && (
+            <button
+              onClick={(event) => { event.stopPropagation(); onToggle(branch) }}
+              className="btn-primary text-xs px-3 py-1.5 mt-3 w-full"
+            >
+              <Power size={12} className="inline mr-1" />
+              Turn branch on
+            </button>
+          )}
+        </div>
+      ) : <div className="border-t border-noch-border pt-3">
         {loading ? (
           <p className="text-noch-muted text-xs">Loading shift...</p>
         ) : shift ? (
@@ -76,16 +95,27 @@ function BranchCard({ branch, onOpen, onSelect, onWaste }) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Report waste */}
-      <button
-        onClick={(e) => { e.stopPropagation(); onWaste(branch) }}
-        className="btn-secondary text-xs px-3 py-1.5 mt-3 w-full flex items-center justify-center gap-1.5"
-      >
-        <Trash2 size={12} />
-        Report waste
-      </button>
+      {canManage && isActive && (
+        <button
+          onClick={(event) => { event.stopPropagation(); onToggle(branch) }}
+          className="btn-secondary text-xs px-3 py-1.5 mt-3 w-full flex items-center justify-center gap-1.5 text-amber-300 border-amber-400/30"
+        >
+          <Power size={12} />
+          Turn branch off
+        </button>
+      )}
+      {isActive && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onWaste(branch) }}
+          className="btn-secondary text-xs px-3 py-1.5 mt-3 w-full flex items-center justify-center gap-1.5"
+        >
+          <Trash2 size={12} />
+          Report waste
+        </button>
+      )}
     </div>
   )
 }
@@ -95,17 +125,36 @@ export default function POSHome() {
   const [loading, setLoading] = useState(true)
   const [openingShift, setOpeningShift] = useState(null) // branch being opened
   const [openingCash, setOpeningCash] = useState('')
-  const { user } = useAuth()
+  const { user, isOwner } = useAuth()
   const navigate = useNavigate()
   const kiosk = isKioskMode()
   const Wrapper = kiosk ? KioskWrapper : Layout
 
   useEffect(() => {
-    getPOSBranches()
+    getPOSBranches({ includeInactive: isOwner })
       .then(setBranches)
       .catch(() => toast.error('Failed to load branches'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [isOwner])
+
+  const toggleBranch = async (branch) => {
+    const nextActive = !isBranchSelectable(branch)
+    if (!nextActive && !window.confirm(`Turn ${branch.name} off? It will be hidden from POS and the customer menu until reactivated.`)) return
+    if (!nextActive) {
+      const openShift = await getOpenShift(branch.id).catch(() => null)
+      if (openShift) {
+        toast.error('Close the open shift before turning this branch off.')
+        return
+      }
+    }
+    try {
+      const updated = await updatePOSBranch(branch.id, branchAvailabilityUpdate(nextActive))
+      setBranches(current => current.map(item => item.id === branch.id ? { ...item, ...updated } : item))
+      toast.success(nextActive ? `${branch.name} is now on` : `${branch.name} is now off`)
+    } catch (error) {
+      toast.error(error.message || 'Failed to update branch availability')
+    }
+  }
 
   const handleOpenShift = async () => {
     if (!openingShift) return
@@ -146,6 +195,8 @@ export default function POSHome() {
               onOpen={(b) => { setOpeningShift(b); setOpeningCash('') }}
               onSelect={(b) => navigate(`/pos/${b.id}`)}
               onWaste={(b) => navigate(`/pos/${b.id}/waste`)}
+              onToggle={toggleBranch}
+              canManage={isOwner}
             />
           ))}
         </div>

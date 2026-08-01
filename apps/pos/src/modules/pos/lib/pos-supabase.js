@@ -18,12 +18,13 @@ export {
 // BRANCHES
 // ============================================================
 
-export async function getPOSBranches() {
-  const { data, error } = await supabase
+export async function getPOSBranches({ includeInactive = false } = {}) {
+  let query = supabase
     .from('pos_branches')
     .select('*')
-    .eq('is_active', true)
     .order('name')
+  if (!includeInactive) query = query.eq('is_active', true)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
