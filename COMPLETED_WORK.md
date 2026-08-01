@@ -821,5 +821,5 @@ To find if something's been done:
   - `docs/PAGES.md`
 - **Description**: Reordered the primary navigation to Sales, POS, Expenses, Payroll, Reports, Finance, Products, and Accounting; separated Team, Marketing, Content Studio, Loyalty, and Vestaboard with visual breaks; removed Payroll from the Team/Workforce module; and documented the standalone payroll route.
 - **Verification**: Navigation order assertion passed; 31 POS Node tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed.
-- **Commit**: `8a77a20` (`feat(pos): separate payroll from team navigation`)
+- **Commit**: `39439b0` (`feat(pos): separate payroll from team navigation`)
 - **Deployment**: Not deployed; unrelated local Bloom/RBAC files remain unstaged.
