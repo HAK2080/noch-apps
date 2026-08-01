@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, DollarSign, Store, Package, Settings, AlertTriangle, ClipboardList, Bluetooth, Usb, ToggleLeft, BarChart3, Monitor, Download, Shield } from 'lucide-react'
-import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories, getPOSSecurityStatus, listPOSAuditEvents } from '../lib/pos-supabase'
+import { getPOSBranch, updatePOSBranch, getOpenShift, openShift, getPOSCategories } from '../lib/pos-supabase'
+import { getPOSSecurityStatus, listPOSAuditEvents } from '../lib/pos-audit-supabase'
 import { getPOSSettings, updatePOSSettings, clearPOSSettingsCache } from '../lib/pos-settings'
 import {
   connectPrinter, disconnectPrinter, isPrinterConnected, autoConnectPrinter,
