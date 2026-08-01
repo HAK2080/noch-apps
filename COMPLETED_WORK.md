@@ -811,7 +811,7 @@ To find if something's been done:
 ## 2026-08-01 — Separate payroll from Team navigation
 
 - **Agent**: Codex
-- **Status**: Complete locally; not deployed
+- **Status**: Complete & live
 - **Files**:
   - `apps/pos/src/App.jsx`
   - `apps/pos/src/components/Layout.jsx`
@@ -822,4 +822,4 @@ To find if something's been done:
 - **Description**: Reordered the primary navigation to Sales, POS, Expenses, Payroll, Reports, Finance, Products, and Accounting; separated Team, Marketing, Content Studio, Loyalty, and Vestaboard with visual breaks; removed Payroll from the Team/Workforce module; and documented the standalone payroll route.
 - **Verification**: Navigation order assertion passed; 31 POS Node tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed.
 - **Commit**: `39439b0` (`feat(pos): separate payroll from team navigation`)
-- **Deployment**: Not deployed; unrelated local Bloom/RBAC files remain unstaged.
+- **Deployment**: `apps.noch.cloud` deployed via `deploy.py apps` on 2026-08-01. Production serves `index-BZDhUD8-.js`; no-cache HTTP verification returned 200 and confirmed the new `/payroll`, `/sales`, and separator navigation code. Unrelated local Bloom/RBAC files remain unstaged.
