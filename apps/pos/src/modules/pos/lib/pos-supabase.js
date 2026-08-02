@@ -2,6 +2,7 @@
 // All POS CRUD functions. Follows exact pattern from src/lib/supabase.js
 
 import { supabase } from '../../../lib/supabase'
+import { toPOSProductWrite } from './pos-product-write'
 import { BUSINESS_DAY_CUTOFF_H } from './business-time'
 import { ALL_PRODUCTS_SELECT } from './product-query'
 
@@ -250,7 +251,7 @@ export async function getPOSProduct(id) {
 export async function createPOSProduct(data) {
   const { data: result, error } = await supabase
     .from('pos_products')
-    .insert({ ...data, updated_at: new Date().toISOString() })
+    .insert({ ...toPOSProductWrite(data), updated_at: new Date().toISOString() })
     .select()
     .single()
   if (error) throw error
@@ -260,7 +261,7 @@ export async function createPOSProduct(data) {
 export async function updatePOSProduct(id, updates) {
   const { data, error } = await supabase
     .from('pos_products')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...toPOSProductWrite(updates), updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()

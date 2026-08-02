@@ -839,3 +839,19 @@ To find if something's been done:
 - **Verification**: Branch availability tests passed, targeted ESLint passed, POS production build passed, `git diff --check` passed, and no-cache production HTTP verification returned 200 for `index-DrS2gWgZ.js` containing the toggle and open-shift guard.
 - **Commit**: `7d44cbb` (`feat(pos): add branch availability toggle`)
 - **Deployment**: Deployed to `apps.noch.cloud` via `deploy.py apps` on 2026-08-01. Unrelated local Bloom/RBAC files remain unstaged.
+
+---
+
+## 2026-08-02 — POS product update payload repair
+
+- **Agent**: Codex
+- **Status**: Verified; deployment pending
+- **Files**:
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/lib/pos-product-write.js`
+  - `apps/pos/tests/pos-product-write.test.mjs`
+- **Root cause**: Branch product reads add `stock_location_id`, `stock_updated_at`, and `stock_source` as location-ledger display metadata. Product edit forms copied those values into the update payload, and PostgREST rejected `stock_location_id` because it is not a `pos_products` column.
+- **Description**: Added one product-write boundary that removes joined relations and location-derived read metadata before every POS product create or update. This covers both Product Catalog and branch POS product management without adding false columns to the database.
+- **Verification**: The legacy payload reproduction fails deterministically with the reported `stock_location_id` leak. Five focused product/inventory tests pass, targeted ESLint has zero errors, the POS production build passes, and `git diff --check` passes. The broader Node suite passes 134/136; two unrelated workforce tests still assert the superseded combined Team/Payroll design.
+- **Commit**: Pending
+- **Deployment**: Pending
