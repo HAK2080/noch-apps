@@ -27,7 +27,14 @@ test('repairs legacy UTF-8/Latin-1 Arabic literals before rendering', async () =
 
 test('repairs single and double encoded Arabic without Arabic source literals', () => {
   const expected = '\u062a\u0635\u062f\u064a\u0631'
-  const corrupt = value => String.fromCharCode(...new TextEncoder().encode(value))
+  const corrupt = value => new TextDecoder('windows-1252').decode(new TextEncoder().encode(value))
   assert.equal(repairMojibake(corrupt(expected)), expected)
   assert.equal(repairMojibake(corrupt(corrupt(expected))), expected)
+})
+
+
+test('repairs text updates after lazy screens have mounted', async () => {
+  const source = await readFile(sourceUrl, 'utf8')
+  assert.match(source, /characterData: true/)
+  assert.match(source, /WINDOWS_1252_BYTES/)
 })
