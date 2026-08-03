@@ -108,7 +108,7 @@ test('payroll employee fields wrap inside cards without a horizontal table scrol
   assert.match(hub, /tab === 'payroll' \? 'max-w-none' : 'max-w-7xl'/)
 })
 
-test('manual overtime hours calculate overtime cost at the snapshotted hourly rate times one', async () => {
+test('manual overtime hours use the 9-hour, 26-day salary standard and persist the result', async () => {
   const [sql, payroll, calculations] = await Promise.all([
     readFile(overtimeHoursMigrationUrl, 'utf8'),
     readFile(payrollUrl, 'utf8'),
@@ -119,11 +119,17 @@ test('manual overtime hours calculate overtime cost at the snapshotted hourly ra
   assert.match(sql, /when p_overtime_hours is not null\s+then round\(p_overtime_hours \* profile_rate \* 1, 2\)/s)
   assert.match(sql, /manual_overtime_hours = p_overtime_hours/)
   assert.match(payroll, /\['manual_overtime_hours', 'OT hours \(Ã—1\)'\]/)
+  assert.equal(calculations.STANDARD_MONTHLY_HOURS, 234)
+  assert.equal(calculations.overtimeCostOf({ pay_basis: 'salary', base_lyd: 3000, manual_overtime_hours: 180, source_rate_lyd: 1 }), 2307.69)
+  assert.equal(calculations.netOf({ pay_basis: 'salary', base_lyd: 3000, manual_overtime_hours: 180, deduction_lyd: 100 }), 5207.69)
+  assert.equal(calculations.netOf({ pay_basis: 'salary', base_lyd: 4000, manual_overtime_hours: 130 }), 6222.22)
   assert.equal(calculations.overtimeCostOf({ manual_overtime_hours: 3.5, source_rate_lyd: 20 }), 70)
   assert.equal(calculations.overtimeCostOf({ manual_overtime_hours: '', source_rate_lyd: 20, overtime_lyd: 90 }), 0)
   assert.equal(calculations.overtimeCostOf({ manual_overtime_hours: null, overtime_lyd: 90 }), 90)
   assert.equal(calculations.netOf({ base_lyd: 1000, manual_overtime_hours: 3, source_rate_lyd: 20 }), 1060)
   assert.match(payroll, /overtimeHours: item\.manual_overtime_hours === '' \? 0/)
+  assert.match(payroll, /updatePayrollRunItem\(item\.id, \{ overtime_lyd \}\)/)
+  assert.match(payroll, /Math\.abs\(Number\(item\.overtime_lyd \|\| 0\) - overtime_lyd\) < 0\.005/)
   assert.match(payroll, /data-testid="overtime-cost"/)
 })
 
