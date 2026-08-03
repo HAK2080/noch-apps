@@ -123,10 +123,10 @@ const MANUAL_PHRASES = {
   'Export detailed sales': 'تصدير تفاصيل المبيعات',
 }
 
-const PHRASES = {
+const PHRASES = repairDictionary({
   ...buildTranslationPhrases(),
   ...MANUAL_PHRASES,
-}
+})
 
 const PLACEHOLDERS = repairDictionary({
   'Select cost center...': 'اختر مركز التكلفة...',
@@ -138,6 +138,22 @@ const PLACEHOLDERS = repairDictionary({
   'Optional notes': 'ملاحظات اختيارية',
   'Transfer, cash receipt, cheque...': 'تحويل، إيصال كاش، شيك...',
   'Receipt, transfer, cheque...': 'إيصال، تحويل، شيك...',
+})
+
+// Repair legacy Arabic literals that were accidentally decoded as Latin-1.
+function repairMojibake(value) {
+  if (typeof value !== 'string' || !/[ÃÂØÙÐÑ]/.test(value)) return value
+  try {
+    const bytes = Uint8Array.from(Array.from(value).map(char => char.charCodeAt(0)))
+    const repaired = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    return repaired || value
+  } catch {
+    return value
+  }
+}
+
+function repairDictionary(dictionary) {
+  return Object.fromEntries(Object.entries(dictionary).map(([key, value]) => [key, repairMojibake(value)]))
 }
 
 const originalText = new WeakMap()
