@@ -616,6 +616,14 @@ export async function completePayrollRun(runId) {
   return data
 }
 
+export async function reopenPayrollRun(runId) {
+  const { data, error } = await supabase.rpc('payroll_reopen_run_v2', {
+    p_run_id: runId,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function deletePayrollRun(runId) {
   const { data, error } = await supabase.rpc('payroll_delete_run', { p_run_id: runId })
   if (error) throw error

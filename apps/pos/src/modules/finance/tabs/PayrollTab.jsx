@@ -4,12 +4,12 @@
 // payroll_delete_run); draft items and loans are plain table CRUD (owner RLS).
 
 import { useEffect, useRef, useState } from 'react'
-import { Banknote, CheckCircle, FileDown, HandCoins, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Banknote, CheckCircle, FileDown, HandCoins, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
   listPayrollRuns, getPayrollRunItems, updatePayrollRunItem,
   updatePayrollRunItemHours,
-  generatePayrollRun, completePayrollRun, deletePayrollRun,
+  generatePayrollRun, completePayrollRun, reopenPayrollRun, deletePayrollRun,
   listStaffLoans, createStaffLoan, cancelStaffLoan, listLoanRepayments, listBranches,
 } from '../lib/finance-supabase'
 import { getAllTeamMembers } from '../../../lib/profiles'
@@ -56,7 +56,7 @@ function itemIssues(item) {
 }
 
 function StatusBadge({ status }) {
-  const cls = status === 'completed'
+  const cls = ['completed', 'paid', 'reconciled', 'ready'].includes(status)
     ? 'bg-noch-green/10 border-noch-green/30 text-noch-green'
     : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
   return (
@@ -99,16 +99,6 @@ export default function PayrollTab({ readOnly = false }) {
       return []
     } finally { setLoading(false) }
   }
-  // Auto-open the latest run on load so returning to the tab restores
-  // the detail view instead of looking like the run disappeared.
-  useEffect(() => {
-    const init = async () => {
-      const list = await reload()
-      if (list?.length) openRun(list[0])
-    }
-    init()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   const openRun = async (run) => {
     if (!run) { setSelected(null); setItems([]); return }
     setMonth(String(run.period_month).slice(0, 7))
@@ -122,6 +112,16 @@ export default function PayrollTab({ readOnly = false }) {
     } catch (err) { toast.error(err.message || 'Failed to load run items') }
     finally { setItemsLoading(false) }
   }
+
+  // Auto-open the latest run on load so returning to the tab restores
+  // the detail view instead of looking like the run disappeared.
+  useEffect(() => {
+    const init = async () => {
+      const list = await reload()
+      if (list?.length) openRun(list[0])
+    }
+    init()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectMonth = value => {
     setMonth(value)
@@ -169,6 +169,19 @@ export default function PayrollTab({ readOnly = false }) {
       const list = await reload()
       await openRun(list.find(r => r.id === selected.id))
     } catch (err) { toast.error(err.message || 'Complete failed') }
+    finally { setBusy(false) }
+  }
+
+  const reopen = async () => {
+    const period = String(selected.period_month).slice(0, 7)
+    if (!window.confirm(`Reopen payroll for ${period}?\n\nThe posted payroll journal will be reversed with a full audit trail. You can amend the draft and complete it again. Paid payroll cannot be reopened.`)) return
+    setBusy(true)
+    try {
+      await reopenPayrollRun(selected.id)
+      toast.success('Payroll reopened for amendment')
+      const list = await reload()
+      await openRun(list.find(run => run.id === selected.id))
+    } catch (err) { toast.error(err.message || 'Reopen failed') }
     finally { setBusy(false) }
   }
 
@@ -260,12 +273,16 @@ export default function PayrollTab({ readOnly = false }) {
         )}
         {selectedMonthRun && (
           <span className="text-xs text-noch-muted">
-            {selectedMonthRun.status === 'draft' ? 'Draft opened — edit below' : 'Completed payroll — view only'}
+            {selectedMonthRun.status === 'draft'
+              ? 'Payroll open — edit below'
+              : selectedMonthRun.status === 'paid'
+                ? 'Payroll paid — locked'
+                : 'Payroll closed — reopen to amend'}
           </span>
         )}
       </div>
       <p className="-mt-2 text-[11px] text-noch-muted">
-        Select any previous month. Existing drafts open for editing; completed payroll remains locked.
+        Select any previous month. Open payroll is editable; closed unpaid payroll can be reopened and amended.
       </p>
 
       {/* Recent runs */}
@@ -321,6 +338,15 @@ export default function PayrollTab({ readOnly = false }) {
                   <CheckCircle size={12} /> {busy ? 'Working…' : 'Complete payroll'}
                 </button>
               </div>
+            )}
+            {!readOnly && selected.status === 'completed' && (
+              <button onClick={reopen} disabled={busy}
+                className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
+                <RotateCcw size={12} /> {busy ? 'Working…' : 'Reopen payroll'}
+              </button>
+            )}
+            {!readOnly && selected.status === 'paid' && (
+              <span className="text-[11px] text-noch-muted">Paid payroll cannot be reopened</span>
             )}
           </div>
           {isDraft && evidenceBlocked && (
@@ -487,7 +513,7 @@ function LoansCard({ staff, runs, readOnly, nameOf }) {
     } catch (err) { toast.error(err.message || 'Failed to load loans') }
     finally { setLoading(false) }
   }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => { load() }, [runs])
 
   const add = async () => {

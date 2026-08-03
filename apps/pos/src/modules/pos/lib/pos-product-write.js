@@ -1,4 +1,7 @@
 const READ_ONLY_PRODUCT_FIELDS = new Set([
+  'id',
+  'created_at',
+  'updated_at',
   'pos_categories',
   'pos_branches',
   'stock_location_id',

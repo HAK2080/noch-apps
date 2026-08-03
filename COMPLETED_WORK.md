@@ -855,3 +855,26 @@ To find if something's been done:
 - **Verification**: The legacy payload reproduction fails deterministically with the reported `stock_location_id` leak. Five focused product/inventory tests pass, targeted ESLint has zero errors, the POS production build passes, and `git diff --check` passes. The broader Node suite passes 134/136; two unrelated workforce tests still assert the superseded combined Team/Payroll design.
 - **Commit**: `316c263` (`fix(pos): strip read metadata from product writes`)
 - **Deployment**: Deployed to `apps.noch.cloud` via `deploy.py apps` on 2026-08-02. Production serves `index-4GPx2nr5.js`; no-cache HTTP checks returned 200 for the index and asset, the live bundle contains the centralized read-metadata filter, and service-worker cache `noch-pos-2026-08-02-162509` is active. Unrelated local Bloom/RBAC, attachment, and generated Supabase files remain unstaged.
+
+---
+
+## 2026-08-02 — Employee visibility, payroll reopening, and scheduled deployment
+
+- **Agent**: Codex
+- **Status**: Ready for review and scheduled production deployment
+- **Files**:
+  - `.github/workflows/deploy-admin.yml`
+  - `apps/pos/src/pages/Staff.jsx`
+  - `apps/pos/src/modules/finance/tabs/PayrollTab.jsx`
+  - `apps/pos/src/modules/finance/lib/finance-supabase.js`
+  - `apps/pos/src/modules/pos/lib/pos-product-write.js`
+  - `apps/pos/src/lib/service-worker-update.js`
+  - `supabase/functions/create-staff/index.ts`
+  - `supabase/functions/approve-staff-request/index.ts`
+  - `supabase/migrations/20260802210000_employee_visibility_and_payroll_reopen.sql`
+  - focused regression tests under `apps/pos/tests/`
+- **Employee root cause and repair**: Workforce V2 deliberately lists only profiles marked `is_employee`, but both staff provisioning Edge Functions omitted that flag. New staff were saved successfully and then excluded from every employee directory. Both provisioning paths now set `is_employee` and `payroll_enabled`, the migration repairs affected non-owner staff records, and the staff screen inserts the saved profile optimistically before an explicit server refresh instead of swallowing refresh failures.
+- **Payroll control**: Owners can reopen a completed, unpaid payroll from the existing payroll screen. Reopening preserves the original journal, posts a balanced reversing journal, records the actor/time/reopen count, returns the run to draft, and permits amendments and a fresh completion. Paid payroll remains immutable and requires a separate correction.
+- **POS product repair**: Product create/update payloads now remove primary-key/timestamp fields in addition to joined and stock-location read metadata. Branch product management routes also reload after a service-worker controller update, preventing a fixed release from appearing stale on POS terminals.
+- **Deployment schedule**: The existing GitHub Actions deployment workflow now runs daily at `00:00 UTC`, which is `03:00 Asia/Riyadh` year-round, as well as on its existing manual and main-branch push triggers.
+- **Verification**: 13 focused regression tests pass, targeted ESLint has zero errors (two pre-existing hook dependency warnings), the POS production build passes, and `git diff --check` passes. The broader suite passes 138/141; the three failures are stale pre-existing acceptance assertions for an earlier profile migration and the superseded combined Team/Payroll layout, outside these changes.

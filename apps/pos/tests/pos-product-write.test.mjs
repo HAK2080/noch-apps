@@ -12,10 +12,11 @@ test('product writes exclude joined and location-derived read metadata', () => {
     stock_location_id: 'location-1',
     stock_updated_at: '2026-08-02T09:00:00.000Z',
     stock_source: 'location_product_stock',
+    created_at: '2026-07-01T09:00:00.000Z',
+    updated_at: '2026-08-02T09:00:00.000Z',
   })
 
   assert.deepEqual(write, {
-    id: 'product-1',
     name: 'Chocolate Croissant',
     price: 12,
   })

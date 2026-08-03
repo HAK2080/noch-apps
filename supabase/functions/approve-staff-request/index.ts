@@ -89,6 +89,8 @@ Deno.serve(async (req: Request) => {
     email: reqRow.email,
     auth_user_id: authUserId,
     ...profile,
+    is_employee: true,
+    payroll_enabled: true,
   }
   const { error: upsertErr } = await admin
     .from('profiles')
@@ -102,5 +104,10 @@ Deno.serve(async (req: Request) => {
     .eq('id', request_id)
   if (updateErr) return json({ error: `request update failed: ${updateErr.message}`, profile_id: authUserId }, 500)
 
-  return json({ ok: true, profile_id: authUserId, email: reqRow.email })
+  return json({
+    ok: true,
+    profile_id: authUserId,
+    email: reqRow.email,
+    profile: profileRow,
+  })
 })

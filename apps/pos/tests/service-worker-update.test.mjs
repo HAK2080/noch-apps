@@ -9,6 +9,8 @@ import {
 test('reloads the product catalog after a service worker update', () => {
   assert.equal(shouldReloadForServiceWorkerUpdate('/products'), true)
   assert.equal(shouldReloadForServiceWorkerUpdate('/products/coffee'), true)
+  assert.equal(shouldReloadForServiceWorkerUpdate('/pos/branch-123/products'), true)
+  assert.equal(shouldReloadForServiceWorkerUpdate('/pos/branch-123/products/coffee'), true)
 })
 
 test('does not reload an active POS session after a service worker update', () => {

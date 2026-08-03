@@ -136,6 +136,7 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
     }
     setSaving(true)
     try {
+      let savedProfile = null
       const payload = {
         full_name: form.full_name.trim(),
         telegram_chat_id: form.telegram_chat_id.trim() || null,
@@ -168,6 +169,7 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
       if (isEdit) {
         if (email.trim()) payload.email = email.trim()
         await updateProfile(staff.id, payload)
+        savedProfile = { ...staff, ...payload, id: staff.id }
         // PIN must go through the RPC (hashing + salt) — updateProfile strips it
         if (pinValue) {
           await setPIN(staff.id, pinValue)
@@ -184,6 +186,13 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
         if (pinValue && data?.profile_id) {
           try { await setPIN(data.profile_id, pinValue) }
           catch { toast.error('Employee approved, but the POS PIN could not be saved') }
+        }
+        savedProfile = data?.profile || {
+          ...payload,
+          id: data?.profile_id,
+          email: fromRequest.email,
+          is_employee: true,
+          payroll_enabled: true,
         }
       } else {
         const profile = { ...payload }
@@ -207,6 +216,13 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
           try { await setPIN(data.profile_id, pinValue) }
           catch { toast.error('Employee created, but the POS PIN could not be saved') }
         }
+        savedProfile = data?.profile || {
+          ...payload,
+          id: data?.profile_id,
+          email: email.trim() || null,
+          is_employee: true,
+          payroll_enabled: true,
+        }
         if (sendWhatsAppInvite && form.phone) {
           const phone = form.phone.replace(/\D/g, '')
           const message = `Welcome to Noch, ${form.full_name.trim()}!\n\nSign in: ${window.location.origin}/login\nTelegram tasks: https://t.me/Noch_bot`
@@ -222,7 +238,7 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
             : provisionMode === 'invite'
             ? 'Employee created — invite email sent'
             : 'Employee created and ready to sign in')
-      onSave()
+      onSave(savedProfile)
     } catch (err) {
       toast.error(err.message || 'Save failed')
     } finally {
@@ -652,6 +668,28 @@ export default function Staff() {
   const pollRef = useRef(null)
   const prevChatIds = useRef(new Set())
 
+  const refreshTeamMembers = async () => {
+    try {
+      const team = await getAllTeamMembers()
+      setStaff(team)
+      return team
+    } catch (err) {
+      toast.error(err?.message || 'Employee was saved, but the team list could not refresh')
+      return null
+    }
+  }
+
+  const finishStaffSave = (savedProfile, closeModal) => {
+    closeModal()
+    if (savedProfile?.id) {
+      setStaff(current => {
+        const withoutSaved = current.filter(member => member.id !== savedProfile.id)
+        return [...withoutSaved, savedProfile]
+      })
+    }
+    refreshTeamMembers()
+  }
+
   const loadPendingRequests = async () => {
     const { data } = await supabase
       .from('staff_access_requests')
@@ -676,6 +714,8 @@ export default function Staff() {
       })
       .catch(() => toast.error(t('error')))
       .finally(() => setLoading(false))
+    // The async loader owns its own pending/error state and resolves after this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPendingRequests()
   }, [])
 
@@ -764,7 +804,12 @@ export default function Staff() {
 
   useEffect(() => {
     if (showScanner) pollRef.current = setInterval(() => scanBot(true), 20000)
-    else { clearInterval(pollRef.current); setNewlyDetected([]) }
+    else {
+      clearInterval(pollRef.current)
+      // Clear scanner-only results as soon as the scanner closes.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNewlyDetected([])
+    }
     return () => clearInterval(pollRef.current)
   }, [showScanner])
 
@@ -1116,10 +1161,7 @@ export default function Staff() {
           payrollCostCenters={payrollCostCenters}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
-          onSave={() => {
-            setAddingStaff(false)
-            getAllTeamMembers().then(setStaff).catch(() => {})
-          }}
+          onSave={savedProfile => finishStaffSave(savedProfile, () => setAddingStaff(false))}
           onClose={() => setAddingStaff(false)}
         />
       )}
@@ -1133,9 +1175,8 @@ export default function Staff() {
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
           fromRequest={approvingRequest}
-          onSave={() => {
-            setApprovingRequest(null)
-            getAllTeamMembers().then(setStaff).catch(() => {})
+          onSave={savedProfile => {
+            finishStaffSave(savedProfile, () => setApprovingRequest(null))
             loadPendingRequests()
           }}
           onClose={() => setApprovingRequest(null)}
@@ -1150,10 +1191,7 @@ export default function Staff() {
           payrollCostCenters={payrollCostCenters}
           canSeeSalaries={canSeeSalaries}
           canEditRole={canEditRole}
-          onSave={() => {
-            setEditingStaff(null)
-            getAllTeamMembers().then(setStaff).catch(() => {})
-          }}
+          onSave={savedProfile => finishStaffSave(savedProfile, () => setEditingStaff(null))}
           onClose={() => setEditingStaff(null)}
         />
       )}

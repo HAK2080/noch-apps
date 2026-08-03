@@ -1,5 +1,7 @@
 export function shouldReloadForServiceWorkerUpdate(pathname = '') {
-  return pathname === '/products' || pathname.startsWith('/products/')
+  return pathname === '/products'
+    || pathname.startsWith('/products/')
+    || /^\/pos\/[^/]+\/products(?:\/|$)/.test(pathname)
 }
 
 export function createServiceWorkerControllerChangeHandler({
