@@ -434,7 +434,7 @@ export default function PayrollTab({ readOnly = false }) {
                       <button
                         data-testid="export-paystub-pdf"
                         onClick={() => exportPayrollPdf(it.profile_id)}
-                        className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-noch-green hover:underline"
+                        className="sticky top-2 z-20 mt-2 inline-flex items-center gap-1 rounded-lg border border-noch-green bg-noch-green px-2.5 py-1.5 text-[11px] font-bold text-black shadow-md shadow-black/20 transition-colors hover:bg-noch-green/90"
                       >
                         <FileDown size={11} /> Export payslip / {AR_EXPORT_PAYSLIP}
                       </button>
