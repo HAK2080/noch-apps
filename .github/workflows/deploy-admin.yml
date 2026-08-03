@@ -6,7 +6,7 @@ on:
     # 03:00 Asia/Riyadh (Saudi Arabia is UTC+3 year-round).
     - cron: '0 0 * * *'
   push:
-    branches: [main, master]
+    branches: [main, master, codex/publish-loyalty-finance-inventory-v2]
     paths:
       - 'apps/pos/**'
       - 'deploy.py'
