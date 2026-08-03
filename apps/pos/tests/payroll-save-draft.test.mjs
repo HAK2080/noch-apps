@@ -13,3 +13,12 @@ test('open payroll exposes an explicit save-draft action that waits for pending 
   assert.match(payroll, /toast\.success\('Payroll draft saved'\)/)
   assert.match(payroll, /if \(!isDraft \|\| readOnly \|\| !selected\) return/)
 })
+
+test('keeps payroll Arabic labels ASCII-safe through CI builds', async () => {
+  const payroll = await readFile(payrollUrl, 'utf8')
+  assert.match(payroll, /AR_EXPORT_FINANCE/)
+  assert.match(payroll, /AR_EXPORT_PAYSLIP/)
+  assert.match(payroll, /Export finance PDF \/ \{AR_EXPORT_FINANCE\}/)
+  assert.match(payroll, /Export payslip \/ \{AR_EXPORT_PAYSLIP\}/)
+  assert.doesNotMatch(payroll, /Export (finance PDF|payslip) \/ [\u00d8\u00d9\u00c3]/)
+})
