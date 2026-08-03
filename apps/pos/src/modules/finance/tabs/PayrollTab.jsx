@@ -240,7 +240,15 @@ The posted payroll journal will be reversed with a full audit trail. You can ame
       toast.error('Invalid payroll hours')
       return
     }
-    const request = updatePayrollRunItemHours(item.id, updates)
+    const request = (async () => {
+      const hoursUpdated = await updatePayrollRunItemHours(item.id, updates)
+      if (updates.overtimeHours === null) return hoursUpdated
+      const overtime_lyd = overtimeCostOf({
+        ...hoursUpdated,
+        manual_overtime_hours: updates.overtimeHours,
+      })
+      return updatePayrollRunItem(item.id, { overtime_lyd })
+    })()
     pendingSaves.current.add(request)
     try {
       const updated = await request
@@ -262,6 +270,16 @@ The posted payroll journal will be reversed with a full audit trail. You can ame
     setBusy(true)
     try {
       await Promise.all([...pendingSaves.current])
+      await Promise.all(items.map(item => {
+        if (item.manual_overtime_hours === null || item.manual_overtime_hours === undefined) {
+          return Promise.resolve(item)
+        }
+        const overtime_lyd = overtimeCostOf(item)
+        if (Math.abs(Number(item.overtime_lyd || 0) - overtime_lyd) < 0.005) {
+          return Promise.resolve(item)
+        }
+        return updatePayrollRunItem(item.id, { overtime_lyd })
+      }))
       const list = await reload()
       await openRun(list.find(run => run.id === selected.id))
       toast.success('Payroll draft saved')
