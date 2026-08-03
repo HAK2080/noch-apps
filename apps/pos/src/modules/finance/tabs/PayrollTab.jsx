@@ -33,6 +33,9 @@ const HOURS_FIELDS = [
   ['manual_overtime_hours', 'OT hours (Ã—1)'],
 ]
 
+const AR_EXPORT_FINANCE = '\u062a\u0635\u062f\u064a\u0631\u0020\u062a\u0642\u0631\u064a\u0631\u0020\u0627\u0644\u0645\u0627\u0644\u064a\u0629'
+const AR_EXPORT_PAYSLIP = '\u062a\u0635\u062f\u064a\u0631\u0020\u0627\u0644\u0642\u0633\u064a\u0645\u0629'
+
 function currentMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -345,7 +348,7 @@ export default function PayrollTab({ readOnly = false }) {
               disabled={items.length === 0}
               className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 ml-auto"
             >
-              <FileDown size={12} /> Export finance PDF / ØªØµØ¯ÙŠØ± ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ù…Ø§Ù„ÙŠØ©
+              <FileDown size={12} /> Export finance PDF / {AR_EXPORT_FINANCE}
             </button>
             {!readOnly && isDraft && (
               <div className="flex items-center gap-2">
@@ -433,7 +436,7 @@ export default function PayrollTab({ readOnly = false }) {
                         onClick={() => exportPayrollPdf(it.profile_id)}
                         className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-noch-green hover:underline"
                       >
-                        <FileDown size={11} /> Export payslip / ØªØµØ¯ÙŠØ± Ø§Ù„Ù‚Ø³ÙŠÙ…Ø©
+                        <FileDown size={11} /> Export payslip / {AR_EXPORT_PAYSLIP}
                       </button>
                     </div>
                   </div>
