@@ -1,4 +1,4 @@
-// PayrollTab.jsx — monthly payroll runs (generate draft → edit → complete)
+// PayrollTab.jsx â€” monthly payroll runs (generate draft â†’ edit â†’ complete)
 // plus staff loans with running repayment balances.
 // Run lifecycle is owned by RPCs (payroll_generate_run / payroll_complete_run /
 // payroll_delete_run); draft items and loans are plain table CRUD (owner RLS).
@@ -30,7 +30,7 @@ const HOURS_FIELDS = [
   ['manual_hours_per_day', 'Hours/day'],
   ['manual_worked_days', 'Days'],
   ['manual_scheduled_hours', 'Scheduled h'],
-  ['manual_overtime_hours', 'OT hours (×1)'],
+  ['manual_overtime_hours', 'OT hours (Ã—1)'],
 ]
 
 function currentMonth() {
@@ -78,9 +78,10 @@ export default function PayrollTab({ readOnly = false }) {
   const [itemsLoading, setItemsLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const loadedItems = useRef([])
+  const pendingSaves = useRef(new Set())
 
   const nameOf = (id) => staff.find(p => p.id === id)?.full_name || 'Staff'
-  const branchOf = (id) => branches.find(b => b.id === id)?.name || '—'
+  const branchOf = (id) => branches.find(b => b.id === id)?.name || 'â€”'
 
   const reload = async () => {
     setLoading(true)
@@ -203,8 +204,10 @@ export default function PayrollTab({ readOnly = false }) {
     const value = field === 'note' ? (raw || null) : (raw === '' ? 0 : Number(raw))
     if (field !== 'note' && !Number.isFinite(value)) { toast.error('Invalid number'); return }
     if (original && String(original[field] ?? '') === String(item[field] ?? '')) return
+    const request = updatePayrollRunItem(item.id, { [field]: value })
+    pendingSaves.current.add(request)
     try {
-      const updated = await updatePayrollRunItem(item.id, { [field]: value })
+      const updated = await request
       const previous = items.find(row => row.id === item.id)
       const nextTotal = runTotal - netOf(previous || item) + netOf(updated)
       setItems(list => list.map(row => row.id === item.id ? updated : row))
@@ -213,6 +216,8 @@ export default function PayrollTab({ readOnly = false }) {
     } catch (err) {
       toast.error(err.message || 'Save failed')
       openRun(selected)
+    } finally {
+      pendingSaves.current.delete(request)
     }
   }
 
@@ -228,8 +233,10 @@ export default function PayrollTab({ readOnly = false }) {
       toast.error('Invalid payroll hours')
       return
     }
+    const request = updatePayrollRunItemHours(item.id, updates)
+    pendingSaves.current.add(request)
     try {
-      const updated = await updatePayrollRunItemHours(item.id, updates)
+      const updated = await request
       const previous = items.find(row => row.id === item.id)
       const nextTotal = runTotal - netOf(previous || item) + netOf(updated)
       setItems(list => list.map(row => row.id === item.id ? updated : row))
@@ -238,6 +245,23 @@ export default function PayrollTab({ readOnly = false }) {
     } catch (err) {
       toast.error(err.message || 'Failed to save payroll hours')
       openRun(selected)
+    } finally {
+      pendingSaves.current.delete(request)
+    }
+  }
+
+  const saveDraft = async () => {
+    if (!isDraft || readOnly || !selected) return
+    setBusy(true)
+    try {
+      await Promise.all([...pendingSaves.current])
+      const list = await reload()
+      await openRun(list.find(run => run.id === selected.id))
+      toast.success('Payroll draft saved')
+    } catch (err) {
+      toast.error(err.message || 'Failed to save payroll draft')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -268,16 +292,16 @@ export default function PayrollTab({ readOnly = false }) {
           <button onClick={() => generate()} disabled={generating}
             className="btn-secondary text-xs px-4 py-1.5 flex items-center gap-1.5">
             <RefreshCw size={12} className={generating ? 'animate-spin' : ''} />
-            {generating ? 'Generating…' : 'Generate draft'}
+            {generating ? 'Generatingâ€¦' : 'Generate draft'}
           </button>
         )}
         {selectedMonthRun && (
           <span className="text-xs text-noch-muted">
             {selectedMonthRun.status === 'draft'
-              ? 'Payroll open — edit below'
+              ? 'Payroll open â€” edit below'
               : selectedMonthRun.status === 'paid'
-                ? 'Payroll paid — locked'
-                : 'Payroll closed — reopen to amend'}
+                ? 'Payroll paid â€” locked'
+                : 'Payroll closed â€” reopen to amend'}
           </span>
         )}
       </div>
@@ -288,8 +312,8 @@ export default function PayrollTab({ readOnly = false }) {
       {/* Recent runs */}
       <div className="card">
         <h3 className="text-white text-sm font-semibold mb-3">Payroll runs</h3>
-        {loading ? <p className="text-noch-muted">Loading…</p> : runs.length === 0 ? (
-          <p className="text-noch-muted text-sm py-3 text-center">No payroll runs yet — pick a month and generate a draft.</p>
+        {loading ? <p className="text-noch-muted">Loadingâ€¦</p> : runs.length === 0 ? (
+          <p className="text-noch-muted text-sm py-3 text-center">No payroll runs yet â€” pick a month and generate a draft.</p>
         ) : (
           <div className="flex flex-col">
             {runs.map(r => (
@@ -321,7 +345,7 @@ export default function PayrollTab({ readOnly = false }) {
               disabled={items.length === 0}
               className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 ml-auto"
             >
-              <FileDown size={12} /> Export finance PDF / تصدير تقرير المالية
+              <FileDown size={12} /> Export finance PDF / ØªØµØ¯ÙŠØ± ØªÙ‚Ø±ÙŠØ± Ø§Ù„Ù…Ø§Ù„ÙŠØ©
             </button>
             {!readOnly && isDraft && (
               <div className="flex items-center gap-2">
@@ -333,16 +357,21 @@ export default function PayrollTab({ readOnly = false }) {
                   className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 text-red-300">
                   <Trash2 size={12} /> Delete draft
                 </button>
+                <button onClick={saveDraft} disabled={busy}
+                  data-testid="save-payroll-draft"
+                  className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
+                  <CheckCircle size={12} /> {busy ? 'Savingâ€¦' : 'Save draft'}
+                </button>
                 <button onClick={complete} disabled={busy || !canComplete}
                   className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5">
-                  <CheckCircle size={12} /> {busy ? 'Working…' : 'Complete payroll'}
+                  <CheckCircle size={12} /> {busy ? 'Workingâ€¦' : 'Complete payroll'}
                 </button>
               </div>
             )}
             {!readOnly && selected.status === 'completed' && (
               <button onClick={reopen} disabled={busy}
                 className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
-                <RotateCcw size={12} /> {busy ? 'Working…' : 'Reopen payroll'}
+                <RotateCcw size={12} /> {busy ? 'Workingâ€¦' : 'Reopen payroll'}
               </button>
             )}
             {!readOnly && selected.status === 'paid' && (
@@ -355,7 +384,7 @@ export default function PayrollTab({ readOnly = false }) {
               {Object.keys(issueCounts).length > 0 && (
                 <ul className="mt-2 list-disc space-y-1 ps-4">
                   {Object.entries(issueCounts).map(([issue, count]) => (
-                    <li key={issue}>{count} × {ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')}</li>
+                    <li key={issue}>{count} Ã— {ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')}</li>
                   ))}
                 </ul>
               )}
@@ -367,10 +396,10 @@ export default function PayrollTab({ readOnly = false }) {
           )}
           {isDraft && (
             <p className="mb-3 text-xs text-noch-muted">
-              Attendance and schedules are optional evidence. Enter overtime hours manually; OT cost = overtime hours × employee hourly rate × 1 and is added to net pay.
+              Attendance and schedules are optional evidence. Enter overtime hours manually; OT cost = overtime hours Ã— employee hourly rate Ã— 1 and is added to net pay.
             </p>
           )}
-          {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
+          {itemsLoading ? <p className="text-noch-muted">Loadingâ€¦</p> : items.length === 0 ? (
             <p className="text-noch-muted text-sm py-3 text-center">No items in this run.</p>
           ) : (
             <div className="space-y-3" data-testid="payroll-item-list">
@@ -404,7 +433,7 @@ export default function PayrollTab({ readOnly = false }) {
                         onClick={() => exportPayrollPdf(it.profile_id)}
                         className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-noch-green hover:underline"
                       >
-                        <FileDown size={11} /> Export payslip / تصدير القسيمة
+                        <FileDown size={11} /> Export payslip / ØªØµØ¯ÙŠØ± Ø§Ù„Ù‚Ø³ÙŠÙ…Ø©
                       </button>
                     </div>
                   </div>
@@ -426,13 +455,13 @@ export default function PayrollTab({ readOnly = false }) {
                           />
                         ) : (
                           <span className="block rounded border border-noch-border/60 px-2 py-1 text-right text-white">
-                            {it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '—' : '—')}
+                            {it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? 'â€”' : 'â€”')}
                           </span>
                         )}
                       </label>
                     ))}
                     <div className="min-w-0 text-[10px] text-noch-muted">
-                      <span className="mb-1 block truncate">OT cost (×1)</span>
+                      <span className="mb-1 block truncate">OT cost (Ã—1)</span>
                       <span
                         data-testid="overtime-cost"
                         className="block rounded border border-noch-border/60 bg-noch-dark/40 px-2 py-1 text-right font-mono text-noch-green"
@@ -467,13 +496,13 @@ export default function PayrollTab({ readOnly = false }) {
                           aria-label={`Note for ${nameOf(it.profile_id)}`}
                           type="text"
                           value={it.note || ''}
-                          placeholder="—"
+                          placeholder="â€”"
                           onChange={event => setLocal(it.id, 'note', event.target.value)}
                           onBlur={() => persistItem(it, 'note')}
                           className="input w-full min-w-0 px-1.5 py-1 text-xs"
                         />
                       ) : (
-                        <span className="block truncate rounded border border-noch-border/60 px-2 py-1 text-white">{it.note || '—'}</span>
+                        <span className="block truncate rounded border border-noch-border/60 px-2 py-1 text-white">{it.note || 'â€”'}</span>
                       )}
                     </label>
                   </div>
@@ -490,7 +519,7 @@ export default function PayrollTab({ readOnly = false }) {
   )
 }
 
-// Staff loans — plain CRUD. Est. remaining = amount − repayments booked in
+// Staff loans â€” plain CRUD. Est. remaining = amount âˆ’ repayments booked in
 // completed payroll runs (computed client-side from run items).
 function LoansCard({ staff, runs, readOnly, nameOf }) {
   const [loans, setLoans] = useState([])
@@ -562,7 +591,7 @@ function LoansCard({ staff, runs, readOnly, nameOf }) {
       {!readOnly && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3">
           <select value={form.profile_id} onChange={e => set('profile_id', e.target.value)} className="input py-1 px-2 text-xs md:col-span-2">
-            <option value="">Select staff…</option>
+            <option value="">Select staffâ€¦</option>
             {staff.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </select>
           <input type="number" min="0" step="0.01" placeholder="Amount (LYD)"
@@ -574,12 +603,12 @@ function LoansCard({ staff, runs, readOnly, nameOf }) {
             value={form.note} onChange={e => set('note', e.target.value)} className="input py-1 px-2 text-xs" />
           <button onClick={add} disabled={saving}
             className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5 col-span-2 md:col-span-6 md:justify-self-end">
-            <Plus size={12} /> {saving ? 'Adding…' : 'Add loan'}
+            <Plus size={12} /> {saving ? 'Addingâ€¦' : 'Add loan'}
           </button>
         </div>
       )}
 
-      {loading ? <p className="text-noch-muted">Loading…</p> : active.length === 0 ? (
+      {loading ? <p className="text-noch-muted">Loadingâ€¦</p> : active.length === 0 ? (
         <p className="text-noch-muted text-sm py-2">No active loans.</p>
       ) : (
         <div className="flex flex-col">
