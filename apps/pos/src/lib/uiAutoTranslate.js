@@ -141,15 +141,21 @@ const PLACEHOLDERS = repairDictionary({
 })
 
 // Repair legacy Arabic literals that were accidentally decoded as Latin-1.
-function repairMojibake(value) {
-  if (typeof value !== 'string' || !/[ÃÂØÙÐÑ]/.test(value)) return value
-  try {
-    const bytes = Uint8Array.from(Array.from(value).map(char => char.charCodeAt(0)))
-    const repaired = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-    return repaired || value
-  } catch {
-    return value
+export function repairMojibake(value) {
+  if (typeof value !== 'string') return value
+  let repaired = value
+  for (let pass = 0; pass < 3 && /[\u00c3\u00c2\u00d8\u00d9\u00d0\u00d1]/.test(repaired); pass += 1) {
+    try {
+      const points = Array.from(repaired, char => char.charCodeAt(0))
+      if (points.some(point => point > 255)) break
+      const decoded = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(points))
+      if (!decoded || decoded === repaired) break
+      repaired = decoded
+    } catch {
+      break
+    }
   }
+  return repaired
 }
 
 function repairDictionary(dictionary) {
@@ -170,6 +176,29 @@ function shouldSkipTextNode(node) {
   const parent = node.parentElement
   if (!parent) return true
   return ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parent.tagName)
+}
+
+function repairTextNodes(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let node = walker.nextNode()
+  while (node) {
+    if (!shouldSkipTextNode(node)) {
+      const repaired = repairMojibake(node.nodeValue)
+      if (repaired !== node.nodeValue) node.nodeValue = repaired
+    }
+    node = walker.nextNode()
+  }
+}
+
+function repairAttributes(root) {
+  root.querySelectorAll?.('[placeholder], [title], [aria-label]').forEach(el => {
+    ;['placeholder', 'title', 'aria-label'].forEach(attr => {
+      if (!el.hasAttribute(attr)) return
+      const current = el.getAttribute(attr)
+      const repaired = repairMojibake(current)
+      if (repaired !== current) el.setAttribute(attr, repaired)
+    })
+  })
 }
 
 function translateTextNodes(root) {
@@ -224,6 +253,8 @@ export function applyUiAutoTranslate(lang) {
   if (!root) return () => {}
 
   const apply = () => {
+    repairTextNodes(root)
+    repairAttributes(root)
     if (lang === 'ar') {
       translateTextNodes(root)
       translateAttributes(root)
@@ -234,8 +265,6 @@ export function applyUiAutoTranslate(lang) {
   }
 
   apply()
-  if (lang !== 'ar') return () => {}
-
   const observer = new MutationObserver(() => apply())
   observer.observe(root, { childList: true, subtree: true })
   return () => observer.disconnect()
