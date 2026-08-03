@@ -128,7 +128,7 @@ const PHRASES = {
   ...MANUAL_PHRASES,
 }
 
-const PLACEHOLDERS = {
+const PLACEHOLDERS = repairDictionary({
   'Select cost center...': 'اختر مركز التكلفة...',
   'Select category...': 'اختر الفئة...',
   'e.g. Al-Amal Hardware': 'مثال: مورد الأجهزة',
