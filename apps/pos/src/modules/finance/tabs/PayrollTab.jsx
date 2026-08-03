@@ -165,7 +165,9 @@ export default function PayrollTab({ readOnly = false }) {
 
   const complete = async () => {
     const total = items.reduce((s, it) => s + netOf(it), 0)
-    if (!window.confirm(`Complete payroll for ${String(selected.period_month).slice(0, 7)}?\n\nTotal ${lyd(total)} will be posted and the run locked.`)) return
+    if (!window.confirm(`Complete payroll for ${String(selected.period_month).slice(0, 7)}?
+
+Total ${lyd(total)} will be posted and the run locked.`)) return
     setBusy(true)
     try {
       await completePayrollRun(selected.id)
@@ -178,7 +180,9 @@ export default function PayrollTab({ readOnly = false }) {
 
   const reopen = async () => {
     const period = String(selected.period_month).slice(0, 7)
-    if (!window.confirm(`Reopen payroll for ${period}?\n\nThe posted payroll journal will be reversed with a full audit trail. You can amend the draft and complete it again. Paid payroll cannot be reopened.`)) return
+    if (!window.confirm(`Reopen payroll for ${period}?
+
+The posted payroll journal will be reversed with a full audit trail. You can amend the draft and complete it again. Paid payroll cannot be reopened.`)) return
     setBusy(true)
     try {
       await reopenPayrollRun(selected.id)
@@ -428,13 +432,13 @@ export default function PayrollTab({ readOnly = false }) {
                         </span>
                       )}
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-[10px] uppercase tracking-wide text-noch-muted">Net pay</p>
-                      <p className="font-mono text-sm text-noch-green">{lyd(netOf(it))}</p>
+                    <div className="sticky top-2 z-20 shrink-0 rounded-lg border border-noch-green bg-noch-green p-3 text-right shadow-md shadow-black/20">
+                      <p className="text-[10px] uppercase tracking-wide text-black/70">Net pay</p>
+                      <p className="font-mono text-lg font-bold text-black">{lyd(netOf(it))}</p>
                       <button
                         data-testid="export-paystub-pdf"
                         onClick={() => exportPayrollPdf(it.profile_id)}
-                        className="sticky top-2 z-20 mt-2 inline-flex items-center gap-1 rounded-lg border border-noch-green bg-noch-green px-2.5 py-1.5 text-[11px] font-bold text-black shadow-md shadow-black/20 transition-colors hover:bg-noch-green/90"
+                        className="mt-2 inline-flex items-center gap-1 rounded-md border border-black/30 bg-black/5 px-2.5 py-1.5 text-[11px] font-bold text-black transition-colors hover:bg-black/10"
                       >
                         <FileDown size={11} /> Export payslip / {AR_EXPORT_PAYSLIP}
                       </button>
