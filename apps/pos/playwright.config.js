@@ -42,5 +42,17 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: 'tests/.auth/staff.json' },
       dependencies: ['setup-staff'],
     },
+    {
+      name: 'access-control-owner',
+      testMatch: '**/access-control-owner.spec.js',
+      use: { ...devices['Desktop Chrome'], storageState: 'tests/.auth/owner.json' },
+      dependencies: ['setup-owner'],
+    },
+    {
+      name: 'access-control-staff',
+      testMatch: '**/access-control-staff.spec.js',
+      use: { ...devices['Pixel 7'], storageState: 'tests/.auth/staff.json' },
+      dependencies: ['setup-staff'],
+    },
   ],
 });

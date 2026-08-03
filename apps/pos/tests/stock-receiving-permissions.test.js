@@ -22,11 +22,20 @@ function getLatestStockReceiptFunction() {
   throw new Error('receive_pos_product_stock migration not found')
 }
 
-test('all signed-in employees can receive stock within their assigned branches', () => {
+test('all signed-in employees can receive stock from the open POS terminal', () => {
   const { file, sql } = getLatestStockReceiptFunction()
 
-  assert.match(sql, /p\.id = auth\.uid\(\)/, `${file} must authorize the signed-in profile`)
-  assert.match(sql, /p\.branch_id = v_product\.branch_id|staff_branches/, `${file} must preserve branch access`)
+  assert.match(sql, /auth\.uid\(\)\s+is\s+null/i, `${file} must require a signed-in POS user`)
+  assert.doesNotMatch(
+    sql,
+    /You cannot receive stock for this branch/i,
+    `${file} must not reject a signed-in employee because their profile branch is stale or missing`,
+  )
+  assert.match(
+    sql,
+    /Employee is not assigned to this branch/i,
+    `${file} must preserve branch assignment checks for remote Telegram updates`,
+  )
   assert.doesNotMatch(
     sql,
     /(?:p|actor)\.is_active\s+is\s+true|profile is inactive|reporter is not active|Employee is not active/i,

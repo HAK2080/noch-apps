@@ -11,12 +11,12 @@ import { lyd, pct, statusForRatio, STATUS_CLASS } from '../lib/thresholds'
 // covers base products (no modifiers, discounts, or refunds), so its total
 // is reconciled against the P&L figure rather than assumed equal.
 const TITLES = {
-  cogs: 'COGS breakdown',
-  revenue: 'Revenue breakdown',
-  net: 'Net contribution breakdown',
-  prime: 'Prime cost breakdown',
-  labor: 'Direct labor breakdown',
-  opex: 'Direct OpEx breakdown',
+  cogs: 'Product cost breakdown',
+  revenue: 'Sales breakdown',
+  net: 'Operating profit breakdown',
+  prime: 'Products + staff breakdown',
+  labor: 'Staff cost breakdown',
+  opex: 'Branch running cost breakdown',
 }
 
 const NEEDS_MATRIX = { cogs: true, revenue: true }

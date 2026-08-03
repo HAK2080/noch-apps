@@ -2,9 +2,9 @@ import { Settings as SettingsIcon, Database, Wand2, Shield } from 'lucide-react'
 
 const PIPELINE = [
   { label: 'Concept extraction', fn: 'cs-extract-concept', model: 'claude-sonnet-4' },
-  { label: 'Draft generation',   fn: 'cs-generate-drafts', model: 'claude-opus-4' },
+  { label: 'Draft generation',   fn: 'cs-generate-drafts', model: 'Claude → Gemini fallback' },
   { label: 'Draft evaluation',   fn: 'cs-evaluate-draft',  model: 'claude-sonnet-4 + heuristics' },
-  { label: 'Humanize / rewrite', fn: 'cs-humanize-draft',  model: 'claude-sonnet-4' },
+  { label: 'Humanize / rewrite', fn: 'cs-humanize-draft',  model: 'Claude → Gemini fallback' },
 ]
 
 const TABLES = [
@@ -17,7 +17,9 @@ const TABLES = [
   'cs_user_edits',
   'cs_learning_signals',
   'cs_content_bank_items',
-  'cs_creative_briefs',
+  'cs_briefs',
+  'cs_publications',
+  'cs_performance_snapshots',
 ]
 
 export default function Settings() {
@@ -72,8 +74,8 @@ export default function Settings() {
           <h2 className="text-white font-semibold">Access</h2>
         </header>
         <p className="text-noch-muted text-sm">
-          Content Studio is owner-only. RLS grants read to all authenticated users and write only to
-          profiles with <code className="font-mono text-noch-green">role = 'owner'</code>.
+          Content Studio is owner-only. Route protection and database row-level security both require
+          <code className="font-mono text-noch-green"> role = 'owner'</code> for reads and writes.
         </p>
       </section>
     </div>

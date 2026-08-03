@@ -11,7 +11,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "claude-sonnet-4-20250514";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 const ACTIONS: Record<string, string> = {
   shorter:          "Rewrite shorter. Cut 30–50% of the length without losing the hook.",
@@ -72,12 +73,61 @@ Return ONLY this JSON shape:
 Keep the core message and concept. Only apply the one action. Do not invent new claims.`;
 }
 
+async function rewriteText(prompt: string): Promise<{ text: string; model: string }> {
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const failures: string[] = [];
+
+  if (anthropicKey) {
+    try {
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const response = await client.messages.create({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const block = response.content[0];
+      if (!block || block.type !== "text") throw new Error("Unexpected Anthropic output");
+      return { text: block.text, model: ANTHROPIC_MODEL };
+    } catch (error) {
+      failures.push(`Anthropic: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (geminiKey) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.6,
+              maxOutputTokens: 2048,
+              responseMimeType: "application/json",
+            },
+          }),
+        },
+      );
+      if (!response.ok) throw new Error(`Gemini ${response.status}: ${await response.text()}`);
+      const payload = await response.json();
+      const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (typeof text !== "string" || !text.trim()) throw new Error("Gemini returned no text");
+      return { text, model: GEMINI_MODEL };
+    } catch (error) {
+      failures.push(`Gemini: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (!anthropicKey && !geminiKey) throw new Error("No AI provider is configured");
+  throw new Error(`All AI providers failed: ${failures.join(" | ")}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
-
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) return jsonResponse({ error: "ANTHROPIC_API_KEY not set" }, 500);
 
   let body: { draft?: Record<string, unknown>; action?: string; voiceProfile?: Record<string, unknown> } = {};
   try { body = await req.json(); } catch { return jsonResponse({ error: "Invalid JSON" }, 400); }
@@ -85,24 +135,16 @@ Deno.serve(async (req) => {
   if (!draft) return jsonResponse({ error: "Missing draft" }, 400);
   if (!action) return jsonResponse({ error: "Missing action" }, 400);
 
-  const client = new Anthropic({ apiKey });
-
   try {
-    const resp = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      messages: [{ role: "user", content: buildPrompt(draft, action, voiceProfile || {}) }],
-    });
-    const block = resp.content[0];
-    if (!block || block.type !== "text") return jsonResponse({ error: "Unexpected model output" }, 502);
+    const generated = await rewriteText(buildPrompt(draft, action, voiceProfile || {}));
 
     let rewritten;
-    try { rewritten = extractJson(block.text); }
+    try { rewritten = extractJson(generated.text); }
     catch (e) {
-      return jsonResponse({ error: "Failed to parse JSON", raw: block.text, detail: String(e) }, 502);
+      return jsonResponse({ error: "Failed to parse JSON", raw: generated.text, detail: String(e) }, 502);
     }
 
-    return jsonResponse({ rewritten, action, ai_model: MODEL });
+    return jsonResponse({ rewritten, action, ai_model: generated.model });
   } catch (e) {
     console.error("cs-humanize-draft error", e);
     return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

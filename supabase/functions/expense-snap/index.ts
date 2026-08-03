@@ -13,6 +13,7 @@
 //   manual        { text, source, submitted_by? | telegram_chat_id? }
 //                 -> typed expense ("450 قهوة للمخزن"), same return shape (no receipt_url)
 //   set_amount    { snap_id, text } -> staff typed the amount after we asked
+//   set_payment   { snap_id, status:'unpaid'|'paid', method?:'cash'|'card' }
 //   finalize      { snap_id, allocation: {mode:'single',code} | {mode:'even'} | {mode:'custom',parts} }
 //   custom_parse  { snap_id, text } -> parse free-text split, then finalize
 //   mark_custom   { snap_id }
@@ -40,6 +41,11 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
 
+type RequestActor = {
+  profileId: string | null;
+  internalTelegram: boolean;
+};
+
 // ── Supabase REST helpers ───────────────────────────────────
 async function sbGet(path: string) {
   const r = await fetch(SB_URL + "/rest/v1/" + path, { headers: SB_HEADERS });
@@ -62,6 +68,51 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status, headers: { ...CORS, "Content-Type": "application/json" },
   });
+}
+
+async function authenticateRequest(req: Request): Promise<RequestActor | null> {
+  const authorization = req.headers.get("Authorization") || "";
+  const token = authorization.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return null;
+
+  // telegram-webhook calls this function with the service-role bearer token.
+  if (SB_KEY && token === SB_KEY) {
+    return { profileId: null, internalTelegram: true };
+  }
+
+  const userResponse = await fetch(`${SB_URL}/auth/v1/user`, {
+    headers: { apikey: SB_KEY, Authorization: authorization },
+  });
+  if (!userResponse.ok) return null;
+  const user = await userResponse.json();
+  if (!user?.id) return null;
+
+  let profiles = await sbGet(
+    "profiles?select=id,is_active&id=eq." + encodeURIComponent(String(user.id)) + "&limit=1",
+  );
+  if (!Array.isArray(profiles) || !profiles.length) {
+    profiles = await sbGet(
+      "profiles?select=id,is_active&auth_user_id=eq." + encodeURIComponent(String(user.id)) + "&limit=1",
+    );
+  }
+  const profile = Array.isArray(profiles) ? profiles[0] : null;
+  if (!profile?.id || profile.is_active === false) return null;
+  return { profileId: String(profile.id), internalTelegram: false };
+}
+
+async function getSnapForActor(snapId: string, actor: RequestActor) {
+  const snaps = await sbGet(
+    "expense_snaps?select=*&id=eq." + encodeURIComponent(snapId) + "&limit=1",
+  );
+  if (!Array.isArray(snaps) || !snaps.length) {
+    return { response: json({ error: "snap_not_found" }, 404) };
+  }
+  const snap = snaps[0];
+  const allowed = actor.internalTelegram
+    ? snap.source === "telegram"
+    : snap.submitted_by === actor.profileId;
+  if (!allowed) return { response: json({ error: "forbidden" }, 403) };
+  return { snap };
 }
 
 // ── AI provider chain (Gemini free tier first, Claude fallback) ──
@@ -172,8 +223,11 @@ function heuristicSplit(text: string): { code: string; amount: number }[] {
 }
 
 // ── shared: resolve profile + load reference data ───────────
-async function resolveProfile(body: Record<string, unknown>): Promise<string | null> {
-  if (body.submitted_by) return String(body.submitted_by);
+async function resolveProfile(
+  body: Record<string, unknown>,
+  actor: RequestActor,
+): Promise<string | null> {
+  if (!actor.internalTelegram) return actor.profileId;
   if (body.telegram_chat_id) {
     const profiles = await sbGet(
       "profiles?select=id&telegram_chat_id=eq." + encodeURIComponent(String(body.telegram_chat_id)) + "&limit=1",
@@ -194,14 +248,17 @@ async function loadCostCenters() {
 }
 
 // ── extract (photo) ─────────────────────────────────────────
-async function actionExtract(body: Record<string, unknown>) {
+async function actionExtract(body: Record<string, unknown>, actor: RequestActor) {
   const imageB64 = body.image_base64 as string;
   const mimeType = (body.mime_type as string) || "image/jpeg";
   const source = body.source as string;
   const caption = (body.caption as string) || "";
   if (!imageB64 || !source) return json({ error: "image_base64 and source are required" }, 400);
 
-  const submittedBy = await resolveProfile(body);
+  if (actor.internalTelegram !== (source === "telegram")) {
+    return json({ error: "source_not_allowed" }, 403);
+  }
+  const submittedBy = await resolveProfile(body, actor);
   if (!submittedBy) return json({ error: "unlinked", message: "No profile found for this submitter" }, 403);
 
   // 1) Store the photo
@@ -255,7 +312,7 @@ Extract and return ONLY valid JSON (no markdown):
     telegram_message_id: body.telegram_message_id ? String(body.telegram_message_id) : null,
     receipt_url: receiptUrl,
     extracted,
-    status: needsAmount ? "awaiting_amount" : "awaiting_branch",
+    status: needsAmount ? "awaiting_amount" : "awaiting_payment",
   });
   if (!Array.isArray(snaps) || !snaps.length) return json({ error: "snap_insert_failed", detail: snaps }, 500);
 
@@ -270,12 +327,15 @@ Extract and return ONLY valid JSON (no markdown):
 }
 
 // ── manual (typed expense, no photo) ────────────────────────
-async function actionManual(body: Record<string, unknown>) {
+async function actionManual(body: Record<string, unknown>, actor: RequestActor) {
   const text = ((body.text as string) || "").trim();
   const source = body.source as string;
   if (!text || !source) return json({ error: "text and source are required" }, 400);
 
-  const submittedBy = await resolveProfile(body);
+  if (actor.internalTelegram !== (source === "telegram")) {
+    return json({ error: "source_not_allowed" }, 403);
+  }
+  const submittedBy = await resolveProfile(body, actor);
   if (!submittedBy) return json({ error: "unlinked", message: "No profile found for this submitter" }, 403);
 
   const [ccList, categories] = await Promise.all([
@@ -311,7 +371,7 @@ Extract and return ONLY valid JSON (no markdown):
     telegram_chat_id: body.telegram_chat_id ? String(body.telegram_chat_id) : null,
     receipt_url: null,
     extracted,
-    status: needsAmount ? "awaiting_amount" : "awaiting_branch",
+    status: needsAmount ? "awaiting_amount" : "awaiting_payment",
   });
   if (!Array.isArray(snaps) || !snaps.length) return json({ error: "snap_insert_failed", detail: snaps }, 500);
 
@@ -325,7 +385,7 @@ Extract and return ONLY valid JSON (no markdown):
 }
 
 // ── set_amount (staff typed the amount we asked for) ────────
-async function actionSetAmount(body: Record<string, unknown>) {
+async function actionSetAmount(body: Record<string, unknown>, actor: RequestActor) {
   const snapId = body.snap_id as string;
   const text = (body.text as string) || "";
   if (!snapId) return json({ error: "snap_id required" }, 400);
@@ -333,12 +393,12 @@ async function actionSetAmount(body: Record<string, unknown>) {
   const amount = parseAmount(text);
   if (!amount) return json({ ok: false, error: "bad_amount" });
 
-  const snaps = await sbGet("expense_snaps?select=*&id=eq." + snapId + "&limit=1");
-  if (!Array.isArray(snaps) || !snaps.length) return json({ error: "snap_not_found" }, 404);
-  const snap = snaps[0];
+  const owned = await getSnapForActor(snapId, actor);
+  if (owned.response) return owned.response;
+  const snap = owned.snap;
 
   const extracted = { ...(snap.extracted || {}), amount };
-  await sbPatch("expense_snaps?id=eq." + snapId, { extracted, status: "awaiting_branch" });
+  await sbPatch("expense_snaps?id=eq." + snapId, { extracted, status: "awaiting_payment" });
 
   const ccList = await loadCostCenters();
   return json({
@@ -351,14 +411,47 @@ async function actionSetAmount(body: Record<string, unknown>) {
 }
 
 // ── finalize ────────────────────────────────────────────────
-async function actionFinalize(body: Record<string, unknown>) {
+async function actionSetPayment(body: Record<string, unknown>, actor: RequestActor) {
+  const snapId = body.snap_id as string;
+  const status = body.status as string;
+  const method = body.method ? String(body.method) : null;
+  if (!snapId) return json({ error: "snap_id required" }, 400);
+  if (!["unpaid", "paid"].includes(status)) return json({ error: "bad_payment_status" }, 400);
+  if (status === "paid" && !["cash", "card"].includes(method || "")) {
+    return json({ error: "bad_payment_method" }, 400);
+  }
+
+  const owned = await getSnapForActor(snapId, actor);
+  if (owned.response) return owned.response;
+  const snap = owned.snap;
+  if (snap.status === "completed") return json({ error: "already_completed" }, 409);
+  if (snap.status !== "awaiting_payment") return json({ error: "payment_already_set" }, 409);
+
+  const extracted = {
+    ...(snap.extracted || {}),
+    payment_status_reported: status,
+    payment_method_reported: status === "paid" ? method : null,
+  };
+  await sbPatch("expense_snaps?id=eq." + snapId, { extracted, status: "awaiting_branch" });
+
+  const costCenters = await loadCostCenters();
+  return json({
+    ok: true,
+    snap_id: snapId,
+    extracted,
+    cost_centers: costCenters,
+    suggested_code: extracted.branch_hint ?? null,
+  });
+}
+
+async function actionFinalize(body: Record<string, unknown>, actor: RequestActor) {
   const snapId = body.snap_id as string;
   const allocation = body.allocation as { mode: string; code?: string; parts?: { code: string; amount: number }[] };
   if (!snapId || !allocation?.mode) return json({ error: "snap_id and allocation required" }, 400);
 
-  const snaps = await sbGet("expense_snaps?select=*&id=eq." + snapId + "&limit=1");
-  if (!Array.isArray(snaps) || !snaps.length) return json({ error: "snap_not_found" }, 404);
-  const snap = snaps[0];
+  const owned = await getSnapForActor(snapId, actor);
+  if (owned.response) return owned.response;
+  const snap = owned.snap;
   if (snap.status === "completed") return json({ error: "already_completed" }, 409);
 
   const ex = snap.extracted || {};
@@ -427,6 +520,12 @@ async function actionFinalize(body: Record<string, unknown>) {
     receipt_url: snap.receipt_url,
     expense_date: ex.expense_date || new Date().toISOString().slice(0, 10),
     status: "pending",
+    payment_status_reported: ex.payment_status_reported === "paid" ? "paid" : "unpaid",
+    payment_method_reported: ex.payment_status_reported === "paid"
+      ? (ex.payment_method_reported === "card" ? "card" : "cash")
+      : null,
+    payment_reported_by: snap.submitted_by,
+    payment_reported_at: new Date().toISOString(),
     receipt_group_id: groupId,
     source: "snap_" + snap.source,
   }));
@@ -446,14 +545,14 @@ async function actionFinalize(body: Record<string, unknown>) {
 }
 
 // ── custom_parse: free-text split → finalize ────────────────
-async function actionCustomParse(body: Record<string, unknown>) {
+async function actionCustomParse(body: Record<string, unknown>, actor: RequestActor) {
   const snapId = body.snap_id as string;
   const text = (body.text as string) || "";
   if (!snapId || !text.trim()) return json({ error: "snap_id and text required" }, 400);
 
-  const snaps = await sbGet("expense_snaps?select=*&id=eq." + snapId + "&limit=1");
-  if (!Array.isArray(snaps) || !snaps.length) return json({ error: "snap_not_found" }, 404);
-  const snap = snaps[0];
+  const owned = await getSnapForActor(snapId, actor);
+  if (owned.response) return owned.response;
+  const snap = owned.snap;
 
   // Free heuristic first (branch aliases + numbers), AI fallback
   let parts = heuristicSplit(text);
@@ -476,13 +575,15 @@ If you cannot understand the message, return {"parts": [], "understood": false}`
     return json({ ok: false, error: "not_understood", message: "Could not parse the split. Example: 300 citywalk, 150 galaria" });
   }
 
-  return actionFinalize({ snap_id: snapId, allocation: { mode: "custom", parts } });
+  return actionFinalize({ snap_id: snapId, allocation: { mode: "custom", parts } }, actor);
 }
 
 // ── mark_custom ─────────────────────────────────────────────
-async function actionMarkCustom(body: Record<string, unknown>) {
+async function actionMarkCustom(body: Record<string, unknown>, actor: RequestActor) {
   const snapId = body.snap_id as string;
   if (!snapId) return json({ error: "snap_id required" }, 400);
+  const owned = await getSnapForActor(snapId, actor);
+  if (owned.response) return owned.response;
   await sbPatch("expense_snaps?id=eq." + snapId, { status: "awaiting_custom" });
   return json({ ok: true });
 }
@@ -494,15 +595,18 @@ Deno.serve(async (req: Request) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "bad_json" }, 400); }
+  const actor = await authenticateRequest(req);
+  if (!actor) return json({ error: "unauthorized" }, 401);
 
   try {
     switch (body.action) {
-      case "extract": return await actionExtract(body);
-      case "manual": return await actionManual(body);
-      case "set_amount": return await actionSetAmount(body);
-      case "finalize": return await actionFinalize(body);
-      case "custom_parse": return await actionCustomParse(body);
-      case "mark_custom": return await actionMarkCustom(body);
+      case "extract": return await actionExtract(body, actor);
+      case "manual": return await actionManual(body, actor);
+      case "set_amount": return await actionSetAmount(body, actor);
+      case "set_payment": return await actionSetPayment(body, actor);
+      case "finalize": return await actionFinalize(body, actor);
+      case "custom_parse": return await actionCustomParse(body, actor);
+      case "mark_custom": return await actionMarkCustom(body, actor);
       default: return json({ error: "unknown_action" }, 400);
     }
   } catch (e) {

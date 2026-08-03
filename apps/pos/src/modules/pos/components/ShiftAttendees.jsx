@@ -7,7 +7,7 @@ import { UserPlus, UserMinus, Clock, X } from 'lucide-react'
 import {
   getShiftAttendees, clockInAttendee, clockOutAttendee,
 } from '../lib/pos-supabase'
-import { supabase } from '../../../lib/supabase'
+import { getProfileDirectory } from '../../../lib/profiles'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'
 
@@ -30,12 +30,12 @@ export default function ShiftAttendees({ shiftId, branchId, onClose }) {
   const load = async () => {
     setLoading(true)
     try {
-      const [att, { data: stf }] = await Promise.all([
+      const [att, stf] = await Promise.all([
         getShiftAttendees(shiftId),
-        supabase.from('profiles').select('id, full_name, role, photo_url').eq('is_active', true).order('full_name'),
+        getProfileDirectory(),
       ])
       setAttendees(att)
-      setStaff(stf || [])
+      setStaff(stf)
     } catch (err) {
       toast.error(err.message || 'Failed to load attendees')
     } finally {

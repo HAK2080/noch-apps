@@ -15,6 +15,7 @@
 import { useState, useEffect } from 'react'
 import { Delete, Coffee, Loader2, ArrowLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { getProfileDirectory } from '../../../lib/profiles'
 import { setServedBy, setPinGrace, checkPinGrace } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
 import { isOnline } from '../lib/pos-offline'
@@ -98,20 +99,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
 
     const load = async () => {
       try {
-        let query = supabase
-          .from('profiles')
-          .select('id, full_name, role, photo_url, department')
-          .eq('is_active', true)
-          .not('pin_code', 'is', null)
-          .order('full_name')
-
-        if (branchId) {
-          query = query.or(`branch_id.eq.${branchId},branch_id.is.null`)
-        }
-
-        const { data, error } = await query
-        if (error) throw error
-        const list = data || []
+        const list = await getProfileDirectory({ activeOnly: true, pinOnly: true, branchId })
         setStaffList(list)
         saveCachedStaff(branchId, list)
       } catch (err) {

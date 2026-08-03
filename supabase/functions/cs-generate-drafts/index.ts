@@ -217,6 +217,8 @@ function buildPrompt(args: {
     audience_descriptors: voiceProfile.audience_descriptors,
     banned_phrases: voiceProfile.banned_phrases,
     preferred_phrases: voiceProfile.preferred_phrases,
+    proven_good_caption_samples: asArray<string>(voiceProfile.good_caption_samples).slice(0, 6),
+    avoid_caption_samples: asArray<string>(voiceProfile.bad_caption_samples).slice(0, 6),
     notes: voiceProfile.notes,
   };
 

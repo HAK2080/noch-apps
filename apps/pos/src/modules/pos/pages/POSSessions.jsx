@@ -1,318 +1,357 @@
-// POSSessions.jsx — Sessions (shifts) list for a branch.
-// Route: /pos/:branchId/sessions
-//
-// A "session" here = one row in pos_shifts: from staff opening the till
-// to closing it at end of trading. Because cafes open evenings that cross
-// midnight, sessions are the correct unit for "today's sales" (calendar
-// dates split a single trading shift in two).
-//
-// This page is read-only — you open/close shifts from POSHome and
-// POSEndOfDay respectively. Click any row for its detailed report
-// (the existing POSEndOfDay page handles closed-shift view too).
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Lock,
+  Package,
+  RefreshCw,
+} from 'lucide-react'
 
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, CheckCircle2, AlertTriangle, DollarSign, CreditCard, Bike, Package, Lock } from 'lucide-react'
-import { getPOSBranch, listShifts, getShiftRefundTotals, businessToday, businessDayWindow, localYmd } from '../lib/pos-supabase'
-import { getServedBy } from '../lib/pos-session'
-import { useAuth } from '../../../contexts/AuthContext'
-import { usePermissions } from '../../../contexts/PermissionsContext'
-import Layout from '../../../components/Layout'
 import BusinessRangePicker from '../../../components/shared/BusinessRangePicker'
+import Layout from '../../../components/Layout'
+import { useAuth } from '../../../contexts/AuthContext'
+import { useLanguage } from '../../../contexts/LanguageContext'
+import { usePermissions } from '../../../contexts/PermissionsContext'
+import {
+  businessToday,
+  getShiftControls,
+  localYmd,
+} from '../lib/pos-supabase'
+import {
+  combineShiftControls,
+  normalizeShiftControl,
+} from '../lib/sales-control'
+import { getServedBy } from '../lib/pos-session'
 import toast from 'react-hot-toast'
 
-function formatDuration(openedAt, closedAt) {
-  if (!openedAt) return '—'
-  const end = closedAt ? new Date(closedAt) : new Date()
-  const start = new Date(openedAt)
-  const mins = Math.max(0, Math.round((end - start) / 60000))
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h === 0) return `${m}m`
-  return `${h}h ${m}m`
+const COPY = {
+  en: {
+    title: 'Shift cash control',
+    accessTitle: 'Access restricted',
+    accessBody: 'Shift totals and drawer counts are visible to owners and managers only.',
+    back: 'Back to POS',
+    today: 'Today',
+    sevenDays: '7 days',
+    thirtyDays: '30 days',
+    businessRange: 'Business-day range',
+    refresh: 'Refresh',
+    loading: 'Loading shifts…',
+    loadFailed: 'Failed to load shift controls',
+    empty: 'No shifts in this business-day range.',
+    shifts: 'shifts',
+    netSales: 'Net sales in shifts',
+    orders: 'Orders',
+    netCash: 'Net cash tender',
+    netCard: 'Net card tender',
+    netPresto: 'Net Presto tender',
+    refunds: 'Refunds returned',
+    paymentReconciliation: 'Payment reconciliation',
+    reconciled: 'Reconciled',
+    gap: 'Gap',
+    historicalNotice: 'Historical refund tender was reconstructed from the original order and is visibly flagged.',
+    missingCount: 'closed shift(s) have no physical cash count',
+    untracked: 'order(s) have no tender event',
+    open: 'Open',
+    closed: 'Closed',
+    closeShift: 'Close shift',
+    duration: 'Duration',
+    expectedCash: 'Expected drawer',
+    countedCash: 'Counted drawer',
+    notCounted: 'Not counted',
+    cashVariance: 'Cash variance',
+    over: 'over',
+    short: 'short',
+    noVariance: 'balanced',
+    sourceWarning: 'Reconstructed history',
+    counterWarning: 'Stored counter differs',
+    currency: 'LYD',
+    hour: 'h',
+    minute: 'm',
+  },
+  ar: {
+    title: 'رقابة النقدية والورديات',
+    accessTitle: 'الدخول مقيّد',
+    accessBody: 'إجماليات الورديات وعدّ الصندوق متاحة للمالك والمديرين فقط.',
+    back: 'العودة إلى نقطة البيع',
+    today: 'اليوم',
+    sevenDays: '7 أيام',
+    thirtyDays: '30 يوماً',
+    businessRange: 'نطاق أيام العمل',
+    refresh: 'تحديث',
+    loading: 'جارٍ تحميل الورديات…',
+    loadFailed: 'تعذر تحميل رقابة الورديات',
+    empty: 'لا توجد ورديات في نطاق أيام العمل المحدد.',
+    shifts: 'ورديات',
+    netSales: 'صافي المبيعات في الورديات',
+    orders: 'الطلبات',
+    netCash: 'صافي النقدية',
+    netCard: 'صافي البطاقة',
+    netPresto: 'صافي بريستو',
+    refunds: 'المبالغ المرتجعة',
+    paymentReconciliation: 'مطابقة المدفوعات',
+    reconciled: 'متطابق',
+    gap: 'فرق',
+    historicalNotice: 'تم استنتاج وسيلة رد المبالغ التاريخية من الطلب الأصلي ويظهر ذلك بوضوح.',
+    missingCount: 'وردية مغلقة بلا عدّ نقدي فعلي',
+    untracked: 'طلب بلا حركة دفع',
+    open: 'مفتوحة',
+    closed: 'مغلقة',
+    closeShift: 'إقفال الوردية',
+    duration: 'المدة',
+    expectedCash: 'النقدية المتوقعة',
+    countedCash: 'النقدية المعدودة',
+    notCounted: 'لم يتم العد',
+    cashVariance: 'فرق النقدية',
+    over: 'زيادة',
+    short: 'عجز',
+    noVariance: 'متوازن',
+    sourceWarning: 'سجل تاريخي مستنتج',
+    counterWarning: 'عداد مخزن مختلف',
+    currency: 'د.ل',
+    hour: 'س',
+    minute: 'د',
+  },
 }
 
-function formatWhen(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  // Show date + time so cross-midnight sessions are unambiguous
-  return d.toLocaleString('en-GB', {
-    day: '2-digit', month: 'short',
-    hour: '2-digit', minute: '2-digit',
+function formatDuration(openedAt, closedAt, copy) {
+  if (!openedAt) return '—'
+  const end = closedAt ? new Date(closedAt) : new Date()
+  const mins = Math.max(0, Math.round((end - new Date(openedAt)) / 60000))
+  const hours = Math.floor(mins / 60)
+  const minutes = mins % 60
+  return hours
+    ? `${hours}${copy.hour} ${minutes}${copy.minute}`
+    : `${minutes}${copy.minute}`
+}
+
+function formatWhen(value, lang) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString(lang === 'ar' ? 'ar-LY' : 'en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
-const formatAmount = value => Number(value || 0).toLocaleString('en-US', {
+const money = value => Number(value || 0).toLocaleString('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 })
 
-const formatCount = value => Number(value || 0).toLocaleString('en-US')
+function CashVariance({ shift, copy }) {
+  if (shift.status !== 'closed') return null
+  if (!shift.cash_counted) {
+    return <span className="text-red-300">{copy.notCounted}</span>
+  }
+
+  const variance = Number(shift.cash_variance || 0)
+  const label = variance > 0 ? copy.over : variance < 0 ? copy.short : copy.noVariance
+  const tone = variance === 0 ? 'text-noch-green' : variance < 0 ? 'text-red-300' : 'text-yellow-300'
+  return (
+    <span className={tone}>
+      {copy.cashVariance}: {variance > 0 ? '+' : ''}{money(variance)} ({label})
+    </span>
+  )
+}
 
 export default function POSSessions() {
   const { branchId } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const { lang } = useLanguage()
   const { isOwner, hasAccess } = usePermissions()
-  // Session/shift totals: 'sales' permission for the logged-in profile, OR a
-  // PIN-verified owner/supervisor on a shared terminal (role_permissions keys
-  // off the Supabase login, not the PIN operator — keep the role fallback).
+  const copy = COPY[lang] || COPY.en
   const allowed = isOwner || hasAccess('sales')
     || ['owner', 'supervisor'].includes(getServedBy()?.role)
     || profile?.role === 'supervisor'
 
-  const [branch, setBranch] = useState(null)
   const [shifts, setShifts] = useState([])
-  const [refundsByShift, setRefundsByShift] = useState({})
   const [loading, setLoading] = useState(true)
-
-  // Date range (business days, 5 AM → 5 AM). Default: last 30 days.
-  const RANGE_PRESETS = [
-    { key: 'today', label: 'Today', days: 0 },
-    { key: '7d',    label: '7 days', days: 6 },
-    { key: '30d',   label: '30 days', days: 29 },
+  const presets = [
+    { key: 'today', label: copy.today, days: 0 },
+    { key: '7d', label: copy.sevenDays, days: 6 },
+    { key: '30d', label: copy.thirtyDays, days: 29 },
   ]
   const [range, setRange] = useState(() => {
     const to = businessToday()
-    const from = businessToday(); from.setDate(from.getDate() - 29)
+    const from = businessToday()
+    from.setDate(from.getDate() - 29)
     return { preset: '30d', fromDate: localYmd(from), toDate: localYmd(to) }
   })
-  const choosePreset = (p) => {
-    if (p === 'custom') { setRange(r => ({ ...r, preset: 'custom' })); return }
-    const meta = RANGE_PRESETS.find(x => x.key === p)
-    const to = businessToday()
-    const from = businessToday(); from.setDate(from.getDate() - (meta?.days ?? 0))
-    setRange({ preset: p, fromDate: localYmd(from), toDate: localYmd(to) })
-  }
 
   const load = async () => {
-    if (!allowed) { setLoading(false); return }   // guard: don't even fetch
-    setLoading(true)
+    if (!allowed) {
+      setLoading(false)
+      return
+    }
+    // Keep the last reconciled shift view visible while refreshing. This avoids
+    // replacing valid evidence with an indefinite loading state on a slow RPC.
+    setLoading(shifts.length === 0)
     try {
-      const { fromIso, toIso } = businessDayWindow(range.fromDate, range.toDate)
-      const [b, list] = await Promise.all([
-        getPOSBranch(branchId),
-        listShifts(branchId, { limit: 500, fromIso, toIso }),
-      ])
-      const refunds = await getShiftRefundTotals(list.map(s => s.id))
-      setBranch(b)
-      setShifts(list)
-      setRefundsByShift(refunds)
-    } catch (err) {
-      toast.error(err.message || 'Failed to load sessions')
+      const controlRows = await getShiftControls(branchId, range.fromDate, range.toDate)
+      setShifts((controlRows || []).map(normalizeShiftControl))
+    } catch (error) {
+      toast.error(error.message || copy.loadFailed)
     } finally {
       setLoading(false)
     }
   }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [branchId, allowed, range.fromDate, range.toDate])
 
-  // Hard block: staff / limited_staff land here → "Access denied" card.
   if (!allowed) {
     return (
       <Layout>
         <div className="max-w-md mx-auto py-16 text-center">
           <Lock size={36} className="text-noch-muted mx-auto mb-3" />
-          <h1 className="text-white font-bold text-lg mb-2">Access restricted</h1>
-          <p className="text-noch-muted text-sm mb-5">
-            Sessions and shift totals are visible to owners and managers only.
-          </p>
+          <h1 className="text-white font-bold text-lg mb-2">{copy.accessTitle}</h1>
+          <p className="text-noch-muted text-sm mb-5">{copy.accessBody}</p>
           <button onClick={() => navigate(`/pos/${branchId}`)} className="btn-secondary text-sm">
-            Back to POS
+            {copy.back}
           </button>
         </div>
       </Layout>
     )
   }
 
-  const refundFor = shift => Number(refundsByShift[shift.id] || 0)
-
-  // Aggregate top-level metrics across all loaded sessions
-  const totals = shifts.reduce((a, s) => {
-    const refund = refundFor(s)
-    a.revenue += Number(s.total_sales) || 0
-    a.refunds  += refund
-    // Refunds are returned from the cash drawer by the refund workflow.
-    a.cash    += (Number(s.total_cash_sales) || 0) - refund
-    a.card    += Number(s.total_card_sales) || 0
-    a.presto  += Number(s.total_presto_sales) || 0
-    a.orders  += Number(s.total_orders) || 0
-    return a
-  }, { revenue: 0, refunds: 0, cash: 0, card: 0, presto: 0, orders: 0 })
-  const paymentTotal = totals.cash + totals.card + totals.presto
-  const reconciliationGap = totals.revenue - paymentTotal
+  const totals = combineShiftControls(shifts)
+  const paymentReconciled = Math.abs(totals.paymentVariance) < 0.005
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
+      <div className="max-w-5xl mx-auto" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => navigate(`/pos/${branchId}`)} className="p-2 text-noch-muted hover:text-white">
-            <ArrowLeft size={18} />
+            <ArrowLeft size={18} className="rtl:rotate-180" />
           </button>
           <div className="flex-1">
-            <h1 className="text-white font-bold text-xl">Sessions</h1>
-            <p className="text-noch-muted text-sm">{branch?.name} · {range.fromDate} → {range.toDate} · {shifts.length} shifts</p>
+            <h1 className="text-white font-bold text-xl">{copy.title}</h1>
+            <p className="text-noch-muted text-sm">
+              {copy.businessRange}: {range.fromDate} → {range.toDate}
+            </p>
           </div>
-          <button onClick={load} className="btn-secondary text-sm px-3 py-1">Refresh</button>
-        </div>
-
-        {/* Date range (business days: 5 AM → 5 AM, so late-night sales stay with the evening) */}
-        <div className="mb-4">
-          <BusinessRangePicker presets={RANGE_PRESETS} value={{ preset: range.preset, from: range.fromDate, to: range.toDate }} onChange={next => setRange({ preset: next.preset, fromDate: next.from, toDate: next.to })} />
-        </div>
-        {/* eslint-disable-next-line no-constant-binary-expression */}
-        {false && <div className="flex flex-wrap items-center gap-2 mb-4">
-          {RANGE_PRESETS.map(p => (
-            <button
-              key={p.key}
-              onClick={() => choosePreset(p.key)}
-              className={`text-sm px-3 py-1.5 rounded-lg border ${
-                range.preset === p.key
-                  ? 'bg-noch-green/15 border-noch-green/50 text-noch-green'
-                  : 'border-noch-border text-noch-muted hover:text-white'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-          <button
-            onClick={() => choosePreset('custom')}
-            className={`text-sm px-3 py-1.5 rounded-lg border ${
-              range.preset === 'custom'
-                ? 'bg-noch-green/15 border-noch-green/50 text-noch-green'
-                : 'border-noch-border text-noch-muted hover:text-white'
-            }`}
-          >
-            Custom
+          <button onClick={load} className="btn-secondary text-sm px-3 py-1 flex items-center gap-1">
+            <RefreshCw size={13} /> {copy.refresh}
           </button>
-          {range.preset === 'custom' && (
-            <>
-              <input
-                type="date" value={range.fromDate}
-                onChange={e => setRange(r => ({ ...r, fromDate: e.target.value }))}
-                className="input text-sm py-1.5"
-              />
-              <span className="text-noch-muted text-sm">→</span>
-              <input
-                type="date" value={range.toDate}
-                onChange={e => setRange(r => ({ ...r, toDate: e.target.value }))}
-                className="input text-sm py-1.5"
-              />
-            </>
-          )}
-        </div>}
+        </div>
 
-        {/* Top-level totals across the visible window */}
+        <div className="mb-4">
+          <BusinessRangePicker
+            presets={presets}
+            value={{ preset: range.preset, from: range.fromDate, to: range.toDate }}
+            onChange={next => setRange({
+              preset: next.preset,
+              fromDate: next.from,
+              toDate: next.to,
+            })}
+          />
+        </div>
+
         {!loading && shifts.length > 0 && (
-          <div className="card p-4 mb-4">
-            <p className="text-noch-muted text-xs mb-2">Across {shifts.length} sessions ({range.fromDate} → {range.toDate})</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-              <div>
-                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Net revenue</p>
-                <p className="text-noch-green font-bold text-lg leading-tight">{formatAmount(totals.revenue)}</p>
-                <p className="text-noch-muted text-[10px]">LYD</p>
+          <>
+            <div className="card p-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {[
+                  [copy.netSales, totals.netSales, 'text-noch-green'],
+                  [copy.orders, totals.orderCount, 'text-white'],
+                  [copy.netCash, totals.cash, 'text-yellow-300'],
+                  [copy.netCard, totals.card, 'text-blue-300'],
+                  [copy.netPresto, totals.presto, 'text-purple-300'],
+                  [copy.refunds, totals.refunds, 'text-red-300'],
+                ].map(([label, value, tone]) => (
+                  <div key={label}>
+                    <p className="text-noch-muted text-[10px] uppercase tracking-wider">{label}</p>
+                    <p className={`${tone} font-bold text-lg leading-tight`}>{money(value)}</p>
+                    <p className="text-noch-muted text-[10px]">{label === copy.orders ? '' : copy.currency}</p>
+                  </div>
+                ))}
               </div>
-              <div>
-                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Orders</p>
-                <p className="text-white font-bold text-lg leading-tight">{formatCount(totals.orders)}</p>
-                <p className="text-noch-muted text-[10px]">tickets</p>
-              </div>
-              <div>
-                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Cash</p>
-                <p className="text-white font-bold text-lg leading-tight">{formatAmount(totals.cash)}</p>
-                <p className="text-noch-muted text-[10px]">LYD</p>
-              </div>
-              <div>
-                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Card</p>
-                <p className="text-white font-bold text-lg leading-tight">{formatAmount(totals.card)}</p>
-                <p className="text-noch-muted text-[10px]">LYD</p>
-              </div>
-              <div>
-                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Presto</p>
-                <p className="text-white font-bold text-lg leading-tight">{formatAmount(totals.presto)}</p>
-                <p className="text-noch-muted text-[10px]">LYD</p>
-              </div>
-              <div>
-                <p className="text-noch-muted text-[10px] uppercase tracking-wider">Refunds</p>
-                <p className="text-red-400 font-bold text-lg leading-tight">-{formatAmount(totals.refunds)}</p>
-                <p className="text-noch-muted text-[10px]">LYD</p>
+              <div className="mt-4 pt-3 border-t border-noch-border/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-noch-muted">{copy.paymentReconciliation}</span>
+                {paymentReconciled ? (
+                  <span className="text-noch-green flex items-center gap-1">
+                    <CheckCircle2 size={13} /> {copy.reconciled}
+                  </span>
+                ) : (
+                  <span className="text-yellow-300 flex items-center gap-1">
+                    <AlertTriangle size={13} /> {copy.gap} {money(totals.paymentVariance)} {copy.currency}
+                  </span>
+                )}
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-noch-border/40 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="text-noch-muted">Payment reconciliation</span>
-              {Math.abs(reconciliationGap) < 0.01 ? (
-                <span className="text-noch-green flex items-center gap-1"><CheckCircle2 size={13} /> Reconciled · {formatAmount(paymentTotal)} LYD</span>
-              ) : (
-                <span className="text-yellow-400 flex items-center gap-1"><AlertTriangle size={13} /> Gap {reconciliationGap > 0 ? '+' : ''}{formatAmount(reconciliationGap)} LYD</span>
-              )}
-            </div>
-            <p className="text-noch-muted text-[10px] mt-2">Refunds are deducted from cash because refunds leave the cash drawer.</p>
-          </div>
+
+            {(totals.reconstructedEvents > 0 || totals.untrackedOrders > 0 || totals.missingCounts > 0) && (
+              <div className="rounded-xl border border-yellow-400/30 bg-yellow-400/10 p-3 mb-4 text-xs text-yellow-100">
+                {totals.reconstructedEvents > 0 && <p>{copy.historicalNotice}</p>}
+                {totals.untrackedOrders > 0 && <p>{totals.untrackedOrders} {copy.untracked}</p>}
+                {totals.missingCounts > 0 && <p>{totals.missingCounts} {copy.missingCount}</p>}
+              </div>
+            )}
+          </>
         )}
 
-        {/* Sessions list */}
         {loading ? (
-          <p className="text-noch-muted text-center py-12">Loading…</p>
+          <p className="text-noch-muted text-center py-12">{copy.loading}</p>
         ) : shifts.length === 0 ? (
-          <p className="text-noch-muted text-center py-12 text-sm">No sessions yet for this branch.</p>
+          <p className="text-noch-muted text-center py-12 text-sm">{copy.empty}</p>
         ) : (
-          <div className="card divide-y divide-noch-border/40">
-            {shifts.map(s => {
-              const isOpen = s.status === 'open'
-              const refund = refundFor(s)
-              const netCash = (Number(s.total_cash_sales) || 0) - refund
+          <div className="flex flex-col gap-3">
+            {shifts.map(shift => {
+              const isOpen = shift.status === 'open'
               return (
                 <div
-                  key={s.id}
-                  className="py-3 px-3 flex flex-wrap items-center gap-3 cursor-pointer hover:bg-white/[0.02]"
-                  onClick={() => navigate(`/pos/${branchId}/end-of-day?shift=${s.id}`)}
+                  key={shift.shift_id}
+                  className={`card p-4 ${isOpen ? 'border-noch-green/40' : ''}`}
                 >
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="flex items-center gap-2">
-                      <span className={isOpen ? 'text-noch-green font-semibold' : 'text-white font-semibold'}>
-                        {formatWhen(s.opened_at)}
-                      </span>
-                      <span className="text-noch-muted text-xs">→</span>
-                      {isOpen ? (
-                        <span className="bg-noch-green/15 border border-noch-green/30 text-noch-green text-[10px] uppercase px-1.5 py-0.5 rounded inline-flex items-center gap-1">
-                          <Clock size={10} /> OPEN
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-white font-semibold">{formatWhen(shift.opened_at, lang)}</span>
+                        <span className="text-noch-muted">→</span>
+                        <span className={isOpen ? 'text-noch-green' : 'text-white'}>
+                          {isOpen ? copy.open : formatWhen(shift.closed_at, lang)}
                         </span>
-                      ) : (
-                        <span className="text-white">{formatWhen(s.closed_at)}</span>
-                      )}
+                      </div>
+                      <div className="text-noch-muted text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        <span><Clock size={10} className="inline me-1" />{copy.duration}: {formatDuration(shift.opened_at, shift.closed_at, copy)}</span>
+                        <span><Package size={10} className="inline me-1" />{shift.order_count} {copy.orders}</span>
+                        {shift.refunds > 0 && <span className="text-red-300">{copy.refunds}: {money(shift.refunds)}</span>}
+                        <CashVariance shift={shift} copy={copy} />
+                        {shift.dataStatus === 'warning' && <span className="text-yellow-300">{copy.sourceWarning}</span>}
+                        {shift.counterStatus === 'warning' && <span className="text-yellow-300">{copy.counterWarning}</span>}
+                      </div>
                     </div>
-                    <div className="text-noch-muted text-xs mt-0.5 flex items-center gap-3 flex-wrap">
-                      <span><Clock size={10} className="inline mr-1" />{formatDuration(s.opened_at, s.closed_at)}</span>
-                      <span><Package size={10} className="inline mr-1" />{s.total_orders || 0} orders</span>
-                      {Number(s.cash_difference) !== 0 && !isOpen && (
-                        <span className={Number(s.cash_difference) < 0 ? 'text-red-400' : 'text-yellow-400'}>
-                          Cash {Number(s.cash_difference) > 0 ? '+' : ''}{formatAmount(s.cash_difference)}
-                        </span>
-                      )}
-                      {refund > 0 && <span className="text-red-400">Refunds -{formatAmount(refund)}</span>}
-                    </div>
-                  </div>
 
-                  <div className="flex gap-4 text-xs">
-                    <div className="text-right">
-                      <p className="text-noch-muted text-[10px] uppercase">Cash</p>
-                      <p className="text-white font-semibold flex items-center gap-1"><DollarSign size={10} />{formatAmount(netCash)}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                      {[
+                        [copy.netCash, shift.net_cash_tender],
+                        [copy.netCard, shift.net_card_tender],
+                        [copy.netPresto, shift.net_presto_tender],
+                        [copy.expectedCash, shift.expected_drawer_cash],
+                        [copy.countedCash, shift.counted_drawer_cash],
+                      ].map(([label, value]) => (
+                        <div key={label} className="text-end">
+                          <p className="text-noch-muted text-[10px] uppercase">{label}</p>
+                          <p className="text-white font-semibold">
+                            {value == null ? copy.notCounted : money(value)}
+                          </p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-right">
-                      <p className="text-noch-muted text-[10px] uppercase">Card</p>
-                      <p className="text-white font-semibold flex items-center gap-1"><CreditCard size={10} />{formatAmount(s.total_card_sales)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-noch-muted text-[10px] uppercase">Presto</p>
-                      <p className="text-white font-semibold flex items-center gap-1"><Bike size={10} />{formatAmount(s.total_presto_sales)}</p>
-                    </div>
-                  </div>
 
-                  <div className="text-right min-w-[80px]">
-                    <p className="text-noch-muted text-[10px] uppercase">Total</p>
-                    <p className="text-noch-green font-bold">{formatAmount(s.total_sales)}</p>
-                    <p className="text-noch-muted text-[10px]">LYD</p>
+                    {isOpen && (
+                      <button
+                        onClick={() => navigate(`/pos/${branchId}/end-of-day`)}
+                        className="btn-primary text-xs px-3 py-2 whitespace-nowrap"
+                      >
+                        {copy.closeShift}
+                      </button>
+                    )}
                   </div>
                 </div>
               )

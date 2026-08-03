@@ -7,19 +7,22 @@ import { listConcepts } from '../services/concepts'
 import { listDrafts } from '../services/drafts'
 import { listVoiceProfiles } from '../services/voiceProfiles'
 import { listBankItems } from '../services/contentBank'
+import { useLanguage } from '../../../contexts/LanguageContext'
 
 const TILES = [
-  { to: '/content-studio/businesses',  icon: Building2,  label: 'Businesses',    desc: 'Brands & voice profiles', key: null },
-  { to: '/content-studio/inspiration', icon: Lightbulb,  label: 'Inspiration',   desc: 'URLs, screenshots, notes', key: 'inspirations' },
-  { to: '/content-studio/concepts',    icon: Sparkles,   label: 'Concepts',      desc: 'Extracted ideas', key: 'concepts' },
-  { to: '/content-studio/drafts',      icon: FileText,   label: 'Drafts',        desc: 'AI-generated variants', key: 'drafts' },
-  { to: '/content-studio/voice-lab',   icon: Mic,        label: 'Voice Lab',     desc: 'Profiles & learning signals', key: 'voices' },
-  { to: '/content-studio/bank',        icon: Library,    label: 'Content Bank',  desc: 'Approved & reusable', key: 'bank' },
-  { to: '/content-studio/performance', icon: BarChart3,  label: 'Performance',   desc: 'Post effectiveness & learning', key: 'performance' },
+  { to: '/content-studio/businesses', icon: Building2, label: 'Businesses', labelAr: 'الأنشطة', desc: 'Brands & voice profiles', descAr: 'العلامات وملفات الصوت', key: null },
+  { to: '/content-studio/inspiration', icon: Lightbulb, label: 'Inspiration', labelAr: 'الإلهام', desc: 'URLs, screenshots, notes', descAr: 'روابط وصور وملاحظات', key: 'inspirations' },
+  { to: '/content-studio/concepts', icon: Sparkles, label: 'Concepts', labelAr: 'الأفكار', desc: 'Extracted ideas', descAr: 'أفكار مستخرجة', key: 'concepts' },
+  { to: '/content-studio/drafts', icon: FileText, label: 'Drafts', labelAr: 'المسودات', desc: 'AI-generated variants', descAr: 'بدائل مولدة بالذكاء الاصطناعي', key: 'drafts' },
+  { to: '/content-studio/voice-lab', icon: Mic, label: 'Voice Lab', labelAr: 'مختبر الصوت', desc: 'Profiles & learning signals', descAr: 'الملفات وإشارات التعلم', key: 'voices' },
+  { to: '/content-studio/bank', icon: Library, label: 'Content Bank', labelAr: 'بنك المحتوى', desc: 'Approved & reusable', descAr: 'معتمد وقابل لإعادة الاستخدام', key: 'bank' },
+  { to: '/content-studio/performance', icon: BarChart3, label: 'Publishing & measurement', labelAr: 'النشر والقياس', desc: 'Schedule, evidence, outcomes', descAr: 'الجدولة والدليل والنتائج', key: 'performance' },
 ]
 
 export default function Overview() {
   const { businesses, businessId, loading } = useOutletContext()
+  const { lang } = useLanguage()
+  const ar = lang === 'ar'
   const [countState, setCountState] = useState({ businessId: null, values: {} })
 
   useEffect(() => {
@@ -50,9 +53,9 @@ export default function Overview() {
     return (
       <EmptyState
         icon={Building2}
-        title="Welcome to Content Studio"
-        description="Start by adding your first business. Each business gets its own brand voice profiles and content workflow."
-        ctaLabel="Add a business"
+        title={ar ? 'مرحباً في استوديو المحتوى' : 'Welcome to Content Studio'}
+        description={ar ? 'ابدأ بإضافة نشاطك الأول.' : 'Start by adding your first business. Each business gets its own brand voice profiles and content workflow.'}
+        ctaLabel={ar ? 'إضافة نشاط' : 'Add a business'}
         ctaTo="/content-studio/businesses/new"
       />
     )
@@ -76,8 +79,8 @@ export default function Overview() {
                 <span className="text-noch-muted text-xs font-mono">{count}</span>
               )}
             </div>
-            <h3 className="text-white font-semibold">{t.label}</h3>
-            <p className="text-noch-muted text-sm">{t.desc}</p>
+            <h3 className="text-white font-semibold">{ar ? t.labelAr : t.label}</h3>
+            <p className="text-noch-muted text-sm">{ar ? t.descAr : t.desc}</p>
           </Link>
         )
       })}

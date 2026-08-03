@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
   })
 
   const { data: callerProfile } = await admin
-    .from('profiles').select('role').eq('id', caller.id).single()
+    .from('profiles').select('role').or(`id.eq.${caller.id},auth_user_id.eq.${caller.id}`).limit(1).single()
   if (callerProfile?.role !== 'owner') return json({ error: 'forbidden — owner only' }, 403)
 
   let body: { request_id?: string; profile?: Record<string, unknown> } = {}
@@ -85,9 +85,12 @@ Deno.serve(async (req: Request) => {
   const profileRow = {
     id: authUserId,
     role: 'staff',
+    access_enabled: true,
     email: reqRow.email,
     auth_user_id: authUserId,
     ...profile,
+    is_employee: true,
+    payroll_enabled: true,
   }
   const { error: upsertErr } = await admin
     .from('profiles')
@@ -101,5 +104,10 @@ Deno.serve(async (req: Request) => {
     .eq('id', request_id)
   if (updateErr) return json({ error: `request update failed: ${updateErr.message}`, profile_id: authUserId }, 500)
 
-  return json({ ok: true, profile_id: authUserId, email: reqRow.email })
+  return json({
+    ok: true,
+    profile_id: authUserId,
+    email: reqRow.email,
+    profile: profileRow,
+  })
 })

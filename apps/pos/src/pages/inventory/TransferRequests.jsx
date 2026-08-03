@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, PackagePlus, X, Loader2 } from 'lucide-react'
 import Layout from '../../components/Layout'
 import { useAuth } from '../../contexts/AuthContext'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { formatStockQuantity } from '../../modules/pos/lib/inventory-units'
 import {
   listLocations, listProducts, listWarehouseStock, listTransfers,
@@ -18,6 +19,9 @@ import toast from 'react-hot-toast'
 export default function TransferRequests() {
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const { lang } = useLanguage()
+  const arabic = lang === 'ar'
+  const copy = (english, arabicText) => arabic ? arabicText : english
   const canCancel = profile?.role === 'owner' || profile?.role === 'supervisor'
 
   const [locations, setLocations] = useState([])
@@ -54,13 +58,13 @@ export default function TransferRequests() {
         setProducts(prods)
         setWarehouseQty(Object.fromEntries(wh.rows.map(r => [r.product_id, parseFloat(r.qty) || 0])))
       } catch (err) {
-        toast.error(err.message || 'Failed to load')
+        toast.error(err.message || (arabic ? 'تعذر التحميل' : 'Failed to load'))
       } finally {
         setLoading(false)
       }
     }
     init()
-  }, [])
+  }, [arabic])
 
   useEffect(() => {
     if (!locationId) return
@@ -70,19 +74,19 @@ export default function TransferRequests() {
   async function handleSubmit(e) {
     e.preventDefault()
     const n = parseFloat(qty)
-    if (!productId) return toast.error('Select a product')
-    if (!locationId) return toast.error('Select a branch')
-    if (!n || n <= 0) return toast.error('Enter a quantity above 0')
+    if (!productId) return toast.error(copy('Select a product', 'اختر منتجًا'))
+    if (!locationId) return toast.error(copy('Select a branch', 'اختر فرعًا'))
+    if (!n || n <= 0) return toast.error(copy('Enter a quantity above 0', 'أدخل كمية أكبر من صفر'))
     setSubmitting(true)
     try {
       await requestTransfer(productId, locationId, n, note.trim())
-      toast.success('Transfer requested')
+      toast.success(copy('Transfer requested', 'تم طلب التحويل'))
       setProductId('')
       setQty('')
       setNote('')
       await loadRequests(locationId)
     } catch (err) {
-      toast.error(err.message || 'Request failed')
+      toast.error(err.message || copy('Request failed', 'تعذر إرسال الطلب'))
     } finally {
       setSubmitting(false)
     }
@@ -92,10 +96,10 @@ export default function TransferRequests() {
     setCancelling(t.id)
     try {
       await cancelTransfer(t.id)
-      toast.success('Request cancelled')
+      toast.success(copy('Request cancelled', 'تم إلغاء الطلب'))
       await loadRequests(locationId)
     } catch (err) {
-      toast.error(err.message || 'Cancel failed')
+      toast.error(err.message || copy('Cancel failed', 'تعذر الإلغاء'))
     } finally {
       setCancelling(null)
     }
@@ -115,36 +119,36 @@ export default function TransferRequests() {
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl flex items-center gap-2">
               <PackagePlus size={18} className="text-noch-green" />
-              Transfer Requests
+              {copy('Transfer Requests', 'طلبات التحويل')}
             </h1>
-            <p className="text-noch-muted text-sm">Request stock from the central warehouse</p>
+            <p className="text-noch-muted text-sm">{copy('Request stock from the central warehouse', 'اطلب مخزونًا من المستودع المركزي')}</p>
           </div>
         </div>
 
         {/* Request form */}
         <form onSubmit={handleSubmit} className="bg-noch-card border border-noch-border rounded-xl p-4 mb-6 space-y-3">
-          <h2 className="text-white font-semibold text-sm">Request stock</h2>
+          <h2 className="text-white font-semibold text-sm">{copy('Request stock', 'طلب مخزون')}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label block mb-1">Destination branch</label>
+              <label className="label block mb-1">{copy('Destination branch', 'الفرع المستلم')}</label>
               <select value={locationId} onChange={e => setLocationId(e.target.value)} className="input w-full">
                 {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="label block mb-1">Product</label>
+              <label className="label block mb-1">{copy('Product', 'المنتج')}</label>
               <select value={productId} onChange={e => setProductId(e.target.value)} className="input w-full">
-                <option value="">Select product...</option>
+                <option value="">{copy('Select product…', 'اختر منتجًا…')}</option>
                 {products.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — warehouse: {formatStockQuantity(warehouseQty[p.id] ?? 0, p.stock_display_unit)}
+                    {p.name} — {copy('warehouse', 'المستودع')}: {formatStockQuantity(warehouseQty[p.id] ?? 0, p.stock_display_unit)}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="label block mb-1">
-                Quantity{selectedProduct ? ` (${selectedProduct.stock_base_unit || 'pc'})` : ''}
+                {copy('Quantity', 'الكمية')}{selectedProduct ? ` (${selectedProduct.stock_base_unit || 'pc'})` : ''}
               </label>
               <input
                 type="number"
@@ -157,12 +161,12 @@ export default function TransferRequests() {
               />
               {selectedWarehouseQty !== null && (
                 <p className={`text-xs mt-1 ${selectedWarehouseQty <= 0 ? 'text-red-400' : 'text-noch-muted'}`}>
-                  {formatStockQuantity(selectedWarehouseQty, selectedProduct?.stock_display_unit)} available in warehouse
+                  {formatStockQuantity(selectedWarehouseQty, selectedProduct?.stock_display_unit)} {copy('available in warehouse', 'متاح في المستودع')}
                 </p>
               )}
             </div>
             <div>
-              <label className="label block mb-1">Note (optional)</label>
+              <label className="label block mb-1">{copy('Note (optional)', 'ملاحظة (اختياري)')}</label>
               <input
                 type="text"
                 value={note}
@@ -174,7 +178,7 @@ export default function TransferRequests() {
           </div>
           <button type="submit" disabled={submitting || loading} className="btn-primary flex items-center gap-2">
             {submitting && <Loader2 size={14} className="animate-spin" />}
-            Request transfer
+            {copy('Request transfer', 'طلب تحويل')}
           </button>
         </form>
 
@@ -182,13 +186,13 @@ export default function TransferRequests() {
         <div className="bg-noch-card border border-noch-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-noch-border">
             <h2 className="text-white font-semibold text-sm">
-              Open requests{locationId ? ` — ${locationName(locationId)}` : ''}
+              {copy('Open requests', 'الطلبات المفتوحة')}{locationId ? ` — ${locationName(locationId)}` : ''}
             </h2>
           </div>
           {loading ? (
-            <p className="text-noch-muted text-center py-10 text-sm">Loading...</p>
+            <p className="text-noch-muted text-center py-10 text-sm">{copy('Loading…', 'جارٍ التحميل…')}</p>
           ) : openRequests.length === 0 ? (
-            <p className="text-noch-muted text-center py-10 text-sm">No open requests for this branch</p>
+            <p className="text-noch-muted text-center py-10 text-sm">{copy('No open requests for this branch', 'لا توجد طلبات مفتوحة لهذا الفرع')}</p>
           ) : (
             <div className="divide-y divide-noch-border/50">
               {openRequests.map(t => (
@@ -196,7 +200,7 @@ export default function TransferRequests() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{t.product_name}</p>
                     <p className="text-noch-muted text-xs">
-                      {formatStockQuantity(t.qty_requested, t.stock_display_unit)} requested
+                      {formatStockQuantity(t.qty_requested, t.stock_display_unit)} {copy('requested', 'مطلوب')}
                       {t.requested_at && ` · ${new Date(t.requested_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
                       {t.note && ` · ${t.note}`}
                     </p>
@@ -208,7 +212,7 @@ export default function TransferRequests() {
                       className="btn-secondary text-xs px-2 py-1 flex items-center gap-1 shrink-0"
                     >
                       {cancelling === t.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                      Cancel
+                      {copy('Cancel', 'إلغاء')}
                     </button>
                   )}
                 </div>

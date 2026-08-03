@@ -2,6 +2,7 @@
 // Reads from migrations 20260508010000_finance_mvp.sql.
 
 import { supabase } from '../../../lib/supabase'
+import { reconcileExecutiveSummary } from './finance-reporting'
 import { STATUS, statusForRatio } from './thresholds'
 
 // ── Settings (singleton row id='default') ──────────────────────────────
@@ -91,10 +92,14 @@ export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
     ...summarizePnl(await getPnL({ branchId: branch.id, from, to, netOfRefunds }), settings, branch),
   })))
 
+  const total = summarizePnl(totalPnl, settings)
+
   return {
+    generatedAt: new Date().toISOString(),
     settings,
-    total: summarizePnl(totalPnl, settings),
+    total,
     branches: rows,
+    reconciliation: reconcileExecutiveSummary(total, rows),
   }
 }
 
@@ -150,6 +155,9 @@ function summarizePnl(pnl = {}, settings = {}, branch = {}) {
     operationalStatus,
     status,
     reasons,
+    dataQuality: pnl.data_quality || {},
+    businessTimeZone: pnl.business_time_zone || null,
+    businessDayCutoffHour: pnl.business_day_cutoff_hour ?? null,
   }
 }
 
@@ -579,6 +587,23 @@ export async function updatePayrollRunItem(id, updates) {
   return data
 }
 
+export async function updatePayrollRunItemHours(id, {
+  hoursPerDay,
+  workedDays,
+  scheduledHours,
+  overtimeHours,
+}) {
+  const { data, error } = await supabase.rpc('payroll_update_item_hours_v2', {
+    p_item_id: id,
+    p_hours_per_day: hoursPerDay,
+    p_worked_days: workedDays,
+    p_scheduled_hours: scheduledHours,
+    p_overtime_hours: overtimeHours,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function generatePayrollRun(periodMonth) {
   const { data, error } = await supabase.rpc('payroll_generate_run', { p_month: periodMonth })
   if (error) throw error
@@ -587,6 +612,14 @@ export async function generatePayrollRun(periodMonth) {
 
 export async function completePayrollRun(runId) {
   const { data, error } = await supabase.rpc('payroll_complete_run', { p_run_id: runId })
+  if (error) throw error
+  return data
+}
+
+export async function reopenPayrollRun(runId) {
+  const { data, error } = await supabase.rpc('payroll_reopen_run_v2', {
+    p_run_id: runId,
+  })
   if (error) throw error
   return data
 }

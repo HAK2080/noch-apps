@@ -123,6 +123,11 @@ Deno.serve(async (req: Request) => {
     id: profileId,
     full_name: fullName,
     role: requestedRole,
+    // This endpoint creates employees, not generic login profiles. Workforce
+    // directories and payroll intentionally exclude profiles unless this
+    // boundary is explicit.
+    is_employee: true,
+    payroll_enabled: true,
   }
   if (authUserId) profileRow.auth_user_id = authUserId
   if (email) profileRow.email = email
@@ -138,5 +143,11 @@ Deno.serve(async (req: Request) => {
     return json({ error: `Profile creation failed: ${profileError.message}` }, 500)
   }
 
-  return json({ ok: true, profile_id: profileId, email: email || null, mode })
+  return json({
+    ok: true,
+    profile_id: profileId,
+    email: email || null,
+    mode,
+    profile: profileRow,
+  })
 })

@@ -2,7 +2,7 @@
 // Edits the campaign + lists linked briefs (and surface drafts/bank
 // via brief).
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Megaphone, Save, Loader2, Trash2, FileText, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -19,7 +19,7 @@ export default function CampaignDetail() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     setLoading(true)
     try {
       const [c, b] = await Promise.all([getCampaign(id), listBriefs({ campaignId: id }).catch(() => [])])
@@ -29,7 +29,7 @@ export default function CampaignDetail() {
       if (briefIds.length > 0) {
         const { data } = await supabase
           .from('cs_draft_variants')
-          .select('id, body, status, brief_id, created_at')
+          .select('id, body_text, status, brief_id, created_at')
           .in('brief_id', briefIds)
           .order('created_at', { ascending: false })
         setDrafts(data || [])
@@ -38,8 +38,8 @@ export default function CampaignDetail() {
       }
     } catch (e) { toast.error(e.message || 'Load failed') }
     finally { setLoading(false) }
-  }
-  useEffect(() => { reload() }, [id])
+  }, [id])
+  useEffect(() => { reload() }, [reload])
 
   const set = (k, v) => setCampaign(c => ({ ...c, [k]: v }))
 
@@ -98,7 +98,17 @@ export default function CampaignDetail() {
             <Field label="Audience segment"><input className={cls} value={campaign.audience_segment || ''} onChange={e => set('audience_segment', e.target.value)} /></Field>
             <Field label="Product focus"><input className={cls} value={campaign.product_focus || ''} onChange={e => set('product_focus', e.target.value)} /></Field>
             <Field label="Source signal"><input className={cls} value={campaign.source_signal || ''} onChange={e => set('source_signal', e.target.value)} /></Field>
-            <Field label="Success metric"><input className={cls} value={campaign.success_metric || ''} onChange={e => set('success_metric', e.target.value)} placeholder="e.g. +15% Spanish Latte sales" /></Field>
+            <Field label="Objective">
+              <select className={cls} value={campaign.objective_type || ''} onChange={e => set('objective_type', e.target.value || null)}>
+                <option value="">Choose objective</option>
+                {['awareness', 'engagement', 'traffic', 'sales', 'retention', 'ugc'].map(value => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </Field>
+            <Field label="Primary metric"><input className={cls} value={campaign.primary_metric || ''} onChange={e => set('primary_metric', e.target.value)} placeholder="e.g. 7-day saves" /></Field>
+            <Field label="Target value"><input type="number" className={cls} value={campaign.target_value ?? ''} onChange={e => set('target_value', e.target.value === '' ? null : Number(e.target.value))} /></Field>
+            <Field label="Evidence window (days)"><input type="number" min="1" max="90" className={cls} value={campaign.attribution_window_days ?? ''} onChange={e => set('attribution_window_days', e.target.value === '' ? null : Number(e.target.value))} /></Field>
+            <Field label="Experiment reference"><input className={cls} value={campaign.experiment_reference || ''} onChange={e => set('experiment_reference', e.target.value)} placeholder="Required before claiming lift" /></Field>
+            <Field label="Legacy success note"><input className={cls} value={campaign.success_metric || ''} onChange={e => set('success_metric', e.target.value)} /></Field>
             <Field label="Start date"><input type="date" className={cls} value={campaign.start_date || ''} onChange={e => set('start_date', e.target.value || null)} /></Field>
             <Field label="End date"><input type="date" className={cls} value={campaign.end_date || ''} onChange={e => set('end_date', e.target.value || null)} /></Field>
             <Field label="Platforms (comma-separated)"><input className={cls} value={platforms} onChange={e => set('platforms', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="instagram, tiktok, facebook" /></Field>
@@ -160,7 +170,7 @@ export default function CampaignDetail() {
               <ul className="space-y-2 text-xs">
                 {drafts.slice(0, 8).map(d => (
                   <li key={d.id} className="px-2 py-1.5 rounded-lg border border-noch-border">
-                    <p className="text-white text-xs line-clamp-2">{d.body}</p>
+                    <p className="text-white text-xs line-clamp-2">{d.body_text}</p>
                     <p className="text-noch-muted text-[11px]">{d.status}</p>
                   </li>
                 ))}

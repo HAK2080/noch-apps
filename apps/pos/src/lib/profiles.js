@@ -5,41 +5,41 @@ import { supabase } from './supabase'
 // ============================================================
 
 export async function getProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('full_name')
+  const { data, error } = await supabase.rpc('profile_directory_v2', {
+    p_active_only: false,
+  })
   if (error) throw error
   return data
 }
 
 export async function getProfile(id) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single()
+  void id
+  const { data, error } = await supabase.rpc('my_profile_v2')
   if (error) throw error
-  return data
+  if (!data?.[0]) throw new Error('Profile not found')
+  return data[0]
+}
+
+export async function getProfileDirectory({ activeOnly = true, pinOnly = false, branchId = null } = {}) {
+  const { data, error } = await supabase.rpc('profile_directory_v2', {
+    p_active_only: activeOnly,
+    p_pin_only: pinOnly,
+    p_branch_id: branchId,
+  })
+  if (error) throw error
+  return data || []
 }
 
 export async function getStaffProfiles() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'staff')
-    .order('full_name')
+  const { data, error } = await supabase.rpc('workforce_team_v2')
   if (error) throw error
-  return data
+  return (data || []).filter(profile => profile.is_active !== false)
 }
 
 export async function getAllTeamMembers() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('full_name')
+  const { data, error } = await supabase.rpc('workforce_team_v2')
   if (error) throw error
-  return data
+  return data || []
 }
 
 export async function createStaffProfile(nameOrPayload, telegramChatId) {
@@ -47,7 +47,7 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
   const payload = typeof nameOrPayload === 'string'
     ? { full_name: nameOrPayload, telegram_chat_id: telegramChatId || null }
     : { ...nameOrPayload }
-  const row = { id, role: 'staff', ...payload }
+  const row = { id, role: 'staff', is_employee: true, ...payload }
   const { error } = await supabase.from('profiles').insert(row)
   if (error) throw error
   return row
@@ -55,7 +55,8 @@ export async function createStaffProfile(nameOrPayload, telegramChatId) {
 
 export async function updateProfile(id, updates) {
   // Filter out pin_code from direct updates; it must be set via RPC
-  const { pin_code, ...safeUpdates } = updates
+  const safeUpdates = { ...updates }
+  delete safeUpdates.pin_code
 
   const { data, error } = await supabase
     .from('profiles')
@@ -107,17 +108,22 @@ export const updateStaffProfile = async (id, data) => {
 }
 
 export const requestRoleChange = async (staffId, requestedRole) => {
-  const { error } = await supabase.from('profiles').update({ role_requested: requestedRole, role_approved: false }).eq('id', staffId)
+  void staffId
+  const { error } = await supabase.rpc('request_my_role_change_v2', { p_role: requestedRole })
   if (error) throw error
 }
 
 export const approveRoleChange = async (staffId, role) => {
-  const { error } = await supabase.from('profiles').update({ role, role_requested: null, role_approved: true }).eq('id', staffId)
+  const { error } = await supabase.rpc('set_profile_role_v2', {
+    p_profile_id: staffId,
+    p_role: role,
+    p_reason: 'Approved role request',
+  })
   if (error) throw error
 }
 
 export const denyRoleChange = async (staffId) => {
-  const { error } = await supabase.from('profiles').update({ role_requested: null, role_approved: false }).eq('id', staffId)
+  const { error } = await supabase.rpc('deny_profile_role_request_v2', { p_profile_id: staffId })
   if (error) throw error
 }
 
@@ -132,6 +138,26 @@ export const getRolePermissions = async () => {
 }
 
 export const updateRolePermission = async (role, feature, canAccess, canEdit) => {
-  const { error } = await supabase.from('role_permissions').upsert({ role, feature, can_access: canAccess, can_edit: canEdit, updated_at: new Date().toISOString() }, { onConflict: 'role,feature' })
+  const { error } = await supabase.rpc('update_role_permission_v2', {
+    p_role: role,
+    p_feature: feature,
+    p_can_access: canAccess,
+    p_can_edit: canEdit,
+  })
+  if (error) throw error
+}
+
+export const getAccountAccessSummary = async () => {
+  const { data, error } = await supabase.rpc('access_control_accounts_v2')
+  if (error) throw error
+  return data || []
+}
+
+export const setProfileAccess = async (profileId, enabled, reason) => {
+  const { error } = await supabase.rpc('set_profile_access_v2', {
+    p_profile_id: profileId,
+    p_enabled: enabled,
+    p_reason: reason || null,
+  })
   if (error) throw error
 }

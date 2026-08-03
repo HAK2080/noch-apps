@@ -593,7 +593,7 @@ export default function POSSettings({ onClose } = {}) {
               </div>
             </div>
             <button
-              onClick={() => navigate(`/pos/${branchId}/reports`)}
+              onClick={() => navigate('/sales')}
               className="btn-primary text-xs px-3 py-1"
             >
               Open

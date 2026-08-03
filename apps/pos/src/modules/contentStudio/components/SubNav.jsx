@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom'
 import { SUB_NAV } from '../lib/constants'
+import { useLanguage } from '../../../contexts/LanguageContext'
 
 export default function SubNav() {
+  const { lang } = useLanguage()
   return (
     <nav className="flex flex-wrap gap-1 mb-6 p-1 bg-noch-card border border-noch-border rounded-xl">
       {SUB_NAV.map(item => (
@@ -17,7 +19,7 @@ export default function SubNav() {
             }`
           }
         >
-          {item.label}
+          {lang === 'ar' ? item.labelAr : item.label}
         </NavLink>
       ))}
     </nav>

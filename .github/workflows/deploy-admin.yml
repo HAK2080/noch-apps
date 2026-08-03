@@ -2,6 +2,9 @@ name: Deploy apps.noch.cloud
 
 on:
   workflow_dispatch:
+  schedule:
+    # 03:00 Asia/Riyadh (Saudi Arabia is UTC+3 year-round).
+    - cron: '0 0 * * *'
   push:
     branches: [main, master]
     paths:

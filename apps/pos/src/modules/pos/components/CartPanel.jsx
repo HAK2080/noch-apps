@@ -95,6 +95,8 @@ function CartPanel({
   // Reset both when the cart is emptied (after charge / void)
   useEffect(() => {
     if (items.length === 0) {
+      // Reset form fields when a sale is completed or the cart is voided.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCustomerName('')
       setCustomerPhone('')
     }

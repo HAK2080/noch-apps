@@ -9,12 +9,16 @@ import { ArrowLeft, Warehouse, RefreshCw, Search, PackagePlus } from 'lucide-rea
 import Layout from '../../components/Layout'
 import { listWarehouseStock, listProducts, receiveWarehouseStock } from './lib/warehouse'
 import { useAuth } from '../../contexts/AuthContext'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { formatStockQuantity, toBaseQuantity } from '../../modules/pos/lib/inventory-units'
 import toast from 'react-hot-toast'
 
 export default function WarehouseStock() {
   const navigate = useNavigate()
   const { profile, isOwner } = useAuth()
+  const { lang } = useLanguage()
+  const arabic = lang === 'ar'
+  const copy = (english, arabicText) => arabic ? arabicText : english
   const canReceive = isOwner || profile?.role === 'supervisor'
   const [warehouse, setWarehouse] = useState(null)
   const [rows, setRows] = useState([])
@@ -24,7 +28,23 @@ export default function WarehouseStock() {
   const [form, setForm] = useState({ productId: '', qty: '', note: '' })
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let active = true
+    Promise.all([listWarehouseStock(), listProducts()])
+      .then(([stockResult, productRows]) => {
+        if (!active) return
+        setWarehouse(stockResult.warehouse)
+        setRows(stockResult.rows)
+        setProducts(productRows)
+        setLoading(false)
+      })
+      .catch(error => {
+        if (!active) return
+        toast.error(error.message || (arabic ? 'تعذر تحميل مخزون المستودع' : 'Failed to load warehouse stock'))
+        setLoading(false)
+      })
+    return () => { active = false }
+  }, [arabic])
 
   async function load() {
     setLoading(true)
@@ -34,7 +54,7 @@ export default function WarehouseStock() {
       setRows(rows)
       setProducts(prods)
     } catch (err) {
-      toast.error(err.message || 'Failed to load warehouse stock')
+      toast.error(err.message || copy('Failed to load warehouse stock', 'تعذر تحميل مخزون المستودع'))
     } finally {
       setLoading(false)
     }
@@ -44,17 +64,17 @@ export default function WarehouseStock() {
     e.preventDefault()
     const qty = parseFloat(form.qty)
     const product = products.find(item => item.id === form.productId)
-    if (!form.productId) { toast.error('Select a product'); return }
-    if (!qty || qty <= 0) { toast.error('Enter a valid quantity'); return }
+    if (!form.productId) { toast.error(copy('Select a product', 'اختر منتجًا')); return }
+    if (!qty || qty <= 0) { toast.error(copy('Enter a valid quantity', 'أدخل كمية صحيحة')); return }
     setSaving(true)
     try {
       const baseQty = toBaseQuantity(qty, product?.stock_display_unit || product?.stock_base_unit || 'pc')
       await receiveWarehouseStock(form.productId, baseQty, form.note)
-      toast.success('Stock received into warehouse')
+      toast.success(copy('Stock received into warehouse', 'تم استلام المخزون في المستودع'))
       setForm({ productId: '', qty: '', note: '' })
       load()
     } catch (err) {
-      toast.error(err.message || 'Failed to receive stock')
+      toast.error(err.message || copy('Failed to receive stock', 'تعذر استلام المخزون'))
     } finally {
       setSaving(false)
     }
@@ -76,7 +96,7 @@ export default function WarehouseStock() {
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl flex items-center gap-2">
               <Warehouse size={18} className="text-noch-green" />
-              Warehouse Stock
+              {copy('Warehouse Stock', 'مخزون المستودع')}
             </h1>
             <p className="text-noch-muted text-sm">{warehouse?.name || 'Central Warehouse'}</p>
           </div>
@@ -89,7 +109,7 @@ export default function WarehouseStock() {
         {canReceive && (
           <form onSubmit={submitReceive} className="bg-noch-card border border-noch-border rounded-xl p-4 mb-4">
             <p className="text-white text-sm font-semibold mb-3 flex items-center gap-2">
-              <PackagePlus size={15} className="text-noch-green" /> Receive stock into warehouse
+              <PackagePlus size={15} className="text-noch-green" /> {copy('Receive stock into warehouse', 'استلام مخزون في المستودع')}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_110px_1fr_auto] gap-2">
               <select
@@ -97,7 +117,7 @@ export default function WarehouseStock() {
                 onChange={e => setForm(f => ({ ...f, productId: e.target.value }))}
                 className="input"
               >
-                <option value="">Select product…</option>
+                <option value="">{copy('Select product…', 'اختر منتجًا…')}</option>
                 {products.map(p => (
                   <option key={p.id} value={p.id}>{p.name} · {p.stock_display_unit || p.stock_base_unit || 'pc'}</option>
                 ))}
@@ -113,13 +133,13 @@ export default function WarehouseStock() {
               />
               <input
                 type="text"
-                placeholder="Note (optional)"
+                placeholder={copy('Note (optional)', 'ملاحظة (اختياري)')}
                 value={form.note}
                 onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
                 className="input"
               />
               <button type="submit" disabled={saving} className="btn-primary whitespace-nowrap disabled:opacity-50">
-                {saving ? 'Saving…' : 'Receive'}
+                {saving ? copy('Saving…', 'جارٍ الحفظ…') : copy('Receive', 'استلام')}
               </button>
             </div>
           </form>
@@ -130,7 +150,7 @@ export default function WarehouseStock() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder={copy('Search products…', 'ابحث عن المنتجات…')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="input w-full pl-9"
@@ -140,16 +160,18 @@ export default function WarehouseStock() {
         {/* Table */}
         <div className="bg-noch-card border border-noch-border rounded-xl overflow-hidden">
           <div className="grid grid-cols-[1fr_100px_110px_150px] gap-2 px-4 py-2.5 border-b border-noch-border text-xs font-semibold text-noch-muted uppercase tracking-wide">
-            <span>Product</span>
-            <span className="text-right">Qty</span>
-            <span className="text-right">Value</span>
-            <span className="text-right">Updated</span>
+            <span>{copy('Product', 'المنتج')}</span>
+            <span className="text-right">{copy('Qty', 'الكمية')}</span>
+            <span className="text-right">{copy('Value', 'القيمة')}</span>
+            <span className="text-right">{copy('Updated', 'آخر تحديث')}</span>
           </div>
           {loading ? (
-            <p className="text-noch-muted text-center py-10 text-sm">Loading...</p>
+            <p className="text-noch-muted text-center py-10 text-sm">{copy('Loading…', 'جارٍ التحميل…')}</p>
           ) : filtered.length === 0 ? (
             <p className="text-noch-muted text-center py-10 text-sm">
-              {rows.length === 0 ? 'No warehouse stock yet — receive stock above, then ship it to branches' : 'No products match'}
+              {rows.length === 0
+                ? copy('No warehouse stock yet — receive stock above, then ship it to branches', 'لا يوجد مخزون في المستودع بعد — استلم المخزون أعلاه ثم أرسله إلى الفروع')
+                : copy('No products match', 'لا توجد منتجات مطابقة')}
             </p>
           ) : (
             <div className="divide-y divide-noch-border/50">
@@ -173,7 +195,7 @@ export default function WarehouseStock() {
         </div>
 
         <p className="text-noch-muted text-xs mt-3">
-          Stock enters here via the receive form and leaves to branches via Transfers.
+          {copy('Stock enters here through receiving and leaves through audited transfers.', 'يدخل المخزون هنا عبر الاستلام ويخرج عبر تحويلات مسجلة.')}
         </p>
       </div>
     </Layout>

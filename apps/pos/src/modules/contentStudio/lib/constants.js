@@ -99,19 +99,19 @@ export const EDIT_CLASSIFICATIONS = [
 ]
 
 export const SUB_NAV = [
-  { to: '/content-studio',              label: 'Overview',     end: true },
-  { to: '/content-studio/businesses',   label: 'Businesses' },
-  { to: '/content-studio/signals',      label: 'Signals' },
-  { to: '/content-studio/inspiration',  label: 'Inspiration' },
-  { to: '/content-studio/concepts',     label: 'Concepts' },
-  { to: '/content-studio/briefs',       label: 'Briefs' },
-  { to: '/content-studio/campaigns',    label: 'Campaigns' },
-  { to: '/content-studio/drafts',       label: 'Drafts' },
-  { to: '/content-studio/voice-lab',       label: 'Voice Lab' },
-  { to: '/content-studio/dialect-trainer', label: 'Dialect Trainer' },
-  { to: '/content-studio/bank',            label: 'Content Bank' },
-  { to: '/content-studio/performance',     label: 'Performance' },
-  { to: '/content-studio/settings',     label: 'Settings' },
+  { to: '/content-studio', label: 'Overview', labelAr: 'نظرة عامة', end: true },
+  { to: '/content-studio/businesses', label: 'Businesses', labelAr: 'الأنشطة' },
+  { to: '/content-studio/signals', label: 'Signals', labelAr: 'الإشارات' },
+  { to: '/content-studio/inspiration', label: 'Inspiration', labelAr: 'الإلهام' },
+  { to: '/content-studio/concepts', label: 'Concepts', labelAr: 'الأفكار' },
+  { to: '/content-studio/briefs', label: 'Briefs', labelAr: 'الملخصات' },
+  { to: '/content-studio/campaigns', label: 'Campaigns', labelAr: 'الحملات' },
+  { to: '/content-studio/drafts', label: 'Drafts', labelAr: 'المسودات' },
+  { to: '/content-studio/voice-lab', label: 'Voice Lab', labelAr: 'مختبر الصوت' },
+  { to: '/content-studio/dialect-trainer', label: 'Dialect Trainer', labelAr: 'مدرب اللهجة' },
+  { to: '/content-studio/bank', label: 'Content Bank', labelAr: 'بنك المحتوى' },
+  { to: '/content-studio/performance', label: 'Publishing & measurement', labelAr: 'النشر والقياس' },
+  { to: '/content-studio/settings', label: 'Settings', labelAr: 'الإعدادات' },
 ]
 
 export const SELECTED_BUSINESS_KEY = 'cs_selected_business_id'

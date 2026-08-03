@@ -164,11 +164,39 @@ async function handlePhoto(botToken: string, msg: TgMessage, fileId: string, mim
     return Response.json({ ok: true, snap_id: res.snap_id, awaiting: 'amount' }, { headers: CORS })
   }
 
-  await sendBranchButtons(botToken, chatId, res, '✅ تمت قراءة الفاتورة:')
+  await sendPaymentButtons(botToken, chatId, res, '✅ تمت قراءة الفاتورة:')
   return Response.json({ ok: true, snap_id: res.snap_id }, { headers: CORS })
 }
 
 // ── Receipt Snap: shared branch-buttons message ─────────────
+async function sendPaymentButtons(
+  botToken: string,
+  chatId: string,
+  res: { snap_id: string; extracted?: Record<string, unknown> },
+  header: string,
+) {
+  const ex = res.extracted || {}
+  const readLine = [
+    ex.vendor ? '🏪 ' + ex.vendor : null,
+    ex.amount ? '💰 ' + ex.amount + ' ' + (ex.currency || 'LYD') : null,
+    ex.description && !ex.vendor ? '📝 ' + ex.description : null,
+  ].filter(Boolean).join('\n')
+
+  await tg(botToken, 'sendMessage', {
+    chat_id: chatId,
+    text: `${header}\n${readLine}\n\nهل تم دفع هذا المصروف؟\nHas this expense been paid?`,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '⏳ غير مدفوع / Unpaid', callback_data: `epay|${res.snap_id}|unpaid` }],
+        [
+          { text: '💵 نقداً / Cash', callback_data: `epay|${res.snap_id}|paid|cash` },
+          { text: '💳 بطاقة / Card', callback_data: `epay|${res.snap_id}|paid|card` },
+        ],
+      ],
+    },
+  })
+}
+
 async function sendBranchButtons(
   botToken: string,
   chatId: string,
@@ -600,6 +628,34 @@ async function handleCallback(botToken: string, cb: TgCallbackQuery) {
     return handleStockCallback(botToken, cb)
   }
 
+  if (data.startsWith('epay|')) {
+    const [, snapId, status, method] = data.split('|')
+    const res = await callSnapFn({
+      action: 'set_payment',
+      snap_id: snapId,
+      status,
+      method: method || null,
+    })
+    await tg(botToken, 'answerCallbackQuery', {
+      callback_query_id: cb.id,
+      text: res.ok ? 'تم الحفظ / Saved' : 'تم الاختيار مسبقاً / Already selected',
+    })
+    if (res.ok) {
+      const paidLabel = status === 'paid'
+        ? (method === 'card' ? '💳 مدفوع بالبطاقة / Paid by card' : '💵 مدفوع نقداً / Paid cash')
+        : '⏳ غير مدفوع / Unpaid'
+      if (msgId) {
+        await tg(botToken, 'editMessageText', {
+          chat_id: chatId,
+          message_id: msgId,
+          text: paidLabel,
+        })
+      }
+      await sendBranchButtons(botToken, chatId, res, '📍 اختر الفرع / Choose branch:')
+    }
+    return Response.json({ ok: true, payment_saved: Boolean(res.ok) }, { headers: CORS })
+  }
+
   if (!data.startsWith('esnap|')) {
     await tg(botToken, 'answerCallbackQuery', { callback_query_id: cb.id })
     return Response.json({ ok: true, ignored: true }, { headers: CORS })
@@ -672,7 +728,7 @@ async function handleText(botToken: string, msg: TgMessage): Promise<Response> {
   if (Array.isArray(awaitingAmount) && awaitingAmount.length) {
     const res = await callSnapFn({ action: 'set_amount', snap_id: awaitingAmount[0].id, text })
     if (res.ok) {
-      await sendBranchButtons(botToken, chatId, res, '✅ تمام:')
+      await sendPaymentButtons(botToken, chatId, res, '✅ تمام:')
     } else {
       await tg(botToken, 'sendMessage', { chat_id: chatId, text: '⚠️ اكتب الرقم فقط، مثال: 450' })
     }
@@ -712,7 +768,7 @@ async function handleText(botToken: string, msg: TgMessage): Promise<Response> {
       if (res.needs_amount) {
         await tg(botToken, 'sendMessage', { chat_id: chatId, text: '💰 كم المبلغ؟ اكتب الرقم فقط، مثال: 450' })
       } else {
-        await sendBranchButtons(botToken, chatId, res, '📝 مصروف يدوي:')
+        await sendPaymentButtons(botToken, chatId, res, '📝 مصروف يدوي:')
       }
       return Response.json({ ok: true, snap_id: res.snap_id }, { headers: CORS })
     }

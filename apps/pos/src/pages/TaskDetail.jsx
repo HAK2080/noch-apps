@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Trash2, Bell, Edit, Paperclip, ExternalLink, Users } from 'lucide-react'
-import { getProfiles } from '../lib/profiles'
 import { getTask, updateTask, deleteTask, getTaskAttachments, uploadAttachment, getReminders, assignStaffToTask, removeAssignmentFromTask, requestTaskCompletion, approveTaskCompletion, rejectTaskCompletion } from '../lib/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -140,7 +139,9 @@ export default function TaskDetail() {
   }
 
   const handleEdit = async (payload, files) => {
-    const { notifyTelegram, created_by, assigneeIds, ...taskPayload } = payload
+    const { assigneeIds, ...taskPayload } = payload
+    delete taskPayload.notifyTelegram
+    delete taskPayload.created_by
     try {
       const updated = await updateTask(id, taskPayload)
 
@@ -206,15 +207,6 @@ export default function TaskDetail() {
       const updated = await requestTaskCompletion(id)
       setTask(updated)
       toast.success(lang === 'ar' ? 'تم إرسال طلب الإنهاء للمدير' : 'Completion requested — awaiting owner approval')
-      // Notify owner via Telegram — fetch owner profile to get their chat ID
-      try {
-        const staffName = profile?.full_name || ''
-        const allProfiles = await getProfiles()
-        const owner = allProfiles.find(p => p.role === 'owner')
-        if (owner?.telegram_chat_id) {
-          await sendTelegram(owner.telegram_chat_id, `📋 طلب إنهاء مهمة\n\n*${updated.title}*\n\nيطلب ${staffName} الموافقة على إنهاء هذه المهمة.`, id)
-        }
-      } catch {}
     } catch { toast.error(t('error')) }
     finally { setUpdatingStatus(false) }
   }
@@ -230,7 +222,9 @@ export default function TaskDetail() {
       for (const a of assignees) {
         const chatId = getChatId(a)
         if (chatId) {
-          try { await sendTelegram(chatId, `✅ تمت الموافقة على إنهاء المهمة\n\n*${updated.title}*\n\nأحسنت! تم تأكيد إنجاز المهمة من قِبل المدير. 🎉`, id) } catch {}
+          try { await sendTelegram(chatId, `✅ تمت الموافقة على إنهاء المهمة\n\n*${updated.title}*\n\nأحسنت! تم تأكيد إنجاز المهمة من قِبل المدير. 🎉`, id) } catch {
+            // Notification failure must not reverse task approval.
+          }
         }
       }
     } catch { toast.error(t('error')) }
@@ -251,7 +245,9 @@ export default function TaskDetail() {
         const chatId = getChatId(a)
         if (chatId) {
           const note = rejectNote ? `\n\nملاحظة: ${rejectNote}` : ''
-          try { await sendTelegram(chatId, `↩ تم إرجاع طلب الإنهاء\n\n*${updated.title}*${note}\n\nيرجى مراجعة المهمة والتواصل مع المدير.`, id) } catch {}
+          try { await sendTelegram(chatId, `↩ تم إرجاع طلب الإنهاء\n\n*${updated.title}*${note}\n\nيرجى مراجعة المهمة والتواصل مع المدير.`, id) } catch {
+            // Notification failure must not reverse task rejection.
+          }
         }
       }
     } catch { toast.error(t('error')) }

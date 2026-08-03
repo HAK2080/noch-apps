@@ -40,7 +40,7 @@ export default function Login() {
     if (!user) return
     const next = new URLSearchParams(location.search).get('next')
     navigate(next && next.startsWith('/') ? next : '/', { replace: true })
-  }, [user])
+  }, [user, location.search, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -57,13 +57,11 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-noch-dark flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-noch-green font-bold text-5xl tracking-tight mb-1">noch.apps</h1>
           <p className="text-noch-muted text-sm">{t('appTagline')}</p>
         </div>
 
-        {/* Card */}
         <div className="card">
           <h2 className="text-white font-semibold text-center mb-5">{t('login')}</h2>
 
@@ -92,11 +90,7 @@ export default function Login() {
                 minLength={6}
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full mt-2"
-            >
+            <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
               {loading ? t('loading') : t('loginBtn')}
             </button>
           </form>
@@ -112,10 +106,7 @@ export default function Login() {
                 ? (lang === 'ar' ? 'جاري الإرسال...' : 'Sending...')
                 : (lang === 'ar' ? 'نسيت كلمة المرور؟' : 'Forgot password?')}
             </button>
-            <Link
-              to="/staff/request-access"
-              className="text-noch-green hover:underline"
-            >
+            <Link to="/staff/request-access" className="text-noch-green hover:underline">
               {lang === 'ar' ? 'طلب وصول →' : 'Request access →'}
             </Link>
           </div>

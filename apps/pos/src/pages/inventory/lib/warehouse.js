@@ -228,12 +228,21 @@ export async function listMovementHistory({ branchId, movementType, dateFrom, da
   if (productResult.error) throw productResult.error
   if (locationResult.error && locationResult.error.code !== '42P01') throw locationResult.error
 
-  const productRows = (productResult.data || []).map(m => ({
-    ...m,
-    product_name: m.pos_products?.name || 'Unknown product',
-    branch_name: m.pos_branches?.name || '—',
-    unit: m.pos_products?.stock_base_unit || 'pc',
-  }))
+  const mirroredLegacyIds = new Set(
+    (locationResult.data || [])
+      .filter(movement => movement.source === 'legacy_pos_mirror' && movement.source_ref)
+      .map(movement => movement.source_ref),
+  )
+
+  const productRows = (productResult.data || [])
+    .filter(movement => !mirroredLegacyIds.has(movement.id))
+    .map(m => ({
+      ...m,
+      product_name: m.pos_products?.name || 'Unknown product',
+      branch_name: m.pos_branches?.name || '—',
+      unit: m.pos_products?.stock_base_unit || 'pc',
+      ledger_source: 'legacy_product_balance',
+    }))
 
   const locationRows = (locationResult.data || [])
     .filter(m => !branchId || m.inventory_locations?.branch_id === branchId)
@@ -243,6 +252,7 @@ export async function listMovementHistory({ branchId, movementType, dateFrom, da
       branch_name: m.inventory_locations?.name || 'Central Warehouse',
       branch_id: m.inventory_locations?.branch_id || null,
       unit: m.pos_products?.stock_base_unit || 'pc',
+      ledger_source: 'location_product_stock',
     }))
 
   return [...productRows, ...locationRows]

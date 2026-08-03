@@ -4,31 +4,59 @@
 // payroll_delete_run); draft items and loans are plain table CRUD (owner RLS).
 
 import { useEffect, useRef, useState } from 'react'
-import { Banknote, CheckCircle, HandCoins, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Banknote, CheckCircle, FileDown, HandCoins, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import {
   listPayrollRuns, getPayrollRunItems, updatePayrollRunItem,
-  generatePayrollRun, completePayrollRun, deletePayrollRun,
+  updatePayrollRunItemHours,
+  generatePayrollRun, completePayrollRun, reopenPayrollRun, deletePayrollRun,
   listStaffLoans, createStaffLoan, cancelStaffLoan, listLoanRepayments, listBranches,
 } from '../lib/finance-supabase'
-import { supabase } from '../../../lib/supabase'
+import { getAllTeamMembers } from '../../../lib/profiles'
+import { netOf, overtimeCostOf } from '../lib/payroll-calculations'
+import { openPayrollPdf } from '../lib/payroll-pdf'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
 
-const MONEY_FIELDS = ['base_lyd', 'overtime_lyd', 'bonus_lyd', 'deduction_lyd', 'loan_repayment_lyd', 'other_lyd']
+const MANUAL_MONEY_FIELDS = ['base_lyd', 'bonus_lyd', 'deduction_lyd', 'loan_repayment_lyd', 'other_lyd']
+const MONEY_LABELS = {
+  base_lyd: 'Base',
+  bonus_lyd: 'Bonus',
+  deduction_lyd: 'Deduction',
+  loan_repayment_lyd: 'Loan repayment',
+  other_lyd: 'Other',
+}
+const HOURS_FIELDS = [
+  ['manual_hours_per_day', 'Hours/day'],
+  ['manual_worked_days', 'Days'],
+  ['manual_scheduled_hours', 'Scheduled h'],
+  ['manual_overtime_hours', 'OT hours (×1)'],
+]
 
 function currentMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-// Client-side mirror of the generated net_lyd column so edits feel instant.
-function netOf(it) {
-  return Number(it.base_lyd || 0) + Number(it.overtime_lyd || 0) + Number(it.bonus_lyd || 0)
-    + Number(it.other_lyd || 0) - Number(it.deduction_lyd || 0) - Number(it.loan_repayment_lyd || 0)
+const ISSUE_LABELS = {
+  missing_start_date: 'Missing employment start date',
+  missing_cost_allocation: 'Missing branch or cost allocation',
+  missing_pay_basis: 'Missing salary or hourly rate',
+  no_closed_attendance: 'No closed attendance evidence',
+  no_published_schedule: 'No published schedule evidence',
+  open_attendance: 'Open attendance must be closed',
+}
+
+function itemIssues(item) {
+  if (Array.isArray(item?.data_issues)) return item.data_issues
+  if (typeof item?.data_issues === 'string') {
+    try { return JSON.parse(item.data_issues) || [] } catch { return [] }
+  }
+  return []
 }
 
 function StatusBadge({ status }) {
-  const cls = status === 'completed'
+  const cls = ['completed', 'paid', 'reconciled', 'ready'].includes(status)
     ? 'bg-noch-green/10 border-noch-green/30 text-noch-green'
     : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
   return (
@@ -59,11 +87,11 @@ export default function PayrollTab({ readOnly = false }) {
     try {
       const [list, st, bs] = await Promise.all([
         listPayrollRuns(12),
-        supabase.from('profiles').select('id, full_name').order('full_name'),
+        getAllTeamMembers(),
         listBranches(),
       ])
       setRuns(list)
-      setStaff(st.data || [])
+      setStaff(st.filter(person => person.is_active !== false))
       setBranches(bs)
       return list
     } catch (err) {
@@ -71,6 +99,20 @@ export default function PayrollTab({ readOnly = false }) {
       return []
     } finally { setLoading(false) }
   }
+  const openRun = async (run) => {
+    if (!run) { setSelected(null); setItems([]); return }
+    setMonth(String(run.period_month).slice(0, 7))
+    setSelected(run)
+    setItemsLoading(true)
+    try {
+      const list = await getPayrollRunItems(run.id)
+      const sorted = [...list].sort((a, b) => nameOf(a.profile_id).localeCompare(nameOf(b.profile_id)))
+      loadedItems.current = sorted
+      setItems(sorted)
+    } catch (err) { toast.error(err.message || 'Failed to load run items') }
+    finally { setItemsLoading(false) }
+  }
+
   // Auto-open the latest run on load so returning to the tab restores
   // the detail view instead of looking like the run disappeared.
   useEffect(() => {
@@ -81,17 +123,11 @@ export default function PayrollTab({ readOnly = false }) {
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const openRun = async (run) => {
-    if (!run) { setSelected(null); setItems([]); return }
-    setSelected(run)
-    setItemsLoading(true)
-    try {
-      const list = await getPayrollRunItems(run.id)
-      const sorted = [...list].sort((a, b) => nameOf(a.profile_id).localeCompare(nameOf(b.profile_id)))
-      loadedItems.current = sorted
-      setItems(sorted)
-    } catch (err) { toast.error(err.message || 'Failed to load run items') }
-    finally { setItemsLoading(false) }
+  const selectMonth = value => {
+    setMonth(value)
+    const existingRun = runs.find(run => String(run.period_month).slice(0, 7) === value)
+    if (existingRun) openRun(existingRun)
+    else { setSelected(null); setItems([]) }
   }
 
   const generate = async (targetMonth) => {
@@ -136,6 +172,27 @@ export default function PayrollTab({ readOnly = false }) {
     finally { setBusy(false) }
   }
 
+  const reopen = async () => {
+    const period = String(selected.period_month).slice(0, 7)
+    if (!window.confirm(`Reopen payroll for ${period}?\n\nThe posted payroll journal will be reversed with a full audit trail. You can amend the draft and complete it again. Paid payroll cannot be reopened.`)) return
+    setBusy(true)
+    try {
+      await reopenPayrollRun(selected.id)
+      toast.success('Payroll reopened for amendment')
+      const list = await reload()
+      await openRun(list.find(run => run.id === selected.id))
+    } catch (err) { toast.error(err.message || 'Reopen failed') }
+    finally { setBusy(false) }
+  }
+
+  const exportPayrollPdf = (employeeId = null) => {
+    try {
+      openPayrollPdf({ run: selected, items, nameOf, branchOf, employeeId })
+    } catch (err) {
+      toast.error(err.message || 'Unable to open the payroll PDF')
+    }
+  }
+
   // Editable draft cells: update local state on change, persist on blur.
   const setLocal = (id, field, value) =>
     setItems(list => list.map(it => (it.id === id ? { ...it, [field]: value } : it)))
@@ -147,10 +204,39 @@ export default function PayrollTab({ readOnly = false }) {
     if (field !== 'note' && !Number.isFinite(value)) { toast.error('Invalid number'); return }
     if (original && String(original[field] ?? '') === String(item[field] ?? '')) return
     try {
-      await updatePayrollRunItem(item.id, { [field]: value })
-      loadedItems.current = loadedItems.current.map(it => (it.id === item.id ? { ...it, [field]: item[field] } : it))
+      const updated = await updatePayrollRunItem(item.id, { [field]: value })
+      const previous = items.find(row => row.id === item.id)
+      const nextTotal = runTotal - netOf(previous || item) + netOf(updated)
+      setItems(list => list.map(row => row.id === item.id ? updated : row))
+      setSelected(run => run ? { ...run, total_lyd: nextTotal } : run)
+      loadedItems.current = loadedItems.current.map(it => (it.id === item.id ? updated : it))
     } catch (err) {
       toast.error(err.message || 'Save failed')
+      openRun(selected)
+    }
+  }
+
+  const persistHours = async item => {
+    const toNumber = value => value === '' || value === null || value === undefined ? null : Number(value)
+    const updates = {
+      hoursPerDay: toNumber(item.manual_hours_per_day),
+      workedDays: toNumber(item.manual_worked_days),
+      scheduledHours: toNumber(item.manual_scheduled_hours),
+      overtimeHours: item.manual_overtime_hours === '' ? 0 : toNumber(item.manual_overtime_hours),
+    }
+    if (Object.values(updates).some(value => value !== null && !Number.isFinite(value))) {
+      toast.error('Invalid payroll hours')
+      return
+    }
+    try {
+      const updated = await updatePayrollRunItemHours(item.id, updates)
+      const previous = items.find(row => row.id === item.id)
+      const nextTotal = runTotal - netOf(previous || item) + netOf(updated)
+      setItems(list => list.map(row => row.id === item.id ? updated : row))
+      setSelected(run => run ? { ...run, total_lyd: nextTotal } : run)
+      loadedItems.current = loadedItems.current.map(row => row.id === item.id ? updated : row)
+    } catch (err) {
+      toast.error(err.message || 'Failed to save payroll hours')
       openRun(selected)
     }
   }
@@ -160,6 +246,15 @@ export default function PayrollTab({ readOnly = false }) {
   const runTotal = selected
     ? (isDraft ? items.reduce((s, it) => s + netOf(it), 0) : Number(selected.total_lyd || 0))
     : 0
+  const evidenceBlocked = selected?.evidence_status === 'blocked'
+    || items.some(item => item.data_status === 'blocked')
+  const canComplete = isDraft
+    && ['ready', 'warning'].includes(selected?.evidence_status)
+  const issueCounts = items.reduce((counts, item) => {
+    for (const issue of itemIssues(item)) counts[issue] = (counts[issue] || 0) + 1
+    return counts
+  }, {})
+  const selectedMonthRun = runs.find(run => String(run.period_month).slice(0, 7) === month)
 
   return (
     <div className="flex flex-col gap-4">
@@ -167,16 +262,28 @@ export default function PayrollTab({ readOnly = false }) {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex items-center gap-2">
           <Banknote size={14} className="text-noch-green" />
-          <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="input py-1 px-2 text-xs" />
+          <input type="month" value={month} onChange={event => selectMonth(event.target.value)} className="input py-1 px-2 text-xs" />
         </div>
-        {!readOnly && (
+        {!readOnly && !selectedMonthRun && (
           <button onClick={() => generate()} disabled={generating}
             className="btn-secondary text-xs px-4 py-1.5 flex items-center gap-1.5">
             <RefreshCw size={12} className={generating ? 'animate-spin' : ''} />
             {generating ? 'Generating…' : 'Generate draft'}
           </button>
         )}
+        {selectedMonthRun && (
+          <span className="text-xs text-noch-muted">
+            {selectedMonthRun.status === 'draft'
+              ? 'Payroll open — edit below'
+              : selectedMonthRun.status === 'paid'
+                ? 'Payroll paid — locked'
+                : 'Payroll closed — reopen to amend'}
+          </span>
+        )}
       </div>
+      <p className="-mt-2 text-[11px] text-noch-muted">
+        Select any previous month. Open payroll is editable; closed unpaid payroll can be reopened and amended.
+      </p>
 
       {/* Recent runs */}
       <div className="card">
@@ -202,13 +309,22 @@ export default function PayrollTab({ readOnly = false }) {
 
       {/* Run detail */}
       {selected && (
-        <div className="card overflow-x-auto">
+        <div className="card">
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <h3 className="text-white text-sm font-semibold">{String(selected.period_month).slice(0, 7)}</h3>
             <StatusBadge status={selected.status} />
+            <StatusBadge status={selected.evidence_status || 'legacy'} />
             <span className="text-noch-green font-mono text-sm">{lyd(runTotal)}</span>
+            <button
+              data-testid="export-payroll-pdf"
+              onClick={() => exportPayrollPdf()}
+              disabled={items.length === 0}
+              className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 ml-auto"
+            >
+              <FileDown size={12} /> Export finance PDF / تصدير تقرير المالية
+            </button>
             {!readOnly && isDraft && (
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-2">
                 <button onClick={regenerate} disabled={generating || busy}
                   className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
                   <RefreshCw size={12} className={generating ? 'animate-spin' : ''} /> Regenerate
@@ -217,63 +333,153 @@ export default function PayrollTab({ readOnly = false }) {
                   className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 text-red-300">
                   <Trash2 size={12} /> Delete draft
                 </button>
-                <button onClick={complete} disabled={busy}
+                <button onClick={complete} disabled={busy || !canComplete}
                   className="btn-primary text-xs px-4 py-1.5 flex items-center gap-1.5">
                   <CheckCircle size={12} /> {busy ? 'Working…' : 'Complete payroll'}
                 </button>
               </div>
             )}
+            {!readOnly && selected.status === 'completed' && (
+              <button onClick={reopen} disabled={busy}
+                className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5">
+                <RotateCcw size={12} /> {busy ? 'Working…' : 'Reopen payroll'}
+              </button>
+            )}
+            {!readOnly && selected.status === 'paid' && (
+              <span className="text-[11px] text-noch-muted">Paid payroll cannot be reopened</span>
+            )}
           </div>
+          {isDraft && evidenceBlocked && (
+            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+              <p className="font-semibold text-amber-100">Payroll is blocked until the employee evidence is ready.</p>
+              {Object.keys(issueCounts).length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 ps-4">
+                  {Object.entries(issueCounts).map(([issue, count]) => (
+                    <li key={issue}>{count} × {ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')}</li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex flex-wrap gap-3 font-semibold">
+                <Link to="/staff/team" className="underline underline-offset-2">Open team directory to add dates</Link>
+                <Link to="/staff" className="underline underline-offset-2">Review attendance and schedule</Link>
+              </div>
+            </div>
+          )}
+          {isDraft && (
+            <p className="mb-3 text-xs text-noch-muted">
+              Attendance and schedules are optional evidence. Enter overtime hours manually; OT cost = overtime hours × employee hourly rate × 1 and is added to net pay.
+            </p>
+          )}
           {itemsLoading ? <p className="text-noch-muted">Loading…</p> : items.length === 0 ? (
             <p className="text-noch-muted text-sm py-3 text-center">No items in this run.</p>
           ) : (
-            <table className="w-full text-xs">
-              <thead className="text-noch-muted">
-                <tr>
-                  <th className="text-left py-1 pr-2">Staff</th>
-                  <th className="text-left py-1 pr-2">Branch</th>
-                  <th className="text-right py-1 pr-2">Base</th>
-                  <th className="text-right py-1 pr-2">Overtime</th>
-                  <th className="text-right py-1 pr-2">Bonus</th>
-                  <th className="text-right py-1 pr-2">Deduction</th>
-                  <th className="text-right py-1 pr-2">Loan rep.</th>
-                  <th className="text-right py-1 pr-2">Other</th>
-                  <th className="text-right py-1 pr-2">Net</th>
-                  <th className="text-left py-1">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(it => (
-                  <tr key={it.id} className="border-t border-noch-border/40">
-                    <td className="py-1.5 pr-2 text-white whitespace-nowrap">{nameOf(it.profile_id)}</td>
-                    <td className="py-1.5 pr-2 text-noch-muted whitespace-nowrap">{branchOf(it.branch_id)}</td>
-                    {MONEY_FIELDS.map(f => (
-                      <td key={f} className="py-1.5 pr-2 text-right">
-                        {editable ? (
-                          <input type="number" step="0.01" value={it[f] ?? 0}
-                            onChange={e => setLocal(it.id, f, e.target.value)}
-                            onBlur={() => persistItem(it, f)}
-                            className="input py-0.5 px-1.5 text-xs w-24 text-right" />
-                        ) : (
-                          <span className="text-white">{Number(it[f] || 0).toFixed(2)}</span>
-                        )}
-                      </td>
-                    ))}
-                    <td className="py-1.5 pr-2 text-right text-noch-green font-mono whitespace-nowrap">{lyd(netOf(it))}</td>
-                    <td className="py-1.5">
-                      {editable ? (
-                        <input type="text" value={it.note || ''} placeholder="—"
-                          onChange={e => setLocal(it.id, 'note', e.target.value)}
-                          onBlur={() => persistItem(it, 'note')}
-                          className="input py-0.5 px-1.5 text-xs w-32" />
-                      ) : (
-                        <span className="text-noch-muted">{it.note || ''}</span>
+            <div className="space-y-3" data-testid="payroll-item-list">
+              {items.map(it => (
+                <section
+                  key={it.id}
+                  data-testid="payroll-item-card"
+                  className="rounded-xl border border-noch-border/60 bg-noch-dark/30 p-3"
+                >
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{nameOf(it.profile_id)}</p>
+                      <p className="truncate text-xs text-noch-muted">{branchOf(it.branch_id)}</p>
+                    </div>
+                    <div className="min-w-0 flex-1 text-xs sm:max-w-sm">
+                      <span className="mr-1 text-[10px] uppercase tracking-wide text-noch-muted">Evidence</span>
+                      <span className={it.data_status === 'blocked' ? 'text-red-300' : it.data_status === 'warning' ? 'text-amber-300' : 'text-noch-green'}>
+                        {it.data_status || 'ready'}
+                      </span>
+                      {itemIssues(it).length > 0 && (
+                        <span className="block text-[10px] text-noch-muted">
+                          {itemIssues(it).map(issue => ISSUE_LABELS[issue] || issue.replaceAll('_', ' ')).join(', ')}
+                        </span>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[10px] uppercase tracking-wide text-noch-muted">Net pay</p>
+                      <p className="font-mono text-sm text-noch-green">{lyd(netOf(it))}</p>
+                      <button
+                        data-testid="export-paystub-pdf"
+                        onClick={() => exportPayrollPdf(it.profile_id)}
+                        className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-noch-green hover:underline"
+                      >
+                        <FileDown size={11} /> Export payslip / تصدير القسيمة
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-11">
+                    {HOURS_FIELDS.map(([field, label]) => (
+                      <label key={field} className="min-w-0 text-[10px] text-noch-muted">
+                        <span className="mb-1 block truncate">{label}</span>
+                        {editable ? (
+                          <input
+                            aria-label={`${label} for ${nameOf(it.profile_id)}`}
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '' : '')}
+                            onChange={event => setLocal(it.id, field, event.target.value)}
+                            onBlur={() => persistHours(it)}
+                            className="input w-full min-w-0 px-1.5 py-1 text-right text-xs"
+                          />
+                        ) : (
+                          <span className="block rounded border border-noch-border/60 px-2 py-1 text-right text-white">
+                            {it[field] ?? (field === 'manual_scheduled_hours' ? it.scheduled_hours ?? '—' : '—')}
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                    <div className="min-w-0 text-[10px] text-noch-muted">
+                      <span className="mb-1 block truncate">OT cost (×1)</span>
+                      <span
+                        data-testid="overtime-cost"
+                        className="block rounded border border-noch-border/60 bg-noch-dark/40 px-2 py-1 text-right font-mono text-noch-green"
+                      >
+                        {Number(overtimeCostOf(it)).toFixed(2)}
+                      </span>
+                    </div>
+                    {MANUAL_MONEY_FIELDS.map(field => (
+                      <label key={field} className="min-w-0 text-[10px] text-noch-muted">
+                        <span className="mb-1 block truncate">{MONEY_LABELS[field]}</span>
+                        {editable ? (
+                          <input
+                            aria-label={`${MONEY_LABELS[field]} for ${nameOf(it.profile_id)}`}
+                            type="number"
+                            step="0.01"
+                            value={it[field] ?? 0}
+                            onChange={event => setLocal(it.id, field, event.target.value)}
+                            onBlur={() => persistItem(it, field)}
+                            className="input w-full min-w-0 px-1.5 py-1 text-right text-xs"
+                          />
+                        ) : (
+                          <span className="block rounded border border-noch-border/60 px-2 py-1 text-right text-white">
+                            {Number(it[field] || 0).toFixed(2)}
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                    <label className="min-w-0 text-[10px] text-noch-muted">
+                      <span className="mb-1 block truncate">Note</span>
+                      {editable ? (
+                        <input
+                          aria-label={`Note for ${nameOf(it.profile_id)}`}
+                          type="text"
+                          value={it.note || ''}
+                          placeholder="—"
+                          onChange={event => setLocal(it.id, 'note', event.target.value)}
+                          onBlur={() => persistItem(it, 'note')}
+                          className="input w-full min-w-0 px-1.5 py-1 text-xs"
+                        />
+                      ) : (
+                        <span className="block truncate rounded border border-noch-border/60 px-2 py-1 text-white">{it.note || '—'}</span>
+                      )}
+                    </label>
+                  </div>
+                </section>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -307,7 +513,7 @@ function LoansCard({ staff, runs, readOnly, nameOf }) {
     } catch (err) { toast.error(err.message || 'Failed to load loans') }
     finally { setLoading(false) }
   }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => { load() }, [runs])
 
   const add = async () => {

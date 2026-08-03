@@ -2,18 +2,30 @@
 // All POS CRUD functions. Follows exact pattern from src/lib/supabase.js
 
 import { supabase } from '../../../lib/supabase'
+import { toPOSProductWrite } from './pos-product-write'
+import { BUSINESS_DAY_CUTOFF_H } from './business-time'
 import { ALL_PRODUCTS_SELECT } from './product-query'
+
+export {
+  addYmdDays,
+  businessDayWindow,
+  businessHour,
+  businessYmd,
+  BUSINESS_DAY_CUTOFF_H,
+  BUSINESS_TIME_ZONE,
+} from './business-time'
 
 // ============================================================
 // BRANCHES
 // ============================================================
 
-export async function getPOSBranches() {
-  const { data, error } = await supabase
+export async function getPOSBranches({ includeInactive = false } = {}) {
+  let query = supabase
     .from('pos_branches')
     .select('*')
-    .eq('is_active', true)
     .order('name')
+  if (!includeInactive) query = query.eq('is_active', true)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
@@ -101,7 +113,7 @@ export async function deletePOSCategory(id) {
 // PRODUCTS
 // ============================================================
 
-export async function getPOSProducts(branchId) {
+export async function getPOSProducts(branchId, { includeHidden = false } = {}) {
   // Returns products visible at the given branch — array model OR legacy
   // single branch_id column. Mirrors what the storefront Menu.jsx does so
   // both surfaces show the same set.
@@ -109,12 +121,52 @@ export async function getPOSProducts(branchId) {
     .from('pos_products')
     .select('*, pos_categories(name, name_ar, color)')
     .eq('is_active', true)
-    .eq('visible_on_menu', true)
     .order('menu_sort', { ascending: true, nullsFirst: false })
     .order('name')
+  if (!includeHidden) q = q.eq('visible_on_menu', true)
   if (branchId) q = q.or(`visible_branch_ids.cs.{${branchId}},branch_id.eq.${branchId}`)
   const { data, error } = await q
   if (error) throw error
+
+  let products = data || []
+  if (branchId) {
+    const { data: location } = await supabase
+      .from('inventory_locations')
+      .select('id')
+      .eq('branch_id', branchId)
+      .eq('location_type', 'branch')
+      .eq('is_active', true)
+      .order('created_at')
+      .limit(1)
+      .maybeSingle()
+    if (location?.id) {
+      const { data: locationRows } = await supabase
+        .from('location_product_stock')
+        .select('product_id, qty, updated_at')
+        .eq('location_id', location.id)
+      const locationMap = Object.fromEntries(
+        (locationRows || []).map(row => [row.product_id, row]),
+      )
+      products = products.map(product => {
+        const locationStock = locationMap[product.id]
+        return locationStock
+          ? {
+              ...product,
+              stock_qty: Number(locationStock.qty) || 0,
+              stock_location_id: location.id,
+              stock_updated_at: locationStock.updated_at,
+              stock_source: 'location_product_stock',
+            }
+          : {
+              ...product,
+              stock_qty: product.track_inventory ? 0 : product.stock_qty,
+              stock_location_id: location.id,
+              stock_updated_at: null,
+              stock_source: product.track_inventory ? 'missing_location_balance' : 'not_tracked',
+            }
+      })
+    }
+  }
 
   // Popularity sort: best-sellers (last 30 days) float to the top so the
   // cashier finds the most-tapped items first. Ties keep the existing
@@ -124,9 +176,9 @@ export async function getPOSProducts(branchId) {
   // before the migration is applied) so the grid always loads.
   try {
     const pop = await getProductPopularity(branchId)
-    return [...data].sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))
+    return [...products].sort((a, b) => (pop[b.id] || 0) - (pop[a.id] || 0))
   } catch {
-    return data
+    return products
   }
 }
 
@@ -199,7 +251,7 @@ export async function getPOSProduct(id) {
 export async function createPOSProduct(data) {
   const { data: result, error } = await supabase
     .from('pos_products')
-    .insert({ ...data, updated_at: new Date().toISOString() })
+    .insert({ ...toPOSProductWrite(data), updated_at: new Date().toISOString() })
     .select()
     .single()
   if (error) throw error
@@ -209,7 +261,7 @@ export async function createPOSProduct(data) {
 export async function updatePOSProduct(id, updates) {
   const { data, error } = await supabase
     .from('pos_products')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...toPOSProductWrite(updates), updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()
@@ -340,10 +392,9 @@ export async function listPOSAuditEvents(branchId, { limit = 10 } = {}) {
     }))
   }
 
-  const { data: profiles, error } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .in('id', profileIds)
+  const { data: directory, error } = await supabase.rpc('profile_directory_v2', {
+    p_active_only: false,
+  })
   if (error) {
     return rows.map(row => ({
       ...row,
@@ -353,7 +404,8 @@ export async function listPOSAuditEvents(branchId, { limit = 10 } = {}) {
     }))
   }
 
-  const names = new Map((profiles || []).map(profile => [profile.id, profile.full_name]))
+  const profiles = (directory || []).filter(profile => profileIds.includes(profile.id))
+  const names = new Map(profiles.map(profile => [profile.id, profile.full_name]))
   return rows.map(row => ({
     ...row,
     actor_name: names.get(row.actor_user_id) || null,
@@ -382,13 +434,21 @@ export async function listShifts(branchId, { limit = 30, fromIso, toIso } = {}) 
 // Refunds are deducted from shift revenue but legacy payment buckets remain
 // gross. The sessions report applies these to the cash leg so the totals
 // reconcile to net revenue.
-export async function getShiftRefundTotals(shiftIds = []) {
-  if (!shiftIds.length) return {}
-  const { data, error } = await supabase.rpc('pos_shift_refund_totals', {
-    p_shift_ids: shiftIds,
+export async function getShiftControls(branchId, fromDate, toDate, shiftId = null) {
+  const { data, error } = await supabase.rpc('pos_shift_control', {
+    p_branch_id: branchId || null,
+    p_shift_id: shiftId || null,
+    p_from: fromDate,
+    p_to: toDate,
   })
   if (error) throw error
-  return Object.fromEntries((data || []).map(row => [row.shift_id, Number(row.refunded_total) || 0]))
+  return data || []
+}
+
+export async function getShiftControl(shiftId) {
+  const today = localYmd(businessToday())
+  const rows = await getShiftControls(null, today, today, shiftId)
+  return rows[0] || null
 }
 
 export async function openShift(branchId, openingCash, userId) {
@@ -408,14 +468,13 @@ export async function openShift(branchId, openingCash, userId) {
 }
 
 export async function closeShift(shiftId, closeData) {
-  // Routes through close_pos_shift RPC which:
-  //   - locks the shift row (blocks double-close races)
-  //   - rejects with 'shift is already closed' if already closed
-  //   - reconciles shift totals against pos_orders sum
-  //   - writes audit log
-  const { data, error } = await supabase.rpc('close_pos_shift', {
+  const cashCounted = closeData.cash_counted !== false
+    && closeData.closing_cash !== null
+    && closeData.closing_cash !== undefined
+  const { data, error } = await supabase.rpc('close_pos_shift_v2', {
     p_shift_id: shiftId,
-    p_actual_cash: Number(closeData.closing_cash) || 0,
+    p_actual_cash: cashCounted ? Number(closeData.closing_cash) : null,
+    p_cash_counted: cashCounted,
     p_notes: closeData.notes || null,
   })
   if (error) throw error
@@ -488,11 +547,20 @@ export async function getShiftAttendees(shiftId) {
 }
 
 // ── Partial refunds ───────────────────────────────────────────────
-export async function refundPOSOrderLines(orderId, lines, reason, servedBy = null) {
-  const { data, error } = await supabase.rpc('refund_pos_order_lines', {
+export async function refundPOSOrderLines(
+  orderId,
+  lines,
+  reason,
+  servedBy = null,
+  refundMethod = 'original',
+  refundShiftId = null,
+) {
+  const { data, error } = await supabase.rpc('refund_pos_order_lines_v2', {
     p_order_id: orderId,
     p_lines: lines,
     p_reason: reason || null,
+    p_refund_method: refundMethod,
+    p_refund_shift_id: refundShiftId,
     p_served_by: servedBy,
   })
   if (error) throw error
@@ -542,7 +610,6 @@ export async function getSalesByBarista(branchId, fromIso, toIso) {
 // local (Africa/Tripoli), so post-midnight sales belong to the evening's
 // trading day. MUST stay in sync with the pos_sales_daily view
 // (migration 20260717120000_business_day_sales.sql).
-export const BUSINESS_DAY_CUTOFF_H = 5
 const pad2 = n => String(n).padStart(2, '0')
 export function localYmd(d = new Date()) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
@@ -552,17 +619,10 @@ export function localYmd(d = new Date()) {
 export function businessToday() {
   return new Date(Date.now() - BUSINESS_DAY_CUTOFF_H * 3600e3)
 }
+
 // Timestamp window covering business days fromYmd..toYmd inclusive:
 // [from 05:00 local → to+1day 04:59:59.999 local], as UTC ISO strings.
 // Use for created_at/opened_at filters so they match the daily view's buckets.
-export function businessDayWindow(fromYmd, toYmd) {
-  const from = new Date(`${fromYmd}T00:00:00`)
-  from.setHours(BUSINESS_DAY_CUTOFF_H, 0, 0, 0)
-  const to = new Date(`${toYmd}T00:00:00`)
-  to.setDate(to.getDate() + 1)
-  to.setHours(BUSINESS_DAY_CUTOFF_H, 0, 0, 0)
-  return { fromIso: from.toISOString(), toIso: new Date(to.getTime() - 1).toISOString() }
-}
 
 // fromDate/toDate: plain 'YYYY-MM-DD' LOCAL date strings (the view's `day`
 // column is a business day — 5 AM to 5 AM, see helpers above).
@@ -576,6 +636,16 @@ export async function getDailySalesRange(branchId, fromDate, toDate) {
     .order('day', { ascending: true })
   if (error) throw error
   return data || []
+}
+
+export async function getSalesControlSummary(branchId, fromDate, toDate) {
+  const { data, error } = await supabase.rpc('pos_sales_control_summary', {
+    p_branch_id: branchId || null,
+    p_from: fromDate,
+    p_to: toDate,
+  })
+  if (error) throw error
+  return data?.[0] || null
 }
 
 // ── Modifiers ─────────────────────────────────────────────────────
@@ -721,7 +791,10 @@ export async function createPOSOrder(orderData, items) {
     track_inventory: !!item.track_inventory,
   }))
 
-  const { data, error } = await supabase.rpc('create_pos_order', {
+  const rpcName = orderData.loyalty_reward_entitlement_id
+    ? 'create_pos_order_with_loyalty_reward_v2'
+    : 'create_pos_order'
+  const rpcArgs = {
     p_idempotency_key: idempotencyKey,
     p_branch_id: orderData.branch_id,
     p_shift_id: orderData.shift_id || null,
@@ -740,7 +813,12 @@ export async function createPOSOrder(orderData, items) {
     p_items: itemsPayload,
     p_customer_name: orderData.customer_name || null,
     p_customer_phone: orderData.customer_phone || null,
-  })
+  }
+  if (orderData.loyalty_reward_entitlement_id) {
+    rpcArgs.p_loyalty_reward_entitlement_id = orderData.loyalty_reward_entitlement_id
+  }
+
+  const { data, error } = await supabase.rpc(rpcName, rpcArgs)
   if (error) throw error
 
   if (orderData.override_by && data?.order?.id) {
@@ -923,18 +1001,29 @@ export async function replaceProductCostComponents(productId, components) {
   return data
 }
 
-export async function receiveProductStock(productId, quantity, unit, actorProfileId = null) {
+export async function receiveProductStock(branchId, productId, quantity, unit, actorProfileId = null) {
   const sourceRef = typeof crypto !== 'undefined' && crypto.randomUUID
     ? `pos:${crypto.randomUUID()}`
     : `pos:${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-  const { data, error } = await supabase.rpc('receive_pos_product_stock', {
+  const { data, error } = await supabase.rpc('receive_branch_product_stock', {
+    p_branch_id: branchId,
     p_product_id: productId,
     p_quantity: Number(quantity),
-    p_source: 'pos',
     p_source_ref: sourceRef,
     p_actor_profile_id: actorProfileId,
     p_unit: unit,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function adjustProductStock(productId, branchId, newQuantity, notes = 'Manual adjustment') {
+  const { data, error } = await supabase.rpc('adjust_pos_product_stock', {
+    p_product_id: productId,
+    p_branch_id: branchId,
+    p_new_quantity: Number(newQuantity),
+    p_notes: notes,
   })
   if (error) throw error
   return data

@@ -1,5 +1,5 @@
 // ProductCatalog.jsx — Unified product management across POS, inventory & sales
-// Route: /products (owner only)
+// Route: /products (authenticated users)
 
 import { useState, useEffect, useRef } from 'react'
 import {
@@ -234,21 +234,19 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
       coffeeBeanProductId: resolvedCoffeeBeanProductId,
       manualProductCost: form.manual_cost_lyd,
     })
-    if (canEditCost && productCost.source === 'incomplete') {
-      return toast.error('Add a manual cost for every ingredient without an inventory cost')
-    }
+    const costIsComplete = productCost.source !== 'incomplete'
     setSaving(true)
     try {
       const payload = {
         ...form,
         name: form.name.trim(),
-        price: parseFloat(form.price),
+        price: parseFloat(form.price) || 0,
         cost_price: form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
           ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
-          : canEditCost ? productCost.effectiveCost : (product?.cost_price ?? null),
+          : canEditCost && costIsComplete ? productCost.effectiveCost : (product?.cost_price ?? null),
         cost_lyd: form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
           ? calculateRetailCoffeeCost(form.stock_cost_per_base_unit, form.retail_pack_size_base_units)
-          : canEditCost ? productCost.effectiveCost : (product?.cost_lyd ?? null),
+          : canEditCost && costIsComplete ? productCost.effectiveCost : (product?.cost_lyd ?? null),
         manual_cost_lyd: canEditCost
           ? (form.manual_cost_lyd === '' ? null : parseFloat(form.manual_cost_lyd))
           : (product?.manual_cost_lyd ?? product?.cost_price ?? null),
@@ -282,7 +280,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
         saved = await createPOSProduct(payload)
       }
 
-      if (canEditCost) {
+      if (canEditCost && costIsComplete) {
         await replaceProductCostComponents(saved.id, serializeCostComponents(costComponents))
       }
 
@@ -632,15 +630,15 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
 }
 
 // ─── Role permissions ─────────────────────────────────────────
-// Phase 3: what each role can do in the product catalog.
+// Product permissions remain role-scoped. Inventory quantity changes have
+// their own audited POS flow and do not require broad catalog-edit access.
 function getProductPerms(role) {
-  if (role === 'owner')      return { canEdit: true,  allFields: true,  availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: true }
-  if (role === 'supervisor') return { canEdit: true,  allFields: false, availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: false }
-  if (role === 'staff')      return { canEdit: true,  allFields: false, availability: true,  image: false, branchVisibility: false, stock: false, cost: false }
-  if (role === 'accountant')   return { canEdit: true,  allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: true }
-  if (role === 'data_entry')   return { canEdit: true,  allFields: true,  availability: true,  image: true,  branchVisibility: true,  stock: true,  cost: true }
-  // limited_staff and unknown: view only
-  return { canEdit: false, allFields: false, availability: false, image: false, branchVisibility: false, stock: false, cost: false }
+  if (role === 'owner')      return { canEdit: true,  cost: true }
+  if (role === 'supervisor') return { canEdit: true,  cost: false }
+  if (role === 'staff')      return { canEdit: true,  cost: false }
+  if (role === 'accountant') return { canEdit: true,  cost: true }
+  if (role === 'data_entry') return { canEdit: true,  cost: true }
+  return { canEdit: false, cost: false }
 }
 
 // ─── Main page ────────────────────────────────────────────────

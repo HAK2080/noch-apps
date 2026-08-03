@@ -1,256 +1,276 @@
-// RoleManager.jsx — RBAC role & permission management (role_permissions TEXT table)
-// Route: /staff/roles
-
-import { useState, useEffect } from 'react'
-import { Shield, Check, X, Loader2, Bell, Pencil } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
-import { getRolePermissions, updateRolePermission, approveRoleChange, denyRoleChange } from '../../lib/profiles'
-import Layout from '../../components/Layout'
-import { usePermission } from '../../lib/usePermission'
-import { AccessDenied } from '../../components/shared/ProtectedFeature'
-import { FEATURE_GROUPS } from '../../lib/features'
+import { Fragment, useEffect, useState } from 'react'
+import { Bell, Check, Loader2, Pencil, Shield, UserCheck, UserX, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-const ROLES = ['supervisor', 'accountant', 'staff', 'limited_staff', 'data_entry']
+import Layout from '../../components/Layout'
+import { useLanguage } from '../../contexts/LanguageContext'
+import { usePermissions } from '../../contexts/PermissionsContext'
+import { FEATURE_GROUPS } from '../../lib/features'
+import {
+  approveRoleChange,
+  denyRoleChange,
+  getAccountAccessSummary,
+  getRolePermissions,
+  setProfileAccess,
+  updateRolePermission,
+} from '../../lib/profiles'
+import { ROLE_LABELS, SUPPORTED_ROLES, roleLabel } from '../../lib/access-control'
+import { supabase } from '../../lib/supabase'
+
 const ROLE_COLORS = {
-  supervisor:   'text-blue-400',
-  accountant:   'text-green-400',
-  staff:        'text-noch-green',
-  limited_staff:'text-noch-muted',
-  data_entry:   'text-orange-400',
+  supervisor: 'text-blue-400',
+  accountant: 'text-green-400',
+  staff: 'text-noch-green',
+  limited_staff: 'text-noch-muted',
 }
 
 export default function RoleManager() {
-  const can = usePermission()
-  if (!can('staff', 'edit')) {
-    return <Layout><AccessDenied message="You don't have permission to manage roles." /></Layout>
-  }
-
-  // perms[role][feature] = { can_access, can_edit }
+  const { lang } = useLanguage()
+  const { reloadPermissions } = usePermissions()
+  const ar = lang === 'ar'
+  const copy = (en, arText) => ar ? arText : en
   const [perms, setPerms] = useState({})
-  const [saving, setSaving] = useState({}) // { "role:feature": true }
+  const [saving, setSaving] = useState({})
   const [requests, setRequests] = useState([])
+  const [accounts, setAccounts] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [])
-
   const load = async () => {
+    setLoading(true)
     try {
-      const [permsData, { data: reqData }] = await Promise.all([
+      const [permsData, requestResult, accountData] = await Promise.all([
         getRolePermissions(),
-        supabase.from('profiles')
+        supabase
+          .from('profiles')
           .select('id, full_name, role, role_requested')
           .not('role_requested', 'is', null)
           .neq('role_requested', ''),
+        getAccountAccessSummary(),
       ])
+      if (requestResult.error) throw requestResult.error
 
-      const map = {}
-      ROLES.forEach(r => { map[r] = {} })
-      ;(permsData || []).forEach(p => {
-        if (!map[p.role]) map[p.role] = {}
-        map[p.role][p.feature] = { can_access: p.can_access, can_edit: p.can_edit }
+      const map = Object.fromEntries(SUPPORTED_ROLES.map(role => [role, {}]))
+      permsData.forEach(grant => {
+        if (!map[grant.role]) return
+        map[grant.role][grant.feature] = {
+          can_access: !!grant.can_access,
+          can_edit: !!grant.can_access && !!grant.can_edit,
+        }
       })
       setPerms(map)
-      setRequests(reqData || [])
-    } catch (err) {
-      toast.error(err.message || 'Failed to load')
+      setRequests(requestResult.data || [])
+      setAccounts(accountData)
+    } catch (error) {
+      toast.error(error.message || copy('Failed to load access controls', 'تعذر تحميل إعدادات الوصول'))
     } finally {
       setLoading(false)
     }
   }
 
-  // Each click cycles the cell: off → view → view + edit → off
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleAccess = async (role, feature) => {
     const key = `${role}:${feature}`
     const current = perms[role]?.[feature] || { can_access: false, can_edit: false }
-    let newAccess, newEdit
-    if (!current.can_access) {
-      newAccess = true; newEdit = false           // off → view
-    } else if (!current.can_edit) {
-      newAccess = true; newEdit = true            // view → view + edit
-    } else {
-      newAccess = false; newEdit = false          // view + edit → off
-    }
+    const next = !current.can_access
+      ? { can_access: true, can_edit: false }
+      : !current.can_edit
+        ? { can_access: true, can_edit: true }
+        : { can_access: false, can_edit: false }
 
-    setPerms(prev => ({
-      ...prev,
-      [role]: { ...prev[role], [feature]: { can_access: newAccess, can_edit: newEdit } },
+    setPerms(previous => ({
+      ...previous,
+      [role]: { ...previous[role], [feature]: next },
     }))
-    setSaving(s => ({ ...s, [key]: true }))
-
+    setSaving(previous => ({ ...previous, [key]: true }))
     try {
-      await updateRolePermission(role, feature, newAccess, newEdit)
-    } catch (err) {
-      toast.error(err.message || 'Save failed')
-      // revert
-      setPerms(prev => ({
-        ...prev,
-        [role]: { ...prev[role], [feature]: current },
+      await updateRolePermission(role, feature, next.can_access, next.can_edit)
+      await reloadPermissions()
+    } catch (error) {
+      setPerms(previous => ({
+        ...previous,
+        [role]: { ...previous[role], [feature]: current },
       }))
+      toast.error(error.message || copy('Save failed', 'فشل الحفظ'))
     } finally {
-      setSaving(s => ({ ...s, [key]: false }))
+      setSaving(previous => ({ ...previous, [key]: false }))
     }
   }
 
-  const handleApprove = async (staff) => {
+  const handleApprove = async staff => {
+    if (!SUPPORTED_ROLES.includes(staff.role_requested)) {
+      toast.error(copy('This legacy role is archived and cannot be assigned.', 'هذا الدور القديم مؤرشف ولا يمكن تعيينه.'))
+      return
+    }
     try {
       await approveRoleChange(staff.id, staff.role_requested)
-      setRequests(prev => prev.filter(r => r.id !== staff.id))
-      toast.success(`${staff.full_name} approved for ${staff.role_requested}`)
-    } catch (err) {
-      toast.error(err.message || 'Failed')
+      setRequests(previous => previous.filter(request => request.id !== staff.id))
+      toast.success(copy('Role request approved', 'تم اعتماد طلب الدور'))
+    } catch (error) {
+      toast.error(error.message || copy('Approval failed', 'فشل الاعتماد'))
     }
   }
 
-  const handleDeny = async (staff) => {
+  const handleDeny = async staff => {
     try {
       await denyRoleChange(staff.id)
-      setRequests(prev => prev.filter(r => r.id !== staff.id))
-      toast('Request denied')
-    } catch (err) {
-      toast.error(err.message || 'Failed')
+      setRequests(previous => previous.filter(request => request.id !== staff.id))
+      toast.success(copy('Role request denied', 'تم رفض طلب الدور'))
+    } catch (error) {
+      toast.error(error.message || copy('Request failed', 'فشل الطلب'))
     }
   }
 
-  if (loading) return <Layout><p className="text-noch-muted text-center py-16">Loading...</p></Layout>
+  const handleAccountAccess = async account => {
+    const nextEnabled = !account.access_enabled
+    const key = `account:${account.profile_id}`
+    setSaving(previous => ({ ...previous, [key]: true }))
+    try {
+      await setProfileAccess(
+        account.profile_id,
+        nextEnabled,
+        nextEnabled ? 'Enabled in Role Manager' : 'Disabled in Role Manager',
+      )
+      setAccounts(previous => previous.map(item => item.profile_id === account.profile_id
+        ? { ...item, access_enabled: nextEnabled }
+        : item))
+      toast.success(nextEnabled
+        ? copy('Account access enabled', 'تم تفعيل دخول الحساب')
+        : copy('Account access disabled', 'تم إيقاف دخول الحساب'))
+    } catch (error) {
+      toast.error(error.message || copy('Access update failed', 'فشل تحديث الوصول'))
+    } finally {
+      setSaving(previous => ({ ...previous, [key]: false }))
+    }
+  }
+
+  if (loading) return <Layout><p className="py-16 text-center text-noch-muted">{copy('Loading access controls…', 'جارٍ تحميل إعدادات الوصول…')}</p></Layout>
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex items-center gap-3">
           <Shield size={20} className="text-noch-green" />
-          <h1 className="text-white font-bold text-xl">Role Manager</h1>
-          {requests.length > 0 && (
-            <span className="ml-auto flex items-center gap-1.5 text-xs bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 px-2.5 py-1 rounded-full">
-              <Bell size={11} />
-              {requests.length} pending role request{requests.length > 1 ? 's' : ''}
-            </span>
-          )}
+          <div>
+            <h1 className="text-xl font-bold text-white">{copy('Roles and access', 'الأدوار والوصول')}</h1>
+            <p className="text-xs text-noch-muted">{copy('Account access, module access, and edit authority are separate controls.', 'دخول الحساب والوصول للوحدات وصلاحية التعديل هي ضوابط منفصلة.')}</p>
+          </div>
         </div>
 
-        {/* Pending role requests */}
-        {requests.length > 0 && (
-          <div className="card mb-6 border-yellow-500/20">
-            <h2 className="text-white font-semibold text-sm mb-3">Pending Role Requests</h2>
-            <div className="flex flex-col gap-2">
-              {requests.map(s => (
-                <div key={s.id} className="flex items-center justify-between gap-3 p-3 bg-noch-dark rounded-xl border border-noch-border">
-                  <div>
-                    <p className="text-white text-sm font-medium">{s.full_name}</p>
-                    <p className="text-noch-muted text-xs">
-                      Requesting: <span className="text-noch-green">{s.role_requested?.replace(/_/g, ' ')}</span>
-                      {s.role && <span className="text-noch-muted"> (currently: {s.role.replace(/_/g, ' ')})</span>}
+        <section className="card">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-white">{copy('Account access', 'دخول الحسابات')}</h2>
+              <p className="text-xs text-noch-muted">{copy('Disabling login never deletes staff or payroll records.', 'إيقاف الدخول لا يحذف بيانات الموظف أو الرواتب.')}</p>
+            </div>
+            <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-noch-muted">
+              {accounts.filter(account => account.access_enabled).length}/{accounts.length} {copy('enabled', 'مفعّل')}
+            </span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {accounts.map(account => {
+              const key = `account:${account.profile_id}`
+              const locked = account.role === 'owner' || !account.auth_linked
+              return (
+                <div key={account.profile_id} className="flex items-center gap-3 rounded-xl border border-noch-border bg-noch-dark p-3">
+                  {account.access_enabled ? <UserCheck size={17} className="text-noch-green" /> : <UserX size={17} className="text-red-400" />}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">{account.full_name}</p>
+                    <p className="text-xs text-noch-muted">
+                      {roleLabel(account.role, lang)} · {account.auth_linked ? copy('login linked', 'مرتبط بتسجيل دخول') : copy('no login linked', 'غير مرتبط بتسجيل دخول')}
                     </p>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => handleApprove(s)}
-                      className="p-1.5 bg-noch-green/10 text-noch-green rounded-lg hover:bg-noch-green/20 transition-colors"
-                      title="Approve"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDeny(s)}
-                      className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
-                      title="Deny"
-                    >
-                      <X size={14} />
-                    </button>
+                  <button
+                    type="button"
+                    disabled={locked || saving[key]}
+                    onClick={() => handleAccountAccess(account)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${account.access_enabled ? 'border-red-400/30 text-red-300' : 'border-green-400/30 text-noch-green'}`}
+                  >
+                    {saving[key] ? <Loader2 size={13} className="animate-spin" /> : account.access_enabled ? copy('Disable', 'إيقاف') : copy('Enable', 'تفعيل')}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {requests.length > 0 && (
+          <section className="card border-yellow-500/20">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <Bell size={14} className="text-yellow-400" />
+              {copy('Pending role requests', 'طلبات الأدوار المعلقة')} ({requests.length})
+            </h2>
+            <div className="flex flex-col gap-2">
+              {requests.map(staff => (
+                <div key={staff.id} className="flex items-center justify-between gap-3 rounded-xl border border-noch-border bg-noch-dark p-3">
+                  <div>
+                    <p className="text-sm font-medium text-white">{staff.full_name}</p>
+                    <p className="text-xs text-noch-muted">
+                      {roleLabel(staff.role, lang)} → {roleLabel(staff.role_requested, lang)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button onClick={() => handleApprove(staff)} aria-label={copy('Approve', 'اعتماد')} className="rounded-lg bg-noch-green/10 p-2 text-noch-green"><Check size={14} /></button>
+                    <button onClick={() => handleDeny(staff)} aria-label={copy('Deny', 'رفض')} className="rounded-lg bg-red-500/10 p-2 text-red-400"><X size={14} /></button>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Permission Matrix */}
-        <div className="card overflow-x-auto">
-          <p className="text-noch-muted text-xs mb-4">
-            Owner column is always ON and locked.
-            Click a cell to cycle: <span className="text-noch-muted/90">off</span>
-            {' → '}<span className="text-noch-green">view</span>
-            {' → '}<span className="text-blue-400">view + edit</span>
-            {' → off'}. Saves immediately.
+        <section className="card overflow-x-auto">
+          <h2 className="font-semibold text-white">{copy('Module permissions', 'صلاحيات الوحدات')}</h2>
+          <p className="mb-4 mt-1 text-xs text-noch-muted">
+            {copy('Click: off → view → view and edit → off. Owner access is always on.', 'انقر للتبديل: متوقف ← عرض ← عرض وتعديل ← متوقف. وصول المالك دائمًا مفعّل.')}
           </p>
-
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="text-left py-2 px-3 text-noch-muted font-medium text-xs w-48">Feature</th>
-                {/* Owner — locked */}
-                <th className="py-2 px-3 text-center text-purple-400 font-semibold text-xs">Owner</th>
-                {ROLES.map(role => (
-                  <th key={role} className={`py-2 px-3 text-center font-semibold text-xs ${ROLE_COLORS[role]}`}>
-                    {role.replace(/_/g, ' ')}
-                  </th>
+                <th className="w-48 px-3 py-2 text-start text-xs font-medium text-noch-muted">{copy('Module', 'الوحدة')}</th>
+                <th className="px-3 py-2 text-center text-xs font-semibold text-purple-400">{ROLE_LABELS.owner[lang]}</th>
+                {SUPPORTED_ROLES.map(role => (
+                  <th key={role} className={`px-3 py-2 text-center text-xs font-semibold ${ROLE_COLORS[role]}`}>{roleLabel(role, lang)}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {FEATURE_GROUPS.map(group => (
-                <>
-                  {/* Group header row */}
-                  <tr key={group.label}>
-                    <td colSpan={ROLES.length + 2} className="pt-4 pb-1 px-3">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-noch-muted/70">
-                        {group.label}
-                      </span>
+                <Fragment key={group.labelEn}>
+                  <tr>
+                    <td colSpan={SUPPORTED_ROLES.length + 2} className="px-3 pb-1 pt-4">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-noch-muted/70">{ar ? group.labelAr : group.labelEn}</span>
                     </td>
                   </tr>
-                  {group.features.map(f => (
-                    <tr key={f.key} className="border-t border-noch-border/30 hover:bg-noch-dark/50 transition-colors">
-                      <td className="py-2 px-3 text-white text-xs">{f.label}</td>
-                      {/* Owner cell — locked */}
-                      <td className="py-2 px-3 text-center">
-                        <div className="w-5 h-5 rounded bg-purple-400/20 border border-purple-400/40 flex items-center justify-center mx-auto">
-                          <Check size={10} className="text-purple-400" />
-                        </div>
-                      </td>
-                      {ROLES.map(role => {
-                        const key = `${role}:${f.key}`
-                        const p = perms[role]?.[f.key] || { can_access: false, can_edit: false }
-                        const isSaving = saving[key]
+                  {group.features.map(feature => (
+                    <tr key={feature.key} className="border-t border-noch-border/30 hover:bg-noch-dark/50">
+                      <td className="px-3 py-2 text-xs text-white">{ar ? feature.labelAr : feature.labelEn}</td>
+                      <td className="px-3 py-2 text-center"><Check size={13} className="mx-auto text-purple-400" /></td>
+                      {SUPPORTED_ROLES.map(role => {
+                        const key = `${role}:${feature.key}`
+                        const grant = perms[role]?.[feature.key] || { can_access: false, can_edit: false }
                         return (
-                          <td key={role} className="py-2 px-3 text-center">
+                          <td key={role} className="px-3 py-2 text-center">
                             <button
-                              onClick={() => toggleAccess(role, f.key)}
-                              disabled={isSaving}
-                              className={`w-6 h-6 rounded border flex items-center justify-center mx-auto transition-all ${
-                                p.can_access && p.can_edit
-                                  ? 'bg-blue-400/20 border-blue-400/50 text-blue-400 hover:bg-blue-400/30'
-                                  : p.can_access
-                                  ? 'bg-noch-green/20 border-noch-green/50 text-noch-green hover:bg-noch-green/30'
-                                  : 'border-noch-border text-noch-muted hover:border-noch-green/30 hover:bg-noch-green/5'
-                              }`}
-                              title={`${role}: ${f.label} — ${
-                                p.can_access && p.can_edit ? 'View + Edit' : p.can_access ? 'View only' : 'Disabled'
-                              }`}
+                              onClick={() => toggleAccess(role, feature.key)}
+                              disabled={saving[key]}
+                              aria-label={`${roleLabel(role, lang)}: ${ar ? feature.labelAr : feature.labelEn}`}
+                              className={`mx-auto flex h-7 w-7 items-center justify-center rounded border ${grant.can_edit ? 'border-blue-400/50 bg-blue-400/20 text-blue-400' : grant.can_access ? 'border-noch-green/50 bg-noch-green/20 text-noch-green' : 'border-noch-border text-noch-muted'}`}
                             >
-                              {isSaving ? (
-                                <Loader2 size={10} className="animate-spin" />
-                              ) : p.can_access && p.can_edit ? (
-                                <Pencil size={10} />
-                              ) : p.can_access ? (
-                                <Check size={10} />
-                              ) : (
-                                <span className="w-1 h-1 rounded-full bg-noch-border inline-block" />
-                              )}
+                              {saving[key] ? <Loader2 size={11} className="animate-spin" /> : grant.can_edit ? <Pencil size={11} /> : grant.can_access ? <Check size={11} /> : <span className="h-1 w-1 rounded-full bg-noch-border" />}
                             </button>
                           </td>
                         )
                       })}
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
-
-          <p className="text-noch-muted text-xs mt-4">
-            Changes save immediately. Refresh the page to see updated counts.
+          <p className="mt-4 text-xs text-noch-muted">
+            {copy('The old data-entry role is archived. Its historical rows are preserved but it cannot be assigned.', 'دور إدخال البيانات القديم مؤرشف. تم حفظ سجلاته التاريخية ولا يمكن تعيينه.')}
           </p>
-        </div>
+        </section>
       </div>
     </Layout>
   )

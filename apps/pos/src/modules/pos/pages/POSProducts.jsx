@@ -105,7 +105,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   }
 
   const handleSave = async () => {
-    if (!form.name || !form.price) {
+    if (!form.name.trim() || !form.price) {
       toast.error('Name and price are required')
       return
     }
@@ -118,7 +118,8 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
       const data = {
         ...stripped,
         branch_id: branchId,
-        price: parseFloat(form.price),
+        name: form.name.trim(),
+        price: parseFloat(form.price) || 0,
         stock_base_unit: getStockBaseUnit(form.stock_display_unit),
         stock_display_unit: form.stock_display_unit,
         stock_qty: toBaseQuantity(parseFloat(form.stock_qty) || 0, form.stock_display_unit),
@@ -574,7 +575,7 @@ export default function POSProducts() {
     try {
       const [b, p, c, allBranches] = await Promise.all([
         getPOSBranch(branchId),
-        getPOSProducts(branchId),
+        getPOSProducts(branchId, { includeHidden: true }),
         getPOSCategories(branchId),
         getPOSBranches(),
       ])

@@ -96,26 +96,28 @@ test('builds platform-specific benchmarks and portfolio summary', () => {
   )
 })
 
-test('wires the evaluator into Content Studio and persists its report fields', async () => {
+test('routes Content Studio measurement through one authoritative publication workflow', async () => {
   const [routes, nav, page, service, migration] = await Promise.all([
     readFile(new URL('../src/modules/contentStudio/index.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/modules/contentStudio/lib/constants.js', import.meta.url), 'utf8'),
-    readFile(new URL('../src/modules/contentStudio/pages/PostPerformance.jsx', import.meta.url), 'utf8'),
-    readFile(new URL('../src/modules/contentStudio/services/contentBank.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/modules/contentStudio/pages/ContentMeasurement.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/modules/contentStudio/services/measurement.js', import.meta.url), 'utf8'),
     readFile(
-      new URL('../../../supabase/migrations/20260725141000_content_performance_evaluator.sql', import.meta.url),
+      new URL('../../../supabase/migrations/20260731234000_content_measurement_control.sql', import.meta.url),
       'utf8',
     ),
   ])
 
-  assert.match(routes, /path="performance"/)
+  assert.match(routes, /path="performance" element=\{<ContentMeasurement/)
   assert.match(nav, /\/content-studio\/performance/)
-  assert.match(page, /evaluatePostEffectiveness/)
-  assert.match(page, /evaluateDraft/)
-  assert.match(page, /updateBankItemPerformance/)
-  assert.match(page, /recordSignal/)
-  assert.match(service, /PERF_INTEGER_FIELDS/)
-  assert.match(service, /Math\.round\(number\)/)
-  assert.match(migration, /perf_effectiveness_score/)
-  assert.match(migration, /perf_ai_evaluation/)
+  assert.match(page, /Publishing & content measurement/)
+  assert.match(page, /markPublished/)
+  assert.match(page, /Performance snapshot/)
+  assert.match(page, /does not claim lift or causality/)
+  assert.match(service, /content_measurement_summary_v2/)
+  assert.match(service, /cs_publications/)
+  assert.match(service, /cs_performance_snapshots/)
+  assert.match(migration, /create table if not exists public\.cs_publications/i)
+  assert.match(migration, /create table if not exists public\.cs_performance_snapshots/i)
+  assert.match(migration, /'causal_claims_allowed', false/i)
 })

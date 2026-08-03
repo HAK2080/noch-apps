@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { fmt, loadExpenses, deleteExpense } from './lib/expensesData'
 import StatusBadge from './StatusBadge'
+import PaymentDeclarationBadge from './PaymentDeclarationBadge'
 
 export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, costCenters, categories, rates }) {
   const [expenses, setExpenses] = useState([])
@@ -41,11 +42,34 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
     }
     setActing(expenseId)
     try {
-      await supabase.from('expenses').update({ status: decision, updated_at: new Date().toISOString() }).eq('id', expenseId)
-      await supabase.from('expense_approvals').insert({ expense_id: expenseId, acted_by: actorId, decision, notes: notes || null })
-      toast.success(decision === 'paid' ? 'Marked as paid' : `Expense ${decision}`)
+      const expense = expenses.find(item => item.id === expenseId)
+      if (decision === 'approved') {
+        const { error } = await supabase.rpc('approve_expense_with_reported_payment', {
+          p_expense_id: expenseId,
+          p_notes: notes || null,
+        })
+        if (error) throw error
+        const autoPaid = expense?.payment_status_reported === 'paid'
+        toast.success(autoPaid
+          ? `Expense approved and marked paid by ${expense.payment_method_reported || 'cash'}`
+          : 'Expense approved')
+      } else {
+        const { error: updateError } = await supabase
+          .from('expenses')
+          .update({ status: decision, updated_at: new Date().toISOString() })
+          .eq('id', expenseId)
+        if (updateError) throw updateError
+        const { error: approvalError } = await supabase.from('expense_approvals').insert({
+          expense_id: expenseId,
+          acted_by: actorId,
+          decision,
+          notes: notes || null,
+        })
+        if (approvalError) throw approvalError
+        toast.success(`Expense ${decision}`)
+      }
       onAction()
-      load()
+      await load()
     } catch (err) { toast.error(err.message) }
     setActing(null)
   }
@@ -224,6 +248,7 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
                     <span className="text-white font-semibold">{fmt(exp.amount, exp.currency)}</span>
                     {exp.currency !== 'LYD' && <span className="text-noch-muted text-xs">≈ {fmt(exp.amount_lyd)}</span>}
                     <StatusBadge status={exp.status} />
+                    <PaymentDeclarationBadge expense={exp} />
                   </div>
                   <p className="text-xs text-noch-muted mt-0.5">
                     By <span className="text-white">{exp.profiles?.full_name || 'Staff'}</span> · {exp.expense_date}
@@ -263,7 +288,7 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
                   </button>
                 </div>
               )}
-              {exp.status === 'approved' && isOwner && (
+              {exp.status === 'approved' && !exp.paid_at && isOwner && (
                 <button onClick={() => markPaid([exp.id])} disabled={payingBatch}
                   className="w-full bg-blue-400/10 text-blue-400 border border-blue-400/20 rounded-lg py-2 text-xs font-medium hover:bg-blue-400/20 flex items-center justify-center gap-1 disabled:opacity-50">
                   <Wallet size={13} /> Mark as Paid

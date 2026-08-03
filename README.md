@@ -9,6 +9,62 @@ root `.env`.
 | **POS + dashboard** | [`apps/pos/`](apps/pos) | `apps.noch.cloud` | Staff (POS, inventory, finance, loyalty, …) + customers (menu/checkout pages) |
 | **Storefront** | [`apps/storefront/`](apps/storefront) | `noch.cloud` | Customers (Hub, Menu, Shop, Loyalty landing) |
 
+## Current release highlights
+
+- **Owner reporting:** `/report` and Finance use one Tripoli-business-day
+  reporting model for net sales, payment reconciliation, direct profit, shared
+  costs, and fully loaded operating profit. Missing or stale evidence stays
+  visible instead of becoming zero.
+- **Loyalty V2:** privacy-first transaction QR capture with retained masked
+  cashier lookup fallback, an explicit linked/skipped decision for every
+  online order, verified channel consent, owner-only masked customer
+  management, auditable opening balances from V1, missions, reward
+  obligations, refund/void reversals, and a read-only V1 archive.
+- **Inventory control:** branch and warehouse product quantities use the
+  location stock ledger; POS receiving, adjustments, sales reversals,
+  transfers, and waste create auditable location movements. Ingredient
+  estimates require explicit recipes, and missing/stale evidence is shown
+  instead of converted to zero.
+- **Expenses:** submitters report unpaid, paid cash, or paid card before owner
+  approval; Receipt Snap and Telegram follow the same accounting workflow.
+- **Finance:** owner-facing navigation and headline metrics use plain business
+  language while retaining accounting terms such as COGS where useful.
+- **Sales and cash control:** `/sales` is the owner control view for Tripoli
+  business-day sales and tender reconciliation; shift closeouts derive expected
+  drawer cash from an immutable tender-event ledger and keep missing counts
+  visibly missing. Card settlement remains unavailable until an external
+  processor or bank statement source is connected.
+- **Workforce control:** `/staff` is the owner control point for the employee
+  directory, attendance evidence, weekly schedules, and payroll. Open
+  attendance is excluded from paid hours, draft payroll is excluded from actual
+  profit, and payroll approval is separated from payment.
+- **Content Studio measurement:** `/content-studio/performance` is the
+  owner-only publishing and evidence workflow. Approved assets become explicit
+  publication records with objective, product, campaign, spend, and fixed
+  24-hour/7-day snapshots. Associated orders and revenue are never presented as
+  causal lift without a recorded experiment and control.
+- **Access and acceptance:** navigation and direct URLs use the same role
+  policy, denied access fails closed with an English/Arabic explanation, and
+  mobile users can reach every granted page. Full profile rows are owner-or-self;
+  POS and staff pickers use a safe directory that excludes contact, PIN, payroll,
+  and access-control fields.
+
+## Current operating-readiness exceptions
+
+The software reports these as owner actions; they are not silently filled with
+estimates:
+
+- Complete 79 ingredient location counts, resolve 5 negative product-location
+  balances, and link explicit recipes for sold products.
+- Enter 9 missing employee start dates, then record attendance and publish a
+  schedule before regenerating the unreconciled July payroll draft.
+- Start post-launch loyalty capture and member self-linking; the 30% day-30 and
+  50% day-90 targets do not yet have an eligible post-launch order cohort.
+- Record Content Studio publications and 24-hour/7-day evidence snapshots.
+- Connect card/Presto settlement or bank-statement evidence; POS tenders
+  reconcile, but processor settlement is still unavailable.
+
+
 ```
 Jul 26 release/
 ├── apps/
@@ -48,8 +104,11 @@ day-to-day loop.
 
 ## Build & deploy
 
-Deployment is handled by [`deploy.py`](deploy.py) (requires Python +
-`paramiko`). It builds the app and uploads `dist/` to the VPS.
+Production deployment is handled by GitHub Actions on pushes to `main` that
+change `apps/pos/**`, or by manually running the **Deploy apps.noch.cloud**
+workflow. The workflow builds the POS app and invokes [`deploy.py`](deploy.py)
+with repository secrets. Maintainers can also run `deploy.py` locally when
+the required SSH credentials are configured.
 
 ```bash
 python deploy.py apps         # build + deploy apps.noch.cloud
@@ -65,8 +124,9 @@ python deploy.py apps --no-build   # upload an existing dist/ without rebuilding
   transpiles its app ahead of time so the browser doesn't ship/run a JSX
   transpiler at runtime.
 
-`git push` only saves code to GitHub — it does **not** deploy. Deploys go
-through `deploy.py`.
+Feature branches and pull requests do not deploy automatically. A push to
+`main` deploys applicable POS changes; a manual workflow dispatch can deploy
+a selected branch for controlled verification.
 
 ## Database
 

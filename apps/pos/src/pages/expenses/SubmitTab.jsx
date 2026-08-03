@@ -1,6 +1,6 @@
 // SubmitTab.jsx — Expenses: submit a new expense
 import { useState, useEffect, useRef } from 'react'
-import { Plus, X, Camera, ChevronDown, Loader2, Building2, Tag } from 'lucide-react'
+import { Plus, X, Camera, ChevronDown, Loader2, Building2, Tag, Banknote, CreditCard, Clock3 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { fmt, getOwnerSetting, setOwnerSetting, uploadReceipt } from './lib/expensesData'
@@ -11,6 +11,7 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
   const [form, setForm] = useState({
     cost_center_id: '', category_id: '', amount: '', currency: 'LYD',
     vendor: '', description: '', expense_date: today, paid_by: 'Business',
+    payment_status_reported: 'unpaid', payment_method_reported: '',
   })
   const [receiptFile, setReceiptFile] = useState(null)
   const [receiptPreview, setReceiptPreview] = useState(null)
@@ -67,11 +68,15 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
         vendor: form.vendor || null,
         description: form.description || null,
         paid_by: paidBy,
+        payment_status_reported: form.payment_status_reported,
+        payment_method_reported: form.payment_status_reported === 'paid' ? form.payment_method_reported : null,
+        payment_reported_by: user.id,
+        payment_reported_at: new Date().toISOString(),
         // Shareholder funding classification — DB default covers 'business'
         ...(paidBy !== 'Business' ? { funding_type: canFund ? fundingType : 'shareholder_loan' } : {}),
         receipt_url,
         expense_date: form.expense_date,
-        status: isAutoApproved ? 'approved' : 'pending',
+        status: 'pending',
         ...(prepaid ? {
           coverage_months: Math.min(24, Math.max(2, parseInt(coverageMonths, 10) || 2)),
           coverage_start: coverageStart || form.expense_date,
@@ -79,15 +84,18 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
       }).select().single()
       if (error) throw error
       if (isAutoApproved) {
-        await supabase.from('expense_approvals').insert({
-          expense_id: expense.id,
-          acted_by: user.id,
-          decision: 'auto_approved',
-          notes: 'Auto-approved by owner',
+        const { error: approvalError } = await supabase.rpc('approve_expense_with_reported_payment', {
+          p_expense_id: expense.id,
+          p_notes: 'Auto-approved by owner',
         })
+        if (approvalError) throw approvalError
       }
       toast.success(isAutoApproved ? 'Expense submitted & auto-approved' : 'Expense submitted for approval')
-      setForm({ cost_center_id: '', category_id: '', amount: '', currency: 'LYD', vendor: '', description: '', expense_date: today, paid_by: 'Business' })
+      setForm({
+        cost_center_id: '', category_id: '', amount: '', currency: 'LYD',
+        vendor: '', description: '', expense_date: today, paid_by: 'Business',
+        payment_status_reported: 'unpaid', payment_method_reported: '',
+      })
       setReceiptFile(null)
       setReceiptPreview(null)
       setPrepaid(false)
@@ -211,6 +219,73 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
               <input type="date" value={coverageStart || form.expense_date}
                 onChange={e => setCoverageStart(e.target.value)}
                 className="w-full bg-noch-dark border border-noch-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-noch-green/50" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Source of payment */}
+      <div className="bg-noch-dark/50 border border-noch-border rounded-xl p-4 space-y-3">
+        <div>
+          <p className="text-sm text-white font-medium">Has this expense already been paid?</p>
+          <p className="text-xs text-noch-muted mt-0.5">The owner will see this flag automatically.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              set('payment_status_reported', 'unpaid')
+              set('payment_method_reported', '')
+            }}
+            className={`rounded-xl border px-3 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              form.payment_status_reported === 'unpaid'
+                ? 'border-amber-400/50 bg-amber-400/10 text-amber-300'
+                : 'border-noch-border text-noch-muted hover:text-white'
+            }`}
+          >
+            <Clock3 size={16} /> Not paid yet
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              set('payment_status_reported', 'paid')
+              if (!form.payment_method_reported) set('payment_method_reported', 'cash')
+            }}
+            className={`rounded-xl border px-3 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+              form.payment_status_reported === 'paid'
+                ? 'border-noch-green/50 bg-noch-green/10 text-noch-green'
+                : 'border-noch-border text-noch-muted hover:text-white'
+            }`}
+          >
+            Paid
+          </button>
+        </div>
+        {form.payment_status_reported === 'paid' && (
+          <div>
+            <p className="text-xs text-noch-muted mb-2">How was it paid?</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => set('payment_method_reported', 'cash')}
+                className={`rounded-xl border px-3 py-2.5 text-sm flex items-center justify-center gap-2 ${
+                  form.payment_method_reported === 'cash'
+                    ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-300'
+                    : 'border-noch-border text-noch-muted'
+                }`}
+              >
+                <Banknote size={16} /> Cash
+              </button>
+              <button
+                type="button"
+                onClick={() => set('payment_method_reported', 'card')}
+                className={`rounded-xl border px-3 py-2.5 text-sm flex items-center justify-center gap-2 ${
+                  form.payment_method_reported === 'card'
+                    ? 'border-blue-400/50 bg-blue-400/10 text-blue-300'
+                    : 'border-noch-border text-noch-muted'
+                }`}
+              >
+                <CreditCard size={16} /> Card
+              </button>
             </div>
           </div>
         )}
