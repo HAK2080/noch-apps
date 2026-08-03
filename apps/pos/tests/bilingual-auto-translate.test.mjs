@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { repairMojibake } from '../src/lib/uiAutoTranslate.js'
 
 const sourceUrl = new URL('../src/lib/uiAutoTranslate.js', import.meta.url)
 
@@ -21,4 +22,12 @@ test('repairs legacy UTF-8/Latin-1 Arabic literals before rendering', async () =
   assert.match(source, /new TextDecoder\('utf-8', \{ fatal: true \}\)/)
   assert.match(source, /const PHRASES = repairDictionary\(/)
   assert.match(source, /const PLACEHOLDERS = repairDictionary\(/)
+})
+
+
+test('repairs single and double encoded Arabic without Arabic source literals', () => {
+  const expected = '\u062a\u0635\u062f\u064a\u0631'
+  const corrupt = value => String.fromCharCode(...new TextEncoder().encode(value))
+  assert.equal(repairMojibake(corrupt(expected)), expected)
+  assert.equal(repairMojibake(corrupt(corrupt(expected))), expected)
 })
