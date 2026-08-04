@@ -29,7 +29,8 @@ import toast from 'react-hot-toast'
 
 const COPY = {
   en: {
-    title: 'Shift cash control',
+    title: 'Sales control',
+    subtitle: 'Sales totals, payments, refunds and shift reconciliation',
     accessTitle: 'Access restricted',
     accessBody: 'Shift totals and drawer counts are visible to owners and managers only.',
     back: 'Back to POS',
@@ -39,10 +40,13 @@ const COPY = {
     businessRange: 'Business-day range',
     refresh: 'Refresh',
     loading: 'Loading shifts…',
-    loadFailed: 'Failed to load shift controls',
-    empty: 'No shifts in this business-day range.',
+    loadFailed: 'Failed to load sales control',
+    empty: 'No sales or shift data in this business-day range.',
     shifts: 'shifts',
-    netSales: 'Net sales in shifts',
+    totalSales: 'Total sales',
+    totalSalesHelp: 'Before refunds',
+    netSales: 'Net sales after refunds',
+    salesByShift: 'Sales and reconciliation by shift',
     orders: 'Orders',
     netCash: 'Net cash tender',
     netCard: 'Net card tender',
@@ -72,7 +76,8 @@ const COPY = {
     minute: 'm',
   },
   ar: {
-    title: 'رقابة النقدية والورديات',
+    title: 'رقابة المبيعات',
+    subtitle: 'إجماليات المبيعات والمدفوعات والمرتجعات ومطابقة الورديات',
     accessTitle: 'الدخول مقيّد',
     accessBody: 'إجماليات الورديات وعدّ الصندوق متاحة للمالك والمديرين فقط.',
     back: 'العودة إلى نقطة البيع',
@@ -82,10 +87,13 @@ const COPY = {
     businessRange: 'نطاق أيام العمل',
     refresh: 'تحديث',
     loading: 'جارٍ تحميل الورديات…',
-    loadFailed: 'تعذر تحميل رقابة الورديات',
-    empty: 'لا توجد ورديات في نطاق أيام العمل المحدد.',
+    loadFailed: 'تعذر تحميل رقابة المبيعات',
+    empty: 'لا توجد بيانات مبيعات أو ورديات في نطاق أيام العمل المحدد.',
     shifts: 'ورديات',
-    netSales: 'صافي المبيعات في الورديات',
+    totalSales: 'إجمالي المبيعات',
+    totalSalesHelp: 'قبل المرتجعات',
+    netSales: 'صافي المبيعات بعد المرتجعات',
+    salesByShift: 'المبيعات والمطابقة حسب الوردية',
     orders: 'الطلبات',
     netCash: 'صافي النقدية',
     netCard: 'صافي البطاقة',
@@ -140,6 +148,10 @@ function formatWhen(value, lang) {
 const money = value => Number(value || 0).toLocaleString('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+})
+
+const count = value => Number(value || 0).toLocaleString('en-US', {
+  maximumFractionDigits: 0,
 })
 
 function CashVariance({ shift, copy }) {
@@ -220,6 +232,7 @@ export default function POSSessions() {
   }
 
   const totals = combineShiftControls(shifts)
+  const totalSales = totals.netSales + totals.refunds
   const paymentReconciled = Math.abs(totals.paymentVariance) < 0.005
 
   return (
@@ -231,6 +244,7 @@ export default function POSSessions() {
           </button>
           <div className="flex-1">
             <h1 className="text-white font-bold text-xl">{copy.title}</h1>
+            <p className="text-noch-muted text-xs">{copy.subtitle}</p>
             <p className="text-noch-muted text-sm">
               {copy.businessRange}: {range.fromDate} → {range.toDate}
             </p>
@@ -255,7 +269,15 @@ export default function POSSessions() {
         {!loading && shifts.length > 0 && (
           <>
             <div className="card p-4 mb-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+                <div
+                  data-testid="total-sales"
+                  className="col-span-2 rounded-xl bg-noch-green px-4 py-3 text-black"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-black/70">{copy.totalSales}</p>
+                  <p className="text-2xl font-bold leading-tight">{money(totalSales)}</p>
+                  <p className="text-[10px] text-black/70">{copy.totalSalesHelp} · {copy.currency}</p>
+                </div>
                 {[
                   [copy.netSales, totals.netSales, 'text-noch-green'],
                   [copy.orders, totals.orderCount, 'text-white'],
@@ -266,7 +288,7 @@ export default function POSSessions() {
                 ].map(([label, value, tone]) => (
                   <div key={label}>
                     <p className="text-noch-muted text-[10px] uppercase tracking-wider">{label}</p>
-                    <p className={`${tone} font-bold text-lg leading-tight`}>{money(value)}</p>
+                    <p className={`${tone} font-bold text-lg leading-tight`}>{label === copy.orders ? count(value) : money(value)}</p>
                     <p className="text-noch-muted text-[10px]">{label === copy.orders ? '' : copy.currency}</p>
                   </div>
                 ))}
@@ -301,6 +323,10 @@ export default function POSSessions() {
           <p className="text-noch-muted text-center py-12 text-sm">{copy.empty}</p>
         ) : (
           <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3 px-1">
+              <h2 className="text-white text-sm font-semibold">{copy.salesByShift}</h2>
+              <span className="text-noch-muted text-xs">{totals.shiftCount} {copy.shifts}</span>
+            </div>
             {shifts.map(shift => {
               const isOpen = shift.status === 'open'
               return (
@@ -327,17 +353,18 @@ export default function POSSessions() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
                       {[
-                        [copy.netCash, shift.net_cash_tender],
-                        [copy.netCard, shift.net_card_tender],
-                        [copy.netPresto, shift.net_presto_tender],
-                        [copy.expectedCash, shift.expected_drawer_cash],
-                        [copy.countedCash, shift.counted_drawer_cash],
-                      ].map(([label, value]) => (
+                        [copy.totalSales, shift.net_sales + shift.refunds, 'text-noch-green'],
+                        [copy.netCash, shift.net_cash_tender, 'text-white'],
+                        [copy.netCard, shift.net_card_tender, 'text-white'],
+                        [copy.netPresto, shift.net_presto_tender, 'text-white'],
+                        [copy.expectedCash, shift.expected_drawer_cash, 'text-white'],
+                        [copy.countedCash, shift.counted_drawer_cash, 'text-white'],
+                      ].map(([label, value, tone]) => (
                         <div key={label} className="text-end">
                           <p className="text-noch-muted text-[10px] uppercase">{label}</p>
-                          <p className="text-white font-semibold">
+                          <p className={`${tone} font-semibold`}>
                             {value == null ? copy.notCounted : money(value)}
                           </p>
                         </div>
