@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, CheckCircle2, ListOrdered, Clock, Download, TrendingUp } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ListOrdered, Download, TrendingUp } from 'lucide-react'
 import {
   addYmdDays,
   businessDayWindow,
@@ -57,7 +57,7 @@ const SALES_COPY = {
     settlementUnavailable: 'Card settlement evidence is unavailable. POS card tender is not proof of bank settlement.',
     dataUnavailable: 'Data unavailable',
     orderEvidence: 'Orders',
-    shifts: 'Shifts',
+    shifts: 'Sales control',
     currency: 'LYD',
     today: 'Today',
     sevenDays: '7 days',
@@ -103,7 +103,7 @@ const SALES_COPY = {
     settlementUnavailable: 'دليل تسوية البطاقات غير متاح. تسجيل الدفع بالبطاقة في نقطة البيع لا يثبت وصوله إلى البنك.',
     dataUnavailable: 'البيانات غير متاحة',
     orderEvidence: 'الطلبات',
-    shifts: 'الورديات',
+    shifts: 'رقابة المبيعات',
     currency: 'د.ل',
     today: 'اليوم',
     sevenDays: '7 أيام',
@@ -462,7 +462,7 @@ export default function Sales() {
                       onClick={() => navigate(`/pos/${b.id}/sessions`)}
                       className="btn-secondary text-sm py-2 flex items-center justify-center gap-2"
                     >
-                      <Clock size={14} /> {copy.shifts}
+                      <TrendingUp size={14} /> {copy.shifts}
                     </button>
                   )}
                 </div>
