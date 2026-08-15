@@ -878,3 +878,19 @@ To find if something's been done:
 - **POS product repair**: Product create/update payloads now remove primary-key/timestamp fields in addition to joined and stock-location read metadata. Branch product management routes also reload after a service-worker controller update, preventing a fixed release from appearing stale on POS terminals.
 - **Deployment schedule**: The existing GitHub Actions deployment workflow now runs daily at `00:00 UTC`, which is `03:00 Asia/Riyadh` year-round, as well as on its existing manual and main-branch push triggers.
 - **Verification**: 13 focused regression tests pass, targeted ESLint has zero errors (two pre-existing hook dependency warnings), the POS production build passes, and `git diff --check` passes. The broader suite passes 138/141; the three failures are stale pre-existing acceptance assertions for an earlier profile migration and the superseded combined Team/Payroll layout, outside these changes.
+
+---
+
+## 2026-08-15 — Management report nullable inventory repair
+
+- **Agent**: Codex
+- **Status**: Complete & live
+- **Files**:
+  - `apps/pos/src/pages/Report.jsx`
+  - `apps/pos/src/modules/reports/lib/report-format.js`
+  - `apps/pos/tests/report-format.test.mjs`
+- **Root cause**: The report model correctly preserves missing recipe-derived theoretical stock as `null`, but the stock-risk UI called `.toLocaleString()` directly on that nullable value. A currently tracked ingredient without recipe usage evidence therefore crashed the entire `/report` route before React could commit the page.
+- **Description**: Added a shared null- and invalid-number-safe report quantity formatter. Branch orders, report counters, inventory thresholds, and theoretical quantities now use it. Missing theoretical inventory stays visibly `Unavailable`, omits a misleading unit, and is labeled `recipe usage unavailable` instead of being converted to zero.
+- **Verification**: The regression test failed before the formatter existed and now passes. Nine focused reporting and finance tests pass, targeted ESLint passes, the POS production build passes, and `git diff --check` passes. Authenticated production verification rendered `Management Report`, payment reconciliation, branch performance, and the unavailable inventory label without the former null error.
+- **Commit**: `a50cd33` (`fix(reporting): handle unavailable quantities safely`)
+- **Deployment**: Rebased onto the concurrent payroll/staff release and deployed the integrated state to `apps.noch.cloud` through `py -3.10 deploy.py apps` on 2026-08-15. Production serves `index-B3dPtypi.js` and `Report-CUS6tc9H.js`; both returned HTTP 200 in no-cache checks, and the live report chunk contains the safe formatter with no direct `theoreticalQty.toLocaleString` call. No migration was required. Unrelated local Bloom/RBAC, attachment, and generated Supabase files remain unstaged.
