@@ -19,6 +19,7 @@ import {
 import { getTasks, getTaskStats, getLastReport, logReport } from '../lib/tasks'
 import { businessYmd } from '../modules/pos/lib/pos-supabase'
 import { getManagementReport } from '../modules/reports/lib/management-report'
+import { formatReportQuantity } from '../modules/reports/lib/report-format'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -165,10 +166,6 @@ function fmtYmd(value) {
 
 function fmtTimestamp(value, locale = 'en-GB') {
   return value ? new Date(value).toLocaleString(locale) : 'not available'
-}
-
-function countValue(value) {
-  return value == null ? 'Unavailable' : Number(value).toLocaleString('en-GB')
 }
 
 function localizeInsight(item, lang) {
@@ -650,7 +647,7 @@ export default function Report() {
                     <tr key={row.id} className="border-b border-noch-border/60 last:border-0">
                       <td className="px-2 py-2 text-white">{row.name}</td>
                       <td className="px-2 py-2 text-right font-mono text-white">{fmtLyd(row.netSales)}</td>
-                      <td className="px-2 py-2 text-right font-mono text-noch-muted">{row.orders.toLocaleString('en-GB')}</td>
+                      <td className="px-2 py-2 text-right font-mono text-noch-muted">{formatReportQuantity(row.orders, copy.unavailable)}</td>
                       <td className="px-2 py-2 text-right font-mono text-noch-muted">{fmtLyd(row.cogs)}</td>
                       <td className="px-2 py-2 text-right font-mono text-noch-muted">{fmtLyd(row.labor)}</td>
                       <td className="px-2 py-2 text-right font-mono text-noch-muted">{fmtLyd(row.operatingExpenses)}</td>
@@ -681,21 +678,21 @@ export default function Report() {
             <MetricCard
               icon={Package}
               label="Theoretical stock risk"
-              value={countValue(metrics.lowStockCount)}
+              value={formatReportQuantity(metrics.lowStockCount, copy.unavailable)}
               sub={metrics.outOfStockCount == null ? 'Inventory source unavailable' : `${metrics.outOfStockCount} at zero · ${metrics.staleStockCount} stale counts`}
               tone={metrics.lowStockCount ? 'text-red-400' : metrics.lowStockCount === 0 ? 'text-noch-green' : 'text-noch-muted'}
             />
             <MetricCard
               icon={Users}
               label="Loyalty network"
-              value={countValue(metrics.loyaltyActive)}
+              value={formatReportQuantity(metrics.loyaltyActive, copy.unavailable)}
               sub={metrics.newCustomers == null ? 'Loyalty source unavailable' : `${metrics.newCustomers} new · ${metrics.loyaltyCustomers} total · all branches`}
               tone="text-blue-300"
             />
             <MetricCard
               icon={MessageSquare}
               label="WhatsApp network"
-              value={countValue(metrics.whatsappSent)}
+              value={formatReportQuantity(metrics.whatsappSent, copy.unavailable)}
               sub={metrics.whatsappFailed == null ? 'Messaging source unavailable' : `${metrics.whatsappFailed} failed · ${metrics.whatsappQueued} queued/sent · all branches`}
               tone={metrics.whatsappFailed ? 'text-red-400' : metrics.whatsappFailed === 0 ? 'text-noch-green' : 'text-noch-muted'}
             />
@@ -739,15 +736,17 @@ export default function Report() {
                       <div>
                         <p className="text-white text-sm">{item.name}</p>
                         <p className="text-noch-muted text-xs">
-                          Minimum {item.minThreshold.toLocaleString('en-GB')} {item.unit}
+                          Minimum {formatReportQuantity(item.minThreshold, copy.unavailable)} {item.unit}
                           {item.countIsStale ? ' · physical count stale' : ''}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-red-300 text-sm font-mono">
-                          {item.theoreticalQty.toLocaleString('en-GB')} {item.unit}
+                          {formatReportQuantity(item.theoreticalQty, copy.unavailable)} {item.theoreticalQty == null ? '' : item.unit}
                         </p>
-                        <p className="text-noch-muted text-[10px]">estimated on hand</p>
+                        <p className="text-noch-muted text-[10px]">
+                          {item.recipeUsageAvailable ? 'estimated on hand' : 'recipe usage unavailable'}
+                        </p>
                       </div>
                     </div>
                   ))}
