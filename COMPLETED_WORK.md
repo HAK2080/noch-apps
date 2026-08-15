@@ -894,3 +894,19 @@ To find if something's been done:
 - **Verification**: The regression test failed before the formatter existed and now passes. Nine focused reporting and finance tests pass, targeted ESLint passes, the POS production build passes, and `git diff --check` passes. Authenticated production verification rendered `Management Report`, payment reconciliation, branch performance, and the unavailable inventory label without the former null error.
 - **Commit**: `a50cd33` (`fix(reporting): handle unavailable quantities safely`)
 - **Deployment**: Rebased onto the concurrent payroll/staff release and deployed the integrated state to `apps.noch.cloud` through `py -3.10 deploy.py apps` on 2026-08-15. Production serves `index-B3dPtypi.js` and `Report-CUS6tc9H.js`; both returned HTTP 200 in no-cache checks, and the live report chunk contains the safe formatter with no direct `theoreticalQty.toLocaleString` call. No migration was required. Unrelated local Bloom/RBAC, attachment, and generated Supabase files remain unstaged.
+
+---
+
+## 2026-08-15 — Storefront unavailable delivery treatment
+
+- **Agent**: Codex
+- **Status**: Complete & live
+- **Files**:
+  - `apps/storefront/index.html`
+  - `apps/storefront/scripts/precompile.mjs`
+  - `deploy.py`
+- **Description**: Changed the coming-soon delivery card from an active-looking anchor into a semantic unavailable tile. A translucent cream veil, reduced saturation, subdued arrow, and high-contrast coming-soon badge distinguish it from active cards while preserving readable Arabic and English copy. The tile is non-interactive and exposes `aria-disabled="true"`.
+- **Release reliability**: The storefront precompile now emits a content-hashed app bundle instead of fixed `assets/app.js`, preventing browsers from retaining stale storefront behavior after deployment. The canonical deploy verifier recognizes both POS `index-*` and storefront `app-*` assets.
+- **Verification**: Storefront production build passed, the precompile emitted `app-c2b0f5ee7d.js`, Node and Python syntax checks passed, and `git diff --check` passed. Live browser verification confirmed the shaded tile, unavailable semantics, removal of the old delivery link, and the content-hashed bundle.
+- **Commit**: `4073836` (`fix(storefront): mute unavailable delivery tile`)
+- **Deployment**: Deployed to `noch.cloud` through `py -3.10 deploy.py storefront` on 2026-08-15. The server verified `app-c2b0f5ee7d.js`; no-cache HTML and asset checks returned HTTP 200, and production visual inspection passed.
