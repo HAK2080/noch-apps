@@ -198,7 +198,7 @@ def upload(target_key: str):
 
     print("[4/4] Verifying...")
     local_html = (cfg["dist"] / "index.html").read_text()
-    m = re.search(r'/assets/(index-[^"]+\.js)', local_html)
+    m = re.search(r'assets/((?:index|app)-[^"?]+\.js)', local_html)
     expected_js = m.group(1) if m else None
 
     _, stdout, _ = ssh.exec_command(

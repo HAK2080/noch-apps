@@ -92,6 +92,10 @@
   .tile-mascot.shift-right{right:-10px}
   [dir="rtl"] .tile-mascot{right:auto;left:-6px}
   .tile .soon-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;border:2px solid var(--ink);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;margin-top:auto;width:fit-content;background:rgba(255,255,255,.3);font-weight:700}
+  .tile.tile-unavailable{cursor:not-allowed;filter:saturate(.55);pointer-events:none}
+  .tile.tile-unavailable::after{content:"";position:absolute;inset:0;z-index:3;background:rgba(251,243,227,.42);pointer-events:none}
+  .tile.tile-unavailable .soon-badge{position:relative;z-index:4;background:rgba(251,243,227,.92)}
+  .tile.tile-unavailable .tile-arrow{opacity:.4}
 
   .sec{padding:10px 40px 80px;position:relative;z-index:1}
   .sec-wrap{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:22px}
@@ -2435,14 +2439,14 @@ const [slots, setSlots] = useState(TWEAK_DEFAULTS);
               <div className="tile-arrow">{lang==="ar"?"←":"→"}</div>
               <img className="tile-mascot shift-left" src={gp(slots.find, allPoses)} alt="" style={getMascotStyle('find')}/>
             </button>
-            <a className="tile" href="#deliver">
+            <div className="tile tile-unavailable" aria-disabled="true" data-availability="unavailable">
               <div className="tile-kicker">{t.delK}</div>
               <div className="tile-title">{t.delT}</div>
               <div className="tile-desc">{t.delD}</div>
               <span className="soon-badge">{t.soon}</span>
               <div className="tile-arrow">{lang==="ar"?"←":"→"}</div>
               <img className="tile-mascot size-lg shift-left" src={gp(slots.deliver, allPoses)} alt="" style={getMascotStyle('deliver')}/>
-            </a>
+            </div>
           </div>
         </div>
       </section>

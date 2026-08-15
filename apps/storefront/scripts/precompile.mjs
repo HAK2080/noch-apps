@@ -7,7 +7,7 @@
 // giving ~3.8 s cold FCP.
 //
 // This step transpiles that JSX ahead-of-time with esbuild, emits a
-// static assets/app.js, and rewrites dist/index.html to:
+// a content-hashed static app bundle, and rewrites dist/index.html to:
 //   - drop @babel/standalone entirely,
 //   - use React / ReactDOM *production* builds,
 //   - load the precompiled app via <script defer>.
@@ -16,14 +16,13 @@
 // global ReactDOM / supabase, so no bundling is needed — a plain
 // transform preserves identical runtime semantics.
 import esbuild from 'esbuild'
+import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const distHtml = resolve(root, 'dist/index.html')
-const appOut = resolve(root, 'dist/assets/app.js')
-
 let html = readFileSync(distHtml, 'utf8')
 
 // 1. Extract the inline babel app.
@@ -35,6 +34,10 @@ const jsx = m[1]
 const { code } = esbuild.transformSync(jsx, {
   loader: 'jsx', jsx: 'transform', minify: true, target: 'es2018', charset: 'utf8',
 })
+
+const appHash = createHash('sha256').update(code).digest('hex').slice(0, 10)
+const appFile = `app-${appHash}.js`
+const appOut = resolve(root, 'dist/assets', appFile)
 
 mkdirSync(dirname(appOut), { recursive: true })
 writeFileSync(appOut, code, 'utf8')
@@ -49,9 +52,9 @@ html = html
   // Integrity hashes no longer match the prod files — strip them.
   .replace(/\s+integrity="[^"]*"/g, '')
   // Swap the inline app for the precompiled bundle.
-  .replace(/<script type="text\/babel">[\s\S]*?<\/script>/, '<script defer src="./assets/app.js"></script>')
+  .replace(/<script type="text\/babel">[\s\S]*?<\/script>/, `<script defer src="./assets/${appFile}"></script>`)
 
 writeFileSync(distHtml, html, 'utf8')
 
 const kb = (n) => (n / 1024).toFixed(1) + ' KB'
-console.log(`precompile: app.js ${kb(code.length)} | index.html ${kb(html.length)} | @babel/standalone removed, React prod builds`)
+console.log(`precompile: ${appFile} ${kb(code.length)} | index.html ${kb(html.length)} | @babel/standalone removed, React prod builds`)
