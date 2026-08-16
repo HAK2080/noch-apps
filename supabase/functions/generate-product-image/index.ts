@@ -20,7 +20,7 @@ Deno.serve(async (request: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const openAIKey = Deno.env.get('OPENAI_API_KEY')
+    const openAIKey = Deno.env.get('OPENAI_API_KEY') || Deno.env.get('Openai_API_KEY')
     if (!supabaseUrl || !anonKey || !serviceKey) return json({ error: 'server configuration is incomplete' }, 500)
     if (!openAIKey) return json({ error: 'AI product images are not configured yet' }, 503)
 
