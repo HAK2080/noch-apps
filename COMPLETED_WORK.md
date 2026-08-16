@@ -858,6 +858,20 @@ To find if something's been done:
 
 ---
 
+## 2026-08-16 — Compact, photo-forward customer menu cards
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/pages/storefront/styles/Menu.css`
+  - `apps/pos/tests/product-image-optimization.test.mjs`
+- **Description**: Enlarged scroll/grid product photos with a restrained 1.12× card-only zoom that removes most optimizer safety padding without cutting the drink. Reduced the separate white name/price band from 102px to 82px minimum height and prevented short cards from stretching to match neighbours with long descriptions. Detail, list, and add-on images retain their original contained framing.
+- **Verification**: Ten focused image/badge tests passed; the POS production build and `git diff --check` passed. Local and production browser screenshots confirmed the full Sky Matcha cup remains visible, fills more of the photo area, and uses the shorter information band.
+- **Commit**: `d77f416` (`style(menu): compact product image cards`)
+- **Deployment**: GitHub Actions run `31954478542` deployed successfully to `apps.noch.cloud`. No-cache checks returned 200 and confirmed live CSS asset `index-MT3vFQrv.css` contains the card zoom, compact band/footer heights, cover framing, and anti-stretch alignment.
+
+---
+
 ## 2026-08-16 — Owner-controlled public branch visibility
 
 - **Agent**: Codex
