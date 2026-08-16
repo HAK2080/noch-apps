@@ -858,6 +858,25 @@ To find if something's been done:
 
 ---
 
+## 2026-08-16 — Owner-controlled public branch visibility
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/modules/pos/lib/branch-availability.js`
+  - `apps/pos/src/modules/pos/pages/POSHome.jsx`
+  - `apps/pos/tests/branch-availability.test.mjs`
+  - `apps/storefront/index.html`
+  - `apps/storefront/tests/branch-picker.test.mjs`
+  - `supabase/migrations/20260816170000_public_branch_visibility.sql`
+  - `.github/workflows/deploy-storefront.yml`
+- **Description**: Replaced the owner-only on/off toggle with Operational, Coming Soon, and Hidden customer-visibility options. Operational branches remain selectable in POS and customer menus; Coming Soon branches appear disabled on `noch.cloud`; Hidden branches are omitted. The public site reads a security-definer RPC exposing only branch display fields and fails closed if the feed is unavailable.
+- **Verification**: Four POS branch tests and four storefront/RPC/deployment tests passed; targeted POS ESLint passed; both production builds passed; `git diff --check` passed. The production RPC returned only City Walk for the current backend selection, and live browser verification confirmed the Arabic branch picker contains City Walk while Bloom and Gallery Mall are absent.
+- **Commits**: `9502c51` (`feat(branches): add customer visibility controls`) and `bac0a16` (`fix(deploy): install storefront dependencies`)
+- **Deployment**: Migration `20260816170000_public_branch_visibility.sql` was applied directly in the production SQL editor and verified through the anonymous RPC. GitHub Actions run `31947200232` deployed `apps.noch.cloud`; corrective storefront run `31947327215` deployed `noch.cloud` after the workflow was repaired to install locked dependencies. No-cache production checks returned 200 and confirmed the owner-control bundle and public RPC client.
+
+---
+
 ## 2026-08-16 — Global product image optimization button
 
 - **Agent**: Codex
