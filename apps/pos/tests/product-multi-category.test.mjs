@@ -11,6 +11,7 @@ import {
 
 const productGridUrl = new URL('../src/modules/pos/components/ProductGrid.jsx', import.meta.url)
 const productManagerUrl = new URL('../src/modules/pos/pages/POSProducts.jsx', import.meta.url)
+const productCatalogUrl = new URL('../src/pages/ProductCatalog.jsx', import.meta.url)
 const customerMenuUrl = new URL('../src/pages/storefront/Menu.jsx', import.meta.url)
 const migrationUrl = new URL('../../../supabase/migrations/20260529010000_product_secondary_categories.sql', import.meta.url)
 
@@ -60,9 +61,10 @@ test('choosing no categories clears both primary and additional membership', () 
 })
 
 test('POS, product management, and customer menu use the shared membership rule', async () => {
-  const [grid, manager, menu, migration] = await Promise.all([
+  const [grid, manager, catalog, menu, migration] = await Promise.all([
     readFile(productGridUrl, 'utf8'),
     readFile(productManagerUrl, 'utf8'),
+    readFile(productCatalogUrl, 'utf8'),
     readFile(customerMenuUrl, 'utf8'),
     readFile(migrationUrl, 'utf8'),
   ])
@@ -75,6 +77,10 @@ test('POS, product management, and customer menu use the shared membership rule'
   assert.match(manager, /Additional category/)
   assert.match(manager, /normalizeProductCategorySelection\(\s*form\.category_id,\s*form\.secondary_category_ids/s)
   assert.match(manager, /Every selected category is used in the POS and customer menu/)
+  assert.match(catalog, /changeProductPrimaryCategory/)
+  assert.match(catalog, /secondary_category_ids: categorySelection\.secondary_category_ids/)
+  assert.match(catalog, /productBelongsToCategory\(p, categoryFilter\)/)
+  assert.match(catalog, /Every selected category is used in the POS and customer menu/)
   assert.match(menu, /products\.filter\(p => productBelongsToCategory\(p, cat\.id\)\)/)
   assert.match(migration, /secondary_category_ids uuid\[\]/)
   assert.match(migration, /using gin \(secondary_category_ids\)/)

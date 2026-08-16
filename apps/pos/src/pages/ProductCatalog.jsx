@@ -29,6 +29,12 @@ import {
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
 import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
+import {
+  changeProductPrimaryCategory,
+  getProductCategoryIds,
+  normalizeProductCategorySelection,
+  productBelongsToCategory,
+} from '../lib/product-categories'
 
 // ─── helpers ──────────────────────────────────────────────────
 function fmt(n) { return parseFloat(n || 0).toFixed(3) }
@@ -55,6 +61,7 @@ function StockBadge({ qty, threshold, track, unit }) {
 function ProductCard({ product, stats, onEdit, onDelete }) {
   const qty = stats?.qty || 0
   const revenue = stats?.revenue || 0
+  const additionalCategoryCount = Math.max(0, getProductCategoryIds(product).length - 1)
   return (
     <div
       className="group rounded-2xl border overflow-hidden cursor-pointer transition-all duration-200"
@@ -78,7 +85,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
             className="absolute top-2 left-2 text-[11px] font-semibold px-2 py-0.5 rounded-full"
             style={{ background: product.pos_categories.color + '28', color: product.pos_categories.color }}
           >
-            {product.pos_categories.name}
+            {product.pos_categories.name}{additionalCategoryCount > 0 ? ` +${additionalCategoryCount}` : ''}
           </span>
         )}
         {/* Hidden badge */}
@@ -131,7 +138,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
 // ─── Edit / Add modal ─────────────────────────────────────────
 const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', manual_cost_lyd: '', barcode: '', sku: '',
-  category_id: '', track_inventory: false, stock_qty: '0',
+  category_id: '', secondary_category_ids: [], track_inventory: false, stock_qty: '0',
   low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
   stock_base_unit: 'pc', stock_display_unit: 'pc',
   coffee_grams_per_sale: '', coffee_bean_product_id: '',
@@ -144,9 +151,14 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
   const [form, setForm] = useState(() => {
     if (product) {
       const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
+      const categorySelection = normalizeProductCategorySelection(
+        product.category_id,
+        product.secondary_category_ids,
+      )
       return {
         ...BLANK,
         ...product,
+        ...categorySelection,
         price: product.price ?? '',
         cost_price: product.cost_price ?? '',
         manual_cost_lyd: product.manual_cost_lyd ?? product.cost_price ?? '',
@@ -178,6 +190,31 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
   useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const changePrimaryCategory = (nextCategoryId) => {
+    setForm(current => ({
+      ...current,
+      ...changeProductPrimaryCategory(current, nextCategoryId),
+    }))
+  }
+
+  const toggleAdditionalCategory = (categoryId) => {
+    setForm(current => {
+      if (!current.category_id) {
+        return { ...current, ...changeProductPrimaryCategory(current, categoryId) }
+      }
+
+      const secondaryIds = Array.isArray(current.secondary_category_ids)
+        ? current.secondary_category_ids
+        : []
+      return {
+        ...current,
+        secondary_category_ids: secondaryIds.includes(categoryId)
+          ? secondaryIds.filter(id => id !== categoryId)
+          : [...secondaryIds, categoryId],
+      }
+    })
+  }
 
   const changeStockUnit = (nextUnit) => setForm(current => {
     const previousUnit = current.stock_display_unit || 'pc'
@@ -235,6 +272,10 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
       manualProductCost: form.manual_cost_lyd,
     })
     const costIsComplete = productCost.source !== 'incomplete'
+    const categorySelection = normalizeProductCategorySelection(
+      form.category_id,
+      form.secondary_category_ids,
+    )
     setSaving(true)
     try {
       const payload = {
@@ -260,7 +301,8 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
         low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
         coffee_grams_per_sale: normalizeCoffeeGrams(form.coffee_grams_per_sale),
         coffee_bean_product_id: normalizeCoffeeGrams(form.coffee_grams_per_sale) ? (resolvedCoffeeBeanProductId || null) : null,
-        category_id: form.category_id || null,
+        category_id: categorySelection.category_id || null,
+        secondary_category_ids: categorySelection.secondary_category_ids,
         visible_branch_ids: Array.isArray(form.visible_branch_ids) ? form.visible_branch_ids : [],
         visible_on_menu:          !!form.visible_on_menu,
         visible_on_customer_menu: form.visible_on_customer_menu !== false,
@@ -474,11 +516,11 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
                   />
             )}
 
-            {/* Category + SKU */}
+            {/* Main category + SKU */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Category</label>
-                <select value={form.category_id} onChange={e => set('category_id', e.target.value)} className="input">
+                <label className="label">Main category</label>
+                <select value={form.category_id} onChange={e => changePrimaryCategory(e.target.value)} className="input">
                   <option value="">No category</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -488,6 +530,44 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
                 <input value={form.sku} onChange={e => set('sku', e.target.value)} className="input" placeholder="CAP-001" />
               </div>
             </div>
+
+            {/* Additional categories used by POS and customer menus */}
+            {categories.length > 0 && (
+              <div className="rounded-xl p-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between gap-3 mb-2.5">
+                  <div>
+                    <p className="text-white text-xs font-semibold">Also appears in</p>
+                    <p className="text-zinc-600 text-[11px]">Select every category where customers should find this product.</p>
+                  </div>
+                  <span className="text-noch-muted text-[11px] whitespace-nowrap">{getProductCategoryIds(form).length} selected</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(category => {
+                    const isPrimary = form.category_id === category.id
+                    const isAdditional = (form.secondary_category_ids || []).includes(category.id)
+                    const selected = isPrimary || isAdditional
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => {
+                          if (isPrimary) return
+                          toggleAdditionalCategory(category.id)
+                        }}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          selected
+                            ? 'bg-noch-green/15 border-noch-green/40 text-noch-green'
+                            : 'border-noch-border text-noch-muted hover:text-white'
+                        }`}
+                      >
+                        {selected ? '✓ ' : ''}{category.name}{isPrimary ? ' · Main' : ''}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-zinc-600 text-[11px] mt-2.5">Every selected category is used in the POS and customer menu.</p>
+              </div>
+            )}
 
             {/* Barcode */}
             <div>
@@ -713,7 +793,7 @@ export default function ProductCatalog() {
         (p.sku && p.sku.toLowerCase().includes(q))
       if (!hit) return false
     }
-    if (categoryFilter && p.category_id !== categoryFilter) return false
+    if (categoryFilter && !productBelongsToCategory(p, categoryFilter)) return false
     return true
   })
 
