@@ -872,6 +872,25 @@ To find if something's been done:
 
 ---
 
+## 2026-08-16 — Animated bilingual customer-menu badges
+
+- **Agent**: Codex
+- **Status**: Complete; database migration live and application deployment in progress
+- **Files**:
+  - `apps/pos/src/lib/product-menu-badges.js`
+  - `apps/pos/src/modules/pos/pages/POSProducts.jsx`
+  - `apps/pos/src/pages/ProductCatalog.jsx`
+  - `apps/pos/src/pages/storefront/Menu.jsx`
+  - `apps/pos/src/pages/storefront/styles/Menu.css`
+  - `apps/pos/tests/product-menu-badges.test.mjs`
+  - `supabase/migrations/20260816150000_product_menu_badges.sql`
+- **Description**: Added manually configurable customer-menu badges for New, Limited, Back in Stock, Popular, and Must Try with matching Arabic labels. Product editors expose Dazzle, Shimmer, Pulse, and Float animations. Every customer-menu layout and the detail modal render the localized badge, while `prefers-reduced-motion` disables animation for customers who request it.
+- **Verification**: Fifteen focused product/menu tests passed; targeted ESLint reported zero errors and six pre-existing hook dependency warnings; POS production build passed; `git diff --check` passed.
+- **Commit**: `3d6a5bd` (`feat(menu): add animated bilingual product badges`)
+- **Deployment**: Migration `20260816150000_product_menu_badges.sql` was applied directly in the production SQL editor and verified through `information_schema.columns` and `pg_constraint`; the application release is authorized and pending the `main` deployment workflow.
+
+---
+
 ## 2026-08-16 — Automated product images and multi-category menus
 
 - **Agent**: Codex
