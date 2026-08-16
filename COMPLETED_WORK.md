@@ -881,7 +881,7 @@ To find if something's been done:
 ## 2026-08-16 — Customer menu product image optimization
 
 - **Agent**: Codex
-- **Status**: Verified locally; production deployment pending
+- **Status**: Complete & Live
 - **Backup**: Local branch `backup/pre-menu-image-optimization-20260816` preserves production commit `4b99689`.
 - **Files**:
   - `apps/pos/src/lib/product-images.js`
@@ -893,8 +893,8 @@ To find if something's been done:
   - `apps/pos/src/pages/storefront/styles/Menu.css`
   - `apps/pos/tests/product-image-optimization.test.mjs`
 - **Description**: Customer-menu and POS product photos now request contained Supabase image derivatives with original-URL fallback, visible loading and failure states, and a 4:5 no-crop presentation. New uploads are normalized in-browser to a padded 1200×1500 WebP canvas, iteratively compressed, versioned, and stored with one-year cache metadata. Existing originals remain unchanged for recovery while their delivery is optimized.
-- **Verification**: 20 focused product/menu tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed. Repository-wide ESLint still reports pre-existing errors outside the changed files.
+- **Verification**: 20 focused product/menu tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed. Production HTTP verification returned 200 and confirmed the deployed JavaScript contains the Supabase derivative/fallback code while the deployed CSS contains the 4:5 contain and loading-skeleton rules. Repository-wide ESLint still reports pre-existing errors outside the changed files.
 - **Commit**: `b57efb7` (`perf(menu): optimize product image delivery`)
-- **Deployment**: Pending push to `main` and `apps.noch.cloud` verification.
+- **Deployment**: GitHub Actions run `31935396785` deployed commit `e15069a` successfully to `apps.noch.cloud`; the live menu serves JavaScript asset `index-BJKwUVZi.js` and CSS asset `index-C7TPDNK2.css`.
 
 ---
