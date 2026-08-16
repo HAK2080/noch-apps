@@ -878,3 +878,23 @@ To find if something's been done:
 - **POS product repair**: Product create/update payloads now remove primary-key/timestamp fields in addition to joined and stock-location read metadata. Branch product management routes also reload after a service-worker controller update, preventing a fixed release from appearing stale on POS terminals.
 - **Deployment schedule**: The existing GitHub Actions deployment workflow now runs daily at `00:00 UTC`, which is `03:00 Asia/Riyadh` year-round, as well as on its existing manual and main-branch push triggers.
 - **Verification**: 13 focused regression tests pass, targeted ESLint has zero errors (two pre-existing hook dependency warnings), the POS production build passes, and `git diff --check` passes. The broader suite passes 138/141; the three failures are stale pre-existing acceptance assertions for an earlier profile migration and the superseded combined Team/Payroll layout, outside these changes.
+## 2026-08-16 — Customer menu product image optimization
+
+- **Agent**: Codex
+- **Status**: Verified locally; production deployment pending
+- **Backup**: Local branch `backup/pre-menu-image-optimization-20260816` preserves production commit `4b99689`.
+- **Files**:
+  - `apps/pos/src/lib/product-images.js`
+  - `apps/pos/src/modules/pos/lib/product-image-processing.js`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/pages/POSProducts.jsx`
+  - `apps/pos/src/modules/pos/components/ProductGrid.jsx`
+  - `apps/pos/src/pages/storefront/Menu.jsx`
+  - `apps/pos/src/pages/storefront/styles/Menu.css`
+  - `apps/pos/tests/product-image-optimization.test.mjs`
+- **Description**: Customer-menu and POS product photos now request contained Supabase image derivatives with original-URL fallback, visible loading and failure states, and a 4:5 no-crop presentation. New uploads are normalized in-browser to a padded 1200×1500 WebP canvas, iteratively compressed, versioned, and stored with one-year cache metadata. Existing originals remain unchanged for recovery while their delivery is optimized.
+- **Verification**: 20 focused product/menu tests passed; targeted ESLint passed; POS production build passed; `git diff --check` passed. Repository-wide ESLint still reports pre-existing errors outside the changed files.
+- **Commit**: `b57efb7` (`perf(menu): optimize product image delivery`)
+- **Deployment**: Pending push to `main` and `apps.noch.cloud` verification.
+
+---
