@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Search, Edit2, Trash2, Upload, Package, TrendingUp, Layers, X,
-  ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag
+  ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag, Loader2, Sparkles
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import toast from 'react-hot-toast'
@@ -28,6 +28,7 @@ import {
 } from '../modules/pos/lib/inventory-units'
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
+import { formatImageBytes, optimizeProductImage } from '../modules/pos/lib/product-image-processing'
 import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
 import {
   changeProductPrimaryCategory,
@@ -178,6 +179,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
   })
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [optimizingImage, setOptimizingImage] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [costComponents, setCostComponents] = useState([])
   const [costComponentsLoading, setCostComponentsLoading] = useState(!!product?.id)
@@ -369,6 +371,39 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
     }
   }
 
+  const handleOptimizeImage = async () => {
+    if (!pendingFile && !form.image_url) return toast.error('Add a product image first')
+
+    setOptimizingImage(true)
+    try {
+      let sourceFile = pendingFile
+      if (!sourceFile) {
+        const response = await fetch(form.image_url, { cache: 'no-store' })
+        if (!response.ok) throw new Error('Could not download the current image')
+
+        const blob = await response.blob()
+        const filename = new URL(form.image_url, window.location.origin).pathname.split('/').pop() || 'product-image'
+        sourceFile = new File([blob], filename, { type: blob.type || 'image/jpeg' })
+      }
+
+      const optimized = await optimizeProductImage(sourceFile)
+      if (product?.id) {
+        const url = await uploadProductImage(product.id, optimized.file)
+        set('image_url', url)
+      } else {
+        if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+        setPendingFile(optimized.file)
+        setPendingPreview(URL.createObjectURL(optimized.file))
+      }
+
+      toast.success(`Image optimized to 4:5 WebP (${formatImageBytes(optimized.optimizedBytes)})`)
+    } catch (err) {
+      toast.error(err.message || 'Image optimization failed')
+    } finally {
+      setOptimizingImage(false)
+    }
+  }
+
   const beanProducts = (products || []).filter(candidate => candidate.is_coffee_bean && candidate.id !== product?.id)
   const defaultBeanProduct = beanProducts.find(candidate => candidate.name?.toLowerCase().includes('ghadamis')) || beanProducts[0]
   const resolvedCoffeeBeanProductId = form.coffee_bean_product_id || defaultBeanProduct?.id || ''
@@ -406,21 +441,39 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
           <div className="p-5 flex flex-col gap-4 flex-1 overflow-y-auto">
 
             {/* Photo — works on Add and Edit. New products: image is uploaded after Save. */}
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <div className="flex items-start gap-4">
+              <div className="w-20 aspect-[4/5] rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#f8f3e8', border: '1px solid var(--border)' }}>
                 {(pendingPreview || form.image_url)
-                  ? <img src={pendingPreview || form.image_url} alt="" className="w-full h-full object-cover" />
+                  ? <img src={pendingPreview || form.image_url} alt="" className="w-full h-full object-contain" />
                   : <div className="w-full h-full flex items-center justify-center"><Image size={22} className="text-zinc-600" /></div>
                 }
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-white text-sm font-medium mb-1.5">Product Photo</p>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary text-xs flex items-center gap-1.5 py-1.5">
-                  <Upload size={11} /> {uploading ? 'Uploading…' : (pendingPreview || form.image_url) ? 'Change photo' : 'Upload photo'}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading || optimizingImage}
+                    className="btn-secondary h-10 min-w-[140px] px-3 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                    {uploading ? 'Uploading…' : (pendingPreview || form.image_url) ? 'Change photo' : 'Upload photo'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOptimizeImage}
+                    disabled={uploading || optimizingImage || (!pendingPreview && !form.image_url)}
+                    className="btn-secondary h-10 min-w-[140px] px-3 text-sm flex items-center justify-center gap-1.5"
+                    title="Convert to a 1200 × 1500 WebP without cropping"
+                  >
+                    {optimizingImage ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                    {optimizingImage ? 'Optimizing…' : 'Optimize Image'}
+                  </button>
+                </div>
                 <p className="text-zinc-600 text-[11px] mt-1">
-                  JPG, PNG, WebP · shown in POS terminal
+                  JPG, PNG, WebP · optimize to 1200 × 1500 WebP without cropping
                   {!isEdit && pendingFile && <> · <span className="text-noch-green">will upload on Save</span></>}
                 </p>
               </div>
