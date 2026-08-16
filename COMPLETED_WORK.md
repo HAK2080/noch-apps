@@ -861,21 +861,21 @@ To find if something's been done:
 ## 2026-08-16 — Global product image optimization button
 
 - **Agent**: Codex
-- **Status**: Complete on GitHub branch; production deployment intentionally pending user approval
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/pages/ProductCatalog.jsx`
   - `apps/pos/tests/product-catalog-image-optimization.test.mjs`
 - **Description**: Added a visible `Optimize Image` control beside `Change photo` in the global product editor. It converts the current or staged product photo to the shared padded 1200×1500 WebP format without cropping, uploads a versioned replacement for existing products, preserves the original storage object, and shows a 4:5 contained preview. Both controls are 40px high with a 140px minimum width and wrap safely on narrow screens.
 - **Verification**: Six focused image tests passed; targeted ESLint reported zero errors and one pre-existing hook dependency warning; POS production build passed; `git diff --check` passed. Local browser rendering requires the uncommitted Supabase environment variables, so visual behavior was verified through the production build and focused source contract test.
 - **Commit**: `9b6e695` (`feat(products): add image optimization control`)
-- **Deployment**: Not deployed to `apps.noch.cloud`; waiting for the user's explicit cue.
+- **Deployment**: Included in successful GitHub Actions run `31945473382` from `main` commit `4334139`; the live production bundle exposes the product-image optimization editor.
 
 ---
 
 ## 2026-08-16 — Animated bilingual customer-menu badges
 
 - **Agent**: Codex
-- **Status**: Complete; database migration live and application deployment in progress
+- **Status**: Complete & Live
 - **Files**:
   - `apps/pos/src/lib/product-menu-badges.js`
   - `apps/pos/src/modules/pos/pages/POSProducts.jsx`
@@ -887,7 +887,7 @@ To find if something's been done:
 - **Description**: Added manually configurable customer-menu badges for New, Limited, Back in Stock, Popular, and Must Try with matching Arabic labels. Product editors expose Dazzle, Shimmer, Pulse, and Float animations. Every customer-menu layout and the detail modal render the localized badge, while `prefers-reduced-motion` disables animation for customers who request it.
 - **Verification**: Fifteen focused product/menu tests passed; targeted ESLint reported zero errors and six pre-existing hook dependency warnings; POS production build passed; `git diff --check` passed.
 - **Commit**: `3d6a5bd` (`feat(menu): add animated bilingual product badges`)
-- **Deployment**: Migration `20260816150000_product_menu_badges.sql` was applied directly in the production SQL editor and verified through `information_schema.columns` and `pg_constraint`; the application release is authorized and pending the `main` deployment workflow.
+- **Deployment**: Migration `20260816150000_product_menu_badges.sql` was applied directly in the production SQL editor and verified through `information_schema.columns` and `pg_constraint`. GitHub Actions run `31945473382` deployed `main` commit `4334139` successfully to `apps.noch.cloud`; no-cache checks returned 200 for the app and City Walk menu, and the live JavaScript/CSS contain the badge fields, labels, and animation styles.
 
 ---
 
