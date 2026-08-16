@@ -7,6 +7,8 @@ test('product writes exclude joined and location-derived read metadata', () => {
     id: 'product-1',
     name: 'Chocolate Croissant',
     price: 12,
+    category_id: 'pastries',
+    secondary_category_ids: ['best-sellers', 'breakfast'],
     pos_categories: { name: 'Pastries' },
     pos_branches: { name: 'Main' },
     stock_location_id: 'location-1',
@@ -19,5 +21,7 @@ test('product writes exclude joined and location-derived read metadata', () => {
   assert.deepEqual(write, {
     name: 'Chocolate Croissant',
     price: 12,
+    category_id: 'pastries',
+    secondary_category_ids: ['best-sellers', 'breakfast'],
   })
 })

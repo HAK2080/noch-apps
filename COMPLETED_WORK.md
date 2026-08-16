@@ -858,6 +858,32 @@ To find if something's been done:
 
 ---
 
+## 2026-08-16 — Automated product images and multi-category menus
+
+- **Agent**: Codex
+- **Status**: Verified locally; deployment pending
+- **Backup**: Local branch `backup/pre-ai-product-image-20260816` preserves live commit `bd51126`.
+- **Files**:
+  - `apps/pos/src/lib/product-categories.js`
+  - `apps/pos/src/modules/pos/components/ProductGrid.jsx`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/lib/product-image-processing.js`
+  - `apps/pos/src/modules/pos/pages/POSProducts.jsx`
+  - `apps/pos/src/pages/storefront/Menu.jsx`
+  - `apps/pos/tests/pos-product-write.test.mjs`
+  - `apps/pos/tests/product-image-generation.test.mjs`
+  - `apps/pos/tests/product-image-optimization.test.mjs`
+  - `apps/pos/tests/product-multi-category.test.mjs`
+  - `supabase/config.toml`
+  - `supabase/functions/_shared/product-image-prompt.js`
+  - `supabase/functions/generate-product-image/index.ts`
+- **Description**: Product management now offers one-click AI menu photography using a server-side OpenAI Edge Function, then sends the generated result through the existing 4:5 no-crop WebP optimizer before upload. Products can have one primary category plus any number of additional categories, with consistent membership, counts, filters, and badges across product management, POS, and the customer-facing menu.
+- **Data safety**: Generated and uploaded images remain staged until Create or Update succeeds; an existing image is retained unless its replacement uploads successfully. The OpenAI API key remains server-side. The existing `secondary_category_ids` migration already supports the multi-category release, so no new schema migration is required.
+- **Verification**: 29 focused tests passed; targeted ESLint passed; the POS production build passed; `git diff --check` passed.
+- **Deployment**: Pending.
+
+---
+
 ## 2026-08-02 — Employee visibility, payroll reopening, and scheduled deployment
 
 - **Agent**: Codex

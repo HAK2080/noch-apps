@@ -3,12 +3,12 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Edit2, Trash2, Package, Tag, ScanLine, X, Check, Globe, Star, GripVertical, LayoutList, Grid2X2, Copy } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Package, Tag, ScanLine, X, Check, Globe, Star, GripVertical, LayoutList, Grid2X2, Copy, ImagePlus, Sparkles, Loader2 } from 'lucide-react'
 import {
   getPOSBranch, getPOSBranches, getPOSProducts, getPOSCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
   createPOSCategory, updatePOSCategory, deletePOSCategory,
-  uploadProductImage, shareBranchMenu,
+  uploadProductImage, generateProductImage, shareBranchMenu,
 } from '../lib/pos-supabase'
 import BarcodeScanner from '../components/BarcodeScanner'
 import CoffeeConsumptionField from '../components/CoffeeConsumptionField'
@@ -24,8 +24,14 @@ import {
 } from '../lib/inventory-units'
 import { normalizeCoffeeGrams } from '../lib/coffee-consumption'
 import { NEW_PRODUCT_VISIBILITY } from '../lib/product-visibility'
-import { formatImageBytes, optimizeProductImage } from '../lib/product-image-processing'
+import { formatImageBytes, generatedImageFileFromBase64, optimizeProductImage } from '../lib/product-image-processing'
 import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
+import {
+  changeProductPrimaryCategory,
+  getProductCategoryIds,
+  normalizeProductCategorySelection,
+  productBelongsToCategory,
+} from '../../../lib/product-categories'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
@@ -43,13 +49,47 @@ const BLANK_PRODUCT = {
 // Columns that come from JOIN queries — never send these back to PostgREST
 const JOINED_FIELDS = ['pos_categories', 'pos_branches']
 
+function ProductCategoryBadges({ product, categories, compact = false }) {
+  const memberships = getProductCategoryIds(product)
+    .map((id, index) => ({ category: categories.find(item => item.id === id), isPrimary: index === 0 }))
+    .filter(item => item.category)
+
+  if (memberships.length === 0) return null
+  if (compact) {
+    return (
+      <span className="text-[10px] opacity-60">
+        {memberships.map(({ category }) => category.name).join(' · ')}
+      </span>
+    )
+  }
+
+  return memberships.map(({ category, isPrimary }) => {
+    const color = category.color || '#10b981'
+    return (
+      <span
+        key={category.id}
+        className="text-xs px-1.5 py-0.5 rounded-full text-white"
+        style={{ backgroundColor: `${color}40`, border: `1px solid ${color}40` }}
+        title={isPrimary ? 'Main category' : 'Additional category'}
+      >
+        {isPrimary ? category.name : `+ ${category.name}`}
+      </span>
+    )
+  })
+}
+
 function ProductModal({ product, products, categories, branchId, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (!product) return { ...BLANK_PRODUCT }
     const displayUnit = product.stock_display_unit || product.stock_base_unit || 'pc'
+    const categorySelection = normalizeProductCategorySelection(
+      product.category_id,
+      product.secondary_category_ids,
+    )
     return {
       ...BLANK_PRODUCT,
       ...product,
+      ...categorySelection,
       stock_base_unit: product.stock_base_unit || getStockBaseUnit(displayUnit),
       stock_display_unit: displayUnit,
       stock_qty: fromBaseQuantity(product.stock_qty, displayUnit),
@@ -59,16 +99,25 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   const [saving, setSaving] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [uploadingImg, setUploadingImg] = useState(false)
+  const [generatingImg, setGeneratingImg] = useState(false)
   const [pendingFile, setPendingFile] = useState(null)   // file waiting for new-product ID
   const [pendingPreview, setPendingPreview] = useState(null)
   const imgInputRef = useRef(null)
   const isEdit = !!product?.id
+  const imageWorking = uploadingImg || generatingImg
 
   useEffect(() => () => {
     if (pendingPreview) URL.revokeObjectURL(pendingPreview)
   }, [pendingPreview])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const changePrimaryCategory = (nextCategoryId) => {
+    setForm(current => ({
+      ...current,
+      ...changeProductPrimaryCategory(current, nextCategoryId),
+    }))
+  }
 
   const changeStockUnit = (nextUnit) => setForm(current => {
     const previousUnit = current.stock_display_unit || 'pc'
@@ -82,7 +131,14 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
     }
   })
 
-  // Handle image file selected from disk
+  const stageOptimizedImage = (optimized) => {
+    const preview = URL.createObjectURL(optimized.file)
+    setPendingPreview(preview)
+    setPendingFile(optimized.file)
+    return `${formatImageBytes(optimized.originalBytes)} → ${formatImageBytes(optimized.optimizedBytes)}`
+  }
+
+  // Handle image file selected from disk. Upload only happens when the product is saved.
   const handleFileSelected = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -91,29 +147,45 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
 
     try {
       const optimized = await optimizeProductImage(file)
-      const preview = URL.createObjectURL(optimized.file)
-      setPendingPreview(preview)
-      const sizeChange = `${formatImageBytes(optimized.originalBytes)} → ${formatImageBytes(optimized.optimizedBytes)}`
-
-      if (isEdit) {
-        // Existing product: upload immediately
-        const url = await uploadProductImage(product.id, optimized.file)
-        set('image_url', url)
-        setPendingFile(null)
-        setPendingPreview(null)
-        toast.success(`Image optimized and uploaded (${sizeChange})`)
-      } else {
-        // New product: store the normalized file, upload after create
-        setPendingFile(optimized.file)
-        set('image_url', '')
-        toast.success(`Image ready (${sizeChange})`)
-      }
+      const sizeChange = stageOptimizedImage(optimized)
+      toast.success(`Image optimized and ready (${sizeChange})`)
     } catch (err) {
       setPendingFile(null)
       setPendingPreview(null)
       toast.error(err.message || 'Image optimization failed')
     } finally {
       setUploadingImg(false)
+    }
+  }
+
+  const handleGenerateImage = async () => {
+    if (!form.name.trim() && !form.name_ar.trim()) {
+      toast.error('Enter the product name first')
+      return
+    }
+
+    setGeneratingImg(true)
+    try {
+      const category = categories.find(item => item.id === form.category_id)
+      const generated = await generateProductImage({
+        name: form.name,
+        name_ar: form.name_ar,
+        description: form.menu_description || form.description,
+        description_ar: form.menu_description_ar,
+        category: category?.name || category?.name_ar || '',
+      })
+      const generatedFile = generatedImageFileFromBase64(
+        generated.image_base64,
+        generated.mime_type,
+        `${form.name || form.name_ar || 'product'}-ai.webp`,
+      )
+      const optimized = await optimizeProductImage(generatedFile)
+      stageOptimizedImage(optimized)
+      toast.success('AI product image created, optimized, and ready to save')
+    } catch (err) {
+      toast.error(err.message || 'AI product image generation failed')
+    } finally {
+      setGeneratingImg(false)
     }
   }
 
@@ -128,6 +200,10 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
       const stripped = Object.fromEntries(
         Object.entries(form).filter(([k]) => !JOINED_FIELDS.includes(k))
       )
+      const categorySelection = normalizeProductCategorySelection(
+        form.category_id,
+        form.secondary_category_ids,
+      )
       const data = {
         ...stripped,
         branch_id: branchId,
@@ -139,19 +215,22 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
         low_stock_alert: toBaseQuantity(parseFloat(form.low_stock_alert) || 5, form.stock_display_unit),
         coffee_grams_per_sale: normalizeCoffeeGrams(form.coffee_grams_per_sale),
         coffee_bean_product_id: form.coffee_bean_product_id || null,
-        category_id: form.category_id || null,
+        category_id: categorySelection.category_id || null,
+        secondary_category_ids: categorySelection.secondary_category_ids,
+        image_url: pendingFile && isEdit ? (product.image_url || null) : stripped.image_url,
       }
+      let savedProduct = product
       if (isEdit) {
-        await updatePOSProduct(product.id, data)
+        savedProduct = await updatePOSProduct(product.id, data)
       } else {
-        const created = await createPOSProduct(data)
-        // Upload pending image for new product
-        if (pendingFile && created?.id) {
-          try {
-            await uploadProductImage(created.id, pendingFile)
-          } catch {
-            toast.error('Product saved but image upload failed')
-          }
+        savedProduct = await createPOSProduct(data)
+      }
+      if (pendingFile && savedProduct?.id) {
+        try {
+          await uploadProductImage(savedProduct.id, pendingFile)
+        } catch {
+          toast.error('Product saved but image upload failed. Try saving again.')
+          if (isEdit) return
         }
       }
       toast.success(isEdit ? 'Product updated' : 'Product created')
@@ -195,18 +274,22 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                 <input type="number" value={form.price} onChange={e => set('price', e.target.value)} className="input w-full" placeholder="8.500" step="0.001" min="0" />
               </div>
               <div>
-                <label className="label block mb-1">Primary category</label>
-                <select value={form.category_id} onChange={e => set('category_id', e.target.value)} className="input w-full">
-                  <option value="">No category</option>
+                <label className="label block mb-1">Main category</label>
+                <select value={form.category_id} onChange={e => changePrimaryCategory(e.target.value)} className="input w-full">
+                  <option value="">No categories</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
             </div>
 
-            {/* Secondary categories — product appears in multiple sections */}
+            {/* Additional categories — used by both POS and customer-facing menu */}
             {categories.filter(c => c.id !== form.category_id).length > 0 && (
               <div>
-                <label className="label block mb-1">Also show in <span className="text-noch-muted text-xs">(optional — extra categories on customer menu)</span></label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="label">Also appears in</label>
+                  <span className="text-noch-muted text-xs">{getProductCategoryIds(form).length} selected</span>
+                </div>
+                <p className="text-noch-muted text-[11px] mb-2">The main category controls the card color. Every selected category is used in the POS and customer menu.</p>
                 <div className="flex flex-wrap gap-2 mt-1">
                   {categories.filter(c => c.id !== form.category_id).map(c => {
                     const checked = (form.secondary_category_ids || []).includes(c.id)
@@ -217,10 +300,17 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                           className="hidden"
                           checked={checked}
                           onChange={e => {
+                            if (e.target.checked && !form.category_id) {
+                              changePrimaryCategory(c.id)
+                              return
+                            }
                             const ids = form.secondary_category_ids || []
-                            set('secondary_category_ids', e.target.checked ? [...ids, c.id] : ids.filter(id => id !== c.id))
+                            set('secondary_category_ids', e.target.checked
+                              ? [...new Set([...ids, c.id])]
+                              : ids.filter(id => id !== c.id))
                           }}
                         />
+                        {checked && <Check size={11} />}
                         {c.name}
                       </label>
                     )
@@ -330,9 +420,11 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                             else e.currentTarget.style.display = 'none'
                           }}
                         />
-                        {uploadingImg && (
+                        {imageWorking && (
                           <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                            <span className="text-white text-sm animate-pulse">Uploading…</span>
+                            <span className="text-white text-sm animate-pulse">
+                              {generatingImg ? 'Creating product image…' : 'Optimizing image…'}
+                            </span>
                           </div>
                         )}
                         <button
@@ -353,20 +445,31 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                       className="hidden"
                       onChange={handleFileSelected}
                     />
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => imgInputRef.current?.click()}
-                        disabled={uploadingImg}
-                        className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-2"
+                        disabled={imageWorking}
+                        className="btn-secondary text-xs flex items-center justify-center gap-1.5 px-3 py-2"
                       >
-                        📷 {uploadingImg ? 'Uploading…' : (pendingFile ? 'Change photo' : 'Upload photo')}
+                        {uploadingImg ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                        {pendingFile ? 'Change photo' : 'Upload photo'}
                       </button>
-                      <span className="text-noch-muted text-xs self-center">or paste URL:</span>
+                      <button
+                        type="button"
+                        onClick={handleGenerateImage}
+                        disabled={imageWorking || (!form.name.trim() && !form.name_ar.trim())}
+                        className="btn-secondary text-xs flex items-center justify-center gap-1.5 px-3 py-2"
+                        title="Create a menu-ready image from the product name and description"
+                      >
+                        {generatingImg ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                        {generatingImg ? 'Creating…' : 'Generate with AI'}
+                      </button>
                     </div>
                     <p className="text-noch-muted text-[11px] mt-2">
-                      Uploads are automatically fitted without cropping to a 4:5 WebP image.
+                      Upload a photo or generate one from the product name. Both are automatically fitted without cropping to a 4:5 WebP image.
                     </p>
+                    <label className="label block mt-2">Or paste an image URL</label>
                     <input
                       value={pendingFile ? '' : (form.image_url || '')}
                       onChange={e => { set('image_url', e.target.value); setPendingFile(null); setPendingPreview(null) }}
@@ -374,8 +477,14 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                       placeholder="https://..."
                       disabled={!!pendingFile}
                     />
+                    {generatingImg && (
+                      <p className="text-noch-muted text-xs mt-1">AI generation can take up to two minutes.</p>
+                    )}
                     {pendingFile && !isEdit && (
-                      <p className="text-noch-muted text-xs mt-1">📎 {pendingFile.name} — will upload when product is created</p>
+                      <p className="text-noch-muted text-xs mt-1">{pendingFile.name} — will upload when product is created</p>
+                    )}
+                    {pendingFile && isEdit && (
+                      <p className="text-noch-muted text-xs mt-1">New image ready — select Update to replace the current product image</p>
                     )}
                   </div>
 
@@ -413,8 +522,8 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
 
             <div className="flex gap-3 pt-2">
               <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
-                {saving ? 'Saving...' : (isEdit ? 'Update' : 'Create')}
+              <button onClick={handleSave} disabled={saving || imageWorking} className="btn-primary flex-1">
+                {saving ? 'Saving...' : imageWorking ? 'Preparing image…' : (isEdit ? 'Update' : 'Create')}
               </button>
             </div>
           </div>
@@ -729,8 +838,8 @@ export default function POSProducts() {
 
   const catMatch = p =>
     filterCat === 'all' ? true :
-    filterCat === '__none__' ? !p.category_id :
-    p.category_id === filterCat
+    filterCat === '__none__' ? getProductCategoryIds(p).length === 0 :
+    productBelongsToCategory(p, filterCat)
 
   // Menu-visible products in sort order (draggable)
   const menuItems = useMemo(() =>
@@ -877,7 +986,7 @@ export default function POSProducts() {
                     }`}
                     style={filterCat === c.id ? { background: c.color, borderColor: c.color } : {}}
                   >
-                    {c.name}
+                    {c.name} ({products.filter(product => productBelongsToCategory(product, c.id)).length})
                   </button>
                 ))}
                 <button
@@ -945,14 +1054,7 @@ export default function POSProducts() {
                           {!compact && p.name_ar && <p className="text-noch-muted text-xs" dir="rtl">{p.name_ar}</p>}
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-noch-green font-bold ${compact ? 'text-xs' : 'text-sm'}`}>{parseFloat(p.price).toFixed(3)} LYD</span>
-                            {!compact && p.pos_categories && (
-                              <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: p.pos_categories.color + '40', border: `1px solid ${p.pos_categories.color}40` }}>
-                                {p.pos_categories.name}
-                              </span>
-                            )}
-                            {compact && p.pos_categories && (
-                              <span className="text-[10px] opacity-60">{p.pos_categories.name}</span>
-                            )}
+                            <ProductCategoryBadges product={p} categories={categories} compact={compact} />
                             {!compact && p.barcode && <span className="text-noch-muted text-xs font-mono">{p.barcode}</span>}
                             {!compact && <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-0.5">
                               <Globe size={9} />Menu{p.featured ? ' ★' : ''}
@@ -994,14 +1096,7 @@ export default function POSProducts() {
                             {!compact && p.name_ar && <p className="text-noch-muted text-xs" dir="rtl">{p.name_ar}</p>}
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`text-noch-green font-bold ${compact ? 'text-xs' : 'text-sm'}`}>{parseFloat(p.price).toFixed(3)} LYD</span>
-                              {!compact && p.pos_categories && (
-                                <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: p.pos_categories.color + '40', border: `1px solid ${p.pos_categories.color}40` }}>
-                                  {p.pos_categories.name}
-                                </span>
-                              )}
-                              {compact && p.pos_categories && (
-                                <span className="text-[10px] opacity-60">{p.pos_categories.name}</span>
-                              )}
+                              <ProductCategoryBadges product={p} categories={categories} compact={compact} />
                               {!compact && p.barcode && <span className="text-noch-muted text-xs font-mono">{p.barcode}</span>}
                             </div>
                           </div>

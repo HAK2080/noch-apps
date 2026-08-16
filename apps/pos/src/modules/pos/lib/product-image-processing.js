@@ -123,6 +123,26 @@ export async function optimizeProductImage(file) {
   }
 }
 
+export function generatedImageFileFromBase64(
+  imageBase64,
+  mimeType = 'image/webp',
+  filename = 'ai-product-image.webp',
+) {
+  const normalized = String(imageBase64 || '').replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
+  if (!normalized || !/^[a-z0-9+/]+={0,2}$/i.test(normalized)) {
+    throw new Error('AI returned an invalid product image')
+  }
+
+  const binary = atob(normalized)
+  if (!binary.length || binary.length > PRODUCT_IMAGE_MAX_INPUT_BYTES) {
+    throw new Error('AI returned a product image that is too large')
+  }
+
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return new File([bytes], filename, { type: mimeType, lastModified: Date.now() })
+}
+
 export function formatImageBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB'
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`

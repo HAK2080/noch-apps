@@ -7,6 +7,7 @@ import {
   PRODUCT_IMAGE_HEIGHT,
   PRODUCT_IMAGE_WIDTH,
   calculateContainedImageRect,
+  generatedImageFileFromBase64,
 } from '../src/modules/pos/lib/product-image-processing.js'
 
 const menuCssUrl = new URL('../src/pages/storefront/styles/Menu.css', import.meta.url)
@@ -45,6 +46,16 @@ test('portrait and square originals fit the 4:5 canvas without cropping', () => 
     height: 1056,
   })
   assert.equal(PRODUCT_IMAGE_WIDTH / PRODUCT_IMAGE_HEIGHT, 4 / 5)
+})
+
+test('generated image bytes become a browser file for the standard optimizer', () => {
+  const encoded = Buffer.from([82, 73, 70, 70]).toString('base64')
+  const file = generatedImageFileFromBase64(encoded, 'image/webp', 'matcha-ai.webp')
+
+  assert.equal(file.name, 'matcha-ai.webp')
+  assert.equal(file.type, 'image/webp')
+  assert.equal(file.size, 4)
+  assert.throws(() => generatedImageFileFromBase64('not base64!'), /invalid product image/)
 })
 
 test('menu presentation and uploads preserve the optimization contract', async () => {

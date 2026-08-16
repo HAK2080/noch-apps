@@ -242,6 +242,25 @@ export async function uploadProductImage(productId, file) {
   return publicUrl
 }
 
+export async function generateProductImage(input) {
+  const { data, error } = await supabase.functions.invoke('generate-product-image', { body: input })
+  if (error) {
+    let message = error.message || 'Product image generation failed'
+    if (error.context) {
+      try {
+        const body = await error.context.clone().json()
+        message = body?.error || body?.message || message
+      } catch {
+        // Keep the Supabase error when the response body is not JSON.
+      }
+    }
+    throw new Error(message)
+  }
+  if (data?.error) throw new Error(data.error)
+  if (!data?.image_base64) throw new Error('AI returned no product image')
+  return data
+}
+
 export async function getPOSProduct(id) {
   const { data, error } = await supabase
     .from('pos_products')

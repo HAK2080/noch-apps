@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatFixed } from '../../lib/numbers'
 import { buildOptimizedProductImageUrl } from '../../lib/product-images'
+import { productBelongsToCategory } from '../../lib/product-categories'
 import nochLogo from '../../assets/noch-logo.png'
 import './styles/Menu.css'
 
@@ -602,18 +603,16 @@ export default function Menu() {
     return map
   }, [categories])
 
-  const visibleCatIds = useMemo(() => new Set(categories.map(c => c.id)), [categories])
-  const hasFeatured = useMemo(() => products.some(p => p.featured && visibleCatIds.has(p.category_id)), [products, visibleCatIds])
+  const hasFeatured = useMemo(() => products.some(p =>
+    p.featured && categories.some(cat => productBelongsToCategory(p, cat.id))
+  ), [products, categories])
 
   // Products for each category section, filtered by activeCat & showFeatured.
   // A product appears in a section if its primary category_id matches OR
   // the category is in its secondary_category_ids array.
   const sectionsData = useMemo(() => {
     return categories.map(cat => {
-      let prods = products.filter(p =>
-        p.category_id === cat.id ||
-        (Array.isArray(p.secondary_category_ids) && p.secondary_category_ids.includes(cat.id))
-      )
+      let prods = products.filter(p => productBelongsToCategory(p, cat.id))
       if (showFeatured) prods = prods.filter(p => p.featured)
       if (activeCat !== 'all' && activeCat !== cat.id) prods = []
       return { cat, products: prods }

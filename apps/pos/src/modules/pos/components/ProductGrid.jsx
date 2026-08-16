@@ -10,6 +10,7 @@ import { AlertTriangle, Ban } from 'lucide-react'
 import { format } from '../lib/money'
 import { formatStockQuantity } from '../lib/inventory-units'
 import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
+import { productBelongsToCategory } from '../../../lib/product-categories'
 
 const LONG_PRESS_MS = 500
 
@@ -53,7 +54,7 @@ function ProductGrid({
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.name_ar && p.name_ar.includes(searchQuery)) ||
       (p.barcode && p.barcode.includes(searchQuery))
-    const matchCat = activeCategory === 'all' || p.category_id === activeCategory
+    const matchCat = activeCategory === 'all' || productBelongsToCategory(p, activeCategory)
     return matchSearch && matchCat
   }), [products, searchQuery, activeCategory])
 
@@ -99,6 +100,7 @@ function ProductGrid({
         {categories.map(cat => {
           const active = activeCategory === cat.id
           const c = cat.color || '#10b981'
+          const productCount = products.filter(product => productBelongsToCategory(product, cat.id)).length
           return (
             <button
               key={cat.id}
@@ -109,7 +111,7 @@ function ProductGrid({
               style={active ? { backgroundColor: c, borderColor: c } : {}}
             >
               {!active && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: c }} />}
-              {tileLang === 'ar' && cat.name_ar ? cat.name_ar : cat.name}
+              {tileLang === 'ar' && cat.name_ar ? cat.name_ar : cat.name} ({productCount})
             </button>
           )
         })}
