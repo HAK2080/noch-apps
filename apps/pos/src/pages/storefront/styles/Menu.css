@@ -817,6 +817,7 @@
    ───────────────────────────────────────────────────────── */
 .scroll-row {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -973,6 +974,7 @@
 .grid-2col {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 12px;
   margin-bottom: 8px;
 }
@@ -1229,6 +1231,15 @@
   z-index: 1;
 }
 .menu-product-image-shell.is-loaded .menu-product-image-media { opacity: 1; }
+
+/* Optimized menu photos include a small no-crop safety border. A restrained
+   card-only zoom removes most of that border while retaining the whole drink;
+   detail, list, and add-on images keep the original contained framing. */
+.scroll-card-img .menu-product-image-media,
+.grid-card-img .menu-product-image-media {
+  object-fit: cover;
+  transform: scale(1.12);
+}
 .menu-product-image-skeleton {
   position: absolute;
   inset: 0;
@@ -1287,19 +1298,19 @@
 .detail-name, .detail-name-alt, .detail-desc {
   font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
 }
-/* The opaque information band stays separate from the photo so the drink is
-   never obscured. Names can wrap while the price and add control stay fixed. */
+/* Keep the opaque information band separate from the photo, but compact. A
+   two-line name can still grow naturally while one-line products stay short. */
 .scroll-card-body-text,
 .grid-card-body-text {
-  min-height: 54px;
-  padding: 10px 10px 4px;
+  min-height: 40px;
+  padding: 8px 10px 2px;
   background: var(--card);
   border-top: 1.5px solid var(--border);
 }
 .scroll-card .scroll-card-footer,
 .grid-card .grid-card-footer {
-  min-height: 48px;
-  padding: 4px 10px 10px;
+  min-height: 42px;
+  padding: 2px 10px 8px;
   background: var(--card);
 }
 .list-row-tap {
