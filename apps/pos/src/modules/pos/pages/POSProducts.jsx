@@ -24,6 +24,8 @@ import {
 } from '../lib/inventory-units'
 import { normalizeCoffeeGrams } from '../lib/coffee-consumption'
 import { NEW_PRODUCT_VISIBILITY } from '../lib/product-visibility'
+import { formatImageBytes, optimizeProductImage } from '../lib/product-image-processing'
+import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
@@ -62,6 +64,10 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   const imgInputRef = useRef(null)
   const isEdit = !!product?.id
 
+  useEffect(() => () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+  }, [pendingPreview])
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const changeStockUnit = (nextUnit) => setForm(current => {
@@ -80,27 +86,34 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   const handleFileSelected = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const preview = URL.createObjectURL(file)
-    setPendingPreview(preview)
+    e.target.value = ''
+    setUploadingImg(true)
 
-    if (isEdit) {
-      // Existing product: upload immediately
-      setUploadingImg(true)
-      try {
-        const url = await uploadProductImage(product.id, file)
+    try {
+      const optimized = await optimizeProductImage(file)
+      const preview = URL.createObjectURL(optimized.file)
+      setPendingPreview(preview)
+      const sizeChange = `${formatImageBytes(optimized.originalBytes)} → ${formatImageBytes(optimized.optimizedBytes)}`
+
+      if (isEdit) {
+        // Existing product: upload immediately
+        const url = await uploadProductImage(product.id, optimized.file)
         set('image_url', url)
         setPendingFile(null)
         setPendingPreview(null)
-        toast.success('Image uploaded')
-      } catch (err) {
-        toast.error(err.message || 'Upload failed')
-      } finally {
-        setUploadingImg(false)
+        toast.success(`Image optimized and uploaded (${sizeChange})`)
+      } else {
+        // New product: store the normalized file, upload after create
+        setPendingFile(optimized.file)
+        set('image_url', '')
+        toast.success(`Image ready (${sizeChange})`)
       }
-    } else {
-      // New product: store file, upload after create
-      setPendingFile(file)
-      set('image_url', '')   // clear any URL text while file is pending
+    } catch (err) {
+      setPendingFile(null)
+      setPendingPreview(null)
+      toast.error(err.message || 'Image optimization failed')
+    } finally {
+      setUploadingImg(false)
     }
   }
 
@@ -309,10 +322,13 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                     {(pendingPreview || form.image_url) && (
                       <div className="relative mb-2">
                         <img
-                          src={pendingPreview || form.image_url}
+                          src={pendingPreview || buildOptimizedProductImageUrl(form.image_url, { width: 600, height: 750, quality: 82 })}
                           alt=""
-                          className="h-36 w-full object-cover rounded-lg border border-noch-border"
-                          onError={e => e.target.style.display='none'}
+                          className="w-full max-h-80 aspect-[4/5] object-contain bg-[#f8f3e8] rounded-lg border border-noch-border"
+                          onError={e => {
+                            if (!pendingPreview && e.currentTarget.src !== form.image_url) e.currentTarget.src = form.image_url
+                            else e.currentTarget.style.display = 'none'
+                          }}
                         />
                         {uploadingImg && (
                           <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
@@ -348,6 +364,9 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                       </button>
                       <span className="text-noch-muted text-xs self-center">or paste URL:</span>
                     </div>
+                    <p className="text-noch-muted text-[11px] mt-2">
+                      Uploads are automatically fitted without cropping to a 4:5 WebP image.
+                    </p>
                     <input
                       value={pendingFile ? '' : (form.image_url || '')}
                       onChange={e => { set('image_url', e.target.value); setPendingFile(null); setPendingPreview(null) }}

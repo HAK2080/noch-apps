@@ -727,13 +727,13 @@
 
 .scroll-card-img {
   width: 100%;
-  height: 120px;
-  object-fit: cover;
+  aspect-ratio: 4 / 5;
   display: block;
+  background: #f8f3e8;
 }
 .scroll-card-placeholder {
   width: 100%;
-  height: 120px;
+  aspect-ratio: 4 / 5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -769,6 +769,7 @@
 .scroll-card-price {
   font-size: 14px; font-weight: 800;
   color: var(--brand);
+  white-space: nowrap;
 }
 .scroll-card-price small { font-size: 10px; font-weight: 500; color: var(--muted); }
 
@@ -867,13 +868,13 @@
 
 .grid-card-img {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
+  aspect-ratio: 4 / 5;
   display: block;
+  background: #f8f3e8;
 }
 .grid-card-placeholder {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -903,6 +904,7 @@
 .grid-card-price {
   font-size: 14px; font-weight: 800;
   color: var(--brand);
+  white-space: nowrap;
 }
 .grid-card-price small { font-size: 10px; color: var(--muted); }
 
@@ -1085,6 +1087,51 @@
 }
 .card-tap-area:active { opacity: 0.85; }
 
+/* Product photos share one predictable 4:5 canvas. The optimized derivative
+   loads over a visible placeholder, then falls back to the original URL if
+   Storage transformations are unavailable. */
+.menu-product-image-shell {
+  position: relative;
+  overflow: hidden;
+  background: #f8f3e8;
+  isolation: isolate;
+}
+.menu-product-image-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  z-index: 1;
+}
+.menu-product-image-shell.is-loaded .menu-product-image-media { opacity: 1; }
+.menu-product-image-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, #f8f3e8 22%, #fff 40%, #f8f3e8 58%);
+  background-size: 220% 100%;
+  animation: menu-image-loading 1.2s ease-in-out infinite;
+  transition: opacity 180ms ease;
+}
+.menu-product-image-shell.is-loaded .menu-product-image-skeleton { opacity: 0; }
+.menu-product-image-shell.is-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #f8f3e8, #fff);
+}
+@keyframes menu-image-loading {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-product-image-skeleton { animation: none; }
+  .menu-product-image-media { transition: none; }
+}
+
 /* Name shown in place of a missing image (instead of a single letter) */
 .placeholder-name {
   font-size: 15px;
@@ -1116,11 +1163,21 @@
 .detail-name, .detail-name-alt, .detail-desc {
   font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif;
 }
-/* keep name/desc padding now that footer sits outside the tap area */
-.scroll-card-body-text { padding: 10px 10px 4px; }
-.grid-card-body-text   { padding: 10px 10px 4px; }
+/* The opaque information band stays separate from the photo so the drink is
+   never obscured. Names can wrap while the price and add control stay fixed. */
+.scroll-card-body-text,
+.grid-card-body-text {
+  min-height: 54px;
+  padding: 10px 10px 4px;
+  background: var(--card);
+  border-top: 1.5px solid var(--border);
+}
 .scroll-card .scroll-card-footer,
-.grid-card .grid-card-footer { padding: 0 10px 10px; }
+.grid-card .grid-card-footer {
+  min-height: 48px;
+  padding: 4px 10px 10px;
+  background: var(--card);
+}
 .list-row-tap {
   display: flex;
   align-items: center;
@@ -1190,9 +1247,9 @@
 .detail-img-wrap { position: relative; width: 100%; }
 .detail-img {
   width: 100%;
-  height: 280px;
-  object-fit: cover;
+  height: min(52dvh, 460px);
   display: block;
+  background: #f8f3e8;
   border-radius: 19px 19px 0 0;
 }
 .detail-img-placeholder {

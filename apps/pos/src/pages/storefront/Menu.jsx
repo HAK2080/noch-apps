@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatFixed } from '../../lib/numbers'
+import { buildOptimizedProductImageUrl } from '../../lib/product-images'
 import nochLogo from '../../assets/noch-logo.png'
 import './styles/Menu.css'
 
@@ -67,35 +68,93 @@ const CARD_COLORS = [
   { bg: '#e0f7fa', text: '#00695c' },
 ]
 
+function MenuProductImage({ src, alt, className, fallback, priority = false, detail = false }) {
+  return (
+    <MenuProductImageState
+      key={src || 'missing-image'}
+      src={src}
+      alt={alt}
+      className={className}
+      fallback={fallback}
+      priority={priority}
+      detail={detail}
+    />
+  )
+}
+
+function MenuProductImageState({ src, alt, className, fallback, priority, detail }) {
+  const optimizedSource = buildOptimizedProductImageUrl(src, detail
+    ? { width: 800, height: 1000, quality: 85 }
+    : { width: 400, height: 500, quality: 80 })
+  const [currentSource, setCurrentSource] = useState(optimizedSource)
+  const [status, setStatus] = useState(src ? 'loading' : 'failed')
+
+  const handleError = () => {
+    if (currentSource !== src) {
+      setCurrentSource(src)
+      setStatus('loading')
+      return
+    }
+    setStatus('failed')
+  }
+
+  if (!src || status === 'failed') {
+    return (
+      <div className={`${className} menu-product-image-shell is-fallback`} role="img" aria-label={alt}>
+        {fallback}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`${className} menu-product-image-shell${status === 'loaded' ? ' is-loaded' : ''}`}>
+      <span className="menu-product-image-skeleton" aria-hidden="true" />
+      <img
+        src={currentSource}
+        alt={alt}
+        className="menu-product-image-media"
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        fetchPriority={priority ? 'high' : 'auto'}
+        onLoad={() => setStatus('loaded')}
+        onError={handleError}
+      />
+    </div>
+  )
+}
+
 // ── Section layout components ────────────────────────────────────────────────
 
 function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
   return (
     <div className="scroll-row">
-      {products.map(p => (
+      {products.map((p, index) => (
         <ScrollCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          priority={index < 2}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
+function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail, priority }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
     <div className={`scroll-card${soldOut ? ' sold-out' : ''}`}>
       {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
       <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
-        {p.image_url ? (
-          <img src={p.image_url} alt={name_(p)} className="scroll-card-img" loading="lazy" />
-        ) : (
-          <div className="scroll-card-img scroll-card-placeholder" style={{ background: col.bg }}>
+        <MenuProductImage
+          src={p.image_url}
+          alt={name_(p)}
+          className="scroll-card-img"
+          priority={priority}
+          fallback={(
             <span className="placeholder-name" style={{ color: col.text }}>{name_(p)}</span>
-          </div>
-        )}
+          )}
+        />
         <div className="scroll-card-body-text">
           <p className="scroll-card-name">{name_(p)}</p>
           {desc_(p) && <p className="scroll-card-desc">{desc_(p)}</p>}
@@ -136,13 +195,14 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, on
   return (
     <div className={`list-row${soldOut ? ' sold-out' : ''}`}>
       <button className="list-row-tap" onClick={onOpenDetail} aria-label={name_(p)}>
-        {p.image_url ? (
-          <img src={p.image_url} alt={name_(p)} className="list-row-img" loading="lazy" />
-        ) : (
-          <div className="list-row-img list-row-placeholder" style={{ background: col.bg }}>
+        <MenuProductImage
+          src={p.image_url}
+          alt={name_(p)}
+          className="list-row-img"
+          fallback={(
             <span style={{ color: col.text, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
-          </div>
-        )}
+          )}
+        />
         <div className="list-row-body">
           <p className="list-row-name">{name_(p)}</p>
           {desc_(p) && <p className="list-row-desc">{desc_(p)}</p>}
@@ -184,13 +244,14 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, o
     <div className={`grid-card${soldOut ? ' sold-out' : ''}`}>
       {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
       <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
-        {p.image_url ? (
-          <img src={p.image_url} alt={name_(p)} className="grid-card-img" loading="lazy" />
-        ) : (
-          <div className="grid-card-img grid-card-placeholder" style={{ background: col.bg }}>
+        <MenuProductImage
+          src={p.image_url}
+          alt={name_(p)}
+          className="grid-card-img"
+          fallback={(
             <span className="placeholder-name" style={{ color: col.text }}>{name_(p)}</span>
-          </div>
-        )}
+          )}
+        />
         <div className="grid-card-body-text">
           <p className="grid-card-name">{name_(p)}</p>
           {desc_(p) && <p className="grid-card-desc">{desc_(p)}</p>}
@@ -271,13 +332,14 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
         const soldOut = p.is_available === false
         return (
           <div key={p.id} className={`addon-item${soldOut ? ' sold-out' : ''}`}>
-            {p.image_url ? (
-              <img src={p.image_url} alt={name_(p)} className="addon-img" loading="lazy" />
-            ) : (
-              <div className="addon-img addon-placeholder" style={{ background: col.bg }}>
+            <MenuProductImage
+              src={p.image_url}
+              alt={name_(p)}
+              className="addon-img"
+              fallback={(
                 <span style={{ color: col.text, fontSize: 18 }}>{catEmoji(name_(p))}</span>
-              </div>
-            )}
+              )}
+            />
             <p className="addon-name">{name_(p)}</p>
             <p className="addon-price">{formatFixed(p.price)} {currency}</p>
             {!soldOut && (qty === 0 ? (
@@ -376,13 +438,16 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
         <button className="detail-close" onClick={onClose} aria-label={t('Close', 'إغلاق')}>✕</button>
 
         <div className="detail-img-wrap">
-          {p.image_url ? (
-            <img src={p.image_url} alt={name_(p)} className="detail-img" />
-          ) : (
-            <div className="detail-img detail-img-placeholder" style={{ background: col.bg }}>
+          <MenuProductImage
+            src={p.image_url}
+            alt={name_(p)}
+            className="detail-img"
+            priority
+            detail
+            fallback={(
               <span className="placeholder-name placeholder-name-lg" style={{ color: col.text }}>{name_(p)}</span>
-            </div>
-          )}
+            )}
+          />
           {soldOut && <span className="detail-soldout">{t('SOLD OUT', 'نفد')}</span>}
         </div>
 

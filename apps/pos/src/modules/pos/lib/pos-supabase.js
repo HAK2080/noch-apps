@@ -229,9 +229,13 @@ export async function getProductSalesStats(branchId, from, to) {
 }
 
 export async function uploadProductImage(productId, file) {
-  const ext = file.name.split('.').pop()
+  const ext = file.type === 'image/webp' ? 'webp' : file.name.split('.').pop()
   const path = `products/${productId}/${Date.now()}.${ext}`
-  const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, file, { upsert: true })
+  const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, file, {
+    upsert: true,
+    contentType: file.type || undefined,
+    cacheControl: '31536000',
+  })
   if (uploadErr) throw uploadErr
   const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path)
   await supabase.from('pos_products').update({ image_url: publicUrl, updated_at: new Date().toISOString() }).eq('id', productId)

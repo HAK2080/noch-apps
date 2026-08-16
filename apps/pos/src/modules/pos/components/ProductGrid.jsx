@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { AlertTriangle, Ban } from 'lucide-react'
 import { format } from '../lib/money'
 import { formatStockQuantity } from '../lib/inventory-units'
+import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
 
 const LONG_PRESS_MS = 500
 
@@ -169,10 +170,14 @@ function ProductGrid({
               >
                 {product.image_url ? (
                   <img
-                    src={product.image_url}
+                    src={buildOptimizedProductImageUrl(product.image_url, { width: 320, height: 400, quality: 78 })}
                     alt=""
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-contain"
                     loading="lazy"
+                    decoding="async"
+                    onError={e => {
+                      if (e.currentTarget.src !== product.image_url) e.currentTarget.src = product.image_url
+                    }}
                   />
                 ) : (
                   <span
