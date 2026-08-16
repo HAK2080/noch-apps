@@ -1,5 +1,5 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { buildProductImagePrompt, normalizeProductImageBrief } from './product-image-prompt.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +9,8 @@ const CORS_HEADERS = {
 
 const ALLOWED_ROLES = new Set(['owner', 'supervisor', 'data_entry'])
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
+const MAX_NAME_LENGTH = 160
+const MAX_DESCRIPTION_LENGTH = 500
 
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
@@ -95,4 +97,43 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   })
+}
+
+function cleanText(value: unknown, maxLength: number) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength)
+}
+
+function normalizeProductImageBrief(input: Record<string, unknown> = {}) {
+  const name = cleanText(input.name, MAX_NAME_LENGTH)
+  const nameAr = cleanText(input.name_ar, MAX_NAME_LENGTH)
+  const description = cleanText(input.description, MAX_DESCRIPTION_LENGTH)
+  const descriptionAr = cleanText(input.description_ar, MAX_DESCRIPTION_LENGTH)
+  const category = cleanText(input.category, MAX_NAME_LENGTH)
+
+  if (!name && !nameAr) throw new Error('Enter a product name before generating an image')
+
+  return { name, nameAr, description, descriptionAr, category }
+}
+
+function buildProductImagePrompt(input: Record<string, unknown> = {}) {
+  const brief = normalizeProductImageBrief(input)
+  const productName = [brief.name, brief.nameAr].filter(Boolean).join(' / ')
+  const description = [brief.description, brief.descriptionAr].filter(Boolean).join(' / ')
+
+  return [
+    'Create one polished, photorealistic cafe menu product photograph.',
+    `Product: ${productName}.`,
+    brief.category ? `Category: ${brief.category}.` : '',
+    description ? `Product details: ${description}.` : '',
+    'Show exactly one finished product as the clear hero subject.',
+    'Use a vertical portrait composition with the entire cup, glass, plate, or package fully visible from top to base.',
+    'Center the product and leave generous clean space on every side so it remains safe when fitted into a 4:5 menu card.',
+    'Use a warm cream seamless studio background (#f8f3e8), soft natural commercial lighting, realistic texture, and a subtle grounding shadow.',
+    'Camera angle should clearly show the drink or product while keeping its silhouette easy to recognize on a small mobile menu card.',
+    'Do not crop the product. Do not add text, lettering, labels, logos, watermarks, borders, hands, people, multiple products, or distracting props.',
+    'The final result must look appetizing, premium, realistic, uncluttered, and ready for an online cafe menu.',
+  ].filter(Boolean).join(' ')
 }
