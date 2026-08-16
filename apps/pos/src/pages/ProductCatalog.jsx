@@ -36,6 +36,12 @@ import {
   normalizeProductCategorySelection,
   productBelongsToCategory,
 } from '../lib/product-categories'
+import {
+  getProductMenuBadge,
+  normalizeProductMenuBadgeAnimation,
+  PRODUCT_MENU_BADGE_ANIMATIONS,
+  PRODUCT_MENU_BADGES,
+} from '../lib/product-menu-badges'
 
 // ─── helpers ──────────────────────────────────────────────────
 function fmt(n) { return parseFloat(n || 0).toFixed(3) }
@@ -145,7 +151,7 @@ const BLANK = {
   coffee_grams_per_sale: '', coffee_bean_product_id: '',
   is_coffee_bean: false, stock_cost_per_base_unit: '', retail_pack_size_base_units: '250',
   visible_branch_ids: [], ...NEW_PRODUCT_VISIBILITY,
-  is_available: true,
+  is_available: true, menu_badge_key: '', menu_badge_animation: 'dazzle',
 }
 
 function ProductModal({ product, products, categories, branches, canEditCost, onSave, onClose }) {
@@ -310,6 +316,8 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
         visible_on_customer_menu: form.visible_on_customer_menu !== false,
         visible_on_website:       form.visible_on_website !== false,
         is_available:       form.is_available !== false,
+        menu_badge_key: form.menu_badge_key || null,
+        menu_badge_animation: normalizeProductMenuBadgeAnimation(form.menu_badge_animation),
       }
       // Drop legacy single-branch field — visibility lives in the array now
       delete payload.branch_id
@@ -405,6 +413,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
   }
 
   const beanProducts = (products || []).filter(candidate => candidate.is_coffee_bean && candidate.id !== product?.id)
+  const selectedMenuBadge = getProductMenuBadge(form.menu_badge_key)
   const defaultBeanProduct = beanProducts.find(candidate => candidate.name?.toLowerCase().includes('ghadamis')) || beanProducts[0]
   const resolvedCoffeeBeanProductId = form.coffee_bean_product_id || defaultBeanProduct?.id || ''
   const calculatedRetailCost = form.is_coffee_bean && form.stock_cost_per_base_unit && form.retail_pack_size_base_units
@@ -715,6 +724,44 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
                     <p className="text-zinc-600 text-xs">Visible to customers on the ordering page</p>
                   </div>
                 </label>
+                {form.visible_on_customer_menu !== false && (
+                  <div className="ml-11 rounded-xl p-3 flex flex-col gap-3" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Animated menu tag</label>
+                        <select value={form.menu_badge_key || ''} onChange={e => set('menu_badge_key', e.target.value)} className="input w-full">
+                          <option value="">No tag</option>
+                          {PRODUCT_MENU_BADGES.map(badge => (
+                            <option key={badge.key} value={badge.key}>{badge.icon} {badge.labelEn} / {badge.labelAr}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label">Animation</label>
+                        <select
+                          value={normalizeProductMenuBadgeAnimation(form.menu_badge_animation)}
+                          onChange={e => set('menu_badge_animation', e.target.value)}
+                          className="input w-full"
+                          disabled={!form.menu_badge_key}
+                        >
+                          {PRODUCT_MENU_BADGE_ANIMATIONS.map(animation => (
+                            <option key={animation.key} value={animation.key}>{animation.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    {selectedMenuBadge && (
+                      <div className="flex items-center gap-2 text-xs text-zinc-500">
+                        <span>Preview</span>
+                        <span className="inline-flex items-center gap-1 rounded-full border-2 border-[#0B1020] bg-gradient-to-r from-[#ff7a18] via-[#ff3d81] to-[#7a5cff] px-2.5 py-1 font-extrabold text-white shadow-[2px_2px_0_#0B1020] animate-pulse">
+                          <span aria-hidden="true">{selectedMenuBadge.icon}</span>
+                          {selectedMenuBadge.labelEn} · {selectedMenuBadge.labelAr}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-zinc-600 text-[11px]">The customer menu automatically switches this tag between Arabic and English.</p>
+                  </div>
+                )}
                 <label className="flex items-center gap-3 cursor-pointer" onClick={() => set('visible_on_website', !form.visible_on_website)}>
                   <div className="w-8 h-4 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors"
                     style={{ background: form.visible_on_website !== false ? '#4ADE80' : 'var(--border-bright, #2D3050)' }}>

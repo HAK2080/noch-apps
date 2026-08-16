@@ -32,6 +32,12 @@ import {
   normalizeProductCategorySelection,
   productBelongsToCategory,
 } from '../../../lib/product-categories'
+import {
+  getProductMenuBadge,
+  normalizeProductMenuBadgeAnimation,
+  PRODUCT_MENU_BADGE_ANIMATIONS,
+  PRODUCT_MENU_BADGES,
+} from '../../../lib/product-menu-badges'
 
 const BLANK_PRODUCT = {
   name: '', name_ar: '', price: '', barcode: '', sku: '',
@@ -42,7 +48,7 @@ const BLANK_PRODUCT = {
   ...NEW_PRODUCT_VISIBILITY, featured: false,
   image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
   show_description_on_menu: true, show_description_on_website: true,
-  secondary_category_ids: [],
+  secondary_category_ids: [], menu_badge_key: '', menu_badge_animation: 'dazzle',
 }
 
 
@@ -105,6 +111,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   const imgInputRef = useRef(null)
   const isEdit = !!product?.id
   const imageWorking = uploadingImg || generatingImg
+  const selectedMenuBadge = getProductMenuBadge(form.menu_badge_key)
 
   useEffect(() => () => {
     if (pendingPreview) URL.revokeObjectURL(pendingPreview)
@@ -218,6 +225,8 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
         category_id: categorySelection.category_id || null,
         secondary_category_ids: categorySelection.secondary_category_ids,
         image_url: pendingFile && isEdit ? (product.image_url || null) : stripped.image_url,
+        menu_badge_key: form.menu_badge_key || null,
+        menu_badge_animation: normalizeProductMenuBadgeAnimation(form.menu_badge_animation),
       }
       let savedProduct = product
       if (isEdit) {
@@ -403,6 +412,40 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                   </label>
                 </div>
               </div>
+
+              {form.visible_on_customer_menu !== false && (
+                <div className="border border-noch-border rounded-xl p-3 mb-3">
+                  <p className="text-noch-muted text-xs mb-2">Animated customer-menu tag</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select value={form.menu_badge_key || ''} onChange={e => set('menu_badge_key', e.target.value)} className="input w-full">
+                      <option value="">No tag</option>
+                      {PRODUCT_MENU_BADGES.map(badge => (
+                        <option key={badge.key} value={badge.key}>{badge.icon} {badge.labelEn} / {badge.labelAr}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={normalizeProductMenuBadgeAnimation(form.menu_badge_animation)}
+                      onChange={e => set('menu_badge_animation', e.target.value)}
+                      className="input w-full"
+                      disabled={!form.menu_badge_key}
+                    >
+                      {PRODUCT_MENU_BADGE_ANIMATIONS.map(animation => (
+                        <option key={animation.key} value={animation.key}>{animation.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {selectedMenuBadge && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-noch-muted">
+                      <span>Preview</span>
+                      <span className="inline-flex items-center gap-1 rounded-full border-2 border-[#0B1020] bg-gradient-to-r from-[#ff7a18] via-[#ff3d81] to-[#7a5cff] px-2.5 py-1 font-extrabold text-white shadow-[2px_2px_0_#0B1020] animate-pulse">
+                        <span aria-hidden="true">{selectedMenuBadge.icon}</span>
+                        {selectedMenuBadge.labelEn} · {selectedMenuBadge.labelAr}
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-noch-muted text-[11px] mt-2">The live menu switches the tag language automatically.</p>
+                </div>
+              )}
 
               {form.visible_on_menu && (
                 <>

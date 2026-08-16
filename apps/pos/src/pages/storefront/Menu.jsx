@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { formatFixed } from '../../lib/numbers'
 import { buildOptimizedProductImageUrl } from '../../lib/product-images'
 import { productBelongsToCategory } from '../../lib/product-categories'
+import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
 import nochLogo from '../../assets/noch-logo.png'
 import './styles/Menu.css'
 
@@ -124,15 +125,40 @@ function MenuProductImageState({ src, alt, className, fallback, priority, detail
   )
 }
 
+function ProductMenuBadge({ product, lang, inline = false, compact = false, detail = false }) {
+  const badge = getProductMenuBadge(product.menu_badge_key, lang)
+  if (!badge) return null
+
+  const className = [
+    'menu-highlight-badge',
+    inline ? 'menu-highlight-badge--inline' : '',
+    compact ? 'menu-highlight-badge--compact' : '',
+    detail ? 'menu-highlight-badge--detail' : '',
+  ].filter(Boolean).join(' ')
+
+  return (
+    <span
+      className={className}
+      data-kind={badge.key}
+      data-animation={normalizeProductMenuBadgeAnimation(product.menu_badge_animation)}
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
+    >
+      <span className="menu-highlight-badge-icon" aria-hidden="true">{badge.icon}</span>
+      <span>{badge.label}</span>
+    </span>
+  )
+}
+
 // ── Section layout components ────────────────────────────────────────────────
 
-function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
+function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
   return (
     <div className="scroll-row">
       {products.map((p, index) => (
         <ScrollCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          lang={lang}
           priority={index < 2}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
@@ -140,12 +166,13 @@ function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency
   )
 }
 
-function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail, priority }) {
+function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priority }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
     <div className={`scroll-card${soldOut ? ' sold-out' : ''}`}>
       {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
+      {!soldOut && <ProductMenuBadge product={p} lang={lang} />}
       <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
         <MenuProductImage
           src={p.image_url}
@@ -177,20 +204,21 @@ function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor,
   )
 }
 
-function ListSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
+function ListSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
   return (
     <div className="list-section">
       {products.map(p => (
         <ListRow key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          lang={lang}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
+function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
@@ -205,7 +233,10 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, on
           )}
         />
         <div className="list-row-body">
-          <p className="list-row-name">{name_(p)}</p>
+          <div className="list-row-name-line">
+            <p className="list-row-name">{name_(p)}</p>
+            {!soldOut && <ProductMenuBadge product={p} lang={lang} inline compact />}
+          </div>
           {desc_(p) && <p className="list-row-desc">{desc_(p)}</p>}
         </div>
       </button>
@@ -225,25 +256,27 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, on
   )
 }
 
-function GridSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
+function GridSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
   return (
     <div className="grid-2col">
       {products.map(p => (
         <GridCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
+          lang={lang}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, onOpenDetail }) {
+function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
     <div className={`grid-card${soldOut ? ' sold-out' : ''}`}>
       {soldOut && <span className="sold-out-badge">SOLD OUT</span>}
+      {!soldOut && <ProductMenuBadge product={p} lang={lang} />}
       <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
         <MenuProductImage
           src={p.image_url}
@@ -296,6 +329,7 @@ function TextSection({ products, cart, onAdd, onRemove, name_, desc_, currency, 
             <div className="text-row-main">
               <div className="text-row-line">
                 <span className="text-row-name">{name_(p)}</span>
+                {!soldOut && <ProductMenuBadge product={p} lang={lang} inline compact />}
                 <span className="text-row-dots" />
                 <span className="text-row-price">{formatFixed(p.price)} <small>{currency}</small></span>
               </div>
@@ -324,7 +358,7 @@ function TextSection({ products, cart, onAdd, onRemove, name_, desc_, currency, 
   )
 }
 
-function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColor }) {
+function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColor, lang }) {
   return (
     <div className="addons-strip">
       {products.map(p => {
@@ -333,6 +367,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
         const soldOut = p.is_available === false
         return (
           <div key={p.id} className={`addon-item${soldOut ? ' sold-out' : ''}`}>
+            {!soldOut && <ProductMenuBadge product={p} lang={lang} inline compact />}
             <MenuProductImage
               src={p.image_url}
               alt={name_(p)}
@@ -391,19 +426,19 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
 
       {style === 'scroll' && (
         <ScrollSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} onOpenDetail={onOpenDetail} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail} />
       )}
       {style === 'list' && (
         <ListSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} onOpenDetail={onOpenDetail} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail} />
       )}
       {style === 'grid' && (
         <GridSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} onOpenDetail={onOpenDetail} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail} />
       )}
       {style === 'addons' && (
         <AddonsStrip products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} currency={currency} catColor={col} />
+          name_={name_} currency={currency} catColor={col} lang={lang} />
       )}
       {style === 'text' && (
         <TextSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
@@ -449,6 +484,7 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
               <span className="placeholder-name placeholder-name-lg" style={{ color: col.text }}>{name_(p)}</span>
             )}
           />
+          {!soldOut && <ProductMenuBadge product={p} lang={lang} detail />}
           {soldOut && <span className="detail-soldout">{t('SOLD OUT', 'نفد')}</span>}
         </div>
 
