@@ -858,6 +858,20 @@ To find if something's been done:
 
 ---
 
+## 2026-08-16 — Global product image optimization button
+
+- **Agent**: Codex
+- **Status**: Complete on GitHub branch; production deployment intentionally pending user approval
+- **Files**:
+  - `apps/pos/src/pages/ProductCatalog.jsx`
+  - `apps/pos/tests/product-catalog-image-optimization.test.mjs`
+- **Description**: Added a visible `Optimize Image` control beside `Change photo` in the global product editor. It converts the current or staged product photo to the shared padded 1200×1500 WebP format without cropping, uploads a versioned replacement for existing products, preserves the original storage object, and shows a 4:5 contained preview. Both controls are 40px high with a 140px minimum width and wrap safely on narrow screens.
+- **Verification**: Six focused image tests passed; targeted ESLint reported zero errors and one pre-existing hook dependency warning; POS production build passed; `git diff --check` passed. Local browser rendering requires the uncommitted Supabase environment variables, so visual behavior was verified through the production build and focused source contract test.
+- **Commit**: `9b6e695` (`feat(products): add image optimization control`)
+- **Deployment**: Not deployed to `apps.noch.cloud`; waiting for the user's explicit cue.
+
+---
+
 ## 2026-08-16 — Automated product images and multi-category menus
 
 - **Agent**: Codex
