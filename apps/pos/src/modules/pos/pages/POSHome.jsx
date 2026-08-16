@@ -5,7 +5,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, MapPin, Plus, Clock, Trash2, Power, AlertTriangle } from 'lucide-react'
 import { getPOSBranches, getOpenShift, openShift, updatePOSBranch } from '../lib/pos-supabase'
-import { branchAvailabilityUpdate, isBranchSelectable } from '../lib/branch-availability'
+import {
+  BRANCH_CUSTOMER_STATUSES,
+  branchCustomerStatusUpdate,
+  getBranchCustomerStatus,
+  isBranchSelectable,
+} from '../lib/branch-availability'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import { isKioskMode } from '../lib/pos-kiosk'
@@ -17,10 +22,11 @@ function KioskWrapper({ children }) {
   return <div className="min-h-screen bg-noch-dark px-4 py-8 sm:py-12">{children}</div>
 }
 
-function BranchCard({ branch, onOpen, onSelect, onWaste, onToggle, canManage }) {
+function BranchCard({ branch, onOpen, onSelect, onWaste, onStatusChange, canManage }) {
   const [shift, setShift] = useState(null)
   const [loading, setLoading] = useState(true)
   const isActive = isBranchSelectable(branch)
+  const customerStatus = getBranchCustomerStatus(branch)
 
   useEffect(() => {
     getOpenShift(branch.id)
@@ -58,17 +64,12 @@ function BranchCard({ branch, onOpen, onSelect, onWaste, onToggle, canManage }) 
         <div className="border-t border-noch-border pt-3">
           <div className="flex items-start gap-2 text-amber-300 text-sm">
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            <span>Branch is off for now. It is hidden from the POS and customer menu.</span>
+            <span>
+              {customerStatus === 'pre_opening'
+                ? 'Customers see this branch as Coming Soon, but cannot select it.'
+                : 'This branch is hidden from customers and unavailable in the POS.'}
+            </span>
           </div>
-          {canManage && (
-            <button
-              onClick={(event) => { event.stopPropagation(); onToggle(branch) }}
-              className="btn-primary text-xs px-3 py-1.5 mt-3 w-full"
-            >
-              <Power size={12} className="inline mr-1" />
-              Turn branch on
-            </button>
-          )}
         </div>
       ) : <div className="border-t border-noch-border pt-3">
         {loading ? (
@@ -97,16 +98,28 @@ function BranchCard({ branch, onOpen, onSelect, onWaste, onToggle, canManage }) 
         )}
       </div>}
 
-      {/* Report waste */}
-      {canManage && isActive && (
-        <button
-          onClick={(event) => { event.stopPropagation(); onToggle(branch) }}
-          className="btn-secondary text-xs px-3 py-1.5 mt-3 w-full flex items-center justify-center gap-1.5 text-amber-300 border-amber-400/30"
-        >
-          <Power size={12} />
-          Turn branch off
-        </button>
+      {canManage && (
+        <div className="mt-3 rounded-xl border border-noch-border bg-black/10 p-3" onClick={event => event.stopPropagation()}>
+          <label className="text-noch-muted text-xs font-medium block mb-1.5" htmlFor={`branch-customer-status-${branch.id}`}>
+            Customer visibility
+          </label>
+          <select
+            id={`branch-customer-status-${branch.id}`}
+            value={customerStatus}
+            onChange={event => onStatusChange(branch, event.target.value)}
+            className="input w-full text-sm"
+          >
+            {BRANCH_CUSTOMER_STATUSES.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <p className="text-noch-muted text-[11px] mt-1.5">
+            Operational is selectable, Coming Soon is visible but disabled, and Hidden is not shown.
+          </p>
+        </div>
       )}
+
+      {/* Report waste */}
       {isActive && (
         <button
           onClick={(e) => { e.stopPropagation(); onWaste(branch) }}
@@ -137,20 +150,25 @@ export default function POSHome() {
       .finally(() => setLoading(false))
   }, [isOwner])
 
-  const toggleBranch = async (branch) => {
-    const nextActive = !isBranchSelectable(branch)
-    if (!nextActive && !window.confirm(`Turn ${branch.name} off? It will be hidden from POS and the customer menu until reactivated.`)) return
-    if (!nextActive) {
+  const setBranchCustomerStatus = async (branch, nextStatus) => {
+    if (nextStatus === getBranchCustomerStatus(branch)) return
+    if (nextStatus !== 'operating' && !window.confirm(
+      nextStatus === 'pre_opening'
+        ? `Show ${branch.name} as Coming Soon? It will be unavailable in the POS and customer menu.`
+        : `Hide ${branch.name}? It will disappear from customer branch lists and be unavailable in the POS.`,
+    )) return
+    if (nextStatus !== 'operating') {
       const openShift = await getOpenShift(branch.id).catch(() => null)
       if (openShift) {
-        toast.error('Close the open shift before turning this branch off.')
+        toast.error('Close the open shift before changing this branch availability.')
         return
       }
     }
     try {
-      const updated = await updatePOSBranch(branch.id, branchAvailabilityUpdate(nextActive))
+      const updated = await updatePOSBranch(branch.id, branchCustomerStatusUpdate(nextStatus))
       setBranches(current => current.map(item => item.id === branch.id ? { ...item, ...updated } : item))
-      toast.success(nextActive ? `${branch.name} is now on` : `${branch.name} is now off`)
+      const label = BRANCH_CUSTOMER_STATUSES.find(option => option.value === nextStatus)?.label || 'updated'
+      toast.success(`${branch.name}: ${label}`)
     } catch (error) {
       toast.error(error.message || 'Failed to update branch availability')
     }
@@ -195,7 +213,7 @@ export default function POSHome() {
               onOpen={(b) => { setOpeningShift(b); setOpeningCash('') }}
               onSelect={(b) => navigate(`/pos/${b.id}`)}
               onWaste={(b) => navigate(`/pos/${b.id}/waste`)}
-              onToggle={toggleBranch}
+              onStatusChange={setBranchCustomerStatus}
               canManage={isOwner}
             />
           ))}

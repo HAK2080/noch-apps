@@ -764,7 +764,7 @@ const STR = {
     fAddr: "City Walk, Hay Al-Andalus", fCity: "Tripoli, Libya", fHours: "Daily 8 AM — 12 AM · Fri 4 PM — 12 AM",
     fRights: "© 2026 Noch Café", fNochi: "Nochi says hi 🐰",
     fDesc: "Tripoli's specialist cafe — coffee, matcha, and an unhinged cheeky bunny with an attitude problem!",
-    pickerTitle: "Which Noch?", pickerSoon: "Coming soon", pickerClose: "Close",
+    pickerTitle: "Which Noch?", pickerSoon: "Coming soon", pickerClose: "Close", pickerEmpty: "No branches available right now.",
   },
   ar: {
     pill: "أووه — أنا نوتشي. أخيراً لقيتنا!",
@@ -782,25 +782,38 @@ const STR = {
     fAddr: "سيتي ووك، حي الأندلس", fCity: "طرابلس، ليبيا", fHours: "يومياً 8 ص — 12 م · الجمعة 4 م — 12 م",
     fRights: "© 2026 نوتش كافيه", fNochi: "نوتشي يسلّم عليكم 🐰",
     fDesc: "كافيه متخصص في طرابلس — قهوة، ماتشا، وأرنوب مجنون ما عنداش حدود!",
-    pickerTitle: "أي فرع نوتش؟", pickerSoon: "قريباً", pickerClose: "إغلاق",
+    pickerTitle: "أي فرع نوتش؟", pickerSoon: "قريباً", pickerClose: "إغلاق", pickerEmpty: "لا توجد فروع متاحة حالياً.",
   }
 };
 
-const BRANCHES = [
+const BRANCH_METADATA = [
   { id: '8936e821-ad7f-4d69-b654-c2f76404f89f',
     nameEn: 'Noch - City Walk', nameAr: 'نوتش - سيتي ووك',
-    subEn: 'Corniche, Al-Andalus',  subAr: 'كورنيش حي الأندلس',
-    live: true },
+    subEn: 'Corniche, Al-Andalus',  subAr: 'كورنيش حي الأندلس' },
   { id: '8459848d-fe99-4716-8222-c99b8746d881',
     nameEn: 'Bloom',                nameAr: 'بلوم',
-    subEn: 'Abu Nawas',             subAr: 'أبو نواس',
-    live: true },
+    subEn: 'Abu Nawas',             subAr: 'أبو نواس' },
   { id: '1332e9b6-8137-40fb-ad3e-074521c32ffb',
     nameEn: 'Noch - Gallery Mall',  nameAr: 'نوتش - جاليري مول',
-    subEn: 'Gallery Mall',          subAr: 'جاليري مول',
-    live: false },
+    subEn: 'Gallery Mall',          subAr: 'جاليري مول' },
 ];
 const MENU_BASE = 'https://apps.noch.cloud/menu';
+
+function normalizePublicBranches(rows){
+  return (rows || [])
+    .filter(branch => branch.operational_status !== 'closed')
+    .map(branch => {
+      const metadata = BRANCH_METADATA.find(item => item.id === branch.id) || {};
+      return {
+        id: branch.id,
+        nameEn: branch.name || metadata.nameEn || '',
+        nameAr: branch.name_ar || metadata.nameAr || branch.name || '',
+        subEn: metadata.subEn || branch.location || '',
+        subAr: metadata.subAr || branch.location || '',
+        status: branch.operational_status === 'pre_opening' ? 'pre_opening' : 'operating',
+      };
+    });
+}
 
 // ── Supabase client (anon key — safe to embed) ─────────────────────────
 const SUPABASE_URL = 'https://kxqjasdvoohiexedtfqw.supabase.co';
@@ -1030,6 +1043,29 @@ const LOC_STR = {
 function gp(key, all){ return (all||POSES).find(p=>p.key===key)?.src || POSES[0].src; }
 
 function BranchPickerModal({ open, onClose, lang, t }){
+  const [branches, setBranches] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+
+  useEffect(()=>{
+    if(!open) return;
+    let cancelled = false;
+    setLoadingBranches(true);
+    if(!sb){
+      setBranches([]);
+      setLoadingBranches(false);
+      return;
+    }
+    (async()=>{
+      const {data, error} = await sb.rpc('get_public_branch_listings');
+      if(!cancelled) setBranches(!error && Array.isArray(data) ? normalizePublicBranches(data) : []);
+    })().catch(()=>{
+      if(!cancelled) setBranches([]);
+    }).finally(()=>{
+      if(!cancelled) setLoadingBranches(false);
+    });
+    return ()=>{ cancelled = true; };
+  }, [open]);
+
   useEffect(()=>{
     if(!open) return;
     const onKey = (e)=>{ if(e.key === 'Escape') onClose(); };
@@ -1045,10 +1081,13 @@ function BranchPickerModal({ open, onClose, lang, t }){
         <button className="bp-close" onClick={onClose} aria-label={t.pickerClose}>✕</button>
         <h3 className="bp-title">{t.pickerTitle}</h3>
         <div className="bp-list">
-          {BRANCHES.filter(b=>!b.hidden).map(b=>{
+          {!loadingBranches && branches.length === 0 && (
+            <div className="bp-row disabled"><div className="bp-row-name">{t.pickerEmpty}</div></div>
+          )}
+          {branches.map(b=>{
             const name = lang==='ar' ? b.nameAr : b.nameEn;
             const sub  = lang==='ar' ? b.subAr  : b.subEn;
-            if(!b.live){
+            if(b.status === 'pre_opening'){
               return (
                 <div key={b.id} className="bp-row disabled">
                   <div className="bp-row-text">
