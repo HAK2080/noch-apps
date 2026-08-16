@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { buildProductImagePrompt, normalizeProductImageBrief } from '../_shared/product-image-prompt.js'
+import { buildProductImagePrompt, normalizeProductImageBrief } from './product-image-prompt.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -96,4 +96,3 @@ function json(body: unknown, status = 200) {
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   })
 }
-

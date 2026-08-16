@@ -5,7 +5,7 @@ import test from 'node:test'
 import {
   buildProductImagePrompt,
   normalizeProductImageBrief,
-} from '../../../supabase/functions/_shared/product-image-prompt.js'
+} from '../../../supabase/functions/generate-product-image/product-image-prompt.js'
 
 const edgeFunctionUrl = new URL('../../../supabase/functions/generate-product-image/index.ts', import.meta.url)
 const supabaseConfigUrl = new URL('../../../supabase/config.toml', import.meta.url)
@@ -68,4 +68,3 @@ test('product form provides one-click generation and reuses the no-crop optimize
   assert.match(source, /stageOptimizedImage\(optimized\)/)
   assert.match(source, /await uploadProductImage\(savedProduct\.id, pendingFile\)/)
 })
-

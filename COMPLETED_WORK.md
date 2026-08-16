@@ -875,7 +875,7 @@ To find if something's been done:
   - `apps/pos/tests/product-image-optimization.test.mjs`
   - `apps/pos/tests/product-multi-category.test.mjs`
   - `supabase/config.toml`
-  - `supabase/functions/_shared/product-image-prompt.js`
+  - `supabase/functions/generate-product-image/product-image-prompt.js`
   - `supabase/functions/generate-product-image/index.ts`
 - **Description**: Product management now offers one-click AI menu photography using a server-side OpenAI Edge Function, then sends the generated result through the existing 4:5 no-crop WebP optimizer before upload. Products can have one primary category plus any number of additional categories, with consistent membership, counts, filters, and badges across product management, POS, and the customer-facing menu.
 - **Data safety**: Generated and uploaded images remain staged until Create or Update succeeds; an existing image is retained unless its replacement uploads successfully. The OpenAI API key remains server-side. The existing `secondary_category_ids` migration already supports the multi-category release, so no new schema migration is required.

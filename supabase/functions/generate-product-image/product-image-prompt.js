@@ -39,4 +39,3 @@ export function buildProductImagePrompt(input = {}) {
     'The final result must look appetizing, premium, realistic, uncluttered, and ready for an online cafe menu.',
   ].filter(Boolean).join(' ')
 }
-
