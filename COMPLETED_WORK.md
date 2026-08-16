@@ -861,8 +861,8 @@ To find if something's been done:
 ## 2026-08-16 — Automated product images and multi-category menus
 
 - **Agent**: Codex
-- **Status**: Verified locally; deployment pending
-- **Backup**: Local branch `backup/pre-ai-product-image-20260816` preserves live commit `bd51126`.
+- **Status**: Complete & Live
+- **Backup**: GitHub branch `backup/pre-ai-product-image-20260816` preserves the previous live commit `bd51126`.
 - **Files**:
   - `apps/pos/src/lib/product-categories.js`
   - `apps/pos/src/modules/pos/components/ProductGrid.jsx`
@@ -880,7 +880,8 @@ To find if something's been done:
 - **Description**: Product management now offers one-click AI menu photography using a server-side OpenAI Edge Function, then sends the generated result through the existing 4:5 no-crop WebP optimizer before upload. Products can have one primary category plus any number of additional categories, with consistent membership, counts, filters, and badges across product management, POS, and the customer-facing menu.
 - **Data safety**: Generated and uploaded images remain staged until Create or Update succeeds; an existing image is retained unless its replacement uploads successfully. The OpenAI API key remains server-side. The existing `secondary_category_ids` migration already supports the multi-category release, so no new schema migration is required.
 - **Verification**: 29 focused tests passed; targeted ESLint passed; the POS production build passed; `git diff --check` passed.
-- **Deployment**: Pending.
+- **Commit**: `f471c9e` (`fix(functions): bundle product image prompt`), including the feature commits immediately before it.
+- **Deployment**: Supabase Edge Function `generate-product-image` was deployed to project `kxqjasdvoohiexedtfqw`; CORS returned 200 and an unauthenticated POST returned 401 as expected. GitHub Actions run `31941218981` deployed `main` successfully to `apps.noch.cloud`. Production serves `index-CWBawruM.js`, `POSProducts-ujDDeQSv.js`, and `index-C7TPDNK2.css`; no-cache checks returned 200 and confirmed the live AI-generation and multi-category code.
 
 ---
 
