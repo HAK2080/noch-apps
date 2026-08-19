@@ -4,10 +4,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, CheckCircle, ArrowDownCircle, ArrowUpCircle, Wallet, Coins, Plus } from 'lucide-react'
+import { getPOSBranch } from '../lib/pos-supabase'
 import {
-  getPOSBranch, getOpenShift, closeShift, getShiftSummary,
+  getOpenShift, closeShift, getShiftSummary,
   getCashMovements, recordCashMovement,
-} from '../lib/pos-supabase'
+} from '../lib/pos-shift-supabase'
 import { printReceipt, isPrinterConnected } from '../lib/escpos'
 import { getServedBy } from '../lib/pos-session'
 import Layout from '../../../components/Layout'

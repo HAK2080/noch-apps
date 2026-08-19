@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { UserPlus, UserMinus, Clock, X } from 'lucide-react'
 import {
   getShiftAttendees, clockInAttendee, clockOutAttendee,
-} from '../lib/pos-supabase'
+} from '../lib/pos-shift-supabase'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'

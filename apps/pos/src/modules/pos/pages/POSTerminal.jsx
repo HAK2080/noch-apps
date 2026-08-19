@@ -15,9 +15,10 @@ const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
 const ReceiptModal   = lazy(() => import('../components/ReceiptModal'))
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
-  getPOSProductByBarcode, createPOSOrder, getOpenShift,
+  getPOSProductByBarcode, createPOSOrder,
   setProductSoldOut,
 } from '../lib/pos-supabase'
+import { getOpenShift } from '../lib/pos-shift-supabase'
 import { getAllModifierData, getModifierGroupsForProduct } from '../lib/pos-modifiers-supabase'
 import { receiveProductStock } from '../lib/pos-inventory-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
