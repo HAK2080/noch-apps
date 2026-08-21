@@ -817,7 +817,7 @@
    stamp are CSS/SVG so the only downloaded art is the lightweight Nochi face. */
 .cat-section.korea-edition {
   width: calc(100% - 24px);
-  max-width: 1180px;
+  max-width: 700px;
   margin: 26px auto 18px;
   padding: 0 28px 24px;
   overflow: hidden;
@@ -832,9 +832,9 @@
 }
 
 .korea-edition-hero {
-  min-height: 270px;
+  min-height: 238px;
   margin: 0 -28px;
-  padding: 28px 180px 66px;
+  padding: 27px 118px 60px;
   position: relative;
   display: flex;
   align-items: flex-start;
@@ -882,7 +882,7 @@
   margin: 0;
   color: #13214f;
   font-family: 'Inter', sans-serif;
-  font-size: clamp(44px, 6.2vw, 80px);
+  font-size: clamp(40px, 4.5vw, 58px);
   font-weight: 800;
   line-height: 0.96;
   letter-spacing: -0.055em;
@@ -932,23 +932,23 @@
 .korea-edition-category {
   position: absolute;
   z-index: 4;
-  right: 180px;
-  bottom: 18px;
+  right: 128px;
+  bottom: 16px;
   padding-right: 12px;
   border-right: 5px solid #d94e83;
   color: #10172e;
   font-family: 'IBM Plex Sans Arabic', sans-serif;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
 }
 
 .korea-edition-stamp {
   position: absolute;
   z-index: 3;
-  left: 11%;
-  bottom: 18px;
-  width: 106px;
-  height: 106px;
+  left: 24px;
+  bottom: 14px;
+  width: 86px;
+  height: 86px;
   border: 4px double #cf4f78;
   border-radius: 50%;
   color: #cf4f78;
@@ -962,7 +962,7 @@
   box-shadow: inset 0 0 0 4px rgba(207,79,120,0.08);
 }
 .korea-edition-stamp strong { font-size: 10px; letter-spacing: 0.1em; }
-.korea-edition-stamp span { margin: 4px 0; font-size: 23px; font-weight: 900; }
+.korea-edition-stamp span { margin: 4px 0; font-size: 19px; font-weight: 900; }
 .korea-edition-stamp small { font-size: 7px; font-weight: 800; letter-spacing: 0.06em; }
 
 .korea-edition-mascot {
@@ -970,7 +970,7 @@
   z-index: 4;
   right: 8px;
   bottom: -10px;
-  width: 150px;
+  width: 116px;
   pointer-events: none;
 }
 .korea-edition-mascot img {
@@ -1062,10 +1062,6 @@
   border-color: rgba(19,33,79,0.17);
   border-radius: 20px;
   box-shadow: 0 8px 22px rgba(28, 35, 73, 0.08);
-}
-
-@media (min-width: 900px) {
-  .korea-edition.cat-section-expanded .grid-2col { grid-template-columns: repeat(4, 1fr); }
 }
 
 @media (max-width: 720px) {
