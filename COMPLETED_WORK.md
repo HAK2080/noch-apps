@@ -1,3 +1,28 @@
+## 2026-08-21 — Weak-Internet POS Optimization
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/public/sw.js`
+  - `apps/pos/src/App.jsx`
+  - `apps/pos/src/contexts/AuthContext.jsx`
+  - `apps/pos/src/contexts/PermissionsContext.jsx`
+  - `apps/pos/src/lib/profile-cache.js`
+  - `apps/pos/src/lib/permission-cache.js`
+  - `apps/pos/src/modules/pos/lib/pos-offline.js`
+  - `apps/pos/src/modules/pos/lib/pos-sync.js`
+  - `apps/pos/src/modules/pos/pages/POSHome.jsx`
+  - `apps/pos/src/modules/pos/pages/POSTerminal.jsx`
+  - `apps/pos/tests/pos-weak-internet.test.mjs`
+- **Description**: Made the cashier flow cache-first and resilient to weak Wi-Fi. Known devices can open with a recent cached profile and role grant, branch/menu/category/settings/modifier data render before Supabase refreshes, branch selection works from cache, and timed-out idempotent sales enter the existing IndexedDB queue even when `navigator.onLine` incorrectly remains true. Queue sync retries once per visible minute, stops hammering the link after a network failure, and updates the queue badge as rows are added or cleared. Realtime remains the primary online-order path; fallback polling was reduced from every minute to every five minutes while visible.
+- **Payload reduction**: Dashboard and public storefront routes are lazy-loaded instead of being bundled into the cashier entry. The main JavaScript fell from 342.38 kB to 269.10 kB (96.42 kB to 78.11 kB gzip), eager CSS fell from 119.48 kB to 78.02 kB (22.45 kB to 14.56 kB gzip), and approximately 1.99 MB of storefront character/logo artwork is no longer referenced by the POS entry page. Receipt rendering remains in the offline-critical shell; camera scanners remain lazy.
+- **Offline shell**: A new service worker refuses to activate unless the current HTML and every referenced script/style/modulepreload are cached. Navigation falls back after four seconds, old unrelated PWA caches are preserved, and up to 180 optimized Supabase product images persist across releases for repeat/offline use.
+- **Verification**: Changed-file ESLint passed; 20 focused POS, access, loyalty, service-worker, and product regression tests passed; the relevant loyalty checkout regression passed; production Vite build passed; and `git diff --check` passed. The broader unit run passed 167/170 after the relevant loyalty expectation was restored; the remaining three failures are pre-existing missing/older workforce and privacy artifacts outside this change.
+- **Commit**: `47f850e` (`perf(pos): harden weak-internet operation`)
+- **Deployment**: GitHub Actions run `32453344037` deployed `main` successfully in 2m35s. No-cache production checks returned 200 for `/index.html`, `/pos`, the main JS/CSS, and `/sw.js`. Production serves `index-CrjwB7sc.js`, CSS `index-BNzdcQ3n.css`, and service-worker cache `noch-pos-2026-08-21-061102`; live browser verification loaded the login shell with no console errors.
+
+---
+
 ## 2026-08-01 — Payroll PDF exports
 
 - **Agent**: Codex
