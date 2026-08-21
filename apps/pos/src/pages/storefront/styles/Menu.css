@@ -812,307 +812,98 @@
   white-space: nowrap;
 }
 
-/* ── Korea Edition collection ─────────────────────────────
-   A category-scoped campaign treatment. The skyline, palace, blossoms and
-   stamp are CSS/SVG so the only downloaded art is the lightweight Nochi face. */
+/* ── Korea + Japan reference-matched collection ───────────
+   The campaign artwork is the supplied banner crop. Product cards remain
+   live, data-backed controls immediately below it. */
 .cat-section.korea-edition {
   width: calc(100% - 24px);
   max-width: 700px;
-  margin: 26px auto 18px;
-  padding: 0 28px 24px;
+  margin: 24px auto 18px;
+  padding: 0 22px 24px;
   overflow: hidden;
-  position: relative;
-  border: 1px solid rgba(198, 119, 141, 0.24);
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(255,255,255,0.98) 0 12%, rgba(255,255,255,0) 43%),
-    linear-gradient(135deg, #fff8f5 0%, #fffdf9 48%, #fff2f4 100%);
-  box-shadow: 0 18px 50px rgba(93, 51, 75, 0.09);
-  isolation: isolate;
+  border: 1px solid #eadcc7;
+  border-radius: 24px;
+  background: #fff8ea;
+  box-shadow: 0 12px 34px rgba(49, 34, 25, 0.08);
 }
 
-.korea-edition-hero {
-  min-height: 238px;
-  margin: 0 -28px;
-  padding: 27px 118px 60px;
+.korea-japan-banner {
   position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  text-align: center;
+  margin: 0 -22px 18px;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% 95%, rgba(207, 218, 239, 0.46), rgba(255,255,255,0) 43%),
-    linear-gradient(180deg, rgba(255,248,246,0.96), rgba(255,255,255,0.38));
+  background: #fff7e8;
 }
-
-.korea-edition-scenery {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  opacity: 0.44;
-}
-.korea-tower,
-.korea-palace {
-  fill: rgba(147, 171, 205, 0.44);
-  stroke: #8da3c4;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.korea-palace { fill: rgba(218, 137, 151, 0.22); stroke: #b27686; }
-
-.korea-edition-copy {
-  position: relative;
-  z-index: 3;
-  max-width: 720px;
-}
-.korea-edition-kicker {
+.korea-japan-banner img {
   display: block;
-  margin-bottom: 5px;
-  color: #cb4f78;
-  font-family: 'Inter', sans-serif;
-  font-size: clamp(16px, 2vw, 24px);
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-.korea-edition-title {
-  margin: 0;
-  color: #13214f;
-  font-family: 'Inter', sans-serif;
-  font-size: clamp(40px, 4.5vw, 58px);
-  font-weight: 800;
-  line-height: 0.96;
-  letter-spacing: -0.055em;
-  white-space: nowrap;
-  text-transform: uppercase;
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-.korea-edition-title > span:first-child { font-weight: 900; }
-.korea-flag {
-  display: inline-block;
-  position: relative;
-  width: 1.24em;
-  height: 0.76em;
-  margin-inline-start: 7px;
-  border: 1px solid rgba(19,33,79,0.35);
-  border-radius: 0.1em;
-  vertical-align: 0.03em;
-  background:
-    linear-gradient(#10172e 0 0) 10% 18% / 18% 2px no-repeat,
-    linear-gradient(#10172e 0 0) 10% 29% / 18% 2px no-repeat,
-    linear-gradient(#10172e 0 0) 10% 40% / 18% 2px no-repeat,
-    linear-gradient(#10172e 0 0) 90% 60% / 18% 2px no-repeat,
-    linear-gradient(#10172e 0 0) 90% 71% / 18% 2px no-repeat,
-    linear-gradient(#10172e 0 0) 90% 82% / 18% 2px no-repeat,
-    #fff;
-  filter: drop-shadow(0 2px 1px rgba(11,16,32,0.13));
-}
-.korea-flag i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0.38em;
-  height: 0.38em;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #cd2e3a 0 50%, #0f64b3 50% 100%);
-  transform: translate(-50%, -50%) rotate(26deg);
-}
-.korea-edition-copy p {
-  margin: 12px 0 0;
-  color: #667199;
-  font-size: clamp(10px, 1.4vw, 16px);
-  font-weight: 700;
-  letter-spacing: 0.22em;
-}
-
-.korea-edition-category {
-  position: absolute;
-  z-index: 4;
-  right: 128px;
-  bottom: 16px;
-  padding-right: 12px;
-  border-right: 5px solid #d94e83;
-  color: #10172e;
-  font-family: 'IBM Plex Sans Arabic', sans-serif;
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.korea-edition-stamp {
-  position: absolute;
-  z-index: 3;
-  left: 24px;
-  bottom: 14px;
-  width: 86px;
-  height: 86px;
-  border: 4px double #cf4f78;
-  border-radius: 50%;
-  color: #cf4f78;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  transform: rotate(-10deg);
-  background: rgba(255,255,255,0.66);
-  box-shadow: inset 0 0 0 4px rgba(207,79,120,0.08);
-}
-.korea-edition-stamp strong { font-size: 10px; letter-spacing: 0.1em; }
-.korea-edition-stamp span { margin: 4px 0; font-size: 19px; font-weight: 900; }
-.korea-edition-stamp small { font-size: 7px; font-weight: 800; letter-spacing: 0.06em; }
-
-.korea-edition-mascot {
-  position: absolute;
-  z-index: 4;
-  right: 8px;
-  bottom: -10px;
-  width: 116px;
-  pointer-events: none;
-}
-.korea-edition-mascot img {
   width: 100%;
   height: auto;
-  display: block;
-  mix-blend-mode: multiply;
-  filter: drop-shadow(0 7px 5px rgba(19,33,79,0.16));
 }
-.korea-speech {
+.korea-banner-title-sr {
   position: absolute;
-  top: -6px;
-  left: -35px;
-  padding: 6px 10px;
-  border: 2px solid #13214f;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.92);
-  color: #13214f;
-  font-size: 12px;
-  font-weight: 800;
-  transform: rotate(-6deg);
-  box-shadow: 3px 3px 0 rgba(19,33,79,0.14);
-}
-
-.korea-blossoms {
-  position: absolute;
-  z-index: 2;
-  color: #ee9caf;
-  font-size: 37px;
-  letter-spacing: 5px;
-  line-height: 1;
-  text-shadow: 13px 17px 0 #f8c8d1, -15px 28px 0 #f6d3db;
-  pointer-events: none;
-}
-.korea-blossoms span { color: #f5c3cc; font-size: 0.72em; }
-.korea-blossoms-start { left: -8px; top: 5px; transform: rotate(-12deg); }
-.korea-blossoms-end { right: -6px; top: 38px; transform: rotate(11deg); }
-.korea-petal {
-  position: absolute;
-  z-index: 2;
-  color: #f4afbf;
-  font-size: 8px;
-  filter: blur(0.2px);
-  pointer-events: none;
-}
-.korea-petal-one { left: 36%; top: 26px; }
-.korea-petal-two { right: 32%; top: 82px; transform: scale(0.7); }
-.korea-petal-three { left: 43%; bottom: 44px; transform: scale(0.6); }
-
-.korea-edition-section-header {
-  position: relative;
-  z-index: 5;
-  margin: -2px 4px 16px;
-}
-.korea-edition .cat-section-title {
-  border: none;
+  width: 1px;
+  height: 1px;
   padding: 0;
-  font-size: 19px;
-  text-transform: none;
-  letter-spacing: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
-[dir="rtl"] .korea-edition .cat-section-title {
-  border: none;
-  padding: 0;
-}
-.korea-title-blossom { color: #e7799a; font-size: 18px; }
-.korea-edition .view-all-btn { background: #ef6b22; }
 
 .korea-edition .scroll-row {
-  gap: 18px;
-  padding: 4px 4px 18px;
+  gap: 12px;
+  padding: 2px 2px 14px;
 }
 .korea-edition .scroll-card {
-  width: 248px;
-  border-color: rgba(19,33,79,0.17);
-  border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(28, 35, 73, 0.08);
+  flex: 0 0 calc((100% - 36px) / 4);
+  width: auto;
+  border: 1px solid rgba(42, 31, 25, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 5px 14px rgba(54, 38, 28, 0.07);
 }
 .korea-edition .scroll-card-img,
 .korea-edition .scroll-card-placeholder,
 .korea-edition .grid-card-img,
 .korea-edition .grid-card-placeholder { aspect-ratio: 1 / 1.08; }
 .korea-edition .scroll-card-name,
-.korea-edition .grid-card-name { font-size: 15px; }
+.korea-edition .grid-card-name { font-size: 13px; }
 .korea-edition .scroll-card-price,
-.korea-edition .grid-card-price { color: #ed641d; font-size: 17px; }
-.korea-edition .grid-2col { gap: 18px; }
+.korea-edition .grid-card-price { color: #ed641d; font-size: 15px; }
+.korea-edition .grid-2col { gap: 12px; }
 .korea-edition .grid-card {
-  border-color: rgba(19,33,79,0.17);
-  border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(28, 35, 73, 0.08);
+  border: 1px solid rgba(42, 31, 25, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 5px 14px rgba(54, 38, 28, 0.07);
+}
+
+@media (min-width: 721px) {
+  .korea-edition.cat-section-expanded .grid-2col { grid-template-columns: repeat(4, 1fr); }
 }
 
 @media (max-width: 720px) {
   .cat-section.korea-edition {
     width: calc(100% - 16px);
     margin-top: 18px;
-    padding: 0 14px 18px;
-    border-radius: 22px;
+    padding: 0 12px 18px;
+    border-radius: 20px;
   }
-  .korea-edition-hero {
-    min-height: 224px;
-    margin: 0 -14px;
-    padding: 31px 18px 66px;
+  .korea-japan-banner {
+    margin: 0 -12px 14px;
+    min-height: 174px;
   }
-  .korea-edition-scenery { opacity: 0.3; }
-  .korea-edition-copy { max-width: 100%; }
-  .korea-edition-kicker { font-size: 15px; }
-  .korea-edition-title {
-    font-size: clamp(31px, 9vw, 46px);
-    letter-spacing: -0.06em;
+  .korea-japan-banner img {
+    width: auto;
+    max-width: none;
+    height: 174px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
   }
-  .korea-edition-copy p { margin-top: 9px; font-size: 9px; }
-  .korea-edition-category {
-    right: 104px;
-    bottom: 18px;
-    max-width: 58%;
-    font-size: 16px;
+  .korea-edition .scroll-row { gap: 10px; }
+  .korea-edition .scroll-card {
+    flex-basis: min(70vw, 244px);
+    width: min(70vw, 244px);
   }
-  .korea-edition-stamp {
-    left: 18px;
-    bottom: 17px;
-    width: 76px;
-    height: 76px;
-    border-width: 3px;
-  }
-  .korea-edition-stamp strong { font-size: 7px; }
-  .korea-edition-stamp span { font-size: 16px; }
-  .korea-edition-stamp small { font-size: 5px; }
-  .korea-edition-mascot {
-    right: -8px;
-    bottom: -8px;
-    width: 92px;
-    opacity: 0.96;
-  }
-  .korea-speech { display: none; }
-  .korea-blossoms { font-size: 25px; opacity: 0.82; }
-  .korea-blossoms-end { top: 54px; }
-  .korea-edition-section-header { margin: 5px 2px 14px; }
-  .korea-edition .cat-section-title { font-size: 16px; }
-  .korea-edition .scroll-row { gap: 12px; }
-  .korea-edition .scroll-card { width: min(70vw, 244px); }
   .korea-edition .grid-2col { gap: 10px; }
 }
 
