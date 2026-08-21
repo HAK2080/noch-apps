@@ -56,6 +56,14 @@ test('portrait and square originals fit the 4:5 canvas without cropping', () => 
   assert.equal(PRODUCT_IMAGE_WIDTH / PRODUCT_IMAGE_HEIGHT, 4 / 5)
 })
 
+test('public product images use the authenticated storage download path', async () => {
+  const source = await readFile(posSupabaseUrl, 'utf8')
+
+  assert.match(source, /PUBLIC_PRODUCT_IMAGE_PREFIX = '\/storage\/v1\/object\/public\/product-images\/'/)
+  assert.match(source, /supabase\.storage\.from\('product-images'\)\.download\(path\)/)
+  assert.match(source, /return new File\(\[data\], filename/)
+})
+
 test('existing remote product images download as files for the optimizer', async () => {
   let request
   const file = await downloadProductImage('https://images.example.com/products/sakura.png', {

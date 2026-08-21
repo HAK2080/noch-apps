@@ -246,6 +246,31 @@ export async function uploadProductImage(productId, file) {
   return publicUrl
 }
 
+const PUBLIC_PRODUCT_IMAGE_PREFIX = '/storage/v1/object/public/product-images/'
+
+export function getPublicProductImageStoragePath(source) {
+  try {
+    const url = new URL(source)
+    const prefixIndex = url.pathname.indexOf(PUBLIC_PRODUCT_IMAGE_PREFIX)
+    if (prefixIndex < 0) return ''
+    return decodeURIComponent(url.pathname.slice(prefixIndex + PUBLIC_PRODUCT_IMAGE_PREFIX.length))
+  } catch {
+    return ''
+  }
+}
+
+export async function downloadStoredProductImage(source) {
+  const path = getPublicProductImageStoragePath(source)
+  if (!path) throw new Error('The current image is not in product storage')
+
+  const { data, error } = await supabase.storage.from('product-images').download(path)
+  if (error) throw error
+  if (!data?.type?.startsWith('image/')) throw new Error('The stored product file is not an image')
+
+  const filename = path.split('/').pop() || 'product-image'
+  return new File([data], filename, { type: data.type, lastModified: Date.now() })
+}
+
 export async function uploadProductVideo(productId, file) {
   const ext = file.type === 'video/webm' ? 'webm' : 'mp4'
   const path = `products/${productId}/${Date.now()}.${ext}`

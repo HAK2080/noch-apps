@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import {
   getPOSBranches, getAllProducts, getAllCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
-  getProductSalesStats, uploadProductImage, uploadProductVideo, getProductCostComponents,
+  downloadStoredProductImage, getProductSalesStats, uploadProductImage, uploadProductVideo, getProductCostComponents,
   replaceProductCostComponents,
 } from '../modules/pos/lib/pos-supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -405,7 +405,11 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
     try {
       let sourceFile = pendingFile
       if (!sourceFile) {
-        sourceFile = await downloadProductImage(form.image_url)
+        try {
+          sourceFile = await downloadStoredProductImage(form.image_url)
+        } catch {
+          sourceFile = await downloadProductImage(form.image_url)
+        }
       }
 
       const optimized = await optimizeProductImage(sourceFile)
