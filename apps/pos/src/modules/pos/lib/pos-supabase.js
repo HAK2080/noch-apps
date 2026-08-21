@@ -238,7 +238,11 @@ export async function uploadProductImage(productId, file) {
   })
   if (uploadErr) throw uploadErr
   const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path)
-  await supabase.from('pos_products').update({ image_url: publicUrl, updated_at: new Date().toISOString() }).eq('id', productId)
+  const { error: updateErr } = await supabase
+    .from('pos_products')
+    .update({ image_url: publicUrl, updated_at: new Date().toISOString() })
+    .eq('id', productId)
+  if (updateErr) throw updateErr
   return publicUrl
 }
 

@@ -45,26 +45,74 @@ function canvasToBlob(canvas, type, quality) {
 
 async function loadImage(file) {
   if (typeof createImageBitmap === 'function') {
-    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    return {
-      image: bitmap,
-      width: bitmap.width,
-      height: bitmap.height,
-      cleanup: () => bitmap.close(),
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      return {
+        image: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        cleanup: () => bitmap.close(),
+      }
+    } catch {
+      // Some mobile browsers expose createImageBitmap but reject particular
+      // PNG/WebP encodings. Fall through to the regular image decoder.
     }
   }
 
   const objectUrl = URL.createObjectURL(file)
   const image = new Image()
   image.decoding = 'async'
-  image.src = objectUrl
-  await image.decode()
+  try {
+    image.src = objectUrl
+    if (typeof image.decode === 'function') await image.decode()
+    else await new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = () => reject(new Error('This browser could not decode the image'))
+    })
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl)
+    throw error
+  }
   return {
     image,
     width: image.naturalWidth,
     height: image.naturalHeight,
     cleanup: () => URL.revokeObjectURL(objectUrl),
   }
+}
+
+export async function downloadProductImage(source, {
+  fetchImpl = globalThis.fetch,
+  baseUrl = globalThis.location?.origin || 'http://localhost',
+} = {}) {
+  if (!source) throw new Error('Add a product image first')
+  if (typeof fetchImpl !== 'function') throw new Error('Image download is unavailable in this browser')
+
+  let imageUrl
+  try {
+    imageUrl = new URL(source, baseUrl)
+  } catch {
+    throw new Error('The current product image URL is invalid')
+  }
+
+  let response
+  try {
+    response = await fetchImpl(imageUrl.toString(), {
+      cache: 'no-store',
+      credentials: 'omit',
+      mode: 'cors',
+    })
+  } catch {
+    throw new Error('Could not download the current image. Upload it again, then optimize it.')
+  }
+  if (!response.ok) throw new Error('Could not download the current image')
+
+  const blob = await response.blob()
+  if (!blob.type.startsWith('image/')) throw new Error('The current product image is not a supported image file')
+
+  let filename = imageUrl.pathname.split('/').pop() || 'product-image'
+  try { filename = decodeURIComponent(filename) } catch { /* Keep the URL-safe filename. */ }
+  return new File([blob], filename, { type: blob.type, lastModified: Date.now() })
 }
 
 function optimizedFilename(name = 'product-image') {

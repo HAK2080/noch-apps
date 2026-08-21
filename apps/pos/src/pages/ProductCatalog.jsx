@@ -28,7 +28,7 @@ import {
 } from '../modules/pos/lib/inventory-units'
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
-import { formatImageBytes, optimizeProductImage } from '../modules/pos/lib/product-image-processing'
+import { downloadProductImage, formatImageBytes, optimizeProductImage } from '../modules/pos/lib/product-image-processing'
 import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../modules/pos/lib/product-video'
 import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
 import {
@@ -81,9 +81,9 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--surface)' }}>
         {product.video_url ? (
-          <video src={product.video_url} poster={product.image_url || undefined} muted loop playsInline preload="none" className="w-full h-full object-cover" />
+          <video src={product.video_url} poster={product.image_url || undefined} muted loop playsInline preload="none" className="w-full h-full object-contain bg-[#f8f3e8]" />
         ) : product.image_url ? (
-          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300" />
+          <img src={product.image_url} alt={product.name} className="w-full h-full object-contain bg-[#f8f3e8]" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 opacity-40">
             <ShoppingBag size={26} className="text-zinc-500" />
@@ -405,12 +405,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
     try {
       let sourceFile = pendingFile
       if (!sourceFile) {
-        const response = await fetch(form.image_url, { cache: 'no-store' })
-        if (!response.ok) throw new Error('Could not download the current image')
-
-        const blob = await response.blob()
-        const filename = new URL(form.image_url, window.location.origin).pathname.split('/').pop() || 'product-image'
-        sourceFile = new File([blob], filename, { type: blob.type || 'image/jpeg' })
+        sourceFile = await downloadProductImage(form.image_url)
       }
 
       const optimized = await optimizeProductImage(sourceFile)
@@ -423,7 +418,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
         setPendingPreview(URL.createObjectURL(optimized.file))
       }
 
-      toast.success(`Image optimized to 4:5 WebP (${formatImageBytes(optimized.optimizedBytes)})`)
+      toast.success(`Image optimized without cropping (${formatImageBytes(optimized.originalBytes)} → ${formatImageBytes(optimized.optimizedBytes)})`)
     } catch (err) {
       toast.error(err.message || 'Image optimization failed')
     } finally {

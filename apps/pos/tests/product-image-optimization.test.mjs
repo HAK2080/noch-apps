@@ -7,6 +7,7 @@ import {
   PRODUCT_IMAGE_HEIGHT,
   PRODUCT_IMAGE_WIDTH,
   calculateContainedImageRect,
+  downloadProductImage,
   generatedImageFileFromBase64,
 } from '../src/modules/pos/lib/product-image-processing.js'
 
@@ -45,7 +46,37 @@ test('portrait and square originals fit the 4:5 canvas without cropping', () => 
     width: 1056,
     height: 1056,
   })
+  assert.deepEqual(calculateContainedImageRect(1600, 900), {
+    x: 72,
+    y: 453,
+    width: 1056,
+    height: 594,
+  })
   assert.equal(PRODUCT_IMAGE_WIDTH / PRODUCT_IMAGE_HEIGHT, 4 / 5)
+})
+
+test('existing remote product images download as files for the optimizer', async () => {
+  let request
+  const file = await downloadProductImage('https://images.example.com/products/sakura.png', {
+    fetchImpl: async (url, options) => {
+      request = { url, options }
+      return new Response(new Blob(['image-bytes'], { type: 'image/png' }), {
+        status: 200,
+        headers: { 'Content-Type': 'image/png' },
+      })
+    },
+  })
+
+  assert.equal(file.name, 'sakura.png')
+  assert.equal(file.type, 'image/png')
+  assert.equal(request.url, 'https://images.example.com/products/sakura.png')
+  assert.deepEqual(request.options, { cache: 'no-store', credentials: 'omit', mode: 'cors' })
+  await assert.rejects(
+    () => downloadProductImage('https://images.example.com/not-an-image', {
+      fetchImpl: async () => new Response('html', { headers: { 'Content-Type': 'text/html' } }),
+    }),
+    /not a supported image file/,
+  )
 })
 
 test('generated image bytes become a browser file for the standard optimizer', () => {
@@ -67,7 +98,8 @@ test('menu presentation and uploads preserve the optimization contract', async (
   assert.match(css, /\.scroll-card-img\s*\{[^}]*aspect-ratio:\s*4\s*\/\s*5/s)
   assert.match(css, /\.grid-card-img\s*\{[^}]*aspect-ratio:\s*4\s*\/\s*5/s)
   assert.match(css, /\.menu-product-image-media\s*\{[^}]*object-fit:\s*contain/s)
-  assert.match(css, /\.scroll-card-img \.menu-product-image-media,[\s\S]*\.grid-card-img \.menu-product-image-media\s*\{[^}]*object-fit:\s*cover;[^}]*transform:\s*scale\(1\.12\)/)
+  assert.match(css, /\.scroll-card-img \.menu-product-image-media,[\s\S]*\.grid-card-img \.menu-product-image-media\s*\{[^}]*object-fit:\s*contain;[^}]*transform:\s*none/)
+  assert.doesNotMatch(css, /\.scroll-card-img \.menu-product-image-media,[\s\S]*?transform:\s*scale\(/)
   assert.match(css, /\.scroll-row\s*\{[^}]*align-items:\s*flex-start/s)
   assert.match(css, /\.grid-2col\s*\{[^}]*align-items:\s*start/s)
   assert.match(css, /\.grid-card-body-text\s*\{[^}]*min-height:\s*40px;[^}]*padding:\s*8px 10px 2px/s)
