@@ -4,14 +4,14 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Search, Edit2, Trash2, Upload, Package, TrendingUp, Layers, X,
-  ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag, Loader2, Sparkles
+  ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag, Loader2, Sparkles, Video
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import toast from 'react-hot-toast'
 import {
   getPOSBranches, getAllProducts, getAllCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
-  getProductSalesStats, uploadProductImage, getProductCostComponents,
+  getProductSalesStats, uploadProductImage, uploadProductVideo, getProductCostComponents,
   replaceProductCostComponents,
 } from '../modules/pos/lib/pos-supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,6 +29,7 @@ import {
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
 import { formatImageBytes, optimizeProductImage } from '../modules/pos/lib/product-image-processing'
+import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../modules/pos/lib/product-video'
 import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
 import {
   changeProductPrimaryCategory,
@@ -79,7 +80,9 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
     >
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--surface)' }}>
-        {product.image_url ? (
+        {product.video_url ? (
+          <video src={product.video_url} poster={product.image_url || undefined} muted loop playsInline preload="none" className="w-full h-full object-cover" />
+        ) : product.image_url ? (
           <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 opacity-40">
@@ -146,7 +149,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
 const BLANK = {
   name: '', name_ar: '', price: '', cost_price: '', manual_cost_lyd: '', barcode: '', sku: '',
   category_id: '', secondary_category_ids: [], track_inventory: false, stock_qty: '0',
-  low_stock_alert: '5', is_active: true, image_url: '', cost_recipe_id: '',
+  low_stock_alert: '5', is_active: true, image_url: '', video_url: '', cost_recipe_id: '',
   stock_base_unit: 'pc', stock_display_unit: 'pc',
   coffee_grams_per_sale: '', coffee_bean_product_id: '',
   is_coffee_bean: false, stock_cost_per_base_unit: '', retail_pack_size_base_units: '250',
@@ -191,11 +194,18 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
   const [costComponentsLoading, setCostComponentsLoading] = useState(!!product?.id)
   const [pendingFile, setPendingFile] = useState(null)
   const [pendingPreview, setPendingPreview] = useState(null)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [pendingVideoFile, setPendingVideoFile] = useState(null)
+  const [pendingVideoPreview, setPendingVideoPreview] = useState(null)
   const fileRef = useRef()
+  const videoRef = useRef()
   const isEdit = !!product?.id
 
   // Revoke object URL when modal closes / file changes (avoid memory leak)
-  useEffect(() => () => { if (pendingPreview) URL.revokeObjectURL(pendingPreview) }, [pendingPreview])
+  useEffect(() => () => {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+    if (pendingVideoPreview) URL.revokeObjectURL(pendingVideoPreview)
+  }, [pendingPreview, pendingVideoPreview])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -346,6 +356,15 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
         setPendingFile(null)
         if (pendingPreview) { URL.revokeObjectURL(pendingPreview); setPendingPreview(null) }
       }
+      if (pendingVideoFile && saved?.id) {
+        try {
+          await uploadProductVideo(saved.id, pendingVideoFile)
+        } catch (err) {
+          toast.error('Saved, but video upload failed: ' + (err.message || 'unknown'))
+        }
+        setPendingVideoFile(null)
+        if (pendingVideoPreview) { URL.revokeObjectURL(pendingVideoPreview); setPendingVideoPreview(null) }
+      }
       toast.success(isEdit ? 'Product updated' : 'Product created')
       onSave()
     } catch (err) {
@@ -410,6 +429,36 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
     } finally {
       setOptimizingImage(false)
     }
+  }
+
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      validateProductVideo(file)
+      if (product?.id) {
+        setUploadingVideo(true)
+        const url = await uploadProductVideo(product.id, file)
+        set('video_url', url)
+        toast.success('Video uploaded')
+      } else {
+        if (pendingVideoPreview) URL.revokeObjectURL(pendingVideoPreview)
+        setPendingVideoFile(file)
+        setPendingVideoPreview(URL.createObjectURL(file))
+      }
+    } catch (err) {
+      toast.error(err.message || 'Video upload failed')
+    } finally {
+      setUploadingVideo(false)
+    }
+  }
+
+  const removeVideo = () => {
+    if (pendingVideoPreview) URL.revokeObjectURL(pendingVideoPreview)
+    setPendingVideoFile(null)
+    setPendingVideoPreview(null)
+    set('video_url', '')
   }
 
   const beanProducts = (products || []).filter(candidate => candidate.is_coffee_bean && candidate.id !== product?.id)
@@ -485,6 +534,39 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
                   JPG, PNG, WebP · optimize to 1200 × 1500 WebP without cropping
                   {!isEdit && pendingFile && <> · <span className="text-noch-green">will upload on Save</span></>}
                 </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-start gap-4">
+                <div className="w-20 aspect-[4/5] rounded-xl overflow-hidden flex-shrink-0 bg-black" style={{ border: '1px solid var(--border)' }}>
+                  {(pendingVideoPreview || form.video_url)
+                    ? <video src={pendingVideoPreview || form.video_url} poster={pendingPreview || form.image_url || undefined} muted loop playsInline controls preload="metadata" className="w-full h-full object-contain" />
+                    : <div className="w-full h-full flex items-center justify-center"><Video size={22} className="text-zinc-600" /></div>
+                  }
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-white text-sm font-medium">Customer-menu video</p>
+                      <p className="text-zinc-600 text-[11px] mt-1">Replaces the photo on customer menus; the photo remains the poster and fallback.</p>
+                    </div>
+                    {(pendingVideoPreview || form.video_url) && (
+                      <button type="button" onClick={removeVideo} className="text-red-300 hover:text-red-200" title="Remove video"><X size={15} /></button>
+                    )}
+                  </div>
+                  <input ref={videoRef} type="file" accept={PRODUCT_VIDEO_ACCEPT} className="hidden" onChange={handleVideoUpload} />
+                  <button
+                    type="button"
+                    onClick={() => videoRef.current?.click()}
+                    disabled={uploadingVideo}
+                    className="btn-secondary h-10 min-w-[140px] px-3 mt-3 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    {uploadingVideo ? <Loader2 size={16} className="animate-spin" /> : <Video size={16} />}
+                    {uploadingVideo ? 'Uploading…' : (pendingVideoPreview || form.video_url) ? 'Change video' : 'Upload video'}
+                  </button>
+                  <p className="text-zinc-600 text-[11px] mt-1">MP4 or WebM · maximum 20 MB · short clips work best.</p>
+                </div>
               </div>
             </div>
 

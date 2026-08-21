@@ -3,12 +3,12 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Edit2, Trash2, Package, Tag, ScanLine, X, Check, Globe, Star, GripVertical, LayoutList, Grid2X2, Copy, ImagePlus, Sparkles, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Edit2, Trash2, Package, Tag, ScanLine, X, Check, Globe, Star, GripVertical, LayoutList, Grid2X2, Copy, ImagePlus, Sparkles, Loader2, Video } from 'lucide-react'
 import {
   getPOSBranch, getPOSBranches, getPOSProducts, getPOSCategories,
   createPOSProduct, updatePOSProduct, deletePOSProduct,
   createPOSCategory, updatePOSCategory, deletePOSCategory,
-  uploadProductImage, generateProductImage, shareBranchMenu,
+  uploadProductImage, uploadProductVideo, generateProductImage, shareBranchMenu,
 } from '../lib/pos-supabase'
 import BarcodeScanner from '../components/BarcodeScanner'
 import CoffeeConsumptionField from '../components/CoffeeConsumptionField'
@@ -25,6 +25,7 @@ import {
 import { normalizeCoffeeGrams } from '../lib/coffee-consumption'
 import { NEW_PRODUCT_VISIBILITY } from '../lib/product-visibility'
 import { formatImageBytes, generatedImageFileFromBase64, optimizeProductImage } from '../lib/product-image-processing'
+import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../lib/product-video'
 import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
 import {
   changeProductPrimaryCategory,
@@ -46,7 +47,7 @@ const BLANK_PRODUCT = {
   stock_base_unit: 'pc', stock_display_unit: 'pc',
   coffee_grams_per_sale: '', coffee_bean_product_id: '',
   ...NEW_PRODUCT_VISIBILITY, featured: false,
-  image_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
+  image_url: '', video_url: '', menu_description: '', menu_description_ar: '', menu_sort: 100,
   show_description_on_menu: true, show_description_on_website: true,
   secondary_category_ids: [], menu_badge_key: '', menu_badge_animation: 'dazzle',
 }
@@ -108,14 +109,18 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   const [generatingImg, setGeneratingImg] = useState(false)
   const [pendingFile, setPendingFile] = useState(null)   // file waiting for new-product ID
   const [pendingPreview, setPendingPreview] = useState(null)
+  const [pendingVideoFile, setPendingVideoFile] = useState(null)
+  const [pendingVideoPreview, setPendingVideoPreview] = useState(null)
   const imgInputRef = useRef(null)
+  const videoInputRef = useRef(null)
   const isEdit = !!product?.id
   const imageWorking = uploadingImg || generatingImg
   const selectedMenuBadge = getProductMenuBadge(form.menu_badge_key)
 
   useEffect(() => () => {
     if (pendingPreview) URL.revokeObjectURL(pendingPreview)
-  }, [pendingPreview])
+    if (pendingVideoPreview) URL.revokeObjectURL(pendingVideoPreview)
+  }, [pendingPreview, pendingVideoPreview])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -196,6 +201,28 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
     }
   }
 
+  const handleVideoSelected = (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      validateProductVideo(file)
+      if (pendingVideoPreview) URL.revokeObjectURL(pendingVideoPreview)
+      setPendingVideoFile(file)
+      setPendingVideoPreview(URL.createObjectURL(file))
+      toast.success('Video ready — save the product to upload it')
+    } catch (err) {
+      toast.error(err.message || 'Video selection failed')
+    }
+  }
+
+  const removeVideo = () => {
+    if (pendingVideoPreview) URL.revokeObjectURL(pendingVideoPreview)
+    setPendingVideoFile(null)
+    setPendingVideoPreview(null)
+    set('video_url', '')
+  }
+
   const handleSave = async () => {
     if (!form.name.trim() || !form.price) {
       toast.error('Name and price are required')
@@ -225,6 +252,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
         category_id: categorySelection.category_id || null,
         secondary_category_ids: categorySelection.secondary_category_ids,
         image_url: pendingFile && isEdit ? (product.image_url || null) : stripped.image_url,
+        video_url: pendingVideoFile && isEdit ? (product.video_url || null) : stripped.video_url,
         menu_badge_key: form.menu_badge_key || null,
         menu_badge_animation: normalizeProductMenuBadgeAnimation(form.menu_badge_animation),
       }
@@ -239,6 +267,14 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
           await uploadProductImage(savedProduct.id, pendingFile)
         } catch {
           toast.error('Product saved but image upload failed. Try saving again.')
+          if (isEdit) return
+        }
+      }
+      if (pendingVideoFile && savedProduct?.id) {
+        try {
+          await uploadProductVideo(savedProduct.id, pendingVideoFile)
+        } catch {
+          toast.error('Product saved but video upload failed. Try saving again.')
           if (isEdit) return
         }
       }
@@ -529,6 +565,48 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                     {pendingFile && isEdit && (
                       <p className="text-noch-muted text-xs mt-1">New image ready — select Update to replace the current product image</p>
                     )}
+                  </div>
+
+                  <div className="mb-3 rounded-xl border border-noch-border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <label className="label block">Customer-menu video</label>
+                        <p className="text-noch-muted text-[11px] mt-1">Optional. The video replaces the photo on customer menus; the photo remains its poster and fallback.</p>
+                      </div>
+                      {(pendingVideoPreview || form.video_url) && (
+                        <button type="button" onClick={removeVideo} className="text-red-300 hover:text-red-200" title="Remove video">
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    {(pendingVideoPreview || form.video_url) && (
+                      <video
+                        src={pendingVideoPreview || form.video_url}
+                        poster={pendingPreview || form.image_url || undefined}
+                        className="mt-3 w-full max-h-72 aspect-[4/5] rounded-lg bg-black object-contain"
+                        muted
+                        loop
+                        playsInline
+                        controls
+                        preload="metadata"
+                      />
+                    )}
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept={PRODUCT_VIDEO_ACCEPT}
+                      className="hidden"
+                      onChange={handleVideoSelected}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => videoInputRef.current?.click()}
+                      className="btn-secondary mt-3 w-full text-xs flex items-center justify-center gap-1.5 px-3 py-2"
+                    >
+                      <Video size={14} />
+                      {(pendingVideoPreview || form.video_url) ? 'Change video' : 'Upload video'}
+                    </button>
+                    <p className="text-noch-muted text-[11px] mt-2">MP4 or WebM · maximum 20 MB · short, silent-friendly clips work best.</p>
                   </div>
 
                   <div className="mb-1">

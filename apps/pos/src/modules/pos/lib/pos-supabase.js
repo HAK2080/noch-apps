@@ -242,6 +242,24 @@ export async function uploadProductImage(productId, file) {
   return publicUrl
 }
 
+export async function uploadProductVideo(productId, file) {
+  const ext = file.type === 'video/webm' ? 'webm' : 'mp4'
+  const path = `products/${productId}/${Date.now()}.${ext}`
+  const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, file, {
+    upsert: true,
+    contentType: file.type || undefined,
+    cacheControl: '31536000',
+  })
+  if (uploadErr) throw uploadErr
+  const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path)
+  const { error: updateErr } = await supabase
+    .from('pos_products')
+    .update({ video_url: publicUrl, updated_at: new Date().toISOString() })
+    .eq('id', productId)
+  if (updateErr) throw updateErr
+  return publicUrl
+}
+
 export async function generateProductImage(input) {
   const { data, error } = await supabase.functions.invoke('generate-product-image', { body: input })
   if (error) {

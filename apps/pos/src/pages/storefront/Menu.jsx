@@ -70,7 +70,21 @@ const CARD_COLORS = [
   { bg: '#e0f7fa', text: '#00695c' },
 ]
 
-function MenuProductImage({ src, alt, className, fallback, priority = false, detail = false }) {
+function MenuProductImage({ src, videoSrc, alt, className, fallback, priority = false, detail = false }) {
+  if (videoSrc) {
+    return (
+      <MenuProductVideoState
+        key={videoSrc}
+        videoSrc={videoSrc}
+        posterSrc={src}
+        alt={alt}
+        className={className}
+        fallback={fallback}
+        priority={priority}
+        detail={detail}
+      />
+    )
+  }
   return (
     <MenuProductImageState
       key={src || 'missing-image'}
@@ -81,6 +95,65 @@ function MenuProductImage({ src, alt, className, fallback, priority = false, det
       priority={priority}
       detail={detail}
     />
+  )
+}
+
+function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, priority, detail }) {
+  const videoRef = useRef(null)
+  const [shouldLoad, setShouldLoad] = useState(priority)
+  const [status, setStatus] = useState('loading')
+  const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData === true
+
+  useEffect(() => {
+    if (saveData || shouldLoad) return undefined
+    const video = videoRef.current
+    if (!video || typeof IntersectionObserver === 'undefined') {
+      const timer = window.setTimeout(() => setShouldLoad(true), 0)
+      return () => window.clearTimeout(timer)
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setShouldLoad(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '160px' })
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [saveData, shouldLoad])
+
+  if (status === 'failed' || saveData) {
+    return (
+      <MenuProductImageState
+        src={posterSrc}
+        alt={alt}
+        className={className}
+        fallback={fallback}
+        priority={priority}
+        detail={detail}
+      />
+    )
+  }
+
+  return (
+    <div className={`${className} menu-product-image-shell${status === 'loaded' ? ' is-loaded' : ''}`}>
+      <span className="menu-product-image-skeleton" aria-hidden="true" />
+      <video
+        ref={videoRef}
+        src={shouldLoad ? videoSrc : undefined}
+        poster={posterSrc ? buildOptimizedProductImageUrl(posterSrc, detail
+          ? { width: 800, height: 1000, quality: 85 }
+          : { width: 400, height: 500, quality: 80 }) : undefined}
+        aria-label={alt}
+        className="menu-product-video-media"
+        muted
+        loop
+        playsInline
+        autoPlay
+        preload="none"
+        onLoadedData={() => setStatus('loaded')}
+        onError={() => setStatus('failed')}
+      />
+    </div>
   )
 }
 
@@ -176,6 +249,7 @@ function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor,
       <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
         <MenuProductImage
           src={p.image_url}
+          videoSrc={p.video_url}
           alt={name_(p)}
           className="scroll-card-img"
           priority={priority}
@@ -226,6 +300,7 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, la
       <button className="list-row-tap" onClick={onOpenDetail} aria-label={name_(p)}>
         <MenuProductImage
           src={p.image_url}
+          videoSrc={p.video_url}
           alt={name_(p)}
           className="list-row-img"
           fallback={(
@@ -280,6 +355,7 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, l
       <button className="card-tap-area" onClick={onOpenDetail} aria-label={name_(p)}>
         <MenuProductImage
           src={p.image_url}
+          videoSrc={p.video_url}
           alt={name_(p)}
           className="grid-card-img"
           fallback={(
@@ -370,6 +446,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
             {!soldOut && <ProductMenuBadge product={p} lang={lang} inline compact />}
             <MenuProductImage
               src={p.image_url}
+              videoSrc={p.video_url}
               alt={name_(p)}
               className="addon-img"
               fallback={(
@@ -476,6 +553,7 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
         <div className="detail-img-wrap">
           <MenuProductImage
             src={p.image_url}
+            videoSrc={p.video_url}
             alt={name_(p)}
             className="detail-img"
             priority

@@ -184,6 +184,8 @@ a{color:inherit}
 .card:nth-child(7n){background:#EEF4FF}
 
 .card-illus{aspect-ratio:1/1;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,var(--pink-soft),#FFE3C2);border:2px solid var(--ink);font-size:72px;position:relative;overflow:hidden}
+.card-media{isolation:isolate}
+.card-menu-image,.card-menu-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .card:nth-child(3n) .card-illus{background:linear-gradient(135deg,#FFE3C2,#FFD6E0)}
 .card:nth-child(5n) .card-illus{background:linear-gradient(135deg,#DCE9FF,#FFD6E0)}
 .card:nth-child(7n) .card-illus{background:linear-gradient(135deg,#C5E8B7,#FFE3C2)}

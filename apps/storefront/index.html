@@ -249,7 +249,7 @@
   .shop-card{position:relative;background:#fff;border:3px solid var(--ink);border-radius:24px;box-shadow:5px 5px 0 var(--ink);overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
   .shop-card:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--ink)}
   .shop-card-img{aspect-ratio:1;background:linear-gradient(140deg,#FBDFEB,#FFE3D6);display:grid;place-items:center;overflow:hidden;border-bottom:3px solid var(--ink)}
-  .shop-card-img img{width:100%;height:100%;object-fit:cover}
+  .shop-card-img img,.shop-card-img video{width:100%;height:100%;object-fit:cover}
   .shop-card-img .placeholder{width:60%;height:60%;opacity:.7}
   .shop-card-body{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:6px}
   .shop-card-name{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:15px;line-height:1.2;color:var(--ink);min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -270,7 +270,8 @@
   @keyframes loy-fade{from{opacity:0}to{opacity:1}}
   .ps-card{background:var(--cream);border:3px solid var(--ink);border-radius:24px;box-shadow:8px 8px 0 var(--ink);max-width:520px;width:100%;max-height:90dvh;overflow-y:auto;position:relative}
   .ps-img{aspect-ratio:1;background:linear-gradient(140deg,#FBDFEB,#FFE3D6);display:grid;place-items:center;border-radius:21px 21px 0 0;border-bottom:3px solid var(--ink);overflow:hidden}
-  .ps-img img{width:100%;height:100%;object-fit:cover}
+  .ps-img img,.ps-img video{width:100%;height:100%;object-fit:cover}
+  .ps-img .placeholder{width:60%;height:60%;opacity:.7;object-fit:contain}
   .ps-close{position:absolute;top:14px;right:14px;width:38px;height:38px;border-radius:50%;background:var(--ink);color:#fff;border:none;font-size:18px;cursor:pointer;z-index:2}
   [dir="rtl"] .ps-close{right:auto;left:14px}
   .ps-body{padding:20px}
@@ -1163,6 +1164,42 @@ function relativeDays(iso, lt){
   return days + ' ' + lt.daysAgo;
 }
 
+function ProductMenuMedia({ product, name, detail=false }){
+  const videoRef = useRef(null);
+  const [shouldLoad, setShouldLoad] = useState(detail);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const saveData = typeof navigator !== 'undefined' && navigator.connection && navigator.connection.saveData === true;
+
+  useEffect(()=>{
+    if(!product.video_url || saveData || shouldLoad) return;
+    const video = videoRef.current;
+    if(!video || typeof IntersectionObserver === 'undefined'){
+      const timer = window.setTimeout(()=>setShouldLoad(true), 0);
+      return ()=>window.clearTimeout(timer);
+    }
+    const observer = new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)){
+        setShouldLoad(true);
+        observer.disconnect();
+      }
+    }, {rootMargin:'160px'});
+    observer.observe(video);
+    return ()=>observer.disconnect();
+  }, [product.video_url, saveData, shouldLoad]);
+
+  if(product.video_url && !saveData && !videoFailed){
+    return <video ref={videoRef}
+                  src={shouldLoad ? product.video_url : undefined}
+                  poster={product.image_url || undefined}
+                  aria-label={name}
+                  muted loop playsInline autoPlay preload="none"
+                  onError={()=>setVideoFailed(true)}/>;
+  }
+  return product.image_url
+    ? <img src={product.image_url} alt={name} loading={detail ? 'eager' : 'lazy'}/>
+    : <img className="placeholder" src="assets/nochi-shopping.png" alt=""/>;
+}
+
 // 10 Nochi poses ordered chill → champion; one per stamp slot.
 // Uses /assets/stamp-01.png … stamp-10.png — overwrite same filenames to swap art.
 function ShopProductCard({ product, lang, lt, onAdd, onOpen }){
@@ -1172,9 +1209,7 @@ function ShopProductCard({ product, lang, lt, onAdd, onOpen }){
     <div className="shop-card" onClick={()=>onOpen(product)}>
       {product.featured && <span className="featured-pill">★</span>}
       <div className="shop-card-img">
-        {product.image_url
-          ? <img src={product.image_url} alt={name} loading="lazy"/>
-          : <img className="placeholder" src="assets/nochi-shopping.png" alt=""/>}
+        <ProductMenuMedia product={product} name={name}/>
       </div>
       <div className="shop-card-body">
         <div className="shop-card-name">{name}</div>
@@ -1204,9 +1239,7 @@ function ProductSheet({ product, lang, lt, onClose, onAdd }){
       <div className="ps-card" onClick={(e)=>e.stopPropagation()}>
         <button className="ps-close" onClick={onClose} aria-label="Close">✕</button>
         <div className="ps-img">
-          {product.image_url
-            ? <img src={product.image_url} alt={name}/>
-            : <img className="placeholder" src="assets/nochi-shopping.png" alt="" style={{width:'60%',height:'60%',opacity:.7}}/>}
+          <ProductMenuMedia product={product} name={name} detail/>
         </div>
         <div className="ps-body">
           <div className="ps-name">{name}</div>
@@ -1434,7 +1467,7 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
   useEffect(()=>{
     if (!sb) return;
     Promise.all([
-      sb.from('pos_products').select('id,name,name_ar,price,description,menu_description,menu_description_ar,image_url,is_active,visible_on_website,track_inventory,stock_qty,featured,category_id,created_at')
+      sb.from('pos_products').select('id,name,name_ar,price,description,menu_description,menu_description_ar,image_url,video_url,is_active,visible_on_website,track_inventory,stock_qty,featured,category_id,created_at')
         .eq('visible_on_website', true).eq('is_active', true).order('featured', {ascending:false}).order('name'),
       sb.from('pos_categories').select('id,name,name_ar')
         .eq('show_in_online_store', true).eq('is_active', true).order('name'),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -23,6 +23,58 @@ function getEmoji(name) {
   return '✨'
 }
 
+function ProductMedia({ item, fallback }) {
+  const videoRef = useRef(null)
+  const [shouldLoad, setShouldLoad] = useState(false)
+  const [videoFailed, setVideoFailed] = useState(false)
+  const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData === true
+
+  useEffect(() => {
+    if (!item.video_url || saveData || shouldLoad) return undefined
+    const video = videoRef.current
+    if (!video || typeof IntersectionObserver === 'undefined') {
+      const timer = window.setTimeout(() => setShouldLoad(true), 0)
+      return () => window.clearTimeout(timer)
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setShouldLoad(true)
+        observer.disconnect()
+      }
+    }, { rootMargin: '160px' })
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [item.video_url, saveData, shouldLoad])
+
+  if (item.video_url && !saveData && !videoFailed) {
+    return (
+      <div className="card-illus card-media">
+        <video
+          ref={videoRef}
+          src={shouldLoad ? item.video_url : undefined}
+          poster={item.image_url || undefined}
+          className="card-menu-video"
+          aria-label={item.name}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="none"
+          onError={() => setVideoFailed(true)}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="card-illus card-media">
+      {item.image_url
+        ? <img src={item.image_url} alt={item.name} className="card-menu-image" loading="lazy" decoding="async" />
+        : fallback}
+    </div>
+  )
+}
+
 export default function Menu() {
   const [lang, setLang] = useState('ar')
   const [active, setActive] = useState('all')
@@ -38,7 +90,7 @@ export default function Menu() {
         const [catRes, prodRes] = await Promise.all([
           supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).eq('show_on_website', true).order('sort_order'),
           supabase.from('pos_products')
-            .select('id,name,name_ar,price,description,menu_description,menu_description_ar,show_description_on_website,visible_on_website,category_id')
+            .select('id,name,name_ar,price,description,menu_description,menu_description_ar,show_description_on_website,visible_on_website,category_id,image_url,video_url')
             .eq('is_active', true)
             .eq('visible_on_customer_menu', true)
             .not('is_sold_out', 'is', true) // hide POS long-press sold-out items
@@ -60,6 +112,8 @@ export default function Menu() {
           name: p.name,
           name_ar: p.name_ar || '',
           price: parseFloat(p.price),
+          image_url: p.image_url || '',
+          video_url: p.video_url || '',
           // Use menu_description if available, fall back to legacy description field.
           // Respect show_description_on_website flag (default true).
           desc: p.show_description_on_website === false
@@ -153,9 +207,10 @@ export default function Menu() {
           <div className="grid">
             {filtered.map((item, idx) => (
               <article className="card" key={item.id || idx}>
-                <div className="card-illus">
-                  {getEmoji(activeCat?.name || '')}
-                </div>
+                <ProductMedia
+                  item={item}
+                  fallback={getEmoji(categories.find(category => category.id === item.cat_id)?.name || '')}
+                />
                 <div className="card-head">
                   <div className="card-name">
                     {item.name}
