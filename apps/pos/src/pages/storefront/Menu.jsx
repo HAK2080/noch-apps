@@ -6,6 +6,7 @@ import { buildOptimizedProductImageUrl } from '../../lib/product-images'
 import { productBelongsToCategory } from '../../lib/product-categories'
 import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
 import nochLogo from '../../assets/noch-logo.png'
+import nochiFaceKorea from '../../assets/nochi-face-korea.png'
 import './styles/Menu.css'
 
 // ── Category icon helpers ────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ function CatIcon({ name, imageUrl, size = 16 }) {
 
 function catEmoji(name = '') {
   const n = name.toLowerCase()
+  if (/korea|korean|한국|كوريا|كوري/.test(n)) return '🇰🇷'
   if (/iced.*coffee|coffee.*iced|قهوة.*مثلج|مثلج.*قهوة/.test(n)) return '🥤'
   if (/iced.*tea|tea.*iced|شاي.*مثلج|مثلج.*شاي/.test(n)) return '🍹'
   if (/iced.*matcha|matcha.*iced/.test(n)) return '🥤'
@@ -57,6 +59,59 @@ function catEmoji(name = '') {
   if (/add.?on|إضافة|extra|إضافات/.test(n)) return '✚'
   if (/hot|ساخن|warm/.test(n)) return '🔥'
   return '🌿'
+}
+
+function isKoreaEditionCategory(cat = {}) {
+  const categoryNames = `${cat.name || ''} ${cat.name_ar || ''}`.toLowerCase()
+  return /korea|korean|한국|كوريا|كوري/.test(categoryNames)
+}
+
+function KoreaEditionHero({ catLabel, lang }) {
+  return (
+    <div className="korea-edition-hero">
+      <svg className="korea-edition-scenery" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
+        <g className="korea-tower">
+          <path d="M58 250h235l-18-18h-48l-9-19h-39l-13-31h-45l-13 31H85l-9 19H58z" />
+          <path d="M151 213V91m-16 42h32m-25-28h18m-13-14h8V39h-8z" />
+          <path d="M112 168h78l-10 15h-58z" />
+        </g>
+        <g className="korea-palace">
+          <path d="M896 239h246v18H896zM924 207h190v34H924z" />
+          <path d="M876 207l143-49 143 49-19 11-124-34-124 34z" />
+          <path d="M913 168l106-50 106 50-18 10-88-32-88 32z" />
+          <path d="M964 128l55-43 55 43-16 8-39-25-39 25z" />
+          <path d="M944 204v37m40-50v50m70-50v50m40-37v37" />
+        </g>
+      </svg>
+
+      <div className="korea-blossoms korea-blossoms-start" aria-hidden="true">✿ <span>✿</span> ✿</div>
+      <div className="korea-blossoms korea-blossoms-end" aria-hidden="true">✿ <span>✿</span> ✿</div>
+      <span className="korea-petal korea-petal-one" aria-hidden="true">●</span>
+      <span className="korea-petal korea-petal-two" aria-hidden="true">●</span>
+      <span className="korea-petal korea-petal-three" aria-hidden="true">●</span>
+
+      <div className="korea-edition-copy">
+        <span className="korea-edition-kicker" lang="ko">✦ 한국에서 온 맛 ✦</span>
+        <div className="korea-edition-title" role="heading" aria-level="3">
+          <span>KOREA</span> EDITION <span className="korea-flag" role="img" aria-label="South Korea">🇰🇷</span>
+        </div>
+        <p>AUTHENTIC KOREAN DRINKS</p>
+      </div>
+
+      <div className="korea-edition-stamp" aria-hidden="true">
+        <strong>MADE IN</strong>
+        <span>KOREA</span>
+        <small>PREMIUM QUALITY</small>
+      </div>
+
+      <div className="korea-edition-mascot">
+        <span className="korea-speech" lang="ko">안녕하세요!</span>
+        <img src={nochiFaceKorea} alt="Nochi" loading="lazy" decoding="async" />
+      </div>
+
+      <span className="korea-edition-category" dir={lang === 'ar' ? 'rtl' : 'ltr'}>{catLabel} <span aria-hidden="true">🌸</span></span>
+    </div>
+  )
 }
 
 const CARD_COLORS = [
@@ -476,6 +531,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
   const catLabel = lang === 'ar' && cat.name_ar ? cat.name_ar : cat.name
   const col = catColorMap[cat.id] || CARD_COLORS[0]
   const baseStyle = cat.menu_display_style || 'scroll'
+  const koreaEdition = isKoreaEditionCategory(cat)
   // When a single category is being viewed ("View all" / pill selected), always
   // render a full vertical grid so every item is visible at once — no sideways scroll.
   const style = expanded ? 'grid' : baseStyle
@@ -483,11 +539,13 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
   if (products.length === 0) return null
 
   return (
-    <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}`} id={`cat-${cat.id}`}>
-      <div className="cat-section-header">
+    <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}`} id={`cat-${cat.id}`}>
+      {koreaEdition && <KoreaEditionHero catLabel={catLabel} lang={lang} />}
+      <div className={`cat-section-header${koreaEdition ? ' korea-edition-section-header' : ''}`}>
         <h2 className="cat-section-title">
-          <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />
+          {!koreaEdition && <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />}
           <span>{catLabel}</span>
+          {koreaEdition && <span className="korea-title-blossom" aria-hidden="true">✿</span>}
         </h2>
         {!expanded && baseStyle !== 'addons' && baseStyle !== 'text' && (
           <button className="view-all-btn" onClick={() => onViewAll(cat.id)}>
