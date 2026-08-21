@@ -10,4 +10,6 @@ test('customer-menu description visibility applies to cards and the detail popup
   assert.match(menu, /const fullDesc = p\.show_description_on_menu === false[\s\S]*\? ''/)
   assert.match(menu, /function desc_\(p\)[\s\S]*if \(p\.show_description_on_menu === false\) return ''/)
   assert.match(menu, /\{fullDesc && <p className="detail-desc">\{fullDesc\}<\/p>\}/)
+  const popupDescriptionLogic = menu.match(/const fullDesc =[\s\S]*?\n\n  \/\/ Close on Escape/)?.[0] || ''
+  assert.doesNotMatch(popupDescriptionLogic, /p\.description/)
 })

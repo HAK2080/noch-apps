@@ -558,8 +558,8 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
   const fullDesc = p.show_description_on_menu === false
     ? ''
     : isAr
-      ? (p.menu_description_ar || p.menu_description || p.description || '')
-      : (p.menu_description || p.menu_description_ar || p.description || '')
+      ? (p.menu_description_ar || p.menu_description || '')
+      : (p.menu_description || p.menu_description_ar || '')
 
   // Close on Escape
   useEffect(() => {
