@@ -976,6 +976,23 @@ To find if something's been done:
 
 ---
 
+## 2026-08-21 — Faster customer-facing menu
+
+- **Agent**: Codex
+- **Status**: Complete; production deployment pending
+- **Files**:
+  - `apps/pos/public/assets/korea-japan-banner.webp`
+  - `apps/pos/src/assets/noch-logo-menu.webp`
+  - `apps/pos/src/pages/storefront/Menu.jsx`
+  - `apps/pos/src/pages/storefront/styles/Menu.css`
+  - `apps/pos/tests/customer-menu-performance.test.mjs`
+  - `apps/pos/tests/korea-edition-menu.test.mjs`
+- **Description**: The customer menu now serves an 87 KB WebP Korea/Japan banner and a 12 KB menu logo, requests smaller contained product derivatives, optimizes category icons, and gives high network priority only to the first two images in the first visible section. Repeat visits render from a 12-hour menu cache while branch, category, and product data refresh in the background. Supabase menu queries now select only the fields used by the customer experience.
+- **Data safety**: Product images remain uncropped through `resize=contain`, the original PNG banner remains as a fallback, and cached menu data is always revalidated against Supabase.
+- **Verification**: All 11 focused menu/image tests pass, targeted ESLint has zero errors and two pre-existing hook dependency warnings, the production build passes, and `git diff --check` passes. The broader suite passes 148/151; the same three pre-existing workforce/privacy acceptance assertions remain outside this change.
+
+---
+
 ## 2026-08-16 — Automated product images and multi-category menus
 
 - **Agent**: Codex

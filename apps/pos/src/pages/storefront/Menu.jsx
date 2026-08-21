@@ -5,7 +5,7 @@ import { formatFixed } from '../../lib/numbers'
 import { buildOptimizedProductImageUrl } from '../../lib/product-images'
 import { productBelongsToCategory } from '../../lib/product-categories'
 import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
-import nochLogo from '../../assets/noch-logo.png'
+import nochLogo from '../../assets/noch-logo-menu.webp'
 import './styles/Menu.css'
 
 // ── Category icon helpers ────────────────────────────────────────────────────
@@ -28,7 +28,16 @@ function V60Icon({ size = 16 }) {
   )
 }
 function CatIcon({ name, imageUrl, size = 16 }) {
-  if (imageUrl) return <img src={imageUrl} alt={name} style={{ width: size, height: size, borderRadius: 4, objectFit: 'cover', display: 'inline-block', verticalAlign: '-3px' }} />
+  if (imageUrl) return (
+    <img
+      src={buildOptimizedProductImageUrl(imageUrl, { width: 64, height: 64, quality: 70 })}
+      alt={name}
+      loading="lazy"
+      decoding="async"
+      fetchPriority="low"
+      style={{ width: size, height: size, borderRadius: 4, objectFit: 'cover', display: 'inline-block', verticalAlign: '-3px' }}
+    />
+  )
   const n = (name || '').toLowerCase()
   if (/matcha|ماتشا/.test(n) && !/coffee/.test(n)) return <MatchaIcedIcon size={size} />
   if (/tools|tool|equipment|أدوات|معدات|v60/.test(n)) return <V60Icon size={size} />
@@ -65,17 +74,21 @@ function isKoreaEditionCategory(cat = {}) {
   return /korea|korean|한국|كوريا|كوري/.test(categoryNames)
 }
 
-function KoreaJapanBanner({ catLabel }) {
+function KoreaJapanBanner({ catLabel, priority = false }) {
   return (
     <div className="korea-japan-banner">
       <h2 className="korea-banner-title-sr">{catLabel}</h2>
-      <img
-        src="/assets/korea-japan-banner.png"
-        alt=""
-        aria-hidden="true"
-        fetchPriority="high"
-        decoding="async"
-      />
+      <picture>
+        <source srcSet="/assets/korea-japan-banner.webp" type="image/webp" />
+        <img
+          src="/assets/korea-japan-banner.png"
+          alt=""
+          aria-hidden="true"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'low'}
+          decoding="async"
+        />
+      </picture>
     </div>
   )
 }
@@ -162,8 +175,8 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
         ref={videoRef}
         src={shouldLoad ? videoSrc : undefined}
         poster={posterSrc ? buildOptimizedProductImageUrl(posterSrc, detail
-          ? { width: 800, height: 1000, quality: 85 }
-          : { width: 400, height: 500, quality: 80 }) : undefined}
+          ? { width: 720, height: 900, quality: 80 }
+          : { width: 360, height: 450, quality: 74 }) : undefined}
         aria-label={alt}
         className="menu-product-video-media"
         muted
@@ -180,8 +193,8 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
 
 function MenuProductImageState({ src, alt, className, fallback, priority, detail }) {
   const optimizedSource = buildOptimizedProductImageUrl(src, detail
-    ? { width: 800, height: 1000, quality: 85 }
-    : { width: 400, height: 500, quality: 80 })
+    ? { width: 720, height: 900, quality: 80 }
+    : { width: 360, height: 450, quality: 74 })
   const [currentSource, setCurrentSource] = useState(optimizedSource)
   const [status, setStatus] = useState(src ? 'loading' : 'failed')
 
@@ -245,7 +258,7 @@ function ProductMenuBadge({ product, lang, inline = false, compact = false, deta
 
 // ── Section layout components ────────────────────────────────────────────────
 
-function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
+function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priorityCount = 0 }) {
   return (
     <div className="scroll-row">
       {products.map((p, index) => (
@@ -253,7 +266,7 @@ function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
           lang={lang}
-          priority={index < 2}
+          priority={index < priorityCount}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
@@ -299,21 +312,22 @@ function ScrollCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor,
   )
 }
 
-function ListSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
+function ListSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priorityCount = 0 }) {
   return (
     <div className="list-section">
-      {products.map(p => (
+      {products.map((p, index) => (
         <ListRow key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
           lang={lang}
+          priority={index < priorityCount}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
+function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priority }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
@@ -324,6 +338,7 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, la
           videoSrc={p.video_url}
           alt={name_(p)}
           className="list-row-img"
+          priority={priority}
           fallback={(
             <span style={{ color: col.text, fontWeight: 800 }}>{name_(p).charAt(0).toUpperCase()}</span>
           )}
@@ -352,21 +367,22 @@ function ListRow({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, la
   )
 }
 
-function GridSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
+function GridSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priorityCount = 0 }) {
   return (
     <div className="grid-2col">
-      {products.map(p => (
+      {products.map((p, index) => (
         <GridCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
           name_={name_} desc_={desc_} currency={currency} catColor={catColor}
           lang={lang}
+          priority={index < priorityCount}
           onOpenDetail={() => onOpenDetail && onOpenDetail(p)} />
       ))}
     </div>
   )
 }
 
-function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail }) {
+function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priority }) {
   const col = catColor || CARD_COLORS[0]
   const soldOut = p.is_available === false
   return (
@@ -379,6 +395,7 @@ function GridCard({ p, qty, onAdd, onRemove, name_, desc_, currency, catColor, l
           videoSrc={p.video_url}
           alt={name_(p)}
           className="grid-card-img"
+          priority={priority}
           fallback={(
             <span className="placeholder-name" style={{ color: col.text }}>{name_(p)}</span>
           )}
@@ -455,10 +472,10 @@ function TextSection({ products, cart, onAdd, onRemove, name_, desc_, currency, 
   )
 }
 
-function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColor, lang }) {
+function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColor, lang, priorityCount = 0 }) {
   return (
     <div className="addons-strip">
-      {products.map(p => {
+      {products.map((p, index) => {
         const col = catColor || CARD_COLORS[0]
         const qty = cart[p.id] || 0
         const soldOut = p.is_available === false
@@ -470,6 +487,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
               videoSrc={p.video_url}
               alt={name_(p)}
               className="addon-img"
+              priority={index < priorityCount}
               fallback={(
                 <span style={{ color: col.text, fontSize: 18 }}>{catEmoji(name_(p))}</span>
               )}
@@ -493,7 +511,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
 }
 
 // ── Category section wrapper ─────────────────────────────────────────────────
-function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, currency, catColorMap, lang, onViewAll, onOpenDetail, expanded }) {
+function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, currency, catColorMap, lang, onViewAll, onOpenDetail, expanded, priorityImages = false }) {
   const catLabel = lang === 'ar' && cat.name_ar ? cat.name_ar : cat.name
   const col = catColorMap[cat.id] || CARD_COLORS[0]
   const baseStyle = cat.menu_display_style || 'scroll'
@@ -506,7 +524,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
 
   return (
     <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}`} id={`cat-${cat.id}`}>
-      {koreaEdition && <KoreaJapanBanner catLabel={catLabel} />}
+      {koreaEdition && <KoreaJapanBanner catLabel={catLabel} priority={priorityImages} />}
       {!koreaEdition && <div className="cat-section-header">
         <h2 className="cat-section-title">
           <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />
@@ -526,19 +544,23 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
 
       {style === 'scroll' && (
         <ScrollSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail}
+          priorityCount={priorityImages ? 2 : 0} />
       )}
       {style === 'list' && (
         <ListSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail}
+          priorityCount={priorityImages ? 2 : 0} />
       )}
       {style === 'grid' && (
         <GridSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail} />
+          name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail}
+          priorityCount={priorityImages ? 2 : 0} />
       )}
       {style === 'addons' && (
         <AddonsStrip products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
-          name_={name_} currency={currency} catColor={col} lang={lang} />
+          name_={name_} currency={currency} catColor={col} lang={lang}
+          priorityCount={priorityImages ? 2 : 0} />
       )}
       {style === 'text' && (
         <TextSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
@@ -621,6 +643,38 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
 
 // ── Main page ────────────────────────────────────────────────────────────────
 const BRANCH_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MENU_CACHE_VERSION = 1
+const MENU_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000
+
+function readCachedMenu(branchParam) {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(`noch-menu:${branchParam}`))
+    if (
+      cached?.version !== MENU_CACHE_VERSION
+      || !cached.branch?.id
+      || !Array.isArray(cached.categories)
+      || !Array.isArray(cached.products)
+      || Date.now() - cached.cachedAt > MENU_CACHE_MAX_AGE_MS
+    ) return null
+    return cached
+  } catch {
+    return null
+  }
+}
+
+function writeCachedMenu(branchParam, branch, categories, products) {
+  try {
+    window.localStorage.setItem(`noch-menu:${branchParam}`, JSON.stringify({
+      version: MENU_CACHE_VERSION,
+      cachedAt: Date.now(),
+      branch,
+      categories,
+      products,
+    }))
+  } catch {
+    // Storage may be unavailable in private browsing; the live menu still works.
+  }
+}
 
 export default function Menu() {
   const { branchId: branchParam } = useParams()
@@ -664,11 +718,23 @@ export default function Menu() {
   useEffect(() => { loadMenu() }, [branchParam])
 
   async function loadMenu() {
+    const cached = readCachedMenu(branchParam)
+    if (cached) {
+      setBranchId(cached.branch.id)
+      setBranch(cached.branch)
+      setCategories(cached.categories)
+      setProducts(cached.products)
+      setLoading(false)
+    }
+
     try {
-      setLoading(true); setError(null)
+      if (!cached) setLoading(true)
+      setError(null)
       // Resolve branch by UUID or slug first, then load its menu by real id.
       const isUuid = BRANCH_UUID_RE.test(branchParam)
-      const branchQ = supabase.from('pos_branches').select('*').eq('is_active', true)
+      const branchQ = supabase.from('pos_branches')
+        .select('id, name, lat, lng, geofence_radius_m')
+        .eq('is_active', true)
       const { data: b, error: be } = await (isUuid ? branchQ.eq('id', branchParam) : branchQ.ilike('slug', branchParam)).single()
       if (be || !b) throw new Error('Branch not found')
       const id = b.id
@@ -681,7 +747,7 @@ export default function Menu() {
           .or(`visible_branch_ids.cs.{${id}},branch_id.eq.${id}`)
           .order('sort_order').order('name'),
         supabase.from('pos_products')
-          .select('*')
+          .select('id, name, name_ar, price, image_url, video_url, category_id, secondary_category_ids, menu_description, menu_description_ar, show_description_on_menu, menu_badge_key, menu_badge_animation, featured, is_available')
           .eq('is_active', true)
           .eq('visible_on_customer_menu', true)
           .not('is_sold_out', 'is', true) // hide POS long-press sold-out items
@@ -693,10 +759,11 @@ export default function Menu() {
       setBranch(b)
       setCategories(cats || [])
       setProducts(prods || [])
+      writeCachedMenu(branchParam, b, cats || [], prods || [])
     } catch (err) {
-      setError(err.message || 'Failed to load menu')
+      if (!cached) setError(err.message || 'Failed to load menu')
     } finally {
-      setLoading(false)
+      if (!cached) setLoading(false)
     }
   }
 
@@ -908,7 +975,7 @@ export default function Menu() {
         {sectionsData.length === 0 ? (
           <p className="no-products">{t('Nothing here yet — check back soon.', 'لا يوجد شيء هنا بعد.')}</p>
         ) : (
-          sectionsData.map(({ cat, products: catProducts }) => (
+          sectionsData.map(({ cat, products: catProducts }, sectionIndex) => (
             <CategorySection
               key={cat.id}
               cat={cat}
@@ -924,6 +991,7 @@ export default function Menu() {
               onViewAll={handleViewAll}
               onOpenDetail={setDetailProduct}
               expanded={activeCat !== 'all'}
+              priorityImages={sectionIndex === 0}
             />
           ))
         )}

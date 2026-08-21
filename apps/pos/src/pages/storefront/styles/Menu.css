@@ -833,6 +833,9 @@
   overflow: hidden;
   background: #fff7e8;
 }
+.korea-japan-banner picture {
+  display: block;
+}
 .korea-japan-banner img {
   display: block;
   width: 100%;
