@@ -29,6 +29,7 @@ test('Korea Edition stays responsive and does not add a heavy campaign backgroun
   assert.match(css, /\.cat-section\.korea-edition/)
   assert.match(css, /max-width: 1180px/)
   assert.match(css, /\.korea-edition-scenery/)
+  assert.match(css, /\.korea-edition-title[\s\S]*direction: ltr/)
   assert.match(css, /@media \(max-width: 720px\)/)
   assert.match(css, /\.korea-edition \.scroll-card \{ width: min\(70vw, 244px\)/)
   assert.ok(faceStats.size < 150 * 1024, `Nochi face should stay below 150 KB, got ${faceStats.size}`)

@@ -888,6 +888,8 @@
   letter-spacing: -0.055em;
   white-space: nowrap;
   text-transform: uppercase;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 .korea-edition-title > span:first-child { font-weight: 900; }
 .korea-flag {
