@@ -1,3 +1,30 @@
+## 2026-08-21 — Report Null Safety and Bandwidth-Aware Product Videos
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/src/pages/Report.jsx`
+  - `apps/pos/src/pages/ProductCatalog.jsx`
+  - `apps/pos/src/pages/storefront/Menu.jsx`
+  - `apps/pos/src/pages/storefront/styles/Menu.css`
+  - `apps/pos/src/modules/pos/lib/pos-supabase.js`
+  - `apps/pos/src/modules/pos/lib/product-video.js`
+  - `apps/pos/src/modules/pos/pages/POSProducts.jsx`
+  - `apps/pos/tests/report-null-safety.test.mjs`
+  - `apps/pos/tests/product-menu-video.test.mjs`
+  - `apps/storefront/index.html`
+  - `apps/storefront/src/pages/Menu.jsx`
+  - `apps/storefront/src/styles.css`
+  - `supabase/migrations/20260821094500_product_menu_video.sql`
+- **Report repair**: Fixed the authenticated Management Report blank page caused by nullable order, minimum-threshold, and theoretical-stock values calling `toLocaleString()` directly. Missing metrics now render safely, including `Unavailable` for unavailable theoretical quantities.
+- **Product media**: Added an optional customer-menu video to both product editors. MP4 and WebM files up to 20 MB upload to the existing public product-media bucket, while the product photo remains the poster and fallback. The customer menu at `apps.noch.cloud/menu/:branch` and the Shop/customer experience at `noch.cloud` prefer video when present. Videos are muted, looping, inline, attached only near the viewport, loaded with `preload="none"`, and suppressed when the customer's browser has data-saver enabled.
+- **Database**: Applied `20260821094500_product_menu_video.sql` directly to production and verified that `public.pos_products.video_url` exists as a nullable text column. The `product-images` storage bucket has no configured MIME-type or file-size restriction; the application enforces the supported formats and 20 MB limit.
+- **Verification**: All 21 focused report, product-media, image-optimization, badge, and reporting-model tests passed. Targeted ESLint completed with zero errors and six pre-existing hook warnings; both production builds and `git diff --check` passed. Authenticated production verification confirmed that the Management Report renders, the deployed report bundle no longer contains the unsafe order formatting path, the deployed product editor contains the video workflow, and both public storefront bundles contain the lazy video behavior.
+- **Commits**: `079e0fb` (`fix(reporting): handle unavailable metrics safely`), `1f58851` (`feat(menu): add bandwidth-aware product videos`)
+- **Deployment**: GitHub Actions run `32456230241` deployed `apps.noch.cloud` successfully. Storefront run `32456230240` succeeded on its third attempt after two SSH connection timeouts; both earlier attempts had built successfully. No-cache production checks returned 200 for both sites and their current JavaScript assets.
+
+---
+
 ## 2026-08-21 — Weak-Internet POS Optimization
 
 - **Agent**: Codex
