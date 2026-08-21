@@ -555,9 +555,11 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
   const isAr = lang === 'ar'
   const altName = isAr ? p.name : p.name_ar
   // Full description (no truncation) in the active language, with fallback.
-  const fullDesc = isAr
-    ? (p.menu_description_ar || p.menu_description || p.description || '')
-    : (p.menu_description || p.menu_description_ar || p.description || '')
+  const fullDesc = p.show_description_on_menu === false
+    ? ''
+    : isAr
+      ? (p.menu_description_ar || p.menu_description || p.description || '')
+      : (p.menu_description || p.menu_description_ar || p.description || '')
 
   // Close on Escape
   useEffect(() => {
