@@ -81,6 +81,39 @@ async function loadImage(file) {
   }
 }
 
+async function downloadProductImageThroughCanvas(imageUrl, filename) {
+  if (typeof document === 'undefined' || typeof Image === 'undefined') {
+    throw new Error('Image download is unavailable in this browser')
+  }
+
+  const image = new Image()
+  image.crossOrigin = 'anonymous'
+  image.decoding = 'async'
+  image.src = imageUrl.toString()
+  if (typeof image.decode === 'function') await image.decode()
+  else await new Promise((resolve, reject) => {
+    image.onload = resolve
+    image.onerror = () => reject(new Error('Could not load the current image'))
+  })
+
+  const width = image.naturalWidth
+  const height = image.naturalHeight
+  if (!width || !height) throw new Error('The current product image has invalid dimensions')
+
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Image processing is unavailable in this browser')
+  context.drawImage(image, 0, 0, width, height)
+
+  const blob = await canvasToBlob(canvas, 'image/png')
+  return new File([blob], filename.replace(/\.[^.]+$/, '') + '.png', {
+    type: 'image/png',
+    lastModified: Date.now(),
+  })
+}
+
 export async function downloadProductImage(source, {
   fetchImpl = globalThis.fetch,
   baseUrl = globalThis.location?.origin || 'http://localhost',
@@ -103,7 +136,13 @@ export async function downloadProductImage(source, {
       mode: 'cors',
     })
   } catch {
-    throw new Error('Could not download the current image. Upload it again, then optimize it.')
+    try {
+      let fallbackFilename = imageUrl.pathname.split('/').pop() || 'product-image'
+      try { fallbackFilename = decodeURIComponent(fallbackFilename) } catch { /* Keep URL-safe name. */ }
+      return await downloadProductImageThroughCanvas(imageUrl, fallbackFilename)
+    } catch {
+      throw new Error('Could not download the current image. Upload it again, then optimize it.')
+    }
   }
   if (!response.ok) throw new Error('Could not download the current image')
 

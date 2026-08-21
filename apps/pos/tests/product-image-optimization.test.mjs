@@ -13,6 +13,7 @@ import {
 
 const menuCssUrl = new URL('../src/pages/storefront/styles/Menu.css', import.meta.url)
 const posSupabaseUrl = new URL('../src/modules/pos/lib/pos-supabase.js', import.meta.url)
+const imageProcessingUrl = new URL('../src/modules/pos/lib/product-image-processing.js', import.meta.url)
 
 test('public Supabase product images use a contained optimized derivative', () => {
   const source = 'https://example.supabase.co/storage/v1/object/public/product-images/products/item/photo.png'
@@ -77,6 +78,14 @@ test('existing remote product images download as files for the optimizer', async
     }),
     /not a supported image file/,
   )
+})
+
+test('remote download failure falls back to a no-crop canvas copy', async () => {
+  const source = await readFile(imageProcessingUrl, 'utf8')
+
+  assert.match(source, /image\.crossOrigin = 'anonymous'/)
+  assert.match(source, /context\.drawImage\(image, 0, 0, width, height\)/)
+  assert.match(source, /return await downloadProductImageThroughCanvas\(imageUrl, fallbackFilename\)/)
 })
 
 test('generated image bytes become a browser file for the standard optimizer', () => {
