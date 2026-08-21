@@ -14,7 +14,10 @@ import {
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import { isKioskMode } from '../lib/pos-kiosk'
+import { cacheBranchConfig, getCachedBranchConfig, isOnline, withPOSNetworkTimeout } from '../lib/pos-offline'
 import toast from 'react-hot-toast'
+
+const BRANCH_LIST_CACHE_KEY = '__branch-list__'
 
 // In kiosk mode we render a minimal full-screen branch picker instead
 // of wrapping in <Layout> (which adds the app sidebar/back-to-dashboard).
@@ -144,10 +147,25 @@ export default function POSHome() {
   const Wrapper = kiosk ? KioskWrapper : Layout
 
   useEffect(() => {
-    getPOSBranches({ includeInactive: isOwner })
-      .then(setBranches)
-      .catch(() => toast.error('Failed to load branches'))
-      .finally(() => setLoading(false))
+    let cancelled = false
+    const load = async () => {
+      const cached = await getCachedBranchConfig(BRANCH_LIST_CACHE_KEY).catch(() => null)
+      if (cancelled) return
+      if (cached?.branches?.length) setBranches(cached.branches)
+      setLoading(false)
+
+      if (!isOnline()) return
+      try {
+        const fresh = await withPOSNetworkTimeout(getPOSBranches({ includeInactive: isOwner }), 10000)
+        if (cancelled) return
+        setBranches(fresh)
+        cacheBranchConfig(BRANCH_LIST_CACHE_KEY, { branches: fresh }).catch(() => {})
+      } catch {
+        if (!cached?.branches?.length) toast.error('Failed to load branches')
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [isOwner])
 
   const setBranchCustomerStatus = async (branch, nextStatus) => {

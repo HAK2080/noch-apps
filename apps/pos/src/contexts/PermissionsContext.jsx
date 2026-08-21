@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useAuth } from './AuthContext'
 import { supabase } from '../lib/supabase'
 import { canAccessPolicy, getLandingRoute, isAccountEnabled } from '../lib/access-control'
+import { cacheRolePermissions, getCachedRolePermissions } from '../lib/permission-cache'
 
 const PermissionsContext = createContext({
   hasAccess: () => false,
@@ -53,8 +54,15 @@ export function PermissionsProvider({ children }) {
       return () => { cancelled = true }
     }
 
+    const cachedPermissions = getCachedRolePermissions(profile.role)
+    if (cachedPermissions) {
+      setPermissions(cachedPermissions)
+      setError(null)
+      setLoading(false)
+    }
+
     const load = async () => {
-      setLoading(true)
+      if (!cachedPermissions) setLoading(true)
       setError(null)
       try {
         const query = supabase
@@ -75,13 +83,22 @@ export function PermissionsProvider({ children }) {
             can_edit: !!grant.can_access && !!grant.can_edit,
           }
         })
+        cacheRolePermissions(profile.role, map)
         setPermissions(map)
         setRefreshedAt(new Date())
       } catch (loadError) {
         if (cancelled) return
-        setPermissions({})
-        setRefreshedAt(null)
-        setError(loadError instanceof Error ? loadError : new Error('Unable to verify permissions'))
+        if (cachedPermissions) {
+          // A recent successful access decision is allowed to keep a known POS
+          // device operational during a café internet outage. It is replaced
+          // on the next successful refresh and expires after seven days.
+          setPermissions(cachedPermissions)
+          setError(null)
+        } else {
+          setPermissions({})
+          setRefreshedAt(null)
+          setError(loadError instanceof Error ? loadError : new Error('Unable to verify permissions'))
+        }
       } finally {
         if (!cancelled) setLoading(false)
         clearTimeout(timeoutId)

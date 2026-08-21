@@ -41,9 +41,9 @@ export async function cacheProducts(branchId, products) {
   // Clear existing for this branch
   const index = tx.store.index('branch_id')
   const existing = await index.getAllKeys(branchId)
-  for (const key of existing) await tx.store.delete(key)
+  for (const key of existing) tx.store.delete(key)
   // Insert new
-  for (const p of products) await tx.store.put({ ...p, branch_id: branchId })
+  for (const p of products) tx.store.put({ ...p, branch_id: branchId })
   await tx.done
 }
 
@@ -60,8 +60,8 @@ export async function cacheCategories(branchId, categories) {
   const tx = db.transaction('categories', 'readwrite')
   const index = tx.store.index('branch_id')
   const existing = await index.getAllKeys(branchId)
-  for (const key of existing) await tx.store.delete(key)
-  for (const c of categories) await tx.store.put({ ...c, branch_id: branchId })
+  for (const key of existing) tx.store.delete(key)
+  for (const c of categories) tx.store.put({ ...c, branch_id: branchId })
   await tx.done
 }
 
@@ -79,6 +79,7 @@ export async function queueOfflineOrder(orderData) {
     ...orderData,
     queued_at: new Date().toISOString(),
   })
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('pos-offline-queue-changed'))
   return local_id
 }
 
@@ -90,6 +91,7 @@ export async function getOfflineQueue() {
 export async function clearOfflineOrder(localId) {
   const db = await getDB()
   await db.delete('offline_orders', localId)
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('pos-offline-queue-changed'))
 }
 
 // ── Held (parked) Orders ──────────────────────────────────────
@@ -144,4 +146,30 @@ export async function getCachedBranchConfig(branchId) {
 
 export function isOnline() {
   return navigator.onLine
+}
+
+export function isRetryablePOSNetworkError(error) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  const message = String(error?.message || error || '').toLowerCase()
+  return error?.name === 'TimeoutError'
+    || error?.code === 'POS_NETWORK_TIMEOUT'
+    || message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('load failed')
+    || message.includes('connection')
+    || message.includes('timed out')
+}
+
+export function withPOSNetworkTimeout(promise, timeoutMs = 12000) {
+  let timeoutId
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error('The café connection timed out')
+      error.name = 'TimeoutError'
+      error.code = 'POS_NETWORK_TIMEOUT'
+      reject(error)
+    }, timeoutMs)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
 }

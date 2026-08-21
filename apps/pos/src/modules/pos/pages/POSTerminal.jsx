@@ -15,9 +15,9 @@ import { format, round, sum, lineTotal } from '../lib/money'
 // initial bundle and only fetch on first scan press. Saves ~800 KB on cold load.
 const QRScanner      = lazy(() => import('../components/QRScanner'))
 const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
-// Lazy: only mounts after a sale completes. Keeping it (and its `qrcode`
-// dependency) off the eager POSTerminal path trims the critical-path JS.
-const ReceiptModal   = lazy(() => import('../components/ReceiptModal'))
+// Receipt rendering is part of the offline-critical sale path, so keep its
+// small component in the shell. Camera scanners remain lazy below.
+import ReceiptModal from '../components/ReceiptModal'
 import {
   getPOSBranch, getPOSProducts, getPOSCategories,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
@@ -32,7 +32,9 @@ import ReceiveStockModal from '../components/ReceiveStockModal'
 import {
   cacheProducts, getCachedProducts,
   cacheCategories, getCachedCategories,
-  queueOfflineOrder, isOnline,
+  cacheBranchConfig, getCachedBranchConfig,
+  getOfflineQueue, queueOfflineOrder, isOnline,
+  isRetryablePOSNetworkError, withPOSNetworkTimeout,
   holdOrder, getHeldOrders, deleteHeldOrder,
 } from '../lib/pos-offline'
 import HeldOrdersPanel from '../components/HeldOrdersPanel'
@@ -346,51 +348,100 @@ export default function POSTerminal() {
 
   // Load branch, products, categories
   useEffect(() => {
+    let cancelled = false
+
     const load = async () => {
-      try {
-        const [b, s, st] = await Promise.all([
-          getPOSBranch(branchId),
-          getOpenShift(branchId),
-          getPOSSettings(branchId),
-        ])
-        setBranch(b)
-        setShift(s)
-        setSettings(st)
+      // Cache-first: never wait for a weak Supabase request before rendering
+      // the menu the tablet successfully used last time.
+      const [cachedProds, cachedCats, cachedConfig] = await Promise.all([
+        getCachedProducts(branchId).catch(() => []),
+        getCachedCategories(branchId).catch(() => []),
+        getCachedBranchConfig(branchId).catch(() => null),
+      ])
+      if (cancelled) return
+      if (cachedProds.length > 0) setProducts(cachedProds)
+      if (cachedCats.length > 0) setCategories(cachedCats)
+      if (cachedConfig?.branch) setBranch(cachedConfig.branch)
+      if (cachedConfig?.shift !== undefined) setShift(cachedConfig.shift)
+      if (cachedConfig?.settings) setSettings(cachedConfig.settings)
+      if (cachedConfig?.modifier_groups_by_product) {
+        setModifierData({
+          groupsForProduct: productId => cachedConfig.modifier_groups_by_product[productId] || [],
+        })
+      }
+      setLoading(false)
 
-        // Stale-while-revalidate: show cached products immediately (fast),
-        // then refresh from DB in the background (always fresh).
-        const [cachedProds, cachedCats] = await Promise.all([
-          getCachedProducts(branchId),
-          getCachedCategories(branchId),
-        ])
-        if (cachedProds.length > 0) setProducts(cachedProds)
-        if (cachedCats.length > 0) setCategories(cachedCats)
+      if (!isOnline()) return
 
-        if (isOnline()) {
-          const [prods, cats, modData] = await Promise.all([
-            getPOSProducts(branchId),
-            getPOSCategories(branchId, { posOnly: true }),
-            getAllModifierData(),
-          ])
-          setProducts(prods)
-          setCategories(cats)
-          setModifierData(modData)
-          cacheProducts(branchId, prods).catch(() => {})
-          cacheCategories(branchId, cats).catch(() => {})
-        }
-      } catch (err) {
-        toast.error(err.message || 'Failed to load terminal')
-      } finally {
-        setLoading(false)
+      const request = promise => withPOSNetworkTimeout(promise, 10000)
+      const [branchResult, shiftResult, settingsResult, productsResult, categoriesResult, modifiersResult] =
+        await Promise.allSettled([
+          request(getPOSBranch(branchId)),
+          request(getOpenShift(branchId)),
+          request(getPOSSettings(branchId)),
+          request(getPOSProducts(branchId)),
+          request(getPOSCategories(branchId, { posOnly: true })),
+          request(getAllModifierData()),
+        ])
+
+      if (cancelled) return
+      const valueOr = (result, fallback) => result.status === 'fulfilled' ? result.value : fallback
+      const b = valueOr(branchResult, cachedConfig?.branch || null)
+      const s = valueOr(shiftResult, cachedConfig?.shift || null)
+      const st = valueOr(settingsResult, cachedConfig?.settings || null)
+      const prods = valueOr(productsResult, cachedProds)
+      const cats = valueOr(categoriesResult, cachedCats)
+      const modData = valueOr(modifiersResult, null)
+
+      if (b) setBranch(b)
+      setShift(s)
+      if (st) setSettings(st)
+      if (prods.length > 0) {
+        setProducts(prods)
+        cacheProducts(branchId, prods).catch(() => {})
+      }
+      if (cats.length > 0) {
+        setCategories(cats)
+        cacheCategories(branchId, cats).catch(() => {})
+      }
+      if (modData) setModifierData(modData)
+
+      const modifierGroupsByProduct = modData
+        ? Object.fromEntries(prods.map(product => [product.id, modData.groupsForProduct(product.id)]))
+        : cachedConfig?.modifier_groups_by_product || {}
+      cacheBranchConfig(branchId, {
+        branch: b,
+        shift: s,
+        settings: st,
+        modifier_groups_by_product: modifierGroupsByProduct,
+      }).catch(() => {})
+
+      const menuUnavailable = productsResult.status === 'rejected' && cachedProds.length === 0
+      const anyNetworkSuccess = [branchResult, shiftResult, productsResult, categoriesResult, modifiersResult]
+        .some(result => result.status === 'fulfilled')
+      setOnline(anyNetworkSuccess)
+      if (menuUnavailable) {
+        toast.error('Connection is weak and this tablet has no saved menu yet')
       }
     }
-    load()
+    load().catch(err => {
+      if (!cancelled) {
+        setLoading(false)
+        toast.error(err.message || 'Failed to load terminal')
+      }
+    })
 
     // Online/offline listeners
-    const handleOnline = () => setOnline(true)
+    const refreshQueueCount = () => getOfflineQueue()
+      .then(queue => setOfflineQueue(queue.length))
+      .catch(() => {})
+    const handleOnline = () => { setOnline(true); refreshQueueCount() }
     const handleOffline = () => setOnline(false)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+    window.addEventListener('pos-network-restored', handleOnline)
+    window.addEventListener('pos-offline-queue-changed', refreshQueueCount)
+    refreshQueueCount()
 
     // Start sync listener
     const stopSync = startSyncListener()
@@ -409,8 +460,11 @@ export default function POSTerminal() {
     autoConnectPrinter().catch(() => {})
 
     return () => {
+      cancelled = true
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('pos-network-restored', handleOnline)
+      window.removeEventListener('pos-offline-queue-changed', refreshQueueCount)
       stopSync()
       stopHostSubscriber()
     }
@@ -423,6 +477,7 @@ export default function POSTerminal() {
   useEffect(() => {
     let refreshTimer = null
     const refreshProducts = () => {
+      if (!isOnline() || document.hidden) return
       clearTimeout(refreshTimer)
       refreshTimer = setTimeout(async () => {
         try {
@@ -498,8 +553,11 @@ export default function POSTerminal() {
       })
       .subscribe()
 
-    // Fallback poll every 60s (covers cases where Realtime misses an event)
-    onlineOrdersTimer.current = setInterval(fetchOnlineOrders, 60000)
+    // Realtime is primary. A five-minute visible-tab fallback covers a missed
+    // event without spending hundreds of requests per café shift.
+    onlineOrdersTimer.current = setInterval(() => {
+      if (!document.hidden) fetchOnlineOrders()
+    }, 300000)
 
     return () => {
       supabase.removeChannel(channel)
@@ -799,13 +857,10 @@ export default function POSTerminal() {
       if (loyaltyRewardEntitlementId && !isOnline()) {
         throw new Error('Reward redemption requires an internet connection')
       }
-      if (isOnline()) {
-        order = await createPOSOrder(orderData, items)
-      } else {
+      const saveOffline = async () => {
         // Offline: queue with the pre-generated idempotency_key so sync
         // dedupes correctly even if the queue runs twice.
-        const localId = await queueOfflineOrder({ ...orderData, items })
-        setOfflineQueue(q => q + 1)
+        const localId = await queueOfflineOrder({ ...orderData, synced: false, items })
         // Local receipt uses the OFFLINE-* number; this same number is
         // preserved server-side at sync time (see pos-sync.js) so the
         // customer's printed slip remains valid.
@@ -816,6 +871,24 @@ export default function POSTerminal() {
           created_at: clientCreatedAt,
         }
         toast('Order saved offline. Will sync when online.', { icon: '📴' })
+        return order
+      }
+
+      if (isOnline()) {
+        try {
+          const submitOnlineOrder = async () => await createPOSOrder(orderData, items)
+          order = await withPOSNetworkTimeout(submitOnlineOrder())
+          setOnline(true)
+        } catch (networkError) {
+          if (loyaltyRewardEntitlementId || !isRetryablePOSNetworkError(networkError)) throw networkError
+          // A timeout is ambiguous: the RPC may have reached the server. The
+          // same idempotency key remains in the queued copy, so retrying later
+          // returns the original sale instead of creating a duplicate.
+          setOnline(false)
+          order = await saveOffline()
+        }
+      } else {
+        order = await saveOffline()
       }
 
       if (!String(order.id || '').startsWith('offline-')) {

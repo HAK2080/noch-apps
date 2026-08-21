@@ -5,32 +5,24 @@ import { useLanguage } from './contexts/LanguageContext'
 import { usePermissions } from './contexts/PermissionsContext'
 import { AUTH_POLICY, OWNER_POLICY, featurePolicy } from './lib/access-control'
 
-// Eagerly-loaded: critical-path screens that the operator hits within
-// 1 second of opening the app every day. Login + Dashboard + POS +
-// MyTasks. Everything else is code-split via React.lazy below to keep
-// the initial bundle small for slow Tripoli connections.
+// Eagerly loaded: only authentication and the daily POS path. Keeping the
+// terminal in the app shell means a previously opened café tablet can reload
+// offline without needing a route chunk that may not have been cached.
 import Login from './pages/Login'
 import StaffAccessRequest from './pages/StaffAccessRequest'
-import Dashboard from './pages/Dashboard'
-import MyTasks from './pages/MyTasks'
 
 // POS — eager. Daily critical path; baristas tap this instantly.
 import POSHome from './modules/pos/pages/POSHome'
 import POSTerminal from './modules/pos/pages/POSTerminal'
 import { enableKioskMode } from './modules/pos/lib/pos-kiosk'
 
-// Storefront (Public, customer-facing) — eager so the menu loads fast
-// for customers on the worst connections.
-import Menu from './pages/storefront/Menu'
-import Checkout from './pages/storefront/Checkout'
-import OrderConfirmation from './pages/storefront/OrderConfirmation'
-import Feedback from './pages/storefront/Feedback'
-
 // ── Code-split route components ──────────────────────────────────────
 // Each import() becomes its own JS chunk Vite emits separately, fetched
 // on first navigation to that route. Subsequent visits are cached.
 const Tasks            = lazy(() => import('./pages/Tasks'))
 const TaskDetail       = lazy(() => import('./pages/TaskDetail'))
+const Dashboard        = lazy(() => import('./pages/Dashboard'))
+const MyTasks          = lazy(() => import('./pages/MyTasks'))
 const Staff            = lazy(() => import('./pages/Staff'))
 const WorkforceHub     = lazy(() => import('./modules/workforce/pages/WorkforceHub'))
 const MyProfile        = lazy(() => import('./pages/staff/MyProfile'))
@@ -90,6 +82,13 @@ const ExpensesPage     = lazy(() => import('./pages/expenses/ExpensesPage'))
 const SnapReceipt      = lazy(() => import('./pages/snap/SnapReceipt'))
 
 const PayrollPage      = lazy(() => import('./pages/PayrollPage'))
+
+// Public customer screens carry their own menu UI and brand artwork. They are
+// unrelated to cashier operation, so never make a POS tablet download them.
+const Menu              = lazy(() => import('./pages/storefront/Menu'))
+const Checkout          = lazy(() => import('./pages/storefront/Checkout'))
+const OrderConfirmation = lazy(() => import('./pages/storefront/OrderConfirmation'))
+const Feedback          = lazy(() => import('./pages/storefront/Feedback'))
 
 // Experience OS — Phase 1-10
 const InventoryIntelligence = lazy(() => import('./pages/inventory/InventoryIntelligence'))

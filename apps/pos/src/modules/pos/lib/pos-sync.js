@@ -8,7 +8,13 @@
 //   - A single in-flight guard prevents two `online` events from both
 //     starting a drain at the same time.
 
-import { getOfflineQueue, clearOfflineOrder, isOnline } from './pos-offline'
+import {
+  getOfflineQueue,
+  clearOfflineOrder,
+  isOnline,
+  isRetryablePOSNetworkError,
+  withPOSNetworkTimeout,
+} from './pos-offline'
 import { createPOSOrder } from './pos-supabase'
 import toast from 'react-hot-toast'
 
@@ -28,18 +34,26 @@ export async function syncOfflineOrders() {
 
     for (const offlineOrder of queue) {
       try {
-        const { local_id, items, queued_at, ...orderData } = offlineOrder
+        const { local_id, items } = offlineOrder
+        const orderData = { ...offlineOrder }
+        delete orderData.local_id
+        delete orderData.items
+        delete orderData.queued_at
         // Preserve the OFFLINE-N order number the customer's receipt shows.
         const offlineNumber = `OFFLINE-${local_id}`
-        await createPOSOrder(
+        await withPOSNetworkTimeout(createPOSOrder(
           { ...orderData, offline_order_number: offlineNumber },
           items || []
-        )
+        ))
         await clearOfflineOrder(local_id)
+        if (typeof window !== 'undefined') window.dispatchEvent(new Event('pos-network-restored'))
         synced++
       } catch (err) {
         console.error('Failed to sync offline order:', err)
         failed++
+        // A weak connection will fail the rest of this FIFO queue too. Stop
+        // hammering it and retry later; successful earlier rows are removed.
+        if (isRetryablePOSNetworkError(err)) break
       }
     }
 
@@ -76,6 +90,16 @@ export function startSyncListener() {
 
   window.addEventListener('online', handleOnline)
 
+  // navigator.onLine often stays true on poor Wi-Fi. Checking the local queue
+  // once a minute lets timed-out sales recover without generating any network
+  // traffic while the queue is empty.
+  const retryTimer = setInterval(() => {
+    if (!document.hidden && isOnline()) drainQueue().catch(() => {})
+  }, 60000)
+
   // Return cleanup fn
-  return () => window.removeEventListener('online', handleOnline)
+  return () => {
+    window.removeEventListener('online', handleOnline)
+    clearInterval(retryTimer)
+  }
 }

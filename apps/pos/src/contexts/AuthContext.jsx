@@ -1,6 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getProfile } from '../lib/profiles'
+import { cacheProfile, getCachedProfile } from '../lib/profile-cache'
 
 const AuthContext = createContext({})
 
@@ -13,19 +15,35 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  async function loadProfile(userId) {
+  async function loadProfile(userId, { cached = null } = {}) {
     try {
-      const p = await getProfile(userId)
+      const timeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile refresh timed out')), 6000)
+      })
+      const p = await Promise.race([getProfile(userId), timeout])
+      cacheProfile(userId, p)
       setProfile(p)
+      return p
     } catch {
-      setProfile(null)
+      const fallback = cached || getCachedProfile(userId)
+      setProfile(fallback)
+      return fallback
     }
   }
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) await loadProfile(session.user.id)
+      if (session?.user) {
+        const cached = getCachedProfile(session.user.id)
+        if (cached) {
+          // Let a known café device open immediately; refresh access in the
+          // background and replace the cache whenever the network responds.
+          setProfile(cached)
+          setLoading(false)
+        }
+        await loadProfile(session.user.id, { cached })
+      }
       setLoading(false)
     })
 
@@ -37,8 +55,10 @@ export function AuthProvider({ children }) {
         // Skip refetch on TOKEN_REFRESHED / USER_UPDATED for the same user.
         if (newUserId === lastLoadedUserId) return
         lastLoadedUserId = newUserId
-        setLoading(true)
-        loadProfile(session.user.id).finally(() => setLoading(false))
+        const cached = getCachedProfile(session.user.id)
+        if (cached) setProfile(cached)
+        setLoading(!cached)
+        loadProfile(session.user.id, { cached }).finally(() => setLoading(false))
       } else {
         lastLoadedUserId = null
         setProfile(null)
