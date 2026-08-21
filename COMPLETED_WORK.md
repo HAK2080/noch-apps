@@ -1,3 +1,21 @@
+## 2026-08-21 — Korea and Japan Drinks Reference Match
+
+- **Agent**: Codex
+- **Status**: Complete & Live
+- **Files**:
+  - `apps/pos/public/assets/korea-japan-banner.png`
+  - `apps/pos/src/assets/nochi-face-korea.png` (removed)
+  - `apps/pos/src/pages/storefront/Menu.jsx`
+  - `apps/pos/src/pages/storefront/styles/Menu.css`
+  - `apps/pos/tests/korea-edition-menu.test.mjs`
+- **Description**: Rebuilt the Korean/Japanese drinks collection around a pixel-matched crop of the supplied reference artwork. The campaign banner retains the cream, navy, and red palette; Korean and Japanese flags and typography; Seoul skyline/tower; Mount Fuji; pagoda/torii; blossoms; and brush treatment. The earlier bunny/Nochi mascot asset and styling were removed.
+- **Product behavior preserved**: The banner is a visual wrapper only. Existing data-backed product photography, names, descriptions, prices, badges, product-detail actions, orange `+` controls, cart behavior, and API connections remain live. The desktop section matches the standard 700 px menu width and fits four cards across; mobile retains a contained, swipeable product row without document overflow.
+- **Verification**: All 11 focused Korea/Japan, product-video, and product-badge tests passed. Targeted ESLint completed with zero errors and two pre-existing hook warnings; the POS production build and `git diff --check` passed. Live verification measured a 700 px section, a 698×232 px banner, four 153.5 px cards across, four working `+` controls, no mascot, and no page-level horizontal overflow at 1280 px or 390 px viewport widths.
+- **Commit**: `6b65ad8` (`feat(menu): match Korea Japan drinks reference`)
+- **Deployment**: GitHub Actions run `32489795431` deployed successfully to `apps.noch.cloud`; the live customer menu loaded the 1400×465 banner asset and all four real products directly beneath it.
+
+---
+
 ## 2026-08-21 — Report Null Safety and Bandwidth-Aware Product Videos
 
 - **Agent**: Codex
