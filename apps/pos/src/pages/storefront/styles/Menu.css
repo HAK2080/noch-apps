@@ -892,10 +892,32 @@
 .korea-edition-title > span:first-child { font-weight: 900; }
 .korea-flag {
   display: inline-block;
+  position: relative;
+  width: 1.24em;
+  height: 0.76em;
   margin-inline-start: 7px;
-  font-size: 0.68em;
-  vertical-align: 0.08em;
+  border: 1px solid rgba(19,33,79,0.35);
+  border-radius: 0.1em;
+  vertical-align: 0.03em;
+  background:
+    linear-gradient(#10172e 0 0) 10% 18% / 18% 2px no-repeat,
+    linear-gradient(#10172e 0 0) 10% 29% / 18% 2px no-repeat,
+    linear-gradient(#10172e 0 0) 10% 40% / 18% 2px no-repeat,
+    linear-gradient(#10172e 0 0) 90% 60% / 18% 2px no-repeat,
+    linear-gradient(#10172e 0 0) 90% 71% / 18% 2px no-repeat,
+    linear-gradient(#10172e 0 0) 90% 82% / 18% 2px no-repeat,
+    #fff;
   filter: drop-shadow(0 2px 1px rgba(11,16,32,0.13));
+}
+.korea-flag i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.38em;
+  height: 0.38em;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #cd2e3a 0 50%, #0f64b3 50% 100%);
+  transform: translate(-50%, -50%) rotate(26deg);
 }
 .korea-edition-copy p {
   margin: 12px 0 0;
@@ -944,9 +966,9 @@
 .korea-edition-mascot {
   position: absolute;
   z-index: 4;
-  right: -18px;
-  bottom: -55px;
-  width: 174px;
+  right: 8px;
+  bottom: -10px;
+  width: 150px;
   pointer-events: none;
 }
 .korea-edition-mascot img {
@@ -1081,9 +1103,9 @@
   .korea-edition-stamp span { font-size: 16px; }
   .korea-edition-stamp small { font-size: 5px; }
   .korea-edition-mascot {
-    right: -29px;
-    bottom: -45px;
-    width: 112px;
+    right: -8px;
+    bottom: -8px;
+    width: 92px;
     opacity: 0.96;
   }
   .korea-speech { display: none; }

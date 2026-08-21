@@ -66,7 +66,7 @@ function isKoreaEditionCategory(cat = {}) {
   return /korea|korean|한국|كوريا|كوري/.test(categoryNames)
 }
 
-function KoreaEditionHero({ catLabel, lang }) {
+function KoreaEditionHero({ lang }) {
   return (
     <div className="korea-edition-hero">
       <svg className="korea-edition-scenery" viewBox="0 0 1200 300" preserveAspectRatio="none" aria-hidden="true">
@@ -93,7 +93,7 @@ function KoreaEditionHero({ catLabel, lang }) {
       <div className="korea-edition-copy">
         <span className="korea-edition-kicker" lang="ko">✦ 한국에서 온 맛 ✦</span>
         <div className="korea-edition-title" role="heading" aria-level="3">
-          <span>KOREA</span> EDITION <span className="korea-flag" role="img" aria-label="South Korea">🇰🇷</span>
+          <span>KOREA</span> EDITION <span className="korea-flag" role="img" aria-label="South Korea"><i /></span>
         </div>
         <p>AUTHENTIC KOREAN DRINKS</p>
       </div>
@@ -109,7 +109,9 @@ function KoreaEditionHero({ catLabel, lang }) {
         <img src={nochiFaceKorea} alt="Nochi" loading="lazy" decoding="async" />
       </div>
 
-      <span className="korea-edition-category" dir={lang === 'ar' ? 'rtl' : 'ltr'}>{catLabel} <span aria-hidden="true">🌸</span></span>
+      <span className="korea-edition-category" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+        {lang === 'ar' ? 'اختيارات نوشي' : "NOCHI'S PICKS"} <span aria-hidden="true">🌸</span>
+      </span>
     </div>
   )
 }
@@ -540,7 +542,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
 
   return (
     <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}`} id={`cat-${cat.id}`}>
-      {koreaEdition && <KoreaEditionHero catLabel={catLabel} lang={lang} />}
+      {koreaEdition && <KoreaEditionHero lang={lang} />}
       <div className={`cat-section-header${koreaEdition ? ' korea-edition-section-header' : ''}`}>
         <h2 className="cat-section-title">
           {!koreaEdition && <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />}

@@ -12,10 +12,12 @@ test('Korean-drinks category receives the Korea Edition campaign treatment', asy
   assert.match(menu, /function isKoreaEditionCategory/)
   assert.match(menu, /korea\|korean\|한국\|كوريا\|كوري/)
   assert.match(menu, /koreaEdition \? ' korea-edition'/)
-  assert.match(menu, /<KoreaEditionHero catLabel=\{catLabel\}/)
+  assert.match(menu, /<KoreaEditionHero lang=\{lang\}/)
   assert.match(menu, /한국에서 온 맛/)
   assert.match(menu, /KOREA/)
   assert.match(menu, /AUTHENTIC KOREAN DRINKS/)
+  assert.match(menu, /اختيارات نوشي/)
+  assert.doesNotMatch(menu, />🇰🇷</)
 })
 
 test('Korea Edition stays responsive and does not add a heavy campaign background', async () => {
