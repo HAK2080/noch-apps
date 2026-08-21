@@ -650,7 +650,7 @@ export default function Report() {
                     <tr key={row.id} className="border-b border-noch-border/60 last:border-0">
                       <td className="px-2 py-2 text-white">{row.name}</td>
                       <td className="px-2 py-2 text-right font-mono text-white">{fmtLyd(row.netSales)}</td>
-                      <td className="px-2 py-2 text-right font-mono text-noch-muted">{row.orders.toLocaleString('en-GB')}</td>
+                      <td className="px-2 py-2 text-right font-mono text-noch-muted">{countValue(row.orders)}</td>
                       <td className="px-2 py-2 text-right font-mono text-noch-muted">{fmtLyd(row.cogs)}</td>
                       <td className="px-2 py-2 text-right font-mono text-noch-muted">{fmtLyd(row.labor)}</td>
                       <td className="px-2 py-2 text-right font-mono text-noch-muted">{fmtLyd(row.operatingExpenses)}</td>
@@ -739,13 +739,13 @@ export default function Report() {
                       <div>
                         <p className="text-white text-sm">{item.name}</p>
                         <p className="text-noch-muted text-xs">
-                          Minimum {item.minThreshold.toLocaleString('en-GB')} {item.unit}
+                          Minimum {countValue(item.minThreshold)} {item.minThreshold == null ? '' : item.unit}
                           {item.countIsStale ? ' · physical count stale' : ''}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-red-300 text-sm font-mono">
-                          {item.theoreticalQty.toLocaleString('en-GB')} {item.unit}
+                          {countValue(item.theoreticalQty)} {item.theoreticalQty == null ? '' : item.unit}
                         </p>
                         <p className="text-noch-muted text-[10px]">estimated on hand</p>
                       </div>
