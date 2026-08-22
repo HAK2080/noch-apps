@@ -44,6 +44,8 @@ test('reference-matched section is prominent and places four live cards over the
   assert.match(css, /@media \(max-width: 899px\)/)
   assert.match(css, /aspect-ratio:\s*12\s*\/\s*5/)
   assert.match(css, /flex-basis: min\(78vw, 286px\)/)
+  assert.match(css, /\.korea-japan-stage \.scroll-card \.scroll-card-name\s*\{[^}]*font-size:\s*15px/s)
+  assert.match(css, /\.korea-japan-stage \.scroll-card \.scroll-card-price\s*\{\s*font-size:\s*16px/)
   assert.ok(stageStats.size < 150 * 1024, `Desktop artwork should stay below 150 KB, got ${stageStats.size}`)
   assert.ok(mobileHeaderStats.size < 60 * 1024, `Mobile artwork should stay below 60 KB, got ${mobileHeaderStats.size}`)
   assert.ok(fallbackStats.size < 220 * 1024, `Fallback artwork should stay below 220 KB, got ${fallbackStats.size}`)

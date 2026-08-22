@@ -931,12 +931,12 @@
   min-height: 0;
   padding: 5px 9px 2px;
 }
-.korea-japan-stage .scroll-card-name {
+.korea-japan-stage .scroll-card .scroll-card-name {
   margin-bottom: 3px;
   font-size: 15px;
   line-height: 1.2;
 }
-.korea-japan-stage .scroll-card-desc {
+.korea-japan-stage .scroll-card .scroll-card-desc {
   margin-bottom: 0;
   font-size: 11px;
   line-height: 1.25;
@@ -946,8 +946,8 @@
   min-height: 0;
   padding: 3px 9px 7px;
 }
-.korea-japan-stage .scroll-card-price { font-size: 16px; }
-.korea-japan-stage .scroll-card-price small { font-size: 10px; }
+.korea-japan-stage .scroll-card .scroll-card-price { font-size: 16px; }
+.korea-japan-stage .scroll-card .scroll-card-price small { font-size: 10px; }
 .korea-japan-stage .btn-add {
   width: 32px;
   height: 32px;
@@ -1044,14 +1044,14 @@
     min-height: 48px;
     padding: 10px 12px 3px;
   }
-  .korea-japan-stage .scroll-card-name { font-size: 16px; }
-  .korea-japan-stage .scroll-card-desc { font-size: 12px; }
+  .korea-japan-stage .scroll-card .scroll-card-name { font-size: 16px; }
+  .korea-japan-stage .scroll-card .scroll-card-desc { font-size: 12px; }
   .korea-japan-stage .scroll-card .scroll-card-footer {
     min-height: 50px;
     padding: 3px 12px 10px;
   }
-  .korea-japan-stage .scroll-card-price { font-size: 18px; }
-  .korea-japan-stage .scroll-card-price small { font-size: 11px; }
+  .korea-japan-stage .scroll-card .scroll-card-price { font-size: 18px; }
+  .korea-japan-stage .scroll-card .scroll-card-price small { font-size: 11px; }
   .korea-japan-stage .btn-add {
     width: 36px;
     height: 36px;
