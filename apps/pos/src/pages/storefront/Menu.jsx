@@ -74,14 +74,26 @@ function isKoreaEditionCategory(cat = {}) {
   return /korea|korean|한국|كوريا|كوري/.test(categoryNames)
 }
 
-function KoreaJapanBanner({ catLabel, priority = false }) {
+function KoreaJapanBanner({ catLabel, priority = false, compact = false }) {
   return (
-    <div className="korea-japan-banner">
+    <div className={`korea-japan-banner${compact ? ' is-compact' : ''}`}>
       <h2 className="korea-banner-title-sr">{catLabel}</h2>
       <picture>
-        <source srcSet="/assets/korea-japan-banner.webp" type="image/webp" />
+        {!compact && (
+          <source
+            media="(max-width: 720px)"
+            srcSet="/assets/korea-japan-menu-header.webp"
+            type="image/webp"
+          />
+        )}
+        <source
+          srcSet={compact
+            ? '/assets/korea-japan-menu-header.webp'
+            : '/assets/korea-japan-menu-stage.webp'}
+          type="image/webp"
+        />
         <img
-          src="/assets/korea-japan-banner.png"
+          src="/assets/korea-japan-menu-stage.jpg"
           alt=""
           aria-hidden="true"
           loading={priority ? 'eager' : 'lazy'}
@@ -519,12 +531,21 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
   // When a single category is being viewed ("View all" / pill selected), always
   // render a full vertical grid so every item is visible at once — no sideways scroll.
   const style = expanded ? 'grid' : baseStyle
+  const koreaStage = koreaEdition && style === 'scroll' && !expanded && products.length === 4
 
   if (products.length === 0) return null
 
   return (
-    <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}`} id={`cat-${cat.id}`}>
-      {koreaEdition && <KoreaJapanBanner catLabel={catLabel} priority={priorityImages} />}
+    <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}${koreaStage ? ' korea-edition-stage' : ''}`} id={`cat-${cat.id}`}>
+      {koreaStage && (
+        <div className="korea-japan-stage">
+          <KoreaJapanBanner catLabel={catLabel} priority={priorityImages} />
+          <ScrollSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
+            name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail}
+            priorityCount={priorityImages ? 2 : 0} />
+        </div>
+      )}
+      {koreaEdition && !koreaStage && <KoreaJapanBanner catLabel={catLabel} priority={priorityImages} compact />}
       {!koreaEdition && <div className="cat-section-header">
         <h2 className="cat-section-title">
           <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />
@@ -542,7 +563,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
         )}
       </div>}
 
-      {style === 'scroll' && (
+      {style === 'scroll' && !koreaStage && (
         <ScrollSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
           name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail}
           priorityCount={priorityImages ? 2 : 0} />

@@ -976,19 +976,21 @@ To find if something's been done:
 
 ---
 
-## 2026-08-21 — Faster customer-facing menu
+## 2026-08-22 — Faster customer menu and Korea/Japan reference section
 
 - **Agent**: Codex
-- **Status**: Complete; production deployment pending
+- **Status**: Complete & Live
 - **Files**:
-  - `apps/pos/public/assets/korea-japan-banner.webp`
+  - `apps/pos/public/assets/korea-japan-menu-stage.webp`
+  - `apps/pos/public/assets/korea-japan-menu-header.webp`
+  - `apps/pos/public/assets/korea-japan-menu-stage.jpg`
   - `apps/pos/src/assets/noch-logo-menu.webp`
   - `apps/pos/src/pages/storefront/Menu.jsx`
   - `apps/pos/src/pages/storefront/styles/Menu.css`
   - `apps/pos/tests/customer-menu-performance.test.mjs`
   - `apps/pos/tests/korea-edition-menu.test.mjs`
-- **Description**: The customer menu now serves an 87 KB WebP Korea/Japan banner and a 12 KB menu logo, requests smaller contained product derivatives, optimizes category icons, and gives high network priority only to the first two images in the first visible section. Repeat visits render from a 12-hour menu cache while branch, category, and product data refresh in the background. Supabase menu queries now select only the fields used by the customer experience.
-- **Data safety**: Product images remain uncropped through `resize=contain`, the original PNG banner remains as a fallback, and cached menu data is always revalidated against Supabase.
+- **Description**: The customer menu serves a 140 KB desktop Korea/Japan composition and a separate 48 KB mobile header derived from the supplied reference. On desktop, the four live, data-backed product cards are positioned over the artwork's four placeholders; on mobile, the same products remain readable and swipeable below the compact header. The menu also uses a 12 KB logo, smaller contained product derivatives, optimized category icons, first-section-only image priority, a 12-hour stale-while-refresh menu cache, and narrow Supabase field selection.
+- **Data safety**: Product names, descriptions, prices, photos, badges, videos, add buttons, cart behavior, and API connections remain live. Product images remain uncropped through `resize=contain`; WebP artwork has a progressive JPEG fallback; cached menu data is always revalidated against Supabase.
 - **Verification**: All 11 focused menu/image tests pass, targeted ESLint has zero errors and two pre-existing hook dependency warnings, the production build passes, and `git diff --check` passes. The broader suite passes 148/151; the same three pre-existing workforce/privacy acceptance assertions remain outside this change.
 
 ---
