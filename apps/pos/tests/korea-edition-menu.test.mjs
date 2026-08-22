@@ -26,7 +26,7 @@ test('Korean and Japanese drinks use the supplied banner without replacing live 
   assert.doesNotMatch(menu, /nochiFaceKorea|korea-edition-mascot|KoreaEditionHero/)
 })
 
-test('reference-matched section places four live cards over the artwork placeholders', async () => {
+test('reference-matched section is prominent and places four live cards over the artwork placeholders', async () => {
   const [css, stageStats, mobileHeaderStats, fallbackStats] = await Promise.all([
     readFile(menuCssUrl, 'utf8'),
     stat(stageUrl),
@@ -35,15 +35,15 @@ test('reference-matched section places four live cards over the artwork placehol
   ])
 
   assert.match(css, /\.cat-section\.korea-edition/)
-  assert.match(css, /\.cat-section\.korea-edition[\s\S]*max-width: 700px/)
+  assert.match(css, /\.cat-section\.korea-edition[\s\S]*max-width: 960px/)
   assert.match(css, /\.korea-japan-banner img/)
   assert.match(css, /\.korea-japan-stage\s*\{[^}]*aspect-ratio:\s*3\s*\/\s*2/s)
   assert.match(css, /\.korea-japan-stage \.scroll-row\s*\{[^}]*top:\s*48\.83%;[^}]*right:\s*8\.27%;[^}]*bottom:\s*4\.3%;[^}]*left:\s*7\.49%/s)
   assert.match(css, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/)
   assert.match(css, /gap:\s*3\.01%/)
-  assert.match(css, /@media \(max-width: 720px\)/)
-  assert.match(css, /aspect-ratio:\s*1536\s*\/\s*500/)
-  assert.match(css, /flex-basis: min\(70vw, 244px\)/)
+  assert.match(css, /@media \(max-width: 899px\)/)
+  assert.match(css, /aspect-ratio:\s*12\s*\/\s*5/)
+  assert.match(css, /flex-basis: min\(78vw, 286px\)/)
   assert.ok(stageStats.size < 150 * 1024, `Desktop artwork should stay below 150 KB, got ${stageStats.size}`)
   assert.ok(mobileHeaderStats.size < 60 * 1024, `Mobile artwork should stay below 60 KB, got ${mobileHeaderStats.size}`)
   assert.ok(fallbackStats.size < 220 * 1024, `Fallback artwork should stay below 220 KB, got ${fallbackStats.size}`)

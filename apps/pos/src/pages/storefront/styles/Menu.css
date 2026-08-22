@@ -816,15 +816,15 @@
    On desktop, four live product cards cover the four artwork placeholders.
    Mobile uses a smaller header crop and the normal swipeable card layout. */
 .cat-section.korea-edition {
-  width: calc(100% - 24px);
-  max-width: 700px;
-  margin: 24px auto 18px;
+  width: calc(100% - 32px);
+  max-width: 960px;
+  margin: 32px auto 34px;
   padding: 0 22px 24px;
   overflow: hidden;
-  border: 1px solid #eadcc7;
-  border-radius: 24px;
+  border: 2px solid #e2c99f;
+  border-radius: 30px;
   background: #fff8ea;
-  box-shadow: 0 12px 34px rgba(49, 34, 25, 0.08);
+  box-shadow: 0 22px 58px rgba(49, 34, 25, 0.16), 0 0 0 5px rgba(255, 248, 234, 0.9);
 }
 .cat-section.korea-edition-stage {
   padding: 0;
@@ -905,8 +905,8 @@
   height: 100%;
   min-width: 0;
   border-width: 1px;
-  border-radius: 11px;
-  box-shadow: 0 3px 8px rgba(54, 38, 28, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 5px 13px rgba(54, 38, 28, 0.14);
 }
 .korea-japan-stage .card-tap-area {
   display: flex;
@@ -929,40 +929,40 @@
   flex-direction: column;
   justify-content: center;
   min-height: 0;
-  padding: 3px 7px 1px;
+  padding: 5px 9px 2px;
 }
 .korea-japan-stage .scroll-card-name {
-  margin-bottom: 2px;
-  font-size: 12px;
+  margin-bottom: 3px;
+  font-size: 15px;
   line-height: 1.2;
 }
 .korea-japan-stage .scroll-card-desc {
   margin-bottom: 0;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.25;
 }
 .korea-japan-stage .scroll-card .scroll-card-footer {
   flex: 0 0 16.7%;
   min-height: 0;
-  padding: 2px 7px 5px;
+  padding: 3px 9px 7px;
 }
-.korea-japan-stage .scroll-card-price { font-size: 13px; }
-.korea-japan-stage .scroll-card-price small { font-size: 8px; }
+.korea-japan-stage .scroll-card-price { font-size: 16px; }
+.korea-japan-stage .scroll-card-price small { font-size: 10px; }
 .korea-japan-stage .btn-add {
-  width: 27px;
-  height: 27px;
-  font-size: 18px;
-  box-shadow: 1px 1px 0 var(--text);
+  width: 32px;
+  height: 32px;
+  font-size: 21px;
+  box-shadow: 2px 2px 0 var(--text);
 }
 .korea-japan-stage .menu-highlight-badge {
-  top: 5px;
-  inset-inline-start: 5px;
-  gap: 3px;
-  max-width: calc(100% - 10px);
-  padding: 4px 6px;
-  border-width: 1.5px;
-  box-shadow: 1px 1px 0 var(--text), 0 0 10px rgba(255, 61, 129, 0.28);
-  font-size: 8px;
+  top: 7px;
+  inset-inline-start: 7px;
+  gap: 4px;
+  max-width: calc(100% - 14px);
+  padding: 5px 8px;
+  border-width: 2px;
+  box-shadow: 2px 2px 0 var(--text), 0 0 14px rgba(255, 61, 129, 0.32);
+  font-size: 10px;
 }
 .korea-edition .scroll-card-img,
 .korea-edition .scroll-card-placeholder,
@@ -979,16 +979,18 @@
   box-shadow: 0 5px 14px rgba(54, 38, 28, 0.07);
 }
 
-@media (min-width: 721px) {
+@media (min-width: 900px) {
   .korea-edition.cat-section-expanded .grid-2col { grid-template-columns: repeat(4, 1fr); }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 899px) {
   .cat-section.korea-edition {
-    width: calc(100% - 16px);
-    margin-top: 18px;
+    width: calc(100% - 12px);
+    margin-top: 24px;
+    margin-bottom: 28px;
     padding: 0 12px 18px;
-    border-radius: 20px;
+    border-radius: 24px;
+    box-shadow: 0 16px 38px rgba(49, 34, 25, 0.14), 0 0 0 3px rgba(255, 248, 234, 0.9);
   }
   .cat-section.korea-edition-stage { padding: 0; }
   .korea-japan-stage {
@@ -997,12 +999,12 @@
   .korea-japan-stage .korea-japan-banner {
     position: relative;
     inset: auto;
-    aspect-ratio: 1536 / 500;
+    aspect-ratio: 12 / 5;
     margin: 0;
   }
   .korea-japan-banner {
     margin: 0 -12px 14px;
-    aspect-ratio: 1536 / 500;
+    aspect-ratio: 12 / 5;
   }
   .korea-japan-banner img {
     width: 100%;
@@ -1021,14 +1023,14 @@
     scroll-snap-type: x mandatory;
   }
   .korea-edition .scroll-card {
-    flex-basis: min(70vw, 244px);
-    width: min(70vw, 244px);
+    flex-basis: min(78vw, 286px);
+    width: min(78vw, 286px);
   }
   .korea-japan-stage .scroll-card {
     display: block;
     height: auto;
-    min-width: min(70vw, 244px);
-    border-radius: 18px;
+    min-width: min(78vw, 286px);
+    border-radius: 20px;
   }
   .korea-japan-stage .card-tap-area { display: block; }
   .korea-japan-stage .scroll-card-img,
@@ -1039,21 +1041,21 @@
   }
   .korea-japan-stage .scroll-card-body-text {
     display: block;
-    min-height: 40px;
-    padding: 8px 10px 2px;
+    min-height: 48px;
+    padding: 10px 12px 3px;
   }
-  .korea-japan-stage .scroll-card-name { font-size: 13px; }
-  .korea-japan-stage .scroll-card-desc { font-size: 11px; }
+  .korea-japan-stage .scroll-card-name { font-size: 16px; }
+  .korea-japan-stage .scroll-card-desc { font-size: 12px; }
   .korea-japan-stage .scroll-card .scroll-card-footer {
-    min-height: 42px;
-    padding: 2px 10px 8px;
+    min-height: 50px;
+    padding: 3px 12px 10px;
   }
-  .korea-japan-stage .scroll-card-price { font-size: 15px; }
-  .korea-japan-stage .scroll-card-price small { font-size: 10px; }
+  .korea-japan-stage .scroll-card-price { font-size: 18px; }
+  .korea-japan-stage .scroll-card-price small { font-size: 11px; }
   .korea-japan-stage .btn-add {
-    width: 32px;
-    height: 32px;
-    font-size: 20px;
+    width: 36px;
+    height: 36px;
+    font-size: 23px;
     box-shadow: 2px 2px 0 var(--text);
   }
   .korea-edition .grid-2col { gap: 10px; }

@@ -81,7 +81,7 @@ function KoreaJapanBanner({ catLabel, priority = false, compact = false }) {
       <picture>
         {!compact && (
           <source
-            media="(max-width: 720px)"
+            media="(max-width: 899px)"
             srcSet="/assets/korea-japan-menu-header.webp"
             type="image/webp"
           />
