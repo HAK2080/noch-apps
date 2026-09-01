@@ -15,7 +15,7 @@ import {
   LayoutDashboard, CheckSquare, Users, BarChart2, Coffee, Calculator,
   Sparkles, Package, BarChart3, Heart, ShoppingCart, Lightbulb, Monitor,
   ShoppingBag, Receipt, Settings, ListOrdered, FlaskConical, MessageSquare,
-  ClipboardList, BookOpen,
+  ClipboardList, BookOpen, Banknote,
 } from 'lucide-react'
 
 // ── Role Manager matrix ───────────────────────────────────────────────
@@ -85,28 +85,31 @@ const EVERYONE = [...STAFFISH, 'data_entry']
 
 export const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard', feature: 'dashboard', end: true, fallbackRoles: STAFFISH },
-  { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', feature: 'vestaboard', fallbackRoles: STAFFISH },
   { to: '/staff/my-profile', icon: Settings, labelEn: 'My Profile', labelAr: 'ملفي', feature: null, end: true, fallbackRoles: EVERYONE },
 
-  { type: 'group', labelEn: 'OPERATIONS', labelAr: 'العمليات' },
-  { to: '/tasks', icon: CheckSquare, labelKey: 'tasks', feature: 'tasks', ownerOnly: true },
-  { to: '/my-tasks', icon: CheckSquare, labelKey: 'myTasks', feature: null, hideForOwner: true, fallbackRoles: EVERYONE },
-  { to: '/expenses', icon: Receipt, labelEn: 'Expenses', labelAr: 'المصاريف', feature: 'expenses', fallbackRoles: ['data_entry'] },
-  { to: '/inventory', icon: Package, labelEn: 'Inventory', labelAr: 'المخزون', feature: 'inventory', fallbackRoles: EVERYONE },
-  { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', feature: 'pos', fallbackRoles: STAFFISH },
   { to: '/sales', icon: ListOrdered, labelEn: 'Sales', labelAr: 'المبيعات', feature: 'sales', fallbackRoles: STAFFISH },
-  { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', feature: 'products', fallbackRoles: EVERYONE },
-  { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', feature: 'staff', ownerOnly: true },
-  { to: '/loyalty', icon: Heart, labelEn: 'Nochi Loyalty', labelAr: 'نوتشي لويالتي', feature: 'loyalty', fallbackRoles: EVERYONE },
-
-  { type: 'group', labelEn: 'MANAGEMENT', labelAr: 'الإدارة' },
+  { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', feature: 'pos', fallbackRoles: STAFFISH },
+  { to: '/expenses', icon: Receipt, labelEn: 'Expenses', labelAr: 'المصاريف', feature: 'expenses', fallbackRoles: ['data_entry'] },
+  { to: '/payroll', icon: Banknote, labelEn: 'Payroll', labelAr: 'الرواتب', feature: 'finance' },
   { to: '/report', icon: BarChart2, labelKey: 'report', feature: 'reports' },
   { to: '/finance', icon: BarChart3, labelEn: 'Finance', labelAr: 'المالية', feature: 'finance' },
+  { to: '/products', icon: ShoppingBag, labelEn: 'Products', labelAr: 'المنتجات', feature: 'products', fallbackRoles: EVERYONE },
   { to: '/accounting', icon: BookOpen, labelEn: 'Accounting', labelAr: 'المحاسبة', feature: 'accounting' },
-  { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', feature: 'marketing', fallbackRoles: ['data_entry'] },
 
-  { type: 'group', labelEn: 'CONTENT', labelAr: 'المحتوى' },
+  { type: 'group', labelEn: 'TEAM', labelAr: 'الفريق' },
+  { to: '/staff', icon: Users, labelEn: 'Team', labelAr: 'الفريق', feature: 'staff', ownerOnly: true },
+  { to: '/marketing', icon: BarChart3, labelEn: 'Marketing', labelAr: 'التسويق', feature: 'marketing', fallbackRoles: ['data_entry'] },
   { to: '/content-studio', icon: Sparkles, labelEn: 'Content Studio', labelAr: 'استوديو المحتوى', feature: 'content_studio', ownerOnly: true },
+  { to: '/loyalty', icon: Heart, labelEn: 'Nochi Loyalty', labelAr: 'نوتشي لويالتي', feature: 'loyalty', fallbackRoles: EVERYONE },
+  { to: '/vestaboard', icon: Monitor, labelEn: 'Vestaboard', labelAr: 'فيستابورد', feature: 'vestaboard', fallbackRoles: STAFFISH },
+
+  { type: 'group', labelEn: 'MORE', labelAr: 'المزيد' },
+  { to: '/tasks', icon: CheckSquare, labelKey: 'tasks', feature: 'tasks', ownerOnly: true },
+  { to: '/my-tasks', icon: CheckSquare, labelKey: 'myTasks', feature: null, hideForOwner: true, fallbackRoles: EVERYONE },
+  { to: '/inventory', icon: Package, labelEn: 'Inventory', labelAr: 'المخزون', feature: 'inventory', fallbackRoles: EVERYONE },
+  { to: '/ideas', icon: Lightbulb, labelEn: 'Ideas', labelAr: 'الأفكار', feature: 'ideas', fallbackRoles: ['data_entry'] },
+  { to: '/cost-calculator', icon: Calculator, labelEn: 'Cost Calculator', labelAr: 'حاسبة التكلفة', feature: 'cost_calculator', ownerOnly: true },
+  { to: '/recipes', icon: Coffee, labelKey: 'recipes', feature: 'recipes', fallbackRoles: EVERYONE },
 
   // Ops Checklist — only renders when ops_settings.module_enabled (Layout filters
   // out items flagged requiresOpsEnabled when the module is off).
@@ -114,11 +117,6 @@ export const NAV_ITEMS = [
   { to: '/ops',           icon: ClipboardList, labelEn: 'Checklist',         labelAr: 'القائمة',     feature: 'ops', fallbackRoles: EVERYONE, requiresOpsEnabled: true },
   { to: '/ops/dashboard', icon: BarChart3,     labelEn: 'Ops dashboard',     labelAr: 'لوحة المهام', feature: 'ops', fallbackRoles: ['supervisor'], requiresOpsEnabled: true, requiresOpsEdit: true },
   { to: '/ops/settings',  icon: Settings,      labelEn: 'Ops settings',      labelAr: 'إعدادات المهام', feature: 'ops', fallbackRoles: ['supervisor'], requiresOpsEnabled: true, requiresOpsEdit: true },
-
-  { type: 'group', labelEn: 'TOOLS', labelAr: 'الأدوات' },
-  { to: '/ideas', icon: Lightbulb, labelEn: 'Ideas', labelAr: 'الأفكار', feature: 'ideas', fallbackRoles: ['data_entry'] },
-  { to: '/cost-calculator', icon: Calculator, labelEn: 'Cost Calculator', labelAr: 'حاسبة التكلفة', feature: 'cost_calculator', ownerOnly: true },
-  { to: '/recipes', icon: Coffee, labelKey: 'recipes', feature: 'recipes', fallbackRoles: EVERYONE },
 ]
 
 // Icons exported for any consumer that needs them by name (future use)
