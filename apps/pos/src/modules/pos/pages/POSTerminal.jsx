@@ -1,7 +1,7 @@
 // POSTerminal.jsx — Main POS terminal page
 // Route: /pos/:branchId
 
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Search, ScanLine, Settings, ArrowLeft, Wifi, WifiOff, RefreshCw, ClipboardList, ShoppingBag, ChevronDown, ChevronUp, ListOrdered, Users, UserPlus, X, MoreVertical, PauseCircle, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
@@ -45,6 +45,7 @@ import PaymentModal from '../components/PaymentModal'
 import PrintHostBadge from '../components/PrintHostBadge'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
+import { useOnlineOrders } from '../hooks/useOnlineOrders'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { printReceipt, printDrinkTicket, autoConnectPrinter } from '../lib/escpos'
 import { isPrintHost, startHostSubscriber, stopHostSubscriber } from '../lib/print-queue'
@@ -54,26 +55,6 @@ import toast from 'react-hot-toast'
 
 let itemIdCounter = 0
 function newItemId() { return ++itemIdCounter }
-
-// ── Sound alert (Web Audio API — no file needed) ─────────────────────────────
-function playOrderAlert() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    const play = (freq, start, dur) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain); gain.connect(ctx.destination)
-      osc.frequency.value = freq
-      gain.gain.setValueAtTime(0.35, ctx.currentTime + start)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur)
-      osc.start(ctx.currentTime + start)
-      osc.stop(ctx.currentTime + start + dur)
-    }
-    play(880, 0, 0.15)
-    play(1100, 0.18, 0.15)
-    play(1320, 0.36, 0.25)
-  } catch { /* audio alerts are optional */ }
-}
 
 export default function POSTerminal() {
   const { branchId } = useParams()
@@ -119,10 +100,12 @@ export default function POSTerminal() {
   }
 
   // Online orders
-  const [onlineOrders, setOnlineOrders] = useState([])
-  const [showOnlineOrders, setShowOnlineOrders] = useState(false)
-  const onlineOrdersTimer = useRef(null)
-  const [newOrderAlert, setNewOrderAlert] = useState(null) // order to show in popup
+  const {
+    onlineOrders,
+    showOnlineOrders, setShowOnlineOrders,
+    newOrderAlert, setNewOrderAlert,
+    fetchOnlineOrders,
+  } = useOnlineOrders(branchId)
 
   // Modals
   const [showPayment, setShowPayment] = useState(null) // charge data
@@ -229,59 +212,6 @@ export default function POSTerminal() {
 
     return () => { supabase.removeChannel(channel) }
   }, [branchId])
-
-  // Fetch pending online orders (initial load + after actions)
-  const fetchOnlineOrders = useCallback(async () => {
-    if (!isOnline()) return
-    try {
-      const { data } = await supabase
-        .from('pos_orders')
-        .select('id,order_number,customer_name,customer_phone,total,table_number,created_at,awaiting_staff_confirm,pickup_code,status,pos_order_items(product_name,product_name_ar,quantity,unit_price,total)')
-        .eq('branch_id', branchId)
-        .eq('source', 'online')
-        .in('status', ['pending', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(20)
-      setOnlineOrders(data || [])
-    } catch { /* silently ignore */ }
-  }, [branchId])
-
-  // Realtime subscription — instant notification on new online order
-  useEffect(() => {
-    fetchOnlineOrders()
-
-    const channel = supabase
-      .channel(`online-orders-${branchId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'pos_orders',
-        filter: `branch_id=eq.${branchId}`,
-      }, async (payload) => {
-        if (payload.new?.source !== 'online') return
-        // Fetch full order with items for the popup
-        const { data } = await supabase
-          .from('pos_orders')
-          .select('id,order_number,customer_name,customer_phone,total,table_number,created_at,awaiting_staff_confirm,pickup_code,status,pos_order_items(product_name,product_name_ar,quantity,unit_price,total)')
-          .eq('id', payload.new.id)
-          .single()
-        if (data) {
-          setNewOrderAlert(data)
-          setShowOnlineOrders(true)
-          playOrderAlert()
-          fetchOnlineOrders()
-        }
-      })
-      .subscribe()
-
-    // Fallback poll every 60s (covers cases where Realtime misses an event)
-    onlineOrdersTimer.current = setInterval(fetchOnlineOrders, 60000)
-
-    return () => {
-      supabase.removeChannel(channel)
-      if (onlineOrdersTimer.current) clearInterval(onlineOrdersTimer.current)
-    }
-  }, [branchId, fetchOnlineOrders])
 
   // addCartLine: append a fully-formed cart line (used after the
   // modifier modal returns, and from the bare addToCart path below).
