@@ -28,7 +28,7 @@ import {
 } from '../modules/pos/lib/inventory-units'
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
-import { downloadProductImage, formatImageBytes, optimizeProductImage } from '../modules/pos/lib/product-image-processing'
+import { downloadProductImage, formatImageBytes, optimizeProductImageSet } from '../modules/pos/lib/product-image-processing'
 import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../modules/pos/lib/product-video'
 import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
 import {
@@ -193,6 +193,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
   const [costComponents, setCostComponents] = useState([])
   const [costComponentsLoading, setCostComponentsLoading] = useState(!!product?.id)
   const [pendingFile, setPendingFile] = useState(null)
+  const [pendingVariants, setPendingVariants] = useState(null)
   const [pendingPreview, setPendingPreview] = useState(null)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const [pendingVideoFile, setPendingVideoFile] = useState(null)
@@ -349,11 +350,13 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
       // If the user picked a photo before saving (new product flow), upload now
       if (pendingFile && saved?.id) {
         try {
-          await uploadProductImage(saved.id, pendingFile)
+          await uploadProductImage(saved.id,
+          pendingVariants ? { file: pendingFile, variants: pendingVariants } : pendingFile)
         } catch (err) {
           toast.error('Saved, but photo upload failed: ' + (err.message || 'unknown'))
         }
         setPendingFile(null)
+        setPendingVariants(null)
         if (pendingPreview) { URL.revokeObjectURL(pendingPreview); setPendingPreview(null) }
       }
       if (pendingVideoFile && saved?.id) {
@@ -379,10 +382,13 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
     if (!file) return
     // For existing products: upload immediately so the URL is live.
     // For new products: defer the upload until Save (we need the product ID first).
+    // Always render the stored sizes here: serving those directly is what keeps
+    // Supabase Storage image transformations at zero.
     if (product?.id) {
       setUploading(true)
       try {
-        const url = await uploadProductImage(product.id, file)
+        const optimized = await optimizeProductImageSet(file)
+        const url = await uploadProductImage(product.id, optimized)
         set('image_url', url)
         toast.success('Photo uploaded')
       } catch (err) {
@@ -392,9 +398,18 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
       }
     } else {
       // Stash the file + a local preview; uploaded after createPOSProduct returns the ID
-      setPendingFile(file)
-      if (pendingPreview) URL.revokeObjectURL(pendingPreview)
-      setPendingPreview(URL.createObjectURL(file))
+      setUploading(true)
+      try {
+        const optimized = await optimizeProductImageSet(file)
+        setPendingFile(optimized.file)
+        setPendingVariants(optimized.variants)
+        if (pendingPreview) URL.revokeObjectURL(pendingPreview)
+        setPendingPreview(URL.createObjectURL(optimized.file))
+      } catch (err) {
+        toast.error(err.message || 'Could not prepare the image')
+      } finally {
+        setUploading(false)
+      }
     }
   }
 
@@ -412,13 +427,14 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
         }
       }
 
-      const optimized = await optimizeProductImage(sourceFile)
+      const optimized = await optimizeProductImageSet(sourceFile)
       if (product?.id) {
-        const url = await uploadProductImage(product.id, optimized.file)
+        const url = await uploadProductImage(product.id, optimized)
         set('image_url', url)
       } else {
         if (pendingPreview) URL.revokeObjectURL(pendingPreview)
         setPendingFile(optimized.file)
+        setPendingVariants(optimized.variants)
         setPendingPreview(URL.createObjectURL(optimized.file))
       }
 

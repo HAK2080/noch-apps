@@ -3,6 +3,15 @@ export const PRODUCT_IMAGE_HEIGHT = 1500
 export const PRODUCT_IMAGE_MAX_INPUT_BYTES = 20 * 1024 * 1024
 export const PRODUCT_IMAGE_TARGET_BYTES = 300 * 1024
 
+// Stored sizes. Serving these directly avoids Supabase Storage image
+// transformations, which are quota-limited and billed per origin image.
+// 'full' keeps the existing dimensions so current images stay valid.
+export const PRODUCT_IMAGE_VARIANTS = [
+  { name: 'full', suffix: '', width: 1200, height: 1500, targetBytes: 300 * 1024 },
+  { name: 'card', suffix: '-720', width: 720, height: 900, targetBytes: 120 * 1024 },
+  { name: 'thumb', suffix: '-160', width: 160, height: 200, targetBytes: 12 * 1024 },
+]
+
 const PRODUCT_IMAGE_BACKGROUND = '#f8f3e8'
 const PRODUCT_IMAGE_PADDING = 72
 const WEBP_QUALITIES = [0.82, 0.76, 0.7]
@@ -154,60 +163,96 @@ export async function downloadProductImage(source, {
   return new File([blob], filename, { type: blob.type, lastModified: Date.now() })
 }
 
-function optimizedFilename(name = 'product-image') {
+function optimizedFilename(name = 'product-image', suffix = '') {
   const base = name.replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '')
-  return `${base || 'product-image'}.webp`
+  return `${base || 'product-image'}${suffix}.webp`
 }
 
-export async function optimizeProductImage(file) {
+function assertUsableSource(file) {
   if (!(file instanceof Blob) || !file.type.startsWith('image/')) {
     throw new Error('Choose a valid image file')
   }
   if (file.size > PRODUCT_IMAGE_MAX_INPUT_BYTES) {
     throw new Error('Image must be smaller than 20 MB')
   }
+}
+
+async function renderVariant(decoded, variant, sourceName) {
+  const canvas = document.createElement('canvas')
+  canvas.width = variant.width
+  canvas.height = variant.height
+  const context = canvas.getContext('2d', { alpha: false })
+  if (!context) throw new Error('Image processing is unavailable in this browser')
+
+  context.fillStyle = PRODUCT_IMAGE_BACKGROUND
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
+
+  // Keep the framing identical across sizes by scaling the padding with width.
+  const padding = Math.round(PRODUCT_IMAGE_PADDING * (variant.width / PRODUCT_IMAGE_WIDTH))
+  const rect = calculateContainedImageRect(
+    decoded.width, decoded.height, variant.width, variant.height, padding,
+  )
+  context.drawImage(decoded.image, rect.x, rect.y, rect.width, rect.height)
+
+  let blob = null
+  for (const quality of WEBP_QUALITIES) {
+    blob = await canvasToBlob(canvas, 'image/webp', quality)
+    if (blob.size <= variant.targetBytes) break
+  }
+
+  return new File([blob], optimizedFilename(sourceName, variant.suffix), {
+    type: 'image/webp',
+    lastModified: Date.now(),
+  })
+}
+
+/**
+ * Render every stored size in one decode pass. Serving these directly keeps
+ * Storage image transformations at zero.
+ */
+export async function optimizeProductImageSet(file) {
+  assertUsableSource(file)
 
   const decoded = await loadImage(file)
   try {
     if (!decoded.width || !decoded.height) throw new Error('Image has invalid dimensions')
 
-    const canvas = document.createElement('canvas')
-    canvas.width = PRODUCT_IMAGE_WIDTH
-    canvas.height = PRODUCT_IMAGE_HEIGHT
-    const context = canvas.getContext('2d', { alpha: false })
-    if (!context) throw new Error('Image processing is unavailable in this browser')
-
-    context.fillStyle = PRODUCT_IMAGE_BACKGROUND
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    context.imageSmoothingEnabled = true
-    context.imageSmoothingQuality = 'high'
-
-    const rect = calculateContainedImageRect(decoded.width, decoded.height)
-    context.drawImage(decoded.image, rect.x, rect.y, rect.width, rect.height)
-
-    let optimizedBlob = null
-    for (const quality of WEBP_QUALITIES) {
-      optimizedBlob = await canvasToBlob(canvas, 'image/webp', quality)
-      if (optimizedBlob.size <= PRODUCT_IMAGE_TARGET_BYTES) break
+    const variants = []
+    for (const variant of PRODUCT_IMAGE_VARIANTS) {
+      const rendered = await renderVariant(decoded, variant, file.name)
+      variants.push({
+        name: variant.name,
+        suffix: variant.suffix,
+        file: rendered,
+        width: variant.width,
+        height: variant.height,
+        bytes: rendered.size,
+      })
     }
 
-    const optimizedFile = new File([optimizedBlob], optimizedFilename(file.name), {
-      type: 'image/webp',
-      lastModified: Date.now(),
-    })
-
+    const full = variants.find(entry => entry.name === 'full')
     return {
-      file: optimizedFile,
+      variants,
+      file: full.file,
       originalBytes: file.size,
-      optimizedBytes: optimizedFile.size,
+      optimizedBytes: variants.reduce((total, entry) => total + entry.bytes, 0),
       originalWidth: decoded.width,
       originalHeight: decoded.height,
-      width: PRODUCT_IMAGE_WIDTH,
-      height: PRODUCT_IMAGE_HEIGHT,
+      width: full.width,
+      height: full.height,
     }
   } finally {
     decoded.cleanup()
   }
+}
+
+/** Single full-size render. Kept for callers that only need the master image. */
+export async function optimizeProductImage(file) {
+  const { variants, ...rest } = await optimizeProductImageSet(file)
+  const full = variants.find(entry => entry.name === 'full')
+  return { ...rest, variants, file: full.file, optimizedBytes: full.bytes }
 }
 
 export function generatedImageFileFromBase64(

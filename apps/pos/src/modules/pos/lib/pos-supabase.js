@@ -228,16 +228,36 @@ export async function getProductSalesStats(branchId, from, to) {
   return stats
 }
 
-export async function uploadProductImage(productId, file) {
-  const ext = file.type === 'image/webp' ? 'webp' : file.name.split('.').pop()
-  const path = `products/${productId}/${Date.now()}.${ext}`
-  const { error: uploadErr } = await supabase.storage.from('product-images').upload(path, file, {
-    upsert: true,
-    contentType: file.type || undefined,
-    cacheControl: '31536000',
-  })
-  if (uploadErr) throw uploadErr
-  const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(path)
+/**
+ * Upload a product image. When given an optimized set (from
+ * optimizeProductImageSet) every stored size is uploaded alongside the master
+ * so the app can serve sizes directly instead of using Storage image
+ * transformations, which are quota-limited and billed per origin image.
+ *
+ * Derivatives share the master's basename plus the variant suffix, so
+ * buildStoredProductImageUrl can address them without a database lookup.
+ */
+export async function uploadProductImage(productId, fileOrSet) {
+  const set = Array.isArray(fileOrSet?.variants) ? fileOrSet.variants : null
+  const master = set ? set.find(entry => entry.name === 'full').file : fileOrSet
+  const ext = master.type === 'image/webp' ? 'webp' : master.name.split('.').pop()
+  const stamp = Date.now()
+  const basePath = `products/${productId}/${stamp}`
+
+  const uploads = set
+    ? set.map(entry => ({ path: `${basePath}${entry.suffix}.${ext}`, file: entry.file }))
+    : [{ path: `${basePath}.${ext}`, file: master }]
+
+  for (const item of uploads) {
+    const { error: uploadErr } = await supabase.storage.from('product-images').upload(item.path, item.file, {
+      upsert: true,
+      contentType: item.file.type || undefined,
+      cacheControl: '31536000',
+    })
+    if (uploadErr) throw uploadErr
+  }
+
+  const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(`${basePath}.${ext}`)
   const { error: updateErr } = await supabase
     .from('pos_products')
     .update({ image_url: publicUrl, updated_at: new Date().toISOString() })
@@ -245,6 +265,7 @@ export async function uploadProductImage(productId, file) {
   if (updateErr) throw updateErr
   return publicUrl
 }
+
 
 const PUBLIC_PRODUCT_IMAGE_PREFIX = '/storage/v1/object/public/product-images/'
 

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { formatFixed } from '../../lib/numbers'
-import { buildOptimizedProductImageUrl } from '../../lib/product-images'
+import { buildStoredProductImageUrl } from '../../lib/product-images'
 import { productBelongsToCategory } from '../../lib/product-categories'
 import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
 import nochLogo from '../../assets/noch-logo-menu.webp'
@@ -30,7 +30,7 @@ function V60Icon({ size = 16 }) {
 function CatIcon({ name, imageUrl, size = 16 }) {
   if (imageUrl) return (
     <img
-      src={buildOptimizedProductImageUrl(imageUrl, { width: 64, height: 64, quality: 70 })}
+      src={buildStoredProductImageUrl(imageUrl, 'thumb')}
       alt={name}
       loading="lazy"
       decoding="async"
@@ -186,9 +186,7 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
       <video
         ref={videoRef}
         src={shouldLoad ? videoSrc : undefined}
-        poster={posterSrc ? buildOptimizedProductImageUrl(posterSrc, detail
-          ? { width: 720, height: 900, quality: 80 }
-          : { width: 360, height: 450, quality: 74 }) : undefined}
+        poster={posterSrc ? buildStoredProductImageUrl(posterSrc, detail ? 'full' : 'card') : undefined}
         aria-label={alt}
         className="menu-product-video-media"
         muted
@@ -204,9 +202,7 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
 }
 
 function MenuProductImageState({ src, alt, className, fallback, priority, detail }) {
-  const optimizedSource = buildOptimizedProductImageUrl(src, detail
-    ? { width: 720, height: 900, quality: 80 }
-    : { width: 360, height: 450, quality: 74 })
+  const optimizedSource = buildStoredProductImageUrl(src, detail ? 'full' : 'card')
   const [currentSource, setCurrentSource] = useState(optimizedSource)
   const [status, setStatus] = useState(src ? 'loading' : 'failed')
 

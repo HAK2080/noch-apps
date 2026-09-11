@@ -24,9 +24,9 @@ import {
 } from '../lib/inventory-units'
 import { normalizeCoffeeGrams } from '../lib/coffee-consumption'
 import { NEW_PRODUCT_VISIBILITY } from '../lib/product-visibility'
-import { formatImageBytes, generatedImageFileFromBase64, optimizeProductImage } from '../lib/product-image-processing'
+import { formatImageBytes, generatedImageFileFromBase64, optimizeProductImageSet } from '../lib/product-image-processing'
 import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../lib/product-video'
-import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
+import { buildStoredProductImageUrl } from '../../../lib/product-images'
 import {
   changeProductPrimaryCategory,
   getProductCategoryIds,
@@ -108,6 +108,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
   const [uploadingImg, setUploadingImg] = useState(false)
   const [generatingImg, setGeneratingImg] = useState(false)
   const [pendingFile, setPendingFile] = useState(null)   // file waiting for new-product ID
+  const [pendingVariants, setPendingVariants] = useState(null) // stored sizes for that file
   const [pendingPreview, setPendingPreview] = useState(null)
   const [pendingVideoFile, setPendingVideoFile] = useState(null)
   const [pendingVideoPreview, setPendingVideoPreview] = useState(null)
@@ -147,6 +148,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
     const preview = URL.createObjectURL(optimized.file)
     setPendingPreview(preview)
     setPendingFile(optimized.file)
+    setPendingVariants(optimized.variants || null)
     return `${formatImageBytes(optimized.originalBytes)} → ${formatImageBytes(optimized.optimizedBytes)}`
   }
 
@@ -158,11 +160,12 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
     setUploadingImg(true)
 
     try {
-      const optimized = await optimizeProductImage(file)
+      const optimized = await optimizeProductImageSet(file)
       const sizeChange = stageOptimizedImage(optimized)
       toast.success(`Image optimized and ready (${sizeChange})`)
     } catch (err) {
       setPendingFile(null)
+      setPendingVariants(null)
       setPendingPreview(null)
       toast.error(err.message || 'Image optimization failed')
     } finally {
@@ -191,7 +194,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
         generated.mime_type,
         `${form.name || form.name_ar || 'product'}-ai.webp`,
       )
-      const optimized = await optimizeProductImage(generatedFile)
+      const optimized = await optimizeProductImageSet(generatedFile)
       stageOptimizedImage(optimized)
       toast.success('AI product image created, optimized, and ready to save')
     } catch (err) {
@@ -264,7 +267,8 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
       }
       if (pendingFile && savedProduct?.id) {
         try {
-          await uploadProductImage(savedProduct.id, pendingFile)
+          await uploadProductImage(savedProduct.id,
+            pendingVariants ? { file: pendingFile, variants: pendingVariants } : pendingFile)
         } catch {
           toast.error('Product saved but image upload failed. Try saving again.')
           if (isEdit) return
@@ -491,7 +495,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                     {(pendingPreview || form.image_url) && (
                       <div className="relative mb-2">
                         <img
-                          src={pendingPreview || buildOptimizedProductImageUrl(form.image_url, { width: 600, height: 750, quality: 82 })}
+                          src={pendingPreview || buildStoredProductImageUrl(form.image_url, 'card')}
                           alt=""
                           className="w-full max-h-80 aspect-[4/5] object-contain bg-[#f8f3e8] rounded-lg border border-noch-border"
                           onError={e => {
@@ -508,7 +512,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                         )}
                         <button
                           type="button"
-                          onClick={() => { set('image_url', ''); setPendingFile(null); setPendingPreview(null) }}
+                          onClick={() => { set('image_url', ''); setPendingFile(null); setPendingVariants(null); setPendingPreview(null) }}
                           className="absolute top-1 right-1 bg-black/60 hover:bg-red-600 text-white rounded-full p-1 transition-colors"
                           title="Remove image"
                         >
@@ -551,7 +555,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                     <label className="label block mt-2">Or paste an image URL</label>
                     <input
                       value={pendingFile ? '' : (form.image_url || '')}
-                      onChange={e => { set('image_url', e.target.value); setPendingFile(null); setPendingPreview(null) }}
+                      onChange={e => { set('image_url', e.target.value); setPendingFile(null); setPendingVariants(null); setPendingPreview(null) }}
                       className="input w-full mt-2"
                       placeholder="https://..."
                       disabled={!!pendingFile}

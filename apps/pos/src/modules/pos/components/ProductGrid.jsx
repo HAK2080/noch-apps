@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { AlertTriangle, Ban } from 'lucide-react'
 import { format } from '../lib/money'
 import { formatStockQuantity } from '../lib/inventory-units'
-import { buildOptimizedProductImageUrl } from '../../../lib/product-images'
+import { buildStoredProductImageUrl } from '../../../lib/product-images'
 import { productBelongsToCategory } from '../../../lib/product-categories'
 
 const LONG_PRESS_MS = 500
@@ -172,7 +172,7 @@ function ProductGrid({
               >
                 {product.image_url ? (
                   <img
-                    src={buildOptimizedProductImageUrl(product.image_url, { width: 320, height: 400, quality: 78 })}
+                    src={buildStoredProductImageUrl(product.image_url, 'card')}
                     alt=""
                     className="absolute inset-0 w-full h-full object-contain"
                     loading="lazy"
