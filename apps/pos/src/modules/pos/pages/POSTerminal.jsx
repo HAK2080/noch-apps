@@ -51,6 +51,7 @@ import { isPrintHost, startHostSubscriber, stopHostSubscriber } from '../lib/pri
 import { sendCustomerGreeting } from '../../../lib/vestaboard'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
+import POSInstanceGate from '../components/POSInstanceGate'
 
 let itemIdCounter = 0
 function newItemId() { return ++itemIdCounter }
@@ -287,6 +288,11 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
 }
 
 export default function POSTerminal() {
+  const { branchId } = useParams()
+  return <POSInstanceGate key={branchId} branchId={branchId}><POSTerminalContent /></POSInstanceGate>
+}
+
+function POSTerminalContent() {
   const { branchId } = useParams()
   const navigate = useNavigate()
   const { profile } = useAuth()
