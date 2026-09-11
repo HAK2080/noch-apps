@@ -1,3 +1,21 @@
+## 2026-09-11 — Deep Research and Loyalty Rebuild Preparation
+
+- **Agent**: Codex
+- **Status**: Preparation complete; implementation goal active, pending design/implementation approval.
+- **Files**: `docs/research/noch-loyalty-rebuild/01-executive-summary.md`, `02-research-and-recommendations.md`, `03-current-system-map.md`, `04-points-protection-and-project-goal.md`; `COMPLETED_WORK.md`.
+- **Description**: Deep-research preparation package, 61 capability assessments with connection/potential/outcome-readiness/keep-improve-toss decisions, ranked recommendations, and per-customer points/reward preservation gates. Identified legacy feedback value writer, static passport/standalone entry divergence, reward auto-issuance choice constraint and reporting limitations. Explicitly distinguishes source implementation from live/business outcomes.
+- **Verification**: Current source/migration inspection at `b2ed42d`; 16 focused local loyalty tests passed (mostly source-contract checks); primary brand/provider sources and original research reviewed. No production data exported or changed; backups, deployed reconciliation and live E2E tests are future gates, not completed claims.
+- **Commit / deployment**: None; documentation-only research. Existing research brief and concurrent unrelated POS-instance/expense changes preserved.
+
+## 2026-09-11 — Cafe Loyalty and AI Research Brief
+
+- **Agent**: Codex
+- **Status**: Research complete; documentation only.
+- **Files**: `docs/research/2026-09-11-cafe-loyalty-ai-brief.md`, `COMPLETED_WORK.md`.
+- **Description**: Plain-English marketing brief comparing current loyalty implementation with Starbucks, Dutch Bros, Panera and Thanx/Kahwa examples; separates existing features, legacy integration gaps and proposed AI improvements.
+- **Verification**: Inspected current source at `b2ed42d`; checked current primary brand/vendor web sources. Live settings, message delivery and AI providers were not re-tested. No application code or production data changed.
+- **Commit / deployment**: Not committed or deployed; local research artifact only.
+
 ## 2026-08-21 — Report Null Safety and Bandwidth-Aware Product Videos
 
 - **Agent**: Codex
