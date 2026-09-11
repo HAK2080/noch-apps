@@ -17,9 +17,14 @@ test('customer menu keeps first-screen image downloads small and targeted', asyn
   assert.match(menu, /priorityCount=\{priorityImages \? 2 : 0\}/)
   assert.doesNotMatch(menu, /priority=\{index < 2\}/)
   assert.match(menu, /loading=\{priority \? 'eager' : 'lazy'\}/)
-  assert.match(menu, /\{ width: 360, height: 450, quality: 74 \}/)
-  assert.match(menu, /\{ width: 720, height: 900, quality: 80 \}/)
-  assert.match(menu, /\{ width: 64, height: 64, quality: 70 \}/)
+  // Sizes are rendered once at upload and served straight from Storage.
+  // Supabase image transformations are quota-limited and billed per origin
+  // image, so the menu must never build a render/image URL.
+  assert.match(menu, /buildStoredProductImageUrl\(src, detail \? 'full' : 'card'\)/)
+  assert.match(menu, /buildStoredProductImageUrl\(posterSrc, detail \? 'full' : 'card'\)/)
+  assert.match(menu, /buildStoredProductImageUrl\(imageUrl, 'thumb'\)/)
+  assert.doesNotMatch(menu, /render\/image/)
+  assert.doesNotMatch(menu, /buildOptimizedProductImageUrl/)
   assert.match(menu, /function readCachedMenu/)
   assert.match(menu, /function writeCachedMenu/)
   assert.match(menu, /writeCachedMenu\(branchParam, b, cats \|\| \[\], prods \|\| \[\]\)/)

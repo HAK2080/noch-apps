@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
-import { buildOptimizedProductImageUrl } from '../src/lib/product-images.js'
 import {
   PRODUCT_IMAGE_HEIGHT,
   PRODUCT_IMAGE_WIDTH,
@@ -15,24 +14,8 @@ const menuCssUrl = new URL('../src/pages/storefront/styles/Menu.css', import.met
 const posSupabaseUrl = new URL('../src/modules/pos/lib/pos-supabase.js', import.meta.url)
 const imageProcessingUrl = new URL('../src/modules/pos/lib/product-image-processing.js', import.meta.url)
 
-test('public Supabase product images use a contained optimized derivative', () => {
-  const source = 'https://example.supabase.co/storage/v1/object/public/product-images/products/item/photo.png'
-  const optimized = new URL(buildOptimizedProductImageUrl(source))
-
-  assert.equal(optimized.pathname, '/storage/v1/render/image/public/product-images/products/item/photo.png')
-  assert.equal(optimized.searchParams.get('width'), '400')
-  assert.equal(optimized.searchParams.get('height'), '500')
-  assert.equal(optimized.searchParams.get('resize'), 'contain')
-  assert.equal(optimized.searchParams.get('quality'), '80')
-})
-
-test('non-Supabase and malformed product image URLs remain unchanged', () => {
-  assert.equal(
-    buildOptimizedProductImageUrl('https://images.example.com/drink.jpg'),
-    'https://images.example.com/drink.jpg',
-  )
-  assert.equal(buildOptimizedProductImageUrl('not a url'), 'not a url')
-})
+// Product image URL building is covered by product-image-stored-variants.test.mjs,
+// which also asserts that no source file reaches for the transformation endpoint.
 
 test('portrait and square originals fit the 4:5 canvas without cropping', () => {
   assert.deepEqual(calculateContainedImageRect(1000, 1500), {
@@ -123,5 +106,5 @@ test('menu presentation and uploads preserve the optimization contract', async (
   assert.match(css, /\.grid-card \.grid-card-footer\s*\{[^}]*min-height:\s*42px;[^}]*padding:\s*2px 10px 8px/s)
   assert.match(css, /\.menu-product-image-skeleton/)
   assert.match(uploadSource, /cacheControl:\s*'31536000'/)
-  assert.match(uploadSource, /contentType:\s*file\.type/)
+  assert.match(uploadSource, /contentType:\s*item\.file\.type/)
 })
