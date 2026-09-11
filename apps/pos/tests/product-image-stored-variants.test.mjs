@@ -82,7 +82,7 @@ test('image call sites request a stored variant', async () => {
   const sites = [
     ['../src/modules/pos/components/ProductGrid.jsx', "buildStoredProductImageUrl(product.image_url, 'card')"],
     ['../src/modules/pos/pages/POSProducts.jsx', "buildStoredProductImageUrl(form.image_url, 'card')"],
-    ['../src/pages/storefront/Menu.jsx', "buildStoredProductImageUrl(imageUrl, 'thumb')"],
+    ['../src/pages/storefront/Menu.jsx', "buildStoredProductImageUrl(src, detail ? 'full' : 'card')"],
   ]
   for (const [relative, expected] of sites) {
     const source = await readFile(new URL(relative, import.meta.url), 'utf8')

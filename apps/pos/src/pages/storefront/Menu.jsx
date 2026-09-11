@@ -28,10 +28,13 @@ function V60Icon({ size = 16 }) {
   )
 }
 function CatIcon({ name, imageUrl, size = 16 }) {
-  if (imageUrl) return (
+  const [failedImageUrl, setFailedImageUrl] = useState(null)
+  // Category uploads do not have the stored variants generated for products.
+  if (imageUrl && failedImageUrl !== imageUrl) return (
     <img
-      src={buildStoredProductImageUrl(imageUrl, 'thumb')}
+      src={imageUrl}
       alt={name}
+      onError={() => setFailedImageUrl(imageUrl)}
       loading="lazy"
       decoding="async"
       fetchPriority="low"
