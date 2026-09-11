@@ -37,3 +37,26 @@ export function buildStoredProductImageUrl(source, variant = 'full') {
 export function getProductImageFallback(source) {
   return source || ''
 }
+
+/**
+ * True when a product image has no stored card variant yet, i.e. it predates
+ * variants and still needs re-rendering. Probes with HEAD so an already
+ * converted catalogue costs one cheap request per product.
+ *
+ * A network failure reports false: re-rendering on a flaky connection would
+ * upload the same image repeatedly.
+ */
+export async function productImageNeedsVariants(imageUrl, { fetchImpl = fetch } = {}) {
+  if (!imageUrl) return false
+
+  const cardUrl = buildStoredProductImageUrl(imageUrl, 'card')
+  // An unchanged URL means this is not a public Storage object.
+  if (!cardUrl || cardUrl === imageUrl) return false
+
+  try {
+    const response = await fetchImpl(cardUrl, { method: 'HEAD', cache: 'no-store' })
+    return !response.ok
+  } catch {
+    return false
+  }
+}

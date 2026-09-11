@@ -29,6 +29,7 @@ import {
 import { calculateRetailCoffeeCost, normalizeCoffeeGrams } from '../modules/pos/lib/coffee-consumption'
 import { calculateProductCost, serializeCostComponents } from '../modules/pos/lib/product-costing'
 import { downloadProductImage, formatImageBytes, optimizeProductImageSet } from '../modules/pos/lib/product-image-processing'
+import { backfillProductImageVariants } from '../modules/pos/lib/product-image-backfill'
 import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../modules/pos/lib/product-video'
 import { NEW_PRODUCT_VISIBILITY } from '../modules/pos/lib/product-visibility'
 import {
@@ -937,6 +938,7 @@ export default function ProductCatalog() {
   const [dateTo, setDateTo] = useState(() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [backfill, setBackfill] = useState(null)
 
   // Load branches once.
   useEffect(() => {
@@ -967,6 +969,31 @@ export default function ProductCatalog() {
       toast.error(err.message || 'Failed to load products')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Owner-only one-off: products uploaded before stored sizes existed still
+  // serve the master image. Re-rendering them is what removes the last of the
+  // Storage image-transformation usage.
+  const handleBackfillImages = async () => {
+    const candidates = products.filter(p => p.image_url)
+    if (!candidates.length) return toast.error('No product images to pre-size')
+    if (!confirm(`Check ${candidates.length} product images and re-render the ones missing stored sizes? This can take a few minutes.`)) return
+
+    setBackfill({ done: 0, total: candidates.length, converted: 0, skipped: 0, failed: 0 })
+    try {
+      const result = await backfillProductImageVariants(candidates, { onProgress: setBackfill })
+      if (result.failed.length) {
+        toast.error(`${result.converted} converted, ${result.failed.length} failed. See console for details.`)
+        console.warn('Product image backfill failures:', result.failed)
+      } else {
+        toast.success(`${result.converted} converted, ${result.skipped} already done`)
+      }
+      if (result.converted) await load()
+    } catch (err) {
+      toast.error(err.message || 'Pre-sizing failed')
+    } finally {
+      setBackfill(null)
     }
   }
 
@@ -1015,12 +1042,44 @@ export default function ProductCatalog() {
             </h1>
             <p className="text-zinc-500 text-sm mt-0.5">Central catalog — synced with POS, inventory & cost calculator</p>
           </div>
-          {canEdit && (
-            <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
-              <Plus size={14} /> Add Product
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {profile?.role === 'owner' && (
+              <button
+                onClick={handleBackfillImages}
+                disabled={!!backfill}
+                className="btn-secondary flex items-center gap-2 disabled:opacity-60"
+                title="Render the stored image sizes for products uploaded before this existed"
+              >
+                {backfill
+                  ? <><Loader2 size={14} className="animate-spin" /> {backfill.done}/{backfill.total}</>
+                  : <><Image size={14} /> Pre-size images</>}
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2">
+                <Plus size={14} /> Add Product
+              </button>
+            )}
+          </div>
         </div>
+
+        {backfill && (
+          <div className="bg-noch-card border border-noch-border rounded-xl p-4 mb-5" role="status">
+            <p className="text-white text-sm font-medium">
+              Pre-sizing product images — {backfill.done} of {backfill.total}
+            </p>
+            <p className="text-noch-muted text-xs mt-1">
+              {backfill.converted} converted · {backfill.skipped} already done · {backfill.failed} failed.
+              Keep this tab open; leaving stops the run and it can be resumed later.
+            </p>
+            <div className="h-1.5 bg-noch-border rounded-full mt-3 overflow-hidden">
+              <div
+                className="h-full bg-noch-green transition-all"
+                style={{ width: `${backfill.total ? Math.round((backfill.done / backfill.total) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Branch tabs */}
         {branches.length > 0 && (

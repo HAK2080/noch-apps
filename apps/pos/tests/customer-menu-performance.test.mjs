@@ -22,7 +22,10 @@ test('customer menu keeps first-screen image downloads small and targeted', asyn
   // image, so the menu must never build a render/image URL.
   assert.match(menu, /buildStoredProductImageUrl\(src, detail \? 'full' : 'card'\)/)
   assert.match(menu, /buildStoredProductImageUrl\(posterSrc, detail \? 'full' : 'card'\)/)
-  assert.match(menu, /buildStoredProductImageUrl\(imageUrl, 'thumb'\)/)
+  // Category icons upload through a different path and never get the product
+  // variants, so they serve the original with a load fallback instead.
+  assert.match(menu, /function CatIcon/)
+  assert.match(menu, /onError=\{\(\) => setFailedImageUrl\(imageUrl\)\}/)
   assert.doesNotMatch(menu, /render\/image/)
   assert.doesNotMatch(menu, /buildOptimizedProductImageUrl/)
   assert.match(menu, /function readCachedMenu/)
