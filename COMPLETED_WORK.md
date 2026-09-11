@@ -15,6 +15,32 @@
 - **Deployment**: GitHub Actions run `32489795431` deployed successfully to `apps.noch.cloud`; the live customer menu loaded the 1400×465 banner asset and all four real products directly beneath it.
 
 ---
+## 2026-09-11 — Expense Auto-Approval and POS Duplicate-Tab Restriction
+
+- **Agent**: Claude (took over unfinished work from Codex, which stopped mid-task)
+- **Status**: Implemented, verified locally, and pushed. Migration not yet applied to production.
+- **Files**: `supabase/migrations/20260911100000_expense_auto_approval_and_pos_instance_setting.sql`; `apps/pos/src/pages/expenses/ApprovalSettings.jsx`, `SettingsTab.jsx`, `SubmitTab.jsx`; `apps/pos/src/modules/pos/components/POSInstanceGate.jsx`, `apps/pos/src/modules/pos/lib/pos-instance-lock.js`, `pos-settings.js`, `pages/POSSettings.jsx`, `pages/POSTerminal.jsx`; `apps/pos/tests/expense-auto-approval.test.mjs`, `tests/settings-controls.spec.js`, `tests/fixtures/settings.html`, `tests/fixtures/settings.jsx`, `playwright.settings.config.js`; `apps/pos/package.json`; `.gitignore`.
+- **Description**: Two owner-controlled switches, both off by default. (1) Business-wide expense auto-approval: an `expense_approval_settings` single-row table, an owner-only `set_expense_auto_approval` RPC, and an AFTER INSERT trigger that routes new pending expenses through the shared `apply_expense_approval` helper, preserving owner attribution and settling expenses reported as paid through the existing payment path. Existing pending expenses stay in the approval queue. (2) Per-branch POS duplicate-tab restriction: `pos_settings.block_duplicate_tabs`, guarded by an owner-only trigger covering insert, update, delete and branch reassignment; `POSInstanceGate` holds a Web Locks lock per branch so one terminal runs per browser profile, queues other tabs, keeps an open cart intact when the policy changes mid-session, retains the last confirmed policy during network loss, and fails closed on browsers without the Locks API. Separate devices and browser profiles are unaffected.
+- **Verification**: `node tests/expense-auto-approval.test.mjs` — 10/10 passed against real Postgres (pglite) with the migration applied, covering default-off behaviour, owner attribution, balanced payment posting across all cash/card x business/shareholder funding paths, idempotent repeat approval, owner-only authorization for both switches, and rollback when payment posting fails. `npx playwright test --config playwright.settings.config.js` — 9/9 passed against the real components, covering duplicate-tab admission and hand-off, cart preservation across policy changes, branch and browser-profile independence, network-failure retention, unsupported-browser behaviour, and expense switch persistence including failed saves. `npm run build` succeeded; targeted ESLint clean on every changed file. Not verified against the production Supabase project: RLS, trigger behaviour and the owner UI remain unproven in production until the migration is applied and checked there.
+- **Commit / deployment**: Committed and pushed as `feat/expense-auto-approval-pos-instance-lock` (068784d, 8c82425). Not merged, migration not applied to production, production not verified — these remain open per repository policy.
+
+## 2026-09-11 — Deep Research and Loyalty Rebuild Preparation
+
+- **Agent**: Codex
+- **Status**: Preparation complete; implementation goal active, pending design/implementation approval.
+- **Files**: `docs/research/noch-loyalty-rebuild/01-executive-summary.md`, `02-research-and-recommendations.md`, `03-current-system-map.md`, `04-points-protection-and-project-goal.md`; `COMPLETED_WORK.md`.
+- **Description**: Deep-research preparation package, 61 capability assessments with connection/potential/outcome-readiness/keep-improve-toss decisions, ranked recommendations, and per-customer points/reward preservation gates. Identified legacy feedback value writer, static passport/standalone entry divergence, reward auto-issuance choice constraint and reporting limitations. Explicitly distinguishes source implementation from live/business outcomes.
+- **Verification**: Current source/migration inspection at `b2ed42d`; 16 focused local loyalty tests passed (mostly source-contract checks); primary brand/provider sources and original research reviewed. No production data exported or changed; backups, deployed reconciliation and live E2E tests are future gates, not completed claims.
+- **Commit / deployment**: None; documentation-only research. Existing research brief and concurrent unrelated POS-instance/expense changes preserved.
+
+## 2026-09-11 — Cafe Loyalty and AI Research Brief
+
+- **Agent**: Codex
+- **Status**: Research complete; documentation only.
+- **Files**: `docs/research/2026-09-11-cafe-loyalty-ai-brief.md`, `COMPLETED_WORK.md`.
+- **Description**: Plain-English marketing brief comparing current loyalty implementation with Starbucks, Dutch Bros, Panera and Thanx/Kahwa examples; separates existing features, legacy integration gaps and proposed AI improvements.
+- **Verification**: Inspected current source at `b2ed42d`; checked current primary brand/vendor web sources. Live settings, message delivery and AI providers were not re-tested. No application code or production data changed.
+- **Commit / deployment**: Not committed or deployed; local research artifact only.
 
 ## 2026-08-21 — Report Null Safety and Bandwidth-Aware Product Videos
 

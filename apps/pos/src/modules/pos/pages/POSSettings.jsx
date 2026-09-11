@@ -21,10 +21,14 @@ import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 
-function FlagRow({ label, hint, value, onChange }) {
+function FlagRow({ label, hint, value, onChange, disabled = false }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={!!value}
+      aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!value)}
       className="flex items-start gap-3 text-left p-2 rounded-lg hover:bg-noch-border/30 transition-colors"
     >
@@ -77,6 +81,7 @@ export default function POSSettings({ onClose } = {}) {
   const [openingCash, setOpeningCash] = useState('')
   const [openingShift, setOpeningShift] = useState(false)
   const [posSettings, setPosSettings] = useState(null)
+  const [savingFlag, setSavingFlag] = useState(false)
   const [categories, setCategories] = useState([])
   const [autoPrint, setAutoPrint] = useState(() => localStorage.getItem('noch_auto_print') === 'true')
   const [printHost, setPrintHostState] = useState(() => isPrintHost())
@@ -152,14 +157,19 @@ export default function POSSettings({ onClose } = {}) {
   }
 
   const handleToggleFlag = async (flag, value) => {
+    if (savingFlag) return
+    const previous = posSettings[flag]
+    setSavingFlag(true)
     setPosSettings(s => ({ ...s, [flag]: value }))
     try {
       clearPOSSettingsCache(branchId)
       await updatePOSSettings(branchId, { [flag]: value })
     } catch (err) {
       // Revert on failure
-      setPosSettings(s => ({ ...s, [flag]: !value }))
+      setPosSettings(s => ({ ...s, [flag]: previous }))
       toast.error(err.message || 'Could not save setting')
+    } finally {
+      setSavingFlag(false)
     }
   }
 
@@ -487,6 +497,15 @@ export default function POSSettings({ onClose } = {}) {
 
           {editing ? (
             <div className="flex flex-col gap-3">
+              {isOwner && (
+                <FlagRow
+                  label="Prevent duplicate POS tabs"
+                  hint="Allow only one POS terminal for this branch in the same browser profile. Other tabs/windows wait until it closes. Separate devices and browser profiles are unaffected. Off by default."
+                  value={!!posSettings.block_duplicate_tabs}
+                  disabled={savingFlag}
+                  onChange={v => handleToggleFlag('block_duplicate_tabs', v)}
+                />
+              )}
               <div>
                 <label className="label block mb-1">Receipt Header</label>
                 <input

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Loader2, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
+import ApprovalSettings from './ApprovalSettings'
 
 export default function SettingsTab({ onMetaChanged }) {
   const [costCenters, setCostCenters] = useState([])
@@ -134,6 +135,7 @@ export default function SettingsTab({ onMetaChanged }) {
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <ApprovalSettings />
 
       {/* Expense Categories — at top */}
       <div className="bg-noch-card border border-noch-border rounded-xl p-4">

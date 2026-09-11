@@ -15,18 +15,20 @@ const DEFAULTS = {
   per_barista_shift: false,
   require_pin: true,
   presto_enabled: false,
+  block_duplicate_tabs: false,
 }
 
 const _cache = new Map()  // branchId → settings
 
-export async function getPOSSettings(branchId) {
+export async function getPOSSettings(branchId, { fresh = false } = {}) {
   if (!branchId) return { ...DEFAULTS }
-  if (_cache.has(branchId)) return _cache.get(branchId)
-  const { data } = await supabase
+  if (!fresh && _cache.has(branchId)) return _cache.get(branchId)
+  const { data, error } = await supabase
     .from('pos_settings')
     .select('*')
     .eq('branch_id', branchId)
     .maybeSingle()
+  if (error) throw error
   const merged = { ...DEFAULTS, ...(data || {}) }
   _cache.set(branchId, merged)
   return merged
@@ -43,6 +45,9 @@ export async function updatePOSSettings(branchId, updates) {
     .single()
   if (error) throw error
   _cache.set(branchId, { ...DEFAULTS, ...data })
+  // Notify terminal gates in this window and other tabs of this browser.
+  window.dispatchEvent(new Event('pos-settings-changed'))
+  try { localStorage.setItem('noch_pos_settings_changed', `${branchId}:${Date.now()}`) } catch { /* storage is optional */ }
   return data
 }
 

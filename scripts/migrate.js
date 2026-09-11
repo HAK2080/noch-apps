@@ -14,6 +14,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROJECT_REF = 'kxqjasdvoohiexedtfqw'
 const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN
 
+// DANGER: this is a frozen one-off repair script from an earlier schema fix,
+// not a migration runner. Its first statement drops the expenses table with
+// CASCADE and it will destroy production expense data. It does NOT apply
+// anything from supabase/migrations/ — use scripts/apply-migration.js for that.
+if (!process.argv.includes('--yes-drop-expenses-and-recreate')) {
+  console.error('Refusing to run: scripts/migrate.js DROPS the expenses table (CASCADE).')
+  console.error('It is a historical repair script, not a migration runner.')
+  console.error('To apply a migration file, use:')
+  console.error('  node scripts/apply-migration.js supabase/migrations/<file>.sql')
+  console.error('If you truly intend the destructive repair, re-run with --yes-drop-expenses-and-recreate')
+  process.exit(2)
+}
+
 if (!ACCESS_TOKEN) {
   console.error('❌  SUPABASE_SERVICE_ROLE_KEY not set in .env')
   process.exit(1)

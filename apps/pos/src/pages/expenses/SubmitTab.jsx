@@ -83,14 +83,18 @@ export default function SubmitTab({ user, profile, isOwner, costCenters, categor
         } : {}),
       }).select().single()
       if (error) throw error
-      if (isAutoApproved) {
+      if (isAutoApproved && expense.status === 'pending') {
         const { error: approvalError } = await supabase.rpc('approve_expense_with_reported_payment', {
           p_expense_id: expense.id,
           p_notes: 'Auto-approved by owner',
         })
         if (approvalError) throw approvalError
       }
-      toast.success(isAutoApproved ? 'Expense submitted & auto-approved' : 'Expense submitted for approval')
+      // AFTER INSERT approval/payment triggers run atomically, but INSERT
+      // RETURNING can contain the pre-trigger status. Read the final state.
+      const { data: savedExpense } = await supabase.from('expenses').select('status').eq('id', expense.id).single()
+      const approved = isAutoApproved || ['approved', 'paid'].includes(savedExpense?.status || expense.status)
+      toast.success(approved ? 'Expense submitted & auto-approved' : 'Expense submitted for approval')
       setForm({
         cost_center_id: '', category_id: '', amount: '', currency: 'LYD',
         vendor: '', description: '', expense_date: today, paid_by: 'Business',
