@@ -1,3 +1,12 @@
+## 2026-09-12 — Customer Menu Styling for Nochi Friend
+
+- **Agent**: Codex
+- **Commit**: `3134c53` (`style(loyalty): match Nochi friend to customer menu`).
+- **Files**: `apps/pos/src/modules/loyalty/pages/LoyaltyCheckoutClaim.jsx` and scoped `LoyaltyCheckoutClaim.css`.
+- **Change**: Applied the owner's menu reference to the actual claim page: existing menu palette/fonts/logo, cream background, blue header, white rounded card, orange outlined buttons and dark offset shadows. Kept the exact Nochi upload, title, settlement celebration and existing customer flow. Removed redundant icon and post-payment expiry copy. Staff screens and customer balances are unaffected.
+- **Verification**: Existing isolated QR/verification/payment-result/consent browser journey passed at 390px; screenshot inspected. Targeted ESLint and production build passed. No real transaction or outbound message used.
+- **Live**: Deployment `34681475674` succeeded at 07:46 UTC. Public `LoyaltyCheckoutClaim-C65IJBzT.js` and `LoyaltyCheckoutClaim-C4MG_14R.css` verified for the menu header, Arabic title and scoped customer styling.
+
 ## 2026-09-12 — Nochi Friend Customer Claim Screen
 
 - **Agent**: Codex
