@@ -13,17 +13,19 @@ The menu already loads cached data before network refresh and sorts products by 
 - **Quicker product taps:** use already-loaded modifier data instead of requesting it for every tap. If options have not loaded, a bounded lookup is used. A failed lookup reports a retryable error instead of silently omitting required options. The modifier dialog receives the groups actually found, and failed link-table reads are no longer mistaken for no modifiers.
 - **Opening:** require an explicit counted amount (zero is valid), support form submission, disable controls while opening, and guard duplicate submissions. A failed shift lookup offers retry instead of incorrectly saying there is no open shift. Opening and principal branch controls follow the POS Arabic-first preference.
 - **Closing:** retain the distinction between a blank count and a counted zero, label the count input for accessibility, and show a retry option if loading fails instead of presenting a misleading no-shift state. No closing/accounting policy was changed.
-- **Menu readability:** two lines for names in single-language mode, with Arabic stock badges and empty-search messages.
+- **Menu readability:** two lines for names in single-language mode, with Arabic stock badges and empty-search messages. Small categories keep rows compact instead of stretching them apart.
 - **Popularity:** count completed, non-voided orders over the last 30 days, net of returned quantities. Pending/cancelled baskets and future timestamps no longer contribute. Existing branch filtering and stable sorting for equal popularity remain.
 
 ## Verification
 
-35 checks passed:
+37 checks passed:
 
 - 22 existing Node checks covering weak internet, cashier messages, cash-close states and sales/cash-control interfaces.
 - Three new executable handler/database tests covering cached taps with no request, options fallback/failure, and popularity status/branch/refund/date filtering.
 - Three new browser walkthroughs using real opening/closing components with synthetic backend responses: explicit count and single opening submission, failed shift retry, and closing with a physical count after the missing-count warning.
 - Seven browser checks covering Arabic checkout, loyalty, manager PIN errors, required modifiers and online order controls.
+
+Two additional menu browser checks at 390px and 1024px passed: product tapping, sold-out state, Arabic empty search, no horizontal overflow, and compact row spacing. Phone and tablet screenshots were visually inspected.
 
 Targeted ESLint and production build passed. Browser write paths use synthetic records. Hardware printing, a real employee PIN session, and an actual business-day cash reconciliation have not been performed. Production verification of the prepared changes remains pending deployment approval.
 

@@ -120,7 +120,7 @@ function ProductGrid({
       {/* Product grid — 2 cols on phones, 3 on tablets, 4 on desktop.
           Tiles are taller (h-[180px]/[200px]) to give the hero photo
           real estate while keeping name + Arabic + price below. */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 pt-2 pb-3 pos-scroll">
+      <div className="grid content-start grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 pt-2 pb-3 pos-scroll">
         {filtered.length === 0 && (
           <div className="col-span-full text-center text-noch-muted py-16 text-sm">
             {tileLang === 'ar' ? (searchQuery ? `لا توجد نتائج لـ "${searchQuery}"` : 'لا توجد منتجات في هذا التصنيف') : (searchQuery ? `No results for "${searchQuery}"` : 'No products in this category')}

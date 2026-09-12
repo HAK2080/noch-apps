@@ -49,3 +49,17 @@ test('closing distinguishes an uncounted drawer, then submits a real count and r
   await expect(page.getByRole('heading',{name:'Point of Sale',exact:true})).toBeVisible()
   expect(payload.closing_cash).toBe(100);expect(payload.cash_counted).toBe(true)
 })
+
+for (const width of [390,1024]) test('menu is readable and tappable at '+width+'px',async({page},testInfo)=>{
+  await page.setViewportSize({width,height:844})
+  await page.goto('/tests/fixtures/pos-worker.html?menu')
+  await page.getByRole('button',{name:'W ماء 1.00 LYD',exact:true}).click()
+  await expect(page.getByText('السلة: 1')).toBeVisible()
+  await expect(page.getByRole('button',{name:/لندن كيك/})).toHaveAttribute('aria-disabled','true')
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+  const rows=await page.locator('button[aria-disabled]').evaluateAll(elements=>[...new Map(elements.map(el=>{const r=el.getBoundingClientRect();return [r.top,{top:r.top,bottom:r.bottom}]})).values()].sort((a,b)=>a.top-b.top))
+  for(let i=1;i<rows.length;i++) expect(rows[i].top-rows[i-1].bottom).toBeLessThanOrEqual(16)
+  await page.screenshot({path:testInfo.outputPath('menu.png'),fullPage:true})
+  await page.getByLabel('بحث',{exact:true}).fill('غير موجود')
+  await expect(page.getByText('لا توجد نتائج لـ "غير موجود"')).toBeVisible()
+})
