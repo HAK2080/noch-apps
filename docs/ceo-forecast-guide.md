@@ -2,7 +2,9 @@
 
 The CEO overview separates recorded cash movement from a saved plan for the rest of the current month.
 
-- **Net cash change** is money received minus actual payments within the historical date filter.
+- When the selected dates include today, the top **Money in** and **Money out** cards include actual recorded totals plus saved expected incoming/payments through the forecast target. **Projected net balance** is their difference: green above zero, red below zero, neutral at zero. The card excludes starting cash; cash left after payments below still uses starting funds.
+- Historical ranges excluding today show actual recorded totals and **Net cash change**, without the current forecast.
+- Unsaved forecast changes hide projected totals until Calculate & save succeeds. Loading or save errors also prevent stale projected figures.
 - **Invoices dated in this period** uses the invoice date, not its upload date.
 - **Plan the rest of this month** has its own forecast-through date, from today to month-end. Its calculation does not use the historical date filter.
 - Use **＋ Add expected item** for lease, security, bills or expected receipts. Select incoming (+) or payment (−), enter a positive LYD amount and expected date, and include or exclude it. Remove deletes the planning item only.
