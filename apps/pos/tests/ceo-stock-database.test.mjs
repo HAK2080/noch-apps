@@ -46,7 +46,7 @@ before(async () => {
     create function gl_acct(text) returns uuid language sql as $$select id from gl_accounts where key=$1$$;
     create table gl_journal_batches(id uuid primary key default gen_random_uuid(),journal_date date,source_type text,source_ref text,status text);
     create table gl_journal_lines(batch_id uuid,account_id uuid,debit_lyd numeric default 0,credit_lyd numeric default 0);
-    create table payroll_runs(id uuid primary key default gen_random_uuid(),period_month date,status text);
+    create table payroll_runs(id uuid primary key default gen_random_uuid(),period_month date,status text,paid_at timestamptz);
     create table payroll_run_items(run_id uuid,net_lyd numeric);
   `)
   // Use the actual existing consumption functions, not JavaScript replicas.
@@ -57,6 +57,7 @@ before(async () => {
   await db.exec(await migration('20260912100000_ceo_money_overview'))
   await db.exec(await migration('20260912120000_ceo_payment_correction_reporting'))
   await db.exec(await migration('20260912140000_september_payroll_estimate'))
+  await db.exec(await migration('20260912150000_ceo_saved_forecast'))
   await db.exec(await migration('20260912110000_global_stock_sales_guard'))
   await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false)`)
 })
@@ -187,7 +188,7 @@ test('September uses the owner estimate without changing payments or other month
 })
 
 test('payroll estimates prorate monthly drafts without counting them as cash out', async () => {
-  await db.exec(`insert into payroll_runs values('${id(40)}','2026-09-01','draft'); insert into payroll_run_items values('${id(40)}',3000)`)
+  await db.exec(`insert into payroll_runs(id,period_month,status) values('${id(40)}','2026-09-01','draft'); insert into payroll_run_items values('${id(40)}',3000)`)
   const result = (await first("select ceo_money_overview('2026-09-01','2026-09-10') value")).value
   assert.equal(result.payroll_estimate,1000)
   assert.equal(result.money_out,30)
@@ -204,4 +205,47 @@ test('database grants prevent anonymous financial access and direct policy/balan
   await assert.rejects(db.query('update pos_global_settings set block_unavailable_stock=false'),/permission denied/)
   await assert.rejects(db.query("insert into finance_balance_observations(as_of,cash_lyd,bank_lyd,created_by) values('2026-09-12',0,0,$1)",[staff]),/permission denied/)
   await db.exec('reset role')
+})
+
+
+test('saved forecast adds incoming, subtracts payments, excludes later/disabled items and never posts money', async () => {
+  await db.exec('begin')
+  try {
+    await db.exec(`select set_config('request.jwt.claim.sub','${owner}',true)`)
+    const context=(await first('select get_ceo_forecast() value')).value
+    await db.query('select save_ceo_balances($1,40000,0)',[context.today])
+    const beforeCounts=await first('select (select count(*) from expenses) expenses,(select count(*) from gl_journal_batches) journals')
+    const items=[
+      {id:'salary',label:'Payroll',direction:'out',amount:32460,due_date:context.month_end,included:true},
+      {id:'rent',label:'Lease',direction:'out',amount:2000,due_date:context.month_end,included:true},
+      {id:'income',label:'Expected receipts',direction:'in',amount:5000,due_date:context.month_end,included:true},
+      {id:'off',label:'Excluded',direction:'out',amount:900,due_date:context.today,included:false},
+      {id:'later',label:'Later',direction:'out',amount:800,due_date:'2099-01-01',included:true},
+    ]
+    const result=(await first('select save_ceo_forecast($1,$2,true,false) value',[context.month_end,JSON.stringify(items)])).value
+    assert.equal(result.expected_payments,34460)
+    assert.equal(result.expected_income,5000)
+    assert.equal(result.cash_left,10540)
+    assert.equal(result.bills_covered,false)
+    assert.equal((await first('select get_ceo_forecast() value')).value.items.length,5)
+    assert.deepEqual(await first('select (select count(*) from expenses) expenses,(select count(*) from gl_journal_batches) journals'),beforeCounts)
+    await db.query('select save_ceo_forecast($1,$2,true,true)',[context.month_end,'[]'])
+    assert.equal((await first('select get_ceo_forecast() value')).value.expected_payments,0)
+  } finally { await db.exec('rollback') }
+})
+
+test('forecast refuses malformed values and staff access; missing balances remain unknown', async () => {
+  await db.exec('begin')
+  try {
+    await db.exec(`select set_config('request.jwt.claim.sub','${owner}',true); delete from finance_balance_observations;`)
+    const context=(await first('select get_ceo_forecast() value')).value
+    assert.equal(context.cash_left,null)
+    for(const amount of ['NaN','-3','1.001']) {
+      await db.exec('savepoint invalid')
+      await assert.rejects(db.query('select save_ceo_forecast($1,$2,false,false)',[context.month_end,JSON.stringify([{id:'x',label:'Bad',direction:'out',amount,due_date:context.today,included:true}])]))
+      await db.exec('rollback to savepoint invalid')
+    }
+    await db.exec(`select set_config('request.jwt.claim.sub','${staff}',true); set local role authenticated`)
+    await assert.rejects(db.query('select get_ceo_forecast()'),/Owner access/)
+  } finally { await db.exec('rollback') }
 })

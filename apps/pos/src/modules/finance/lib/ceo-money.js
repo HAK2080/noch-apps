@@ -21,3 +21,18 @@ export async function saveCEOBalances({ date, cash, bank, notes }) {
   })
   if (error) throw error
 }
+
+export async function getCEOForecast() {
+  const { data, error } = await supabase.rpc('get_ceo_forecast')
+  if (error) throw error
+  return data
+}
+
+export async function saveCEOForecast(plan) {
+  const { data, error } = await supabase.rpc('save_ceo_forecast', {
+    p_target: plan.target_date, p_items: plan.items,
+    p_rent_covered: plan.rent_covered, p_bills_covered: plan.bills_covered,
+  })
+  if (error) throw error
+  return data
+}

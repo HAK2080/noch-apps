@@ -4,6 +4,7 @@ const fixture = '/tests/fixtures/ceo-stock.html'
 const summary = { money_in: 5000, money_out: 2000, balance: 3000, payroll_estimate: 1000, invoice_total: 1700, invoice_count: 4, observation: null, baseline_date: null }
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/rpc/get_ceo_forecast', route => route.fulfill({ json: { today:'2026-09-12',month_end:'2026-09-30',target_date:'2026-09-30',items:[],starting_funds:40000,balance_date:'2026-09-12',expected_income:0,expected_payments:0,cash_left:40000,rent_covered:false,bills_covered:false } }))
   await page.route('**/rest/v1/ops_settings**', route => route.fulfill({ json: { module_enabled: false } }))
 })
 
@@ -65,4 +66,31 @@ test('CEO is usable on a phone without horizontal overflow', async ({ page }) =>
   await expect(page.getByText('3,000.00 LYD', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: 'test-results/ceo-mobile.png', fullPage: true })
+})
+
+
+test('owner adds signed planning items, saves without payments, and sees failures without stale forecasts', async ({ page }) => {
+  let saved, fail=false
+  await page.route('**/rpc/ceo_money_overview',route=>route.fulfill({json:summary}))
+  await page.route('**/rpc/save_ceo_forecast',route=>{
+    saved=route.request().postDataJSON()
+    return route.fulfill(fail ? {status:400,json:{message:'Forecast save failed'}} : {json:{today:'2026-09-12',month_end:'2026-09-30',target_date:saved.p_target,items:saved.p_items,starting_funds:40000,balance_date:'2026-09-12',expected_income:5000,expected_payments:2000,cash_left:43000,saved_at:'2026-09-12',rent_covered:false,bills_covered:false}})
+  })
+  await page.goto(fixture)
+  await page.getByRole('button',{name:'＋ Add expected item'}).click()
+  await page.getByLabel('Item 1 name',{exact:true}).fill('Lease')
+  await page.getByLabel('Item 1 amount',{exact:true}).fill('2000')
+  await page.getByRole('button',{name:'＋ Add expected item'}).click()
+  await page.getByLabel('Item 2 name',{exact:true}).fill('Expected sales')
+  await page.getByLabel('Item 2 direction',{exact:true}).selectOption('in')
+  await page.getByLabel('Item 2 amount',{exact:true}).fill('5000')
+  await page.getByRole('button',{name:'Calculate & save forecast'}).click()
+  await expect(page.getByText('43,000.00 LYD',{exact:true})).toBeVisible()
+  expect(saved.p_items.map(i=>i.direction)).toEqual(['out','in'])
+  await expect(page.getByText(/Forecast incomplete:/)).toBeVisible()
+  await page.screenshot({path:'test-results/ceo-forecast.png',fullPage:true})
+  fail=true
+  await page.getByRole('button',{name:'Calculate & save forecast'}).click()
+  await expect(page.getByRole('alert')).toContainText('Forecast save failed')
+  await expect(page.getByText('43,000.00 LYD',{exact:true})).toHaveCount(0)
 })
