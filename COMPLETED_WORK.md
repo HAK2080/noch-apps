@@ -1,3 +1,61 @@
+## 2026-09-12 — Online Order Payment and Stock Safety
+
+- **Agent**: Codex
+- **Status**: Approved by owner, verified, committed, pushed and live; full customer-tablet journey remains unfinished.
+- **Commit / deployment**: `efff7c684a0520135ceb9f8dd98f56b6b5909a21`; GitHub run `34679831635` succeeded at 07:08 UTC. Migration `20260912170000_online_order_payment_safety.sql` applied successfully to production; schema cache refreshed. Live main bundle and Arabic translation chunk verified.
+- **Files**: `OnlineOrderPaymentModal.jsx`, POS terminal and message map; new forward-only migration; payment/Arabic/journey browser and SQL tests; release report `docs/research/noch-loyalty-rebuild/11-payment-safety-fix.md` and checkpoints 09/10.
+- **Change**: Arabic review and explicit cash/card/split collection; authorised atomic completion of the existing order; immutable payment proof, replay protection, single stock path, correct first-payment tender accounting, shift counters and printing only after commit. Old completion shortcuts are blocked. Already-preparing orders do not print twice.
+- **Verification**: 18 isolated SQL tests, 26 other targeted Node checks, 6 payment + 7 Arabic + 16 journey browser tests; targeted lint/build/whitespace and screenshot checks passed. Live function permissions and enabled payment/stock/tender/loyalty triggers checked. Some journey tests still characterize open gaps.
+- **Safety / limits**: No historical balance/order/stock rewrites or real test transactions/messages. Production pickup SQL was older than repository SQL; historical double stock deduction is not established. Physical tablet/printer sale, customer-display QR/profile/prizes, GPS and duplicate guest-submission gaps remain. Existing unrelated work preserved.
+- **Operating handoff**: Added bilingual marketing/cashier guide `docs/research/noch-loyalty-rebuild/12-marketing-and-cashier-guide-ar-en.md`, separating live features from unready customer-tablet and loyalty claims.
+
+## 2026-09-12 — Customer and Barista Journey Assessment
+
+- **Agent**: Codex
+- **Status**: Read-only live inspection plus isolated browser/SQL testing; full two-tablet journey not signed off.
+- **Commit / verification**: `358da84` (test/report artifacts); 16 journey/animation browser tests, 7 Arabic browser regressions and 34 Node checks completed, including 8 actual-SQL tests. Targeted lint/whitespace checks passed. Inspected synthetic menu-success and 390px customer-result screenshots; no horizontal overflow on the tested phone result. Several green assertions reproduce known defects, not successful requirements.
+- **Files**: `apps/pos/tests/loyalty-journey.spec.js`, `loyalty-journey-database.test.mjs`, dedicated fixtures/config; `docs/research/noch-loyalty-rebuild/10-customer-and-barista-test-report.md`; release checkpoint 09.
+- **Findings**: Missing customer-display QR routing, menu-order review/payment handoff and complete profile/prize progress. Reproduced phone fallback removing QR, expired QR staying visible, raw English menu errors and feedback order ID mismatch. Actual isolated SQL reproduced anonymous pickup completion, omitted-GPS bypass, duplicate guest submissions and double tracked-stock deduction under strict stock control. Base-point rounding, sequential settlement, refund/void and failed-completion rollback tested with synthetic values only.
+- **Safety**: No production test sale, customer identity, balance, stock, shift, OTP or outbound device/message writes. Tests include explicit gap characterizations; a green runner is not release approval. Physical tablets/printer/payment/OTP and full ledger integration still require a controlled trial after fixes. Existing unfinished project goal preserved.
+- **Deployment check**: Previously blocked Arabic commit `4fe0be0` is an ancestor of deployed `0a3f518`; successful GitHub run `34678009409` and live Arabic claim UI verified. No additional production deployment performed for these testing artifacts. Concurrent task edits left untouched.
+
+## 2026-09-12 — Arabic-First Cashier Workflow, First Build Slice
+
+- **Agent**: Codex
+- **Status**: Implemented and verified locally; production push blocked pending explicit owner approval.
+- **Commit**: `4fe0be06b18bd9b427f3f5945f3de2feab678739` (`feat(pos): make cashier controls and messages Arabic-first`).
+- **Files**: POS terminal, PIN login, checkout, cart, receipt preview, online-order controls, manager/modifier dialogs, scanner copy, printer status, offline-sync messages, customer loyalty claim page; `pos-messages.js`; Arabic browser/unit tests; `docs/research/noch-loyalty-rebuild/09-agreed-build-sequence.md`.
+- **Description**: Added Arabic default/fallback copy, actionable translated errors and confirmations, Arabic customer-memory greetings, Arabic-first item names, and Arabic claim-page copy with explicit English option. Bilingual product mode retains Arabic controls. RTL text preserves standard numeric keypad order. Modifier validation now explains why Add is disabled. Existing menu/GPS reuse and separately planned review/payment flow recorded in the build checkpoint.
+- **Verification**: 26 targeted Node tests and 7 browser tests passed. Browser tests use synthetic remote responses only; Arabic order and checkout screenshots inspected. Targeted ESLint: zero errors, one pre-existing scanner hook warning. Production build and diff whitespace check passed. These checks do not certify live database behaviour or the physical Android/printer setup.
+- **Safety/deployment**: No payment calculations, order-state transitions, database migrations, points/reward balances, printer routing, SMS/email/WhatsApp templates, or outbound customer messages changed. No production test account/order/shift created. `git push origin main` was rejected before execution because it triggers production deployment and requires explicit user approval; no alternate deployment attempted. Existing unrelated work preserved.
+
+## 2026-09-11 — Loyalty PowerPoint Presentation
+
+- **Agent**: Codex
+- **Status**: Complete as a 10-slide editable PowerPoint presentation.
+- **Files**: `docs/research/noch-loyalty-rebuild/presentation/Noch Loyalty Presentation.pptx`; authoring script, generated cafe cover asset and private render/validation files in `presentation-build/`; `COMPLETED_WORK.md`.
+- **Description**: Created an espresso, cream and sage presentation covering current capabilities, friction, proposed journey and reward choice, customer-value protection, marketing AI, simplification priorities and the next decision. Used the presentation skill and built-in image generation for an illustrative cover. Text remains editable; source details and image provenance are in speaker notes.
+- **Verification**: Artifact Tool export, structural and layout validation, font policy and reimport passed. Rendered all 10 slides from the final file and inspected each image at full size. Native PowerPoint execution was not tested. No application or customer-data changes.
+- **Commit / deployment**: None; presentation artifact only. Existing work preserved.
+
+## 2026-09-11 — Simple Loyalty Team Guide
+
+- **Agent**: Codex
+- **Status**: Complete as a Markdown guide; no Word document or slides produced.
+- **Files**: `docs/research/noch-loyalty-rebuild/08-simple-team-guide.md`; `COMPLETED_WORK.md`.
+- **Description**: Plain-English guide for owner and marketing covering current features, proposed customer journey, points protection, AI boundaries, ranked rollout and next decision. Explicitly separates completed planning from unbuilt software.
+- **Verification**: Compared content with existing assessment and design; checked local links and whitespace. The selected Word template could not be used with the skill-required bundled renderer on this Windows host, so a readable Markdown guide was delivered instead. No new live-system verification claimed.
+- **Commit / deployment**: None; documentation only. No application or customer-value changes.
+
+## 2026-09-11 — Loyalty Implementation Backlog and Baseline Recheck
+
+- **Agent**: Codex
+- **Status**: Planning continuation complete; application implementation not started.
+- **Files**: `docs/research/noch-loyalty-rebuild/07-implementation-backlog.md`, `06-design-at-a-glance.md`; `COMPLETED_WORK.md`.
+- **Description**: Eight ordered build packages, dependencies, acceptance evidence, release gates and an explicitly local-only first engineering slice for synthetic value-preservation tests. Preserved prior design edits and all existing application work.
+- **Verification**: Rechecked scoped source at `1978a78`; 16/16 existing focused loyalty tests passed (14 source-text checks and two conversion-helper tests). These are not live transaction or migration verification. No production data access, backup, migration or customer-value changes.
+- **Commit / deployment**: None; documentation-only continuation. Commercial terms and implementation/deployment authority remain separate gates.
+
 ## 2026-09-11 — Loyalty Detailed Design
 
 - **Agent**: Codex
@@ -1123,6 +1181,13 @@ To find if something's been done:
 - **Deployment**: GitHub Actions run `31935396785` deployed commit `e15069a` successfully to `apps.noch.cloud`; the live menu serves JavaScript asset `index-BJKwUVZi.js` and CSS asset `index-C7TPDNK2.css`.
 
 ---
+
+## 2026-09-11 — Repair customer-menu category thumbnail
+- **Agent**: Codex
+- **Files**: apps/pos/src/pages/storefront/Menu.jsx; apps/pos/tests/product-image-stored-variants.test.mjs.
+- **Change**: Category icons use their original uploaded image because category uploads do not generate product-size derivatives. Failed originals fall back to the existing category symbol. Product image optimization is preserved, with no Supabase transformation requests added.
+- **Verification**: Seven stored-image tests passed; targeted ESLint reported zero errors and two existing hook warnings; production build and diff checks passed. Live browser verified the Korean/Japanese category image loads from its original staff-photos URL with naturalWidth 1254.
+- **Commit / deployment**: 6876954 pushed to main. GitHub Actions deployment 34611084384 completed every step successfully. No database or billing changes. Existing unrelated research edits were preserved and excluded from the code commit.
 
 ## 2026-09-12 — CEO money overview, global stock protection and August payroll
 - **Agent**: Codex.
