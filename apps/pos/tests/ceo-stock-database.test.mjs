@@ -56,6 +56,7 @@ before(async () => {
   await db.exec(beans.slice(beans.indexOf('create or replace function public.adjust_order_item_coffee_stock('), beans.indexOf('--', beans.indexOf('create trigger pos_orders_adjust_coffee_status')) > 0 ? beans.indexOf('--', beans.indexOf('create trigger pos_orders_adjust_coffee_status')) : undefined))
   await db.exec(await migration('20260912100000_ceo_money_overview'))
   await db.exec(await migration('20260912120000_ceo_payment_correction_reporting'))
+  await db.exec(await migration('20260912140000_september_payroll_estimate'))
   await db.exec(await migration('20260912110000_global_stock_sales_guard'))
   await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false)`)
 })
@@ -173,6 +174,16 @@ test('balance observations establish a baseline, expose signed differences and p
   result = (await first("select ceo_money_overview('2026-09-01','2026-09-01') value")).value
   assert.equal(result.cash_difference,0)
   assert.equal(Number((await first('select count(*) n from finance_balance_observations')).n),3)
+})
+
+test('September uses the owner estimate without changing payments or other months', async () => {
+  const overview = async (from,to) => (await first('select ceo_money_overview($1,$2) value',[from,to])).value
+  const partial = await overview('2026-09-01','2026-09-12')
+  assert.equal(partial.payroll_estimate,12984)
+  assert.equal((await overview('2026-09-01','2026-09-30')).payroll_estimate,32460)
+  assert.equal((await overview('2026-08-01','2026-08-31')).payroll_estimate,0)
+  assert.equal((await overview('2026-10-01','2026-10-31')).payroll_estimate,0)
+  assert.equal(partial.money_out,30)
 })
 
 test('payroll estimates prorate monthly drafts without counting them as cash out', async () => {
