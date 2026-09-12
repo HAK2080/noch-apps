@@ -2,6 +2,8 @@
 
 This checkpoint supersedes earlier proposals where they conflict with the decisions below. It does not mean the whole rebuild is implemented.
 
+**Payment follow-up, 12 September:** staff-only atomic menu-order payment and single-path stock deduction are now live in `efff7c6`. See [payment safety release](11-payment-safety-fix.md). The earlier “Next” section below is the original plan; review/payment is implemented, while editing and the remaining customer-tablet work are not.
+
 **Release status:** Arabic code commit `4fe0be0` is included in deployed descendant `0a3f518`. GitHub deployment run `34678009409` succeeded on 12 September 2026 at 06:26 UTC; the Arabic customer claim page was subsequently checked live. The prior deployment gate is superseded by this verification. This Arabic slice did not change points or printer settings. The complete two-tablet journey is **not** ready: see `10-customer-and-barista-test-report.md` for isolated test findings and release blockers.
 
 ## First release: Arabic cashier experience

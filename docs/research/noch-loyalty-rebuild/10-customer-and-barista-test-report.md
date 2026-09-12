@@ -2,6 +2,8 @@
 
 12 September 2026 · Current implementation, not the proposed rebuild
 
+**Follow-up:** the payment/completion permissions and stock-safety findings below were addressed and deployed in `efff7c6`. See [payment safety release](11-payment-safety-fix.md) for updated evidence and limitations. This report preserves the original assessment; duplicate guest submission and the other customer-tablet gaps remain open.
+
 ## Read this first
 
 **Not ready for the complete two-tablet experience.** The menu, cashier customizations and basic QR/points components work in isolation. Their connections are incomplete, and database tests reproduced order-completion and stock risks.
