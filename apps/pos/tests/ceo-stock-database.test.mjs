@@ -18,6 +18,8 @@ before(async () => {
     create table profiles(id uuid primary key,auth_user_id uuid,role text,is_employee boolean default false,payroll_enabled boolean default false,
       monthly_salary numeric,monthly_salary_lyd numeric,start_date date,employment_end_date date,is_active boolean default true);
     insert into profiles(id,role) values('${owner}','owner'),('${staff}','staff');
+    create table pos_branches(id uuid primary key,is_active boolean default true,operational_status text default 'operating');
+    insert into pos_branches(id) values('${branch}');
     create table pos_products(id uuid primary key,name text,is_active boolean default true,is_sold_out boolean default false,
       track_inventory boolean default false,stock_qty numeric default 0,coffee_bean_product_id uuid,coffee_grams_per_sale numeric,
       branch_id uuid,visible_branch_ids uuid[],updated_at timestamptz);
@@ -59,6 +61,7 @@ before(async () => {
   await db.exec(await migration('20260912140000_september_payroll_estimate'))
   await db.exec(await migration('20260912150000_ceo_saved_forecast'))
   await db.exec(await migration('20260912110000_global_stock_sales_guard'))
+  await db.exec(await migration('20260912190000_hide_unavailable_customer_products'))
   await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false)`)
 })
 after(async () => db.close())
@@ -185,6 +188,20 @@ test('September uses the owner estimate without changing payments or other month
   assert.equal((await overview('2026-08-01','2026-08-31')).payroll_estimate,0)
   assert.equal((await overview('2026-10-01','2026-10-31')).payroll_estimate,0)
   assert.equal(partial.money_out,30)
+})
+
+test('customer menu hides blocked products but retains saleable products', async () => {
+  await db.exec(`select set_global_stock_block(true)`)
+  let menu = await db.query(`select product_id,available from get_customer_sale_availability('${branch}') order by product_id`)
+  const available = new Set(menu.rows.filter(row => row.available).map(row => row.product_id))
+  assert.equal(available.has(cake), true)
+  assert.equal(available.has(coffee), true)
+  assert.equal(available.has(unknown), false)
+
+  await db.exec(`update location_product_stock set qty=0 where product_id='${cake}'`)
+  menu = await db.query(`select product_id,available from get_customer_sale_availability(null)`)
+  assert.equal(menu.rows.find(row => row.product_id === cake)?.available, false)
+  await db.exec(`select set_global_stock_block(false)`)
 })
 
 test('payroll estimates prorate monthly drafts without counting them as cash out', async () => {

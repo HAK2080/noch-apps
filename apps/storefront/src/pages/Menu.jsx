@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getCustomerAvailableProductIds } from '../lib/stock-availability'
 
 const CAT_EMOJI = {
   'hot coffee': '☕', 'coffee': '☕',
@@ -87,7 +88,7 @@ export default function Menu() {
   useEffect(() => {
     async function load() {
       try {
-        const [catRes, prodRes] = await Promise.all([
+        const [catRes, prodRes, availableIds] = await Promise.all([
           supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).eq('show_on_website', true).order('sort_order'),
           supabase.from('pos_products')
             .select('id,name,name_ar,price,description,menu_description,menu_description_ar,show_description_on_website,visible_on_website,category_id,image_url,video_url')
@@ -95,6 +96,7 @@ export default function Menu() {
             .eq('visible_on_customer_menu', true)
             .not('is_sold_out', 'is', true) // hide POS long-press sold-out items
             .order('name'),
+          getCustomerAvailableProductIds(),
         ])
 
         if (catRes.data?.length) {
@@ -105,7 +107,7 @@ export default function Menu() {
         }
 
         // Filtered by visibility flags (show_on_website / visible_on_customer_menu)
-        const prods = prodRes.data || []
+        const prods = (prodRes.data || []).filter(product => availableIds.has(product.id))
         setItems(prods.map(p => ({
           id: p.id,
           cat_id: p.category_id,

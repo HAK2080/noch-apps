@@ -18,6 +18,12 @@ export async function getSaleAvailability(branchId) {
   return Object.fromEntries((data || []).map(row => [row.product_id, row]))
 }
 
+export async function getCustomerSaleAvailability(branchId) {
+  const { data, error } = await supabase.rpc('get_customer_sale_availability', { p_branch: branchId || null })
+  if (error) throw error
+  return new Set((data || []).filter(row => row.available).map(row => row.product_id))
+}
+
 export function applySaleAvailability(products, availability) {
   return products.map(product => ({
     ...product,

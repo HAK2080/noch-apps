@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { getSaleAvailability } from '../../modules/pos/lib/global-stock'
+import { getCustomerSaleAvailability } from '../../modules/pos/lib/global-stock'
 import { formatFixed } from '../../lib/numbers'
 import { buildStoredProductImageUrl } from '../../lib/product-images'
 import { productBelongsToCategory } from '../../lib/product-categories'
@@ -664,7 +664,7 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
 
 // ── Main page ────────────────────────────────────────────────────────────────
 const BRANCH_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MENU_CACHE_VERSION = 1
+const MENU_CACHE_VERSION = 2
 const MENU_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000
 
 function readCachedMenu(branchParam) {
@@ -744,12 +744,10 @@ export default function Menu() {
       setBranchId(cached.branch.id)
       setBranch(cached.branch)
       setCategories(cached.categories)
-      setProducts(cached.products)
-      setLoading(false)
     }
 
     try {
-      if (!cached) setLoading(true)
+      setLoading(true)
       setError(null)
       // Resolve branch by UUID or slug first, then load its menu by real id.
       const isUuid = BRANCH_UUID_RE.test(branchParam)
@@ -779,17 +777,16 @@ export default function Menu() {
       if (ce) throw new Error('Failed to load categories: ' + ce.message)
       setBranch(b)
       setCategories(cats || [])
-      const availability = await getSaleAvailability(id)
-      const availableProducts = (prods || []).map(product => ({
-        ...product,
-        is_available: product.is_available !== false && availability[product.id]?.blocked === false,
-      }))
+      const availableIds = await getCustomerSaleAvailability(id)
+      const availableProducts = (prods || []).filter(product =>
+        product.is_available !== false && availableIds.has(product.id)
+      )
       setProducts(availableProducts)
       writeCachedMenu(branchParam, b, cats || [], availableProducts)
     } catch (err) {
-      if (!cached) setError(err.message || 'Failed to load menu')
+      setError(err.message || 'Failed to load menu')
     } finally {
-      if (!cached) setLoading(false)
+      setLoading(false)
     }
   }
 

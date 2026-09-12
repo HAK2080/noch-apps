@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getCustomerAvailableProductIds } from '../lib/stock-availability'
 
 export default function Shop({ lang = 'en' }) {
   const [active, setActive] = useState('all')
@@ -23,10 +24,11 @@ export default function Shop({ lang = 'en' }) {
         .eq('show_in_online_store', true)
         .eq('is_active', true)
         .order('sort_order'),
-    ]).then(([pr, cr]) => {
+      getCustomerAvailableProductIds(),
+    ]).then(([pr, cr, availableIds]) => {
       const cats = cr.data || []
       const catIds = new Set(cats.map(c => c.id))
-      const prods = (pr.data || []).filter(p => !p.category_id || catIds.has(p.category_id))
+      const prods = (pr.data || []).filter(p => availableIds.has(p.id) && (!p.category_id || catIds.has(p.category_id)))
       setProducts(prods)
       setCategories([{ id: 'all', name: 'All', name_ar: 'الكل', emoji: '✨' }, ...cats.map(c => ({ ...c, emoji: '☕' }))])
       setLoading(false)
