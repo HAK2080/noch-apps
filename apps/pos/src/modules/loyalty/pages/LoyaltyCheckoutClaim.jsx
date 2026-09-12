@@ -3,10 +3,16 @@ import { CheckCircle2, Loader2, LockKeyhole, Mail, Phone } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { posMessage, posError } from '../../pos/lib/pos-messages'
+import nochiCustomerFace from '../../../assets/nochi-customer-face.png'
 import {
   joinAndClaimLoyaltyCheckoutV2,
   updateMyLoyaltyProfileV2,
 } from '../lib/loyalty-supabase'
+
+const celebrationPieces = [
+  ['8%', '12%', '#4ADE80'], ['22%', '2%', '#FBBF24'], ['40%', '10%', '#60A5FA'],
+  ['63%', '4%', '#F472B6'], ['80%', '14%', '#4ADE80'], ['92%', '1%', '#FBBF24'],
+]
 
 export default function LoyaltyCheckoutClaim() {
   const { token } = useParams()
@@ -22,6 +28,8 @@ export default function LoyaltyCheckoutClaim() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [consentBusy, setConsentBusy] = useState(false)
+  const firstMission = result?.missions?.[0]
+  const visitsLeft = firstMission ? Math.max(0, firstMission.target_count - firstMission.progress_count) : null
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -129,63 +137,73 @@ export default function LoyaltyCheckoutClaim() {
     <main lang={lang} dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-noch-dark px-4 py-10 text-white">
       <div className="mx-auto max-w-md">
         <button type="button" className="btn-secondary mb-4" onClick={() => setLang(ar ? 'en' : 'ar')}>{ar ? 'English' : 'العربية'}</button>
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-noch-green/15 text-noch-green">
-            {result ? <CheckCircle2 size={30} /> : <LockKeyhole size={28} />}
+        <div className="relative mb-5 text-center">
+          {result?.status === 'settled' && <>
+            <style>{`@keyframes nochi-celebrate { 0% { opacity: 0; transform: translateY(8px) scale(.5) rotate(0deg) } 30% { opacity: 1 } 100% { opacity: 0; transform: translateY(-32px) scale(1) rotate(140deg) } } @media (prefers-reduced-motion: reduce) { .nochi-celebration { animation: none !important; opacity: .8 !important; } }`}</style>
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-4 h-20 overflow-hidden">
+              {celebrationPieces.map(([left, top, color], index) => <span key={left} className="nochi-celebration absolute h-2 w-2 rounded-sm" style={{ left, top, backgroundColor: color, animation: `nochi-celebrate 900ms ease-out ${index * 90}ms both` }} />)}
+            </div>
+          </>}
+          <img
+            src={nochiCustomerFace}
+            alt={ar ? 'وجه نوتشي' : 'Nochi face'}
+            className="mx-auto mb-2 h-24 w-24 rounded-2xl object-contain"
+          />
+          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-noch-green/15 text-noch-green">
+            {result ? <CheckCircle2 size={22} /> : <LockKeyhole size={20} />}
           </div>
-          <h1 className="text-2xl font-bold">{ar ? 'ولاء نوتش V2' : 'Noch Loyalty V2'}</h1>
-          <p className="mt-2 text-sm text-noch-muted">
-            {ar ? 'اربط هذا الطلب بخصوصية. الباريستا لا يرى ولا يسمع رقم هاتفك.' : 'Link this purchase privately. The cashier never sees or hears your phone number.'}
+          <h1 className="text-2xl font-bold">{ar ? 'صديق نوتشي' : 'Nochi Friend'}</h1>
+          {!result && <p className="mt-1 text-sm text-noch-muted">
+            {ar ? 'اربط طلبك واجمع نقاطك.' : 'Link your purchase and collect points.'}
           </p>
+          }
         </div>
 
         <section className="card space-y-4">
           {result ? (
-            <div className="py-4 text-center">
+            <div className="py-2 text-center">
               <h2 className="text-xl font-bold text-noch-green">
                 {result.status === 'settled' ? (ar ? 'تمت إضافة النقاط' : 'Points added') : (ar ? 'تم ربط الطلب' : 'Purchase linked')}
               </h2>
-              <p className="mt-2 text-white">{result.full_name}</p>
               {result.status === 'settled' ? (
-                <p className="mt-3 text-2xl font-bold text-white">+{result.points_earned} {ar ? 'نقطة' : 'points'}</p>
+                <>
+                  <p className="mt-2 text-3xl font-bold text-white">+{result.points_earned} {ar ? 'نقطة' : 'points'}</p>
+                  <p className="mt-1 text-sm text-noch-muted">
+                    {ar ? 'رصيدك الآن' : 'Your balance'} <span className="font-semibold text-white">{result.points_balance} {ar ? 'نقطة' : 'points'}</span>
+                  </p>
+                </>
               ) : (
                 <p className="mt-3 flex items-center justify-center gap-2 text-sm text-noch-muted">
                   <Loader2 size={15} className="animate-spin" /> {ar ? 'بانتظار إتمام الدفع…' : 'Waiting for payment…'}
                 </p>
               )}
-              <p className="mt-1 text-sm text-noch-muted">
-                {ar ? 'الرصيد الحالي:' : 'Current balance:'} <span className="font-semibold text-white">{result.points_balance} {ar ? 'نقطة' : 'points'}</span>
-              </p>
               {result.status === 'settled' && result.available_rewards > 0 && (
-                <p className="mt-3 rounded-lg bg-yellow-300/10 px-3 py-2 text-sm text-yellow-200">
-                  {ar ? `المكافآت المتاحة: ${result.available_rewards}` : `${result.available_rewards} reward${result.available_rewards === 1 ? '' : 's'} available`}
+                <p className="mt-4 rounded-xl bg-yellow-300/10 px-3 py-3 text-sm font-semibold text-yellow-200">
+                  {ar ? `لديك ${result.available_rewards} مكافأة جاهزة` : `${result.available_rewards} reward${result.available_rewards === 1 ? '' : 's'} ready`}
                 </p>
               )}
-              {result.status === 'settled' && result.missions?.length > 0 && (
-                <div className="mt-4 space-y-2 text-left">
-                  {result.missions.map(mission => (
-                    <div key={mission.mission_id} className="rounded-lg border border-noch-border px-3 py-2">
-                      <p className="text-sm font-medium text-white">{ar ? (mission.title_ar || mission.title) : mission.title}</p>
-                      <p className="text-xs text-noch-muted">{ar ? `تم إكمال ${mission.progress_count} من ${mission.target_count}` : `${mission.progress_count} of ${mission.target_count} completed`}</p>
-                    </div>
-                  ))}
+              {result.status === 'settled' && result.available_rewards === 0 && firstMission && (
+                <div className="mt-4 rounded-xl border border-noch-border px-4 py-3">
+                  <p className="text-sm font-semibold text-white">
+                    {visitsLeft === 0
+                      ? (ar ? 'أكملت هدفك القادم!' : 'You reached your next goal!')
+                      : (ar ? `باقي ${visitsLeft} ${visitsLeft === 1 ? 'زيارة' : 'زيارات'} للهدف القادم` : `${visitsLeft} visit${visitsLeft === 1 ? '' : 's'} to your next goal`)}
+                  </p>
+                  <p className="mt-1 text-xs text-noch-muted">{ar ? `${firstMission.progress_count} من ${firstMission.target_count}` : `${firstMission.progress_count} of ${firstMission.target_count}`}</p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-noch-green" style={{ width: `${Math.min(100, (firstMission.progress_count / firstMission.target_count) * 100)}%` }} />
+                  </div>
                 </div>
               )}
               {result.status === 'settled' && !result.consentSaved && (
-                <div className="mt-5 rounded-xl border border-noch-border p-3 text-start">
-                  <p className="text-sm font-semibold text-white">{ar ? 'اختيار التواصل' : 'Contact choice'}</p>
-                  <p className="mt-1 text-xs text-noch-muted">
-                    {ar ? 'لن نرسل أي رسالة دون موافقة موثقة هنا.' : 'We send nothing unless you give verified consent here.'}
-                  </p>
-                  <div className="mt-3 grid gap-2">
+                <div className="mt-5 border-t border-noch-border pt-4">
+                  <p className="text-sm text-noch-muted">{ar ? 'هل ترغب بعروض نوتش عبر واتساب؟' : 'Would you like Noch offers on WhatsApp?'}</p>
+                  <div className="mt-3 flex justify-center gap-2">
                     <button disabled={consentBusy} className="btn-primary text-sm" onClick={() => updateConsent(true, true)}>
-                      {ar ? 'رسائل الخدمة والعروض عبر واتساب' : 'WhatsApp service updates and offers'}
+                      {ar ? 'نعم' : 'Yes'}
                     </button>
-                    <button disabled={consentBusy} className="btn-secondary text-sm" onClick={() => updateConsent(true, false)}>
-                      {ar ? 'رسائل الخدمة فقط' : 'Service updates only'}
-                    </button>
-                    <button disabled={consentBusy} className="text-xs text-noch-muted underline" onClick={() => updateConsent(false, false)}>
-                      {ar ? 'لا رسائل' : 'No messages'}
+                    <button disabled={consentBusy} className="btn-secondary text-sm" onClick={() => updateConsent(false, false)}>
+                      {ar ? 'ليس الآن' : 'Not now'}
                     </button>
                   </div>
                 </div>
