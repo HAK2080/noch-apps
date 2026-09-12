@@ -78,6 +78,7 @@
   .tile:hover .tile-mascot{transform:translateY(-8px) rotate(-6deg) scale(1.06)}
   [dir="rtl"] .tile:hover .tile-mascot{transform:translateY(-8px) rotate(6deg) scale(1.06)}
   .tile:hover .tile-arrow{transform:translate(4px,-4px)}
+  .tile-presto{filter:grayscale(1) brightness(.9)}
   .tile-kicker{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:.7;font-weight:600}
   [lang="ar"] .tile-kicker{font-family:'Cairo',sans-serif;letter-spacing:0}
   .tile-title{font-family:'Baloo 2';font-weight:800;font-size:clamp(38px,5vw,52px);line-height:.9;letter-spacing:-2px;margin-top:8px;color:var(--ink)}
@@ -2507,7 +2508,7 @@ const [slots, setSlots] = useState(TWEAK_DEFAULTS);
               <div className="tile-arrow">{lang==="ar"?"←":"→"}</div>
               <img className="tile-mascot shift-left" src={gp(slots.find, allPoses)} alt="" style={getMascotStyle('find')}/>
             </button>
-            <a className="tile" href="#deliver">
+            <a className="tile tile-presto" href="#deliver">
               <div className="tile-kicker">{t.delK}</div>
               <div className="tile-title">{t.delT}</div>
               <div className="tile-desc">{t.delD}</div>
