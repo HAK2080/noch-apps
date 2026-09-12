@@ -1,6 +1,6 @@
 # POS worker review — September 12, 2026
 
-Local implementation commit: `9e2ef07`. Deployment is pending explicit approval: automatic approval review rejected pushing the workflow/UI/database changes to main as broader than the testing request. No production migration was applied and no production shift or sale was created.
+Deployed after explicit user approval. Implementation commits `9e2ef07` and `d3e2221` are on GitHub main. Website deployment run 34679166124 succeeded. Migration `20260912160000_pos_popularity_completed_sales.sql` was applied successfully to production. No production shift or sale was created during testing.
 
 ## Walkthrough findings
 
@@ -27,7 +27,7 @@ The menu already loads cached data before network refresh and sorts products by 
 
 Two additional menu browser checks at 390px and 1024px passed: product tapping, sold-out state, Arabic empty search, no horizontal overflow, and compact row spacing. Phone and tablet screenshots were visually inspected.
 
-Targeted ESLint and production build passed. Browser write paths use synthetic records. Hardware printing, a real employee PIN session, and an actual business-day cash reconciliation have not been performed. Production verification of the prepared changes remains pending deployment approval.
+Targeted ESLint and production build passed. Browser write paths use synthetic records. Hardware printing, a real employee PIN session, and an actual business-day cash reconciliation have not been performed. Production verification passed: the Arabic opening dialog and labelled cash field load, cancellation leaves the shift closed, owner terminal navigation works, and Arabic stock badges and leading sellers render. The live popularity query returned Water 1501, Cappuccino 451, Matcha latte 313, nitro hibiscus 308, and Iced Caramel Macchiato 283 units.
 
 ## Recommended next improvements
 
@@ -37,4 +37,4 @@ Targeted ESLint and production build passed. Browser write paths use synthetic r
 4. Connect the branch print host and run a real drink-ticket/receipt check on the shop device. The existing banner correctly reports the disconnected state.
 5. Put shift-close readiness in one compact checklist: queued orders synced, pending orders reviewed, cash counted and printer status. Keep manager exceptions explicit.
 
-The software changes are locally verified, but the full live acceptance goal remains open until authorized deployment and subsequent live verification. Physical printer readiness requires access to the shop device.
+The software changes are locally verified, deployed and smoke-tested in production. Physical printer readiness requires access to the shop device.

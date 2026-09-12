@@ -1187,3 +1187,10 @@ To find if something's been done:
 - Agent: Codex. Implementation 9e2ef07; review docs/pos-worker-review-2026-09-12.md at 778b728.
 - Reviewed live branch opening, PIN/owner preview, popular menu order, unsold cart and printer status. Prepared cached modifier taps, safer opening submission, shift-load retry states, Arabic stock badges/two-line names and completed-sales popularity net of returns.
 - Verification: 35 Node/browser checks, targeted ESLint and production build passed. No production sale/shift/count was created. Auto-review rejected pushing to main because it judged production workflow/database changes broader than the testing request. No push or migration deployment followed; explicit approval is required. Goal remains active pending deployment/live verification; physical printer disconnected.
+
+## 2026-09-12 — POS worker improvements deployed
+- Agent: Codex. Explicit user approval resumed deployment after the earlier approval gate.
+- Commits: 9e2ef07 and d3e2221 pushed to main; GitHub Actions run 34679166124 succeeded.
+- Database: applied only 20260912160000_pos_popularity_completed_sales.sql; verified live top-five sales results.
+- Verification: prior 37 checks, targeted lint and production build passed. Live Arabic shift form, cancellation, owner terminal navigation, menu and stock labels verified without posting a sale or opening a shift.
+- Files: docs/pos-worker-review-2026-09-12.md updated with rollout evidence. Physical printer check remains an on-site recommendation. Unrelated active online-order and loyalty work preserved.
