@@ -3,7 +3,7 @@ import { getCEOForecast, saveCEOForecast } from './lib/ceo-money'
 
 const money = value => value == null ? '—' : `${Number(value).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} LYD`
 
-export default function CEOForecast({ revision = 0 }) {
+export default function CEOForecast({ revision = 0, onForecastChange }) {
   const [plan, setPlan] = useState(null)
   const [result, setResult] = useState(null)
   const [dirty, setDirty] = useState(false)
@@ -11,20 +11,21 @@ export default function CEOForecast({ revision = 0 }) {
   const [error, setError] = useState('')
   useEffect(() => {
     let cancelled = false
+    onForecastChange?.({ status: 'loading', data: null })
     getCEOForecast().then(data => {
-      if (!cancelled) { setPlan(data); setResult(data); setDirty(false); setError('') }
-    }).catch(err => { if (!cancelled) setError(err.message) })
+      if (!cancelled) { setPlan(data); setResult(data); setDirty(false); setError(''); onForecastChange?.({ status: 'ready', data }) }
+    }).catch(err => { if (!cancelled) { setError(err.message); setResult(null); onForecastChange?.({ status: 'error', data: null }) } })
     return () => { cancelled = true }
-  }, [revision])
+  }, [revision, onForecastChange])
 
-  function update(change) { setPlan(current => ({ ...current, ...change })); setDirty(true); setResult(null) }
+  function update(change) { setPlan(current => ({ ...current, ...change })); setDirty(true); setResult(null); onForecastChange?.({ status: 'dirty', data: null }) }
   function itemChange(id, change) { update({ items: plan.items.map(item => item.id === id ? { ...item, ...change } : item) }) }
   async function calculate(event) {
-    event.preventDefault(); setBusy(true); setError(''); setResult(null)
+    event.preventDefault(); setBusy(true); setError(''); setResult(null); onForecastChange?.({ status: 'loading', data: null })
     try {
       const data = await saveCEOForecast(plan)
-      setPlan(data); setResult(data); setDirty(false)
-    } catch (err) { setError(err.message || 'Could not save forecast.') }
+      setPlan(data); setResult(data); setDirty(false); onForecastChange?.({ status: 'ready', data })
+    } catch (err) { setError(err.message || 'Could not save forecast.'); onForecastChange?.({ status: 'error', data: null }) }
     finally { setBusy(false) }
   }
   return <section className="bg-noch-card border border-noch-border rounded-2xl p-5 space-y-4">

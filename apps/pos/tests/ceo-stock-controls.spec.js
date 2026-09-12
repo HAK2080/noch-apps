@@ -94,3 +94,33 @@ test('owner adds signed planning items, saves without payments, and sees failure
   await expect(page.getByRole('alert')).toContainText('Forecast save failed')
   await expect(page.getByText('43,000.00 LYD',{exact:true})).toHaveCount(0)
 })
+
+
+test('top cards include saved forecast, switch red to green, persist and keep historical totals actual', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-12T10:00:00Z'))
+  let plan={today:'2026-09-12',month_end:'2026-09-30',target_date:'2026-09-30',items:[{id:'payroll',label:'Payroll',direction:'out',amount:20000,due_date:'2026-09-30',included:true}],starting_funds:40000,balance_date:'2026-09-12',expected_income:0,expected_payments:20000,cash_left:20000,saved_at:'2026-09-12',rent_covered:false,bills_covered:false}
+  await page.route('**/rpc/ceo_money_overview',route=>route.fulfill({json:{...summary,money_in:24921.5,money_out:9393.5,balance:15528}}))
+  await page.route('**/rpc/get_ceo_forecast',route=>route.fulfill({json:plan}))
+  await page.route('**/rpc/save_ceo_forecast',route=>{
+    const request=route.request().postDataJSON()
+    plan={...plan,items:request.p_items,expected_income:5000,cash_left:25000}
+    return route.fulfill({json:plan})
+  })
+  await page.goto(fixture)
+  await expect(page.getByText('29,393.50 LYD',{exact:true})).toBeVisible()
+  await expect(page.getByText('-4,472.00 LYD',{exact:true})).toHaveClass(/text-red-300/)
+  await page.getByRole('button',{name:'＋ Add expected item'}).click()
+  await expect(page.getByText('-4,472.00 LYD',{exact:true})).toHaveCount(0)
+  await page.getByLabel('Item 2 name',{exact:true}).fill('Expected income')
+  await page.getByLabel('Item 2 direction',{exact:true}).selectOption('in')
+  await page.getByLabel('Item 2 amount',{exact:true}).fill('5000')
+  await page.getByRole('button',{name:'Calculate & save forecast'}).click()
+  await expect(page.getByText('29,921.50 LYD',{exact:true})).toBeVisible()
+  await expect(page.getByText('528.00 LYD',{exact:true})).toHaveClass(/text-noch-green/)
+  await page.reload()
+  await expect(page.getByText('528.00 LYD',{exact:true})).toBeVisible()
+  await page.getByLabel('From',{exact:true}).fill('2026-08-01')
+  await page.getByLabel('To',{exact:true}).fill('2026-08-31')
+  await expect(page.getByRole('heading',{name:'Net cash change',exact:true})).toBeVisible()
+  await expect(page.getByText('15,528.00 LYD',{exact:true})).toBeVisible()
+})

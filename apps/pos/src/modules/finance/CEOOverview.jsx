@@ -18,6 +18,7 @@ export default function CEOOverview() {
   const [form, setForm] = useState({ date: businessToday(), cash: '', bank: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [forecast, setForecast] = useState({ status: 'loading', data: null })
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +53,13 @@ export default function CEOOverview() {
     finally { setSaving(false) }
   }
 
+  const today = businessToday()
+  const forecastPeriod = period.from <= today && period.to >= today
+  const forecastPending = forecastPeriod && forecast.status !== 'ready'
+  const projected = forecastPeriod && forecast.status === 'ready' && !!forecast.data?.saved_at
+  const totalIn = data == null || forecastPending ? null : (Math.round(Number(data.money_in) * 100) + (projected ? Math.round(Number(forecast.data.expected_income) * 100) : 0)) / 100
+  const totalOut = data == null || forecastPending ? null : (Math.round(Number(data.money_out) * 100) + (projected ? Math.round(Number(forecast.data.expected_payments) * 100) : 0)) / 100
+  const net = totalIn == null || totalOut == null ? null : (Math.round(totalIn * 100) - Math.round(totalOut * 100)) / 100
   const observation = data?.observation
   const reconciled = data?.baseline_date != null
   const differs = reconciled && (Math.abs(Number(data.cash_difference)) >= 0.01 || Math.abs(Number(data.bank_difference)) >= 0.01)
@@ -72,11 +80,12 @@ export default function CEOOverview() {
         <button className="btn-secondary p-2" aria-label="Refresh overview" onClick={() => setRevision(value => value + 1)} disabled={loading}><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
       </div>
       {error && <p role="alert" className="text-red-400">{error}</p>}
-      <div aria-busy={loading} className="grid sm:grid-cols-3 gap-4">
+      {forecastPeriod && <p className="text-sm text-noch-muted">{forecast.status === 'dirty' ? 'Forecast changed. Calculate & save below to update the top totals.' : forecast.status === 'error' ? 'Forecast unavailable. Top totals are hidden until it can be loaded or saved.' : projected ? `Includes recorded money from ${period.from} to ${period.to}, plus saved expected items through ${forecast.data.target_date}. Forecast totals, not completed payments.` : forecast.status === 'loading' ? 'Loading saved forecast…' : 'Actual recorded totals. Save a forecast below to include expected items here.'}</p>}
+      <div aria-busy={loading || forecastPending} className="grid sm:grid-cols-3 gap-4">
         {[
-          ['Money in', data?.money_in, 'text-noch-green', 'Cash receipts, corrected payment methods and bank settlements'],
-          ['Money out', data?.money_out, 'text-red-300', 'Paid expenses, salaries and cash refunds'],
-          ['Net cash change', data?.balance, 'text-white', 'Money in minus money out for these dates'],
+          ['Money in', totalIn, 'text-noch-green', projected ? 'Recorded receipts + saved expected incoming' : 'Cash receipts, corrected payment methods and bank settlements'],
+          ['Money out', totalOut, 'text-red-300', projected ? 'Recorded payments + saved expected payments' : 'Paid expenses, salaries and cash refunds'],
+          [projected ? 'Projected net balance' : 'Net cash change', net, net > 0 ? 'text-noch-green' : net < 0 ? 'text-red-300' : 'text-white', 'Money in minus money out; excludes starting cash'],
         ].map(([label, value, color, hint]) => <section key={label} className="bg-noch-card border border-noch-border rounded-2xl p-4 sm:p-5">
           <h2 className="text-noch-muted text-sm">{label}</h2>
           <p className={`text-2xl md:text-3xl font-bold mt-2 tabular-nums ${color}`}>{loading ? '…' : money(value)}</p>
@@ -97,7 +106,7 @@ export default function CEOOverview() {
           <p className="text-xs text-noch-muted mt-2">{data?.invoice_count ?? '—'} recorded expenses dated within this range, including pending and unpaid invoices. Rejected invoices excluded.</p>
         </section>
       </div>
-      <CEOForecast revision={revision} />
+      <CEOForecast revision={revision} onForecastChange={setForecast} />
       <section className="bg-noch-card border border-noch-border rounded-2xl p-5 space-y-4">
         <div className="flex justify-between items-center gap-3">
           <div><h2 className="text-lg text-white font-semibold">Cash & bank balances</h2><p className="text-xs text-noch-muted">{observation ? `Last entered: ${observation.as_of} · All branches combined` : 'Enter your actual balances to start checking differences.'}</p></div>
