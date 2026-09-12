@@ -35,6 +35,23 @@ The 40,000 LYD cash and zero bank observation dated September 12 is the owner's 
 
 The owner confirmed that **all scanned invoices have already been paid**. This supersedes the planning assumption above for the scanned 400 LYD September invoice and 900 LYD August invoice: they are not expected future payments. A follow-up production query identified 18 approved scanned receipts totalling 9,385.50 LYD without posted payment details (16 not reported, two reported unpaid). Their payment accounts and dates must be established before posting settlements. Five have suspicious dates: four in 2020/2021 and one in 2027. Other scanned invoices already marked paid also have historical/future dates that merit receipt review. Rejected scans remain excluded from automatic settlement. The owner was asked for the missing payment methods/date rule; no payment details were invented or financial transactions changed.
 
-## Change and checks
+## Final scanned-invoice settlement
 
-Migration `20260912120000_ceo_payment_correction_reporting.sql` replaces only the reporting function. No transactions or payment statuses are edited. CEO card descriptions identify corrected receipt methods and actual cash refunds. PostgreSQL tests cover both correction directions, paired card corrections, real refunds, Libya midnight boundaries, correction-only periods, unchanged net movement and existing owner access controls.
+The owner subsequently instructed **cash assumed; use the system entry date, not the date printed on the receipt**. Applied that instruction to the 18 approved scanned invoices missing settlement entries, totalling 9,385.50 LYD, using `(submitted_at at time zone 'Africa/Tripoli')::date` for `paid_at`. Kept already-posted settlements and rejected scans unchanged. Original invoice dates were not rewritten.
+
+The operation used the existing audited `mark_expense_paid` function, guarded the expected count/amount and business funding, locked each invoice, and updated payment declarations to paid/cash. Payment notes retain the owner's cash/date assumption; reference `owner-scan-cash-2026-09-12`. A production rollback rehearsal and the committed operation both returned zero journal mismatches. Recorded payments: July 8,085.50 LYD, August 900 LYD and September 400 LYD.
+
+| System entry/payment date | Count | LYD |
+| --- | ---: | ---: |
+| 2026-07-25 | 6 | 5,055.50 |
+| 2026-07-27 | 4 | 1,085.00 |
+| 2026-07-29 | 2 | 1,415.00 |
+| 2026-07-30 | 4 | 530.00 |
+| 2026-08-20 | 1 | 900.00 |
+| 2026-09-05 | 1 | 400.00 |
+
+Final September 1–12 figures after the owner's payment reconciliation: money in 24,921.50 LYD, money out 9,393.50 LYD, net movement 15,528.00 LYD. All 16 September invoices (9,134.50 LYD) are now paid; 259 LYD cash refunds make up the rest of money out. The 40,000 LYD user-entered cash observation is preserved. The forecast must no longer include the scanned 400/900 LYD as outstanding; 25,000 LYD base payroll remains an estimate and rent/regular bills still need confirmed amounts and due dates.
+
+## Reporting change and checks
+
+Migration `20260912120000_ceo_payment_correction_reporting.sql` replaces only the reporting function; the separate owner-authorized settlement above changes payment records. CEO card descriptions identify corrected receipt methods and actual cash refunds. PostgreSQL tests cover both correction directions, paired card corrections, real refunds, Libya midnight boundaries, correction-only periods, unchanged net movement and existing owner access controls.
