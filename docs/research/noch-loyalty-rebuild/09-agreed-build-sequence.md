@@ -2,6 +2,8 @@
 
 This checkpoint supersedes earlier proposals where they conflict with the decisions below. It does not mean the whole rebuild is implemented.
 
+**Release status:** code commit `4fe0be0`, locally built and tested (26 targeted Node checks, 7 mocked browser tests; zero lint errors and one pre-existing scanner hook warning). Production push was blocked pending explicit owner approval. Not deployed. Existing points and printer settings unchanged.
+
 ## First release: Arabic cashier experience
 
 Arabic by default for the core cashier screens and messages: incoming orders, payment/loyalty capture, PIN sign-in, manager approval, modifier validation, scanner guidance, print confirmations and offline-sync alerts. English remains an explicit language choice; bilingual product tiles use Arabic controls. The customer checkout-claim page starts in Arabic and has an English option. Existing Arabic customer-memory summaries and greetings are used rather than English ones.
