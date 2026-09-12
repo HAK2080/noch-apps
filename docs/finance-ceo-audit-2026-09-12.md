@@ -31,6 +31,10 @@ The invoice total is 9,134.50 LYD across 16 documents: paid 8,734.50 plus an app
 
 The 40,000 LYD cash and zero bank observation dated September 12 is the owner's first entered baseline. The 15,928 LYD top-card balance is period movement, not cash available. A later closing observation is needed to check recorded movements against another actual balance.
 
+## Owner clarification after the audit
+
+The owner confirmed that **all scanned invoices have already been paid**. This supersedes the planning assumption above for the scanned 400 LYD September invoice and 900 LYD August invoice: they are not expected future payments. A follow-up production query identified 18 approved scanned receipts totalling 9,385.50 LYD without posted payment details (16 not reported, two reported unpaid). Their payment accounts and dates must be established before posting settlements. Five have suspicious dates: four in 2020/2021 and one in 2027. Other scanned invoices already marked paid also have historical/future dates that merit receipt review. Rejected scans remain excluded from automatic settlement. The owner was asked for the missing payment methods/date rule; no payment details were invented or financial transactions changed.
+
 ## Change and checks
 
 Migration `20260912120000_ceo_payment_correction_reporting.sql` replaces only the reporting function. No transactions or payment statuses are edited. CEO card descriptions identify corrected receipt methods and actual cash refunds. PostgreSQL tests cover both correction directions, paired card corrections, real refunds, Libya midnight boundaries, correction-only periods, unchanged net movement and existing owner access controls.

@@ -1140,3 +1140,10 @@ To find if something's been done:
 - **Change**: Apply a muted grey shade to the Presto delivery tile, including its mascot, while keeping the coming-soon text and existing link. The selector also matches cached storefront app code.
 - **Verification**: Storefront and POS production builds passed; Arabic desktop and English mobile screenshots reviewed; diff checks passed. Live browser confirmed the Presto filter is `grayscale(1) brightness(0.9)` and adjacent tiles remain unfiltered. No JavaScript logic changed.
 - **Commits / deployment**: `f1e2b1c`, `d3e7237` pushed to main; storefront deployment run `34674046731`; production appearance verified at noch.cloud. No database changes. Unrelated research and work-log edits preserved.
+
+## 2026-09-12 — Verify CEO payments and correct receipt reclassifications
+- **Agent**: Codex.
+- **Files**: `CEOOverview.jsx`, `ceo-stock-database.test.mjs`, migration `20260912120000_ceo_payment_correction_reporting.sql`, and `docs/finance-ceo-audit-2026-09-12.md`.
+- **Audit**: September 1–12 paid expenses (8,734.50 LYD) match all 15 posted accounting entries; cash refunds total 259 LYD. Payment-method corrections inflated both receipt/payment totals by 1,274 LYD. Corrected totals: in 24,921.50; out 8,993.50; net unchanged at 15,928 LYD. No transaction records were changed.
+- **Verification / deployment**: 11 database tests, targeted ESLint and production build passed. Migration verified in a rolled-back production transaction before applying; authenticated CEO page verified corrected amounts. Commit `425f94e` pushed; GitHub Actions run `34674741454` completed successfully.
+- **Follow-up**: Month-end forecast requires rent/regular bill details (none configured). Owner clarified all scanned invoices are paid; 18 approved scans lack settlement details, with five suspicious dates. Asked for payment accounts/dates before recording settlements. Do not count those scans as future bills. Unrelated research and prior work-log edits preserved.
