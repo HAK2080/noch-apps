@@ -1182,3 +1182,8 @@ To find if something's been done:
 - Agent: Codex. Commit: 0a3f518. Files: CEOOverview.jsx, CEOForecast.jsx, ceo-stock-controls.spec.js and docs/ceo-forecast-guide.md.
 - Top cards now add saved expected incoming/payments to recorded totals when the selected range includes today. Projected net balance is green above zero, red below zero; historical ranges remain actual-only. Unsaved edits and forecast errors hide stale projected totals. Financial records and saved planning amounts are unchanged.
 - Verification: targeted ESLint, production build and all six browser tests passed (red/green transition, save/reload and historical isolation included). GitHub Actions 34678009409 succeeded. Live page verified 24,921.50 in, 29,393.50 out and -4,472 LYD red, including the owner's saved 20,000 LYD plan.
+
+## 2026-09-12 — POS worker review and local improvements (deployment approval pending)
+- Agent: Codex. Implementation 9e2ef07; review docs/pos-worker-review-2026-09-12.md at 778b728.
+- Reviewed live branch opening, PIN/owner preview, popular menu order, unsold cart and printer status. Prepared cached modifier taps, safer opening submission, shift-load retry states, Arabic stock badges/two-line names and completed-sales popularity net of returns.
+- Verification: 35 Node/browser checks, targeted ESLint and production build passed. No production sale/shift/count was created. Auto-review rejected pushing to main because it judged production workflow/database changes broader than the testing request. No push or migration deployment followed; explicit approval is required. Goal remains active pending deployment/live verification; physical printer disconnected.
