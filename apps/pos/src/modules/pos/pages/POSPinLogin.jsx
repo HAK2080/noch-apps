@@ -20,6 +20,9 @@ import { setServedBy, setPinGrace, checkPinGrace } from '../lib/pos-session'
 import { useAuth } from '../../../contexts/AuthContext'
 import { isOnline } from '../lib/pos-offline'
 import toast from 'react-hot-toast'
+import { posMessage, posError, savedPosLanguage } from '../lib/pos-messages'
+
+const msg = (key, values) => posMessage(key, savedPosLanguage(), values)
 
 // ── Local SHA-256 (Web Crypto API) ─────────────────────────────────────────
 async function sha256(str) {
@@ -115,7 +118,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   const handleSelectStaff = (staff) => {
     // Grace-period fast path: same staff within 30 min → skip PIN entry.
     if (checkPinGrace(staff.id)) {
-      toast.success(`Welcome back, ${staff.full_name || 'Staff'} 👋`)
+      toast.success(msg('Welcome, {name}', { name: staff.full_name || msg('Staff') }))
       setServedBy(staff)
       onSuccess(staff)
       return
@@ -134,7 +137,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   }
 
   const handleVerify = async () => {
-    if (pin.length < 4) { setError('PIN must be 4-6 digits'); return }
+    if (pin.length < 4) { setError(msg('PIN must be 4-6 digits')); return }
     await verifyPin(pin)
   }
 
@@ -154,12 +157,12 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         if (rpcErr) throw rpcErr
 
         if (data?.locked) {
-          setError(`Too many failed attempts. Try again in ${Math.ceil((data.retry_in_seconds || 900) / 60)} min.`)
+          setError(msg('Too many attempts. Try again in {minutes} min.', { minutes: Math.ceil((data.retry_in_seconds || 900) / 60) }))
           setPin('')
           return
         }
         if (!data?.matched) {
-          setError('Incorrect PIN — try again')
+          setError(msg('Incorrect PIN — try again'))
           setPin('')
           return
         }
@@ -174,7 +177,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         // ── Offline: verify via local token ────────────────────────────
         const ok = await verifyOfflineToken(selectedStaff.id, pinToVerify)
         if (!ok) {
-          setError('Incorrect PIN — or connect to internet for first-time login')
+          setError(msg('Incorrect PIN — or connect to internet for first-time login'))
           setPin('')
           return
         }
@@ -187,14 +190,15 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           department: selectedStaff.department,
         }
         setPinGrace(selectedStaff.id)
-        toast('Signed in offline', { icon: '📴' })
+        toast(msg('Signed in offline'), { icon: '📴' })
       }
 
-      toast.success(`Welcome, ${profile.full_name || 'Staff'} 👋`)
+      toast.success(msg('Welcome, {name}', { name: profile.full_name || msg('Staff') }))
       setServedBy(profile)
       onSuccess(profile)
     } catch (err) {
-      setError(err.message || 'Verification failed')
+      console.error('POS PIN verification failed', err)
+      setError(posError(err, 'Verification failed', savedPosLanguage()))
       setPin('')
     } finally {
       setVerifying(false)
@@ -220,16 +224,16 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
   // ── GRID STEP ──────────────────────────────────────────────────────────────
   if (step === 'grid') {
     return (
-      <div className="flex items-start justify-center py-8">
+      <div lang={savedPosLanguage()} dir={savedPosLanguage() === 'ar' ? 'rtl' : 'ltr'} className="flex items-start justify-center py-8">
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-noch-green/10 border border-noch-green/20 flex items-center justify-center mx-auto mb-4">
               <Coffee size={28} className="text-noch-green" />
             </div>
-            <h1 className="text-white font-bold text-2xl">Who's serving?</h1>
+            <h1 className="text-white font-bold text-2xl">{msg("Who's serving?")}</h1>
             <p className="text-noch-muted text-sm mt-1">
-              {!isOnline() ? '📴 Offline — using cached staff' : 'Select your name then enter your PIN'}
+              {msg(!isOnline() ? 'Offline — using cached staff' : 'Select your name then enter your PIN')}
             </p>
           </div>
 
@@ -239,8 +243,8 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
             </div>
           ) : staffList.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-noch-muted text-sm">No staff with PIN configured.</p>
-              <p className="text-noch-muted text-xs mt-2">Staff must log in and set a PIN in My Profile first.</p>
+              <p className="text-noch-muted text-sm">{msg('No staff with PIN configured.')}</p>
+              <p className="text-noch-muted text-xs mt-2">{msg('Staff must log in and set a PIN in My Profile first.')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3">
@@ -274,7 +278,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
               onClick={() => { setServedBy(null); onSkip() }}
               className="w-full mt-6 py-2 text-noch-muted text-sm hover:text-white transition-colors"
             >
-              Skip (Owner Mode)
+              {msg('Skip (Owner Mode)')}
             </button>
           )}
         </div>
@@ -284,7 +288,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
 
   // ── PIN STEP ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex items-start justify-center py-8">
+    <div lang={savedPosLanguage()} dir={savedPosLanguage() === 'ar' ? 'rtl' : 'ltr'} className="flex items-start justify-center py-8">
       <div className="w-full max-w-xs">
         {/* Back + selected staff */}
         <div className="text-center mb-8">
@@ -292,7 +296,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
             onClick={handleBack}
             className="flex items-center gap-1 text-noch-muted hover:text-white text-sm mx-auto mb-4 transition-colors"
           >
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={14} /> {msg('Back')}
           </button>
 
           {/* Staff avatar */}
@@ -306,7 +310,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
             )}
           </div>
           <h2 className="text-white font-bold text-lg">{selectedStaff?.full_name}</h2>
-          <p className="text-noch-muted text-sm mt-1">Enter your PIN</p>
+          <p className="text-noch-muted text-sm mt-1">{msg('Enter your PIN')}</p>
         </div>
 
         {/* PIN dots */}
@@ -326,7 +330,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
         )}
 
         {/* Numpad */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div dir="ltr" className="grid grid-cols-3 gap-3 mb-4">
           {KEYS.map((k, i) => {
             if (k === '') return <div key={i} />
             if (k === '⌫') return (
@@ -351,7 +355,7 @@ export default function POSPinLogin({ branchId, onSuccess, onSkip }) {
           className="w-full py-3.5 rounded-2xl bg-noch-green text-noch-dark font-bold text-sm hover:bg-noch-green/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {verifying ? <Loader2 size={16} className="animate-spin" /> : null}
-          {verifying ? 'Verifying...' : 'Enter'}
+          {msg(verifying ? 'Verifying...' : 'Enter')}
         </button>
       </div>
     </div>

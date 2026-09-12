@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Camera, Loader } from 'lucide-react'
+import { posMessage, savedPosLanguage } from '../lib/pos-messages'
+
+const msg = (key) => posMessage(key, savedPosLanguage())
 
 export default function QRScanner({ onScan, onClose }) {
-  const divRef = useRef(null)
   const scannerRef = useRef(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -25,7 +27,8 @@ export default function QRScanner({ onScan, onClose }) {
         )
         setLoading(false)
       } catch (err) {
-        setError(err.message || 'Camera not available')
+        console.error('QR camera failed', err)
+        setError(msg('Camera access denied'))
         setLoading(false)
       }
     }
@@ -43,7 +46,7 @@ export default function QRScanner({ onScan, onClose }) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Camera size={18} className="text-noch-green" />
-            <h3 className="text-white font-semibold">Scan Loyalty Card</h3>
+            <h3 className="text-white font-semibold">{msg('Scan Loyalty Card')}</h3>
           </div>
           <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={20} /></button>
         </div>
@@ -51,20 +54,20 @@ export default function QRScanner({ onScan, onClose }) {
         {loading && (
           <div className="flex items-center justify-center py-8">
             <Loader size={24} className="animate-spin text-noch-green" />
-            <span className="text-noch-muted ml-2 text-sm">Starting camera...</span>
+            <span className="text-noch-muted ml-2 text-sm">{msg('Starting camera...')}</span>
           </div>
         )}
 
         {error && (
           <div className="text-center py-8">
             <p className="text-red-400 text-sm mb-3">{error}</p>
-            <p className="text-noch-muted text-xs">Make sure the browser has camera permissions</p>
+            <p className="text-noch-muted text-xs">{msg('Make sure the browser has camera permissions')}</p>
           </div>
         )}
 
         <div id="qr-scanner-div" className="w-full rounded-xl overflow-hidden" />
 
-        <p className="text-noch-muted text-xs text-center mt-3">Point the camera at the customer's QR code</p>
+        <p className="text-noch-muted text-xs text-center mt-3">{msg("Point the camera at the customer's QR code")}</p>
       </div>
     </div>
   )

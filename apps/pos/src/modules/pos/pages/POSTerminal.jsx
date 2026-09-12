@@ -53,6 +53,13 @@ import { sendCustomerGreeting } from '../../../lib/vestaboard'
 import Layout from '../../../components/Layout'
 import toast from 'react-hot-toast'
 import POSInstanceGate from '../components/POSInstanceGate'
+import { posMessage, posError, posLanguage, savedPosLanguage } from '../lib/pos-messages'
+
+const msg = (key, values) => posMessage(key, savedPosLanguage(), values)
+const cashierError = (error, fallback) => {
+  console.error(fallback, error)
+  return posError(error, fallback, savedPosLanguage())
+}
 
 let itemIdCounter = 0
 function newItemId() { return ++itemIdCounter }
@@ -78,7 +85,7 @@ function playOrderAlert() {
 }
 
 // ── New order popup modal ─────────────────────────────────────────────────────
-function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
+export function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
   const [busy, setBusy] = useState(false)
 
   const handle = async (action) => {
@@ -89,7 +96,7 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
       if (error) throw error
       if (data?.error) throw new Error(data.error)
       if (action === 'accept') {
-        toast.success(`✅ Order ${order.order_number} accepted`)
+        toast.success(msg('Order {number} accepted', { number: order.order_number }))
         // Print drink ticket for the bar — customer name comes from the
         // online order itself. Fire-and-forget.
         // Always enqueue — the print host tablet picks it up. Silent on no-host.
@@ -99,40 +106,40 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
         if (order.customer_name) {
           sendCustomerGreeting(order.customer_name, { seed: order.order_number })
             .then(r => {
-              if (r?.simulated) toast('Vestaboard: no API key — simulated', { icon: '⚙️' })
+              if (r?.simulated) toast(msg('Display greeting is in test mode'), { icon: '⚙️' })
               else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
-              else toast.success(`Vestaboard: ${order.customer_name}`, { duration: 2500 })
+              else toast.success(msg('Greeting sent for {name}', { name: order.customer_name }), { duration: 2500 })
             })
-            .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
+            .catch(err => toast.error(cashierError(err, 'Could not send the display greeting'), { duration: 5000 }))
         }
         onAccept()
       }
-      else { toast(`❌ Order ${order.order_number} declined`, { icon: '🚫' }); onDecline() }
+      else { toast(msg('Order {number} declined', { number: order.order_number }), { icon: '🚫' }); onDecline() }
     } catch (err) {
-      toast.error(err.message || 'Failed')
+      toast.error(cashierError(err, 'Could not update order. Please try again.'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <div role="dialog" aria-label={msg('New Online Order!')} lang={savedPosLanguage()} dir={savedPosLanguage() === 'ar' ? 'rtl' : 'ltr'} className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.85)' }}>
       <div className="bg-noch-card border-2 border-yellow-500/60 rounded-2xl w-full max-w-sm shadow-2xl animate-pulse-once">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-noch-border">
           <span className="text-3xl">🛎</span>
           <div>
-            <p className="text-yellow-400 font-bold text-lg">New Online Order!</p>
+            <p className="text-yellow-400 font-bold text-lg">{msg('New Online Order!')}</p>
             <p className="text-noch-muted text-sm font-mono">{order.order_number}</p>
           </div>
         </div>
         {/* Customer */}
         <div className="px-5 py-3 border-b border-noch-border">
-          <p className="text-white font-semibold">{order.customer_name || 'Guest'}</p>
+          <p className="text-white font-semibold">{order.customer_name || msg('Guest')}</p>
           {order.customer_phone && <p className="text-noch-muted text-sm">{order.customer_phone}</p>}
           {order.table_number && (
-            <p className="text-yellow-400 text-sm mt-1">📍 Table {order.table_number}</p>
+            <p className="text-yellow-400 text-sm mt-1">📍 {msg('Table')} {order.table_number}</p>
           )}
         </div>
         {/* Items */}
@@ -148,13 +155,13 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
         )}
         {/* Total */}
         <div className="flex justify-between items-center px-5 py-3 border-b border-noch-border">
-          <span className="text-noch-muted">Total</span>
-          <span className="text-white font-bold text-lg">{format(order.total)} LYD</span>
+          <span className="text-noch-muted">{msg('Total')}</span>
+          <span className="text-white font-bold text-lg">{format(order.total)} {msg('LYD')}</span>
         </div>
         {/* Pickup code */}
         {order.pickup_code && (
           <div className="px-5 py-3 border-b border-noch-border text-center">
-            <p className="text-noch-muted text-xs mb-1">Pickup code</p>
+            <p className="text-noch-muted text-xs mb-1">{msg('Pickup code')}</p>
             <p className="text-yellow-300 font-mono font-bold text-2xl tracking-widest">{order.pickup_code}</p>
           </div>
         )}
@@ -165,14 +172,14 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
             disabled={busy}
             className="flex-1 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 font-bold transition-colors disabled:opacity-50"
           >
-            ✕ Decline
+            ✕ {msg('Decline')}
           </button>
           <button
             onClick={() => handle('accept')}
             disabled={busy}
             className="flex-1 py-3 rounded-xl bg-noch-green text-black font-bold hover:bg-noch-green/80 transition-colors disabled:opacity-50"
           >
-            ✓ Accept
+            ✓ {msg('Accept')}
           </button>
         </div>
       </div>
@@ -181,7 +188,7 @@ function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
 }
 
 // ── Pending order row in the panel ───────────────────────────────────────────
-function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
+export function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
   const [busy, setBusy] = useState(false)
 
   const handleAction = async (action) => {
@@ -193,7 +200,7 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         })
         if (error) throw error
         if (data?.error) throw new Error(data.error)
-        toast.success(`Order ${order.order_number} collected`)
+        toast.success(msg('Order {number} collected', { number: order.order_number }))
         onConfirmed()
       } else if (action === 'accept') {
         const { data, error } = await supabase.rpc('approve_online_order', {
@@ -201,7 +208,7 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         })
         if (error) throw error
         if (data?.error) throw new Error(data.error)
-        toast.success(`Order ${order.order_number} accepted`)
+        toast.success(msg('Order {number} accepted', { number: order.order_number }))
         // Print drink ticket for the bar.
         // Always enqueue — the print host tablet picks it up. Silent on no-host.
         printDrinkTicket(order, order.pos_order_items || [], branch)
@@ -210,11 +217,11 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         if (order.customer_name) {
           sendCustomerGreeting(order.customer_name, { seed: order.order_number })
             .then(r => {
-              if (r?.simulated) toast('Vestaboard: no API key — simulated', { icon: '⚙️' })
+              if (r?.simulated) toast(msg('Display greeting is in test mode'), { icon: '⚙️' })
               else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
-              else toast.success(`Vestaboard: ${order.customer_name}`, { duration: 2500 })
+              else toast.success(msg('Greeting sent for {name}', { name: order.customer_name }), { duration: 2500 })
             })
-            .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
+            .catch(err => toast.error(cashierError(err, 'Could not send the display greeting'), { duration: 5000 }))
         }
         onConfirmed()
       } else {
@@ -223,11 +230,11 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
         })
         if (error) throw error
         if (data?.error) throw new Error(data.error)
-        toast(`Order ${order.order_number} cancelled`, { icon: '🚫' })
+        toast(msg('Order {number} cancelled', { number: order.order_number }), { icon: '🚫' })
         onCancelled()
       }
     } catch (err) {
-      toast.error(err.message || 'Failed')
+      toast.error(cashierError(err, 'Could not update order. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -243,16 +250,16 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-noch-green font-mono text-xs">{order.order_number}</span>
-          <span className="text-white font-medium">{order.customer_name || 'Guest'}</span>
-          {order.table_number && <span className="text-yellow-400 text-xs">📍 Table {order.table_number}</span>}
+          <span className="text-white font-medium">{order.customer_name || msg('Guest')}</span>
+          {order.table_number && <span className="text-yellow-400 text-xs">📍 {msg('Table')} {order.table_number}</span>}
           {isInProgress && order.pickup_code && (
             <span className="text-yellow-300 text-xs font-mono tracking-widest mt-1">
-              CODE: {order.pickup_code}
+              {msg('Pickup code')}: {order.pickup_code}
             </span>
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-white font-semibold">{format(order.total)} LYD</span>
+          <span className="text-white font-semibold">{format(order.total)} {msg('LYD')}</span>
           <span className="text-noch-muted text-xs">
             {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
@@ -263,11 +270,11 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
           <>
             <button onClick={() => handleAction('decline')} disabled={busy}
               className="flex-1 py-1 text-xs rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium disabled:opacity-50">
-              ✕ Decline
+              ✕ {msg('Decline')}
             </button>
             <button onClick={() => handleAction('accept')} disabled={busy}
               className="flex-1 py-1 text-xs rounded-lg bg-noch-green/20 text-noch-green hover:bg-noch-green/30 font-medium disabled:opacity-50">
-              ✓ Accept
+              ✓ {msg('Accept')}
             </button>
           </>
         )}
@@ -275,11 +282,11 @@ function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
           <>
             <button onClick={() => handleAction('cancel')} disabled={busy}
               className="flex-1 py-1 text-xs rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium disabled:opacity-50">
-              Cancel
+              {msg('Cancel')}
             </button>
             <button onClick={() => handleAction('confirm_pickup')} disabled={busy}
               className="flex-1 py-1 text-xs rounded-lg bg-noch-green text-black hover:bg-noch-green/80 font-bold disabled:opacity-50">
-              ✓ Collected
+              ✓ {msg('Collected')}
             </button>
           </>
         )}
@@ -442,13 +449,13 @@ function POSTerminalContent() {
         .some(result => result.status === 'fulfilled')
       setOnline(anyNetworkSuccess)
       if (menuUnavailable) {
-        toast.error('Connection is weak and this tablet has no saved menu yet')
+        toast.error(msg('Connection is weak and this tablet has no saved menu yet'))
       }
     }
     load().catch(err => {
       if (!cancelled) {
         setLoading(false)
-        toast.error(err.message || 'Failed to load terminal')
+        toast.error(cashierError(err, 'Failed to load terminal'))
       }
     })
 
@@ -619,17 +626,17 @@ function POSTerminalContent() {
   // groups; if any exist, opens the modifier modal instead of adding.
   const addToCart = useCallback(async (product, opts = {}) => {
     if (product.sale_blocked || products.find(item => item.id === product.id)?.sale_blocked) {
-      toast.error(product.sale_block_reason || 'This product is blocked until stock is available')
+      toast.error(cashierError(product.sale_block_reason, 'This product is blocked until stock is available'))
       return
     }
     if (product.is_sold_out) {
-      toast.error(`${product.name} is sold out`)
+      toast.error(msg('{name} is sold out', { name: product.name_ar || product.name }))
       return
     }
     if (settings?.block_out_of_stock && product.track_inventory) {
       const onHand = parseFloat(product.stock_qty)
       if (Number.isFinite(onHand) && onHand <= 0) {
-        toast.error(`${product.name} is out of stock`)
+        toast.error(msg('{name} is out of stock', { name: product.name_ar || product.name }))
         return
       }
     }
@@ -653,11 +660,11 @@ function POSTerminalContent() {
     setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_sold_out: next } : p))
     try {
       await setProductSoldOut(product.id, next)
-      toast.success(next ? `${product.name} marked sold out` : `${product.name} back in stock`)
+      toast.success(msg(next ? '{name} marked sold out' : '{name} back in stock', { name: product.name_ar || product.name }))
     } catch (err) {
       // Revert on failure
       setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_sold_out: !next } : p))
-      toast.error(err.message || 'Could not update')
+      toast.error(cashierError(err, 'Could not update'))
       throw err
     }
   }, [])
@@ -689,10 +696,10 @@ function POSTerminalContent() {
             }
           : item
       ))
-      toast.success(`${product.name}: +${result.quantity_received} ${result.received_unit || unit} received`)
+      toast.success(msg('Stock received: {name}, quantity {quantity}', { name: product.name_ar || product.name, quantity: result.quantity_received }))
       return result
     } catch (error) {
-      toast.error(error.message || 'Could not receive stock')
+      toast.error(cashierError(error, 'Could not receive stock'))
       throw error
     }
   }, [branchId, profile?.id])
@@ -793,9 +800,9 @@ function POSTerminalContent() {
     try {
       const product = await getPOSProductByBarcode(branchId, result)
       await addToCart(product, { skipModifiers: true })
-      toast.success(`Added: ${product.name}`)
+      toast.success(msg('Added: {name}', { name: product.name_ar || product.name }))
     } catch {
-      toast.error(`Product not found for barcode: ${result}`)
+      toast.error(msg('Product not found for barcode: {code}', { code: result }))
     }
   }
 
@@ -901,7 +908,7 @@ function POSTerminalContent() {
           order_number: `OFFLINE-${localId}`,
           created_at: clientCreatedAt,
         }
-        toast('Order saved offline. Will sync when online.', { icon: '📴' })
+        toast(msg('Order saved offline. Will sync when online.'), { icon: '📴' })
         return order
       }
 
@@ -933,7 +940,7 @@ function POSTerminalContent() {
           })
         } catch (err) {
           console.warn('Loyalty capture evidence failed:', err)
-          toast.error('Sale completed; loyalty decision is flagged for reconciliation')
+          toast.error(msg('Sale completed; loyalty decision is flagged for reconciliation'))
         }
       }
 
@@ -956,7 +963,7 @@ function POSTerminalContent() {
       setLoyaltyCustomer(null)
 
       if (order.audit_warning) {
-        toast.error(order.audit_warning)
+        toast.error(cashierError(order.audit_warning, 'Sale completed with a warning. Ask the manager to review it.'))
       }
 
       // Auto-print drink ticket — always fires when printer connected.
@@ -976,11 +983,11 @@ function POSTerminalContent() {
       if (customerName) {
         sendCustomerGreeting(customerName, { seed: order.order_number })
           .then(r => {
-            if (r?.simulated) toast('Vestaboard: no API key — simulated', { icon: '⚙️' })
+            if (r?.simulated) toast(msg('Display greeting is in test mode'), { icon: '⚙️' })
             else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
-            else toast.success(`Vestaboard: ${customerName}`, { duration: 2500 })
+            else toast.success(msg('Greeting sent for {name}', { name: customerName }), { duration: 2500 })
           })
-          .catch(err => toast.error(`Vestaboard: ${err?.message || 'failed'}`, { duration: 5000 }))
+          .catch(err => toast.error(cashierError(err, 'Could not send the display greeting'), { duration: 5000 }))
       }
 
       // Auto-print receipt: fire-and-forget if enabled. Enqueues regardless
@@ -991,7 +998,7 @@ function POSTerminalContent() {
         )
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to complete sale')
+      toast.error(cashierError(err, 'Failed to complete sale'))
     } finally {
       setSubmitting(false)
     }
@@ -1000,7 +1007,7 @@ function POSTerminalContent() {
   if (loading) return (
     <Layout>
       <div className="flex items-center justify-center py-24">
-        <p className="text-noch-muted">Loading terminal...</p>
+        <p className="text-noch-muted">{msg('Loading terminal...')}</p>
       </div>
     </Layout>
   )
@@ -1023,7 +1030,7 @@ function POSTerminalContent() {
   }
 
   return (
-    <div className="flex flex-col h-screen h-[100dvh] bg-noch-dark overflow-hidden">
+    <div lang={posLanguage(tileLang)} dir={posLanguage(tileLang) === 'ar' ? 'rtl' : 'ltr'} className="flex flex-col h-screen h-[100dvh] bg-noch-dark overflow-hidden">
       <PrintHostBadge branchId={branchId} />
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-3 bg-noch-card border-b border-noch-border shrink-0">
@@ -1034,9 +1041,9 @@ function POSTerminalContent() {
         <div className="flex-1 min-w-0">
           <h1 className="text-white font-bold text-sm truncate">{branch?.name}</h1>
           {shift ? (
-            <p className="text-noch-green text-xs">Shift open</p>
+            <p className="text-noch-green text-xs">{msg('Shift open')}</p>
           ) : (
-            <p className="text-yellow-400 text-xs">No shift — go to Settings to open one</p>
+            <p className="text-yellow-400 text-xs">{msg('No shift — go to Settings to open one')}</p>
           )}
         </div>
 
@@ -1045,7 +1052,7 @@ function POSTerminalContent() {
           <button
             onClick={() => { setPinVerified(false) }}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-noch-border bg-noch-dark text-xs text-noch-muted hover:border-noch-green/50 hover:text-white transition-colors shrink-0"
-            title="Switch staff"
+            title={msg('Switch staff')}
           >
             <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-300 shrink-0">
               {getServedBy()?.full_name?.charAt(0)?.toUpperCase() || '?'}
@@ -1081,7 +1088,7 @@ function POSTerminalContent() {
                   ? 'bg-noch-green/20 text-noch-green hover:bg-noch-green/30'
                   : 'text-noch-muted hover:text-white'
               }`}
-              title="Online Orders"
+              title={msg('Online Orders')}
             >
               <ShoppingBag size={16} />
               {onlineOrders.length > 0 && (
@@ -1102,7 +1109,7 @@ function POSTerminalContent() {
               ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
               : 'text-noch-muted hover:text-white'
           }`}
-          title="Held Orders"
+          title={msg('Held Orders')}
         >
           <PauseCircle size={16} />
           {heldOrders.length > 0 && (
@@ -1113,10 +1120,10 @@ function POSTerminalContent() {
         </button>
 
         {/* Primary actions — visible */}
-        <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title="Orders">
+        <button onClick={() => navigate(`/pos/${branchId}/orders`)} className="p-2 text-noch-muted hover:text-white" title={msg('Orders')}>
           <ListOrdered size={18} />
         </button>
-        <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white" title="Scan barcode">
+        <button onClick={() => setShowScanner(true)} className="p-2 text-noch-muted hover:text-white" title={msg('Scan barcode')}>
           <ScanLine size={18} />
         </button>
 
@@ -1138,29 +1145,29 @@ function POSTerminalContent() {
                 <button onClick={() => { cycleTileLang(); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
                   <span className="text-[10px] font-bold uppercase w-10">{tileLang === 'both' ? 'EN+AR' : tileLang === 'en' ? 'EN' : 'AR'}</span>
-                  Language
+                  {msg('Language')}
                 </button>
                 {settings?.per_barista_shift && shift && (
                   <button onClick={() => { setShowAttendees(true); setShowMore(false) }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
-                    <Users size={16} /> Attendees
+                    <Users size={16} /> {msg('Attendees')}
                   </button>
                 )}
                 <button onClick={() => { navigate(`/pos/${branchId}/stock-check`); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
-                  <ClipboardList size={16} /> Stock Check
+                  <ClipboardList size={16} /> {msg('Stock Check')}
                 </button>
                 <button onClick={() => { navigate(`/pos/${branchId}/waste`); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
-                  <Trash2 size={16} /> Report Waste
+                  <Trash2 size={16} /> {msg('Report Waste')}
                 </button>
                 <button onClick={() => { navigate(`/pos/${branchId}/end-of-day`); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
-                  <ShoppingBag size={16} /> End of Day
+                  <ShoppingBag size={16} /> {msg('End of Day')}
                 </button>
                 <button onClick={() => { navigate(`/pos/${branchId}/settings`); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
-                  <Settings size={16} /> Settings
+                  <Settings size={16} /> {msg('Settings')}
                 </button>
               </div>
             </>
@@ -1185,9 +1192,9 @@ function POSTerminalContent() {
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-white font-semibold text-sm flex items-center gap-2">
               <ShoppingBag size={14} className="text-noch-green" />
-              Online Orders
+              {msg('Online Orders')}
               {onlineOrders.length === 0 && (
-                <span className="text-noch-muted font-normal">(none pending)</span>
+                <span className="text-noch-muted font-normal">{msg('(none pending)')}</span>
               )}
             </h2>
             <button onClick={() => setShowOnlineOrders(false)} className="text-noch-muted hover:text-white">
@@ -1208,7 +1215,7 @@ function POSTerminalContent() {
               ))}
             </div>
           ) : (
-            <p className="text-noch-muted text-sm">No pending online orders.</p>
+            <p className="text-noch-muted text-sm">{msg('No pending online orders.')}</p>
           )}
         </div>
       )}
@@ -1220,7 +1227,7 @@ function POSTerminalContent() {
           onResume={handleResume}
           onCancel={handleCancelHeld}
           onClose={() => setShowHeld(false)}
-          posLang={tileLang === 'ar' ? 'ar' : 'en'}
+          posLang={posLanguage(tileLang)}
         />
       )}
 
@@ -1230,7 +1237,7 @@ function POSTerminalContent() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-noch-muted" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={msg('Search...')}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="input pl-8 py-2 text-sm w-full"
@@ -1270,27 +1277,27 @@ function POSTerminalContent() {
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{loyaltyCustomer.full_name}</p>
                     <p className="text-noch-muted text-xs">
-                      {loyaltyCustomer.tier ? `${loyaltyCustomer.tier} · ` : ''}{loyaltyCustomer.current_stamps ?? 0} stamps
+                      {loyaltyCustomer.tier ? `${loyaltyCustomer.tier} · ` : ''}{loyaltyCustomer.current_stamps ?? 0} {msg('stamps')}
                     </p>
                   </div>
                   <button
                     onClick={() => setShowMemory(v => !v)}
                     className="text-noch-muted hover:text-white text-xs px-2"
-                    title={showMemory ? 'Hide details' : 'Show details'}
+                    title={msg(showMemory ? 'Hide details' : 'Show details')}
                   >
                     {showMemory ? '▾' : '▸'}
                   </button>
                   <button
                     onClick={() => setShowCustomerSearch(true)}
                     className="text-noch-muted hover:text-white text-xs px-2"
-                    title="Swap"
+                    title={msg('Swap')}
                   >
-                    Swap
+                    {msg('Swap')}
                   </button>
                   <button
                     onClick={() => { setLoyaltyCustomer(null); setShowMemory(false) }}
                     className="text-noch-muted hover:text-white p-1"
-                    title="Detach"
+                    title={msg('Detach')}
                   >
                     <X size={14} />
                   </button>
@@ -1305,7 +1312,7 @@ function POSTerminalContent() {
                 className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-noch-border text-noch-muted hover:text-white hover:border-noch-green/40 text-sm transition-colors"
               >
                 <UserPlus size={14} />
-                Attach customer
+                {msg('Attach customer')}
               </button>
             )}
           </div>
@@ -1320,7 +1327,7 @@ function POSTerminalContent() {
             onCharge={handleCharge}
             onHold={handleHold}
             managerOverrideEnabled={!!settings?.manager_override_enabled}
-            posLang={tileLang === 'ar' ? 'ar' : 'en'}
+            posLang={posLanguage(tileLang)}
             initialCustomerName={cartSeed?.customer_name || ''}
             initialCustomerPhone={cartSeed?.customer_phone || ''}
             initialDiscountType={cartSeed?.discount_type || 'pct'}
@@ -1354,7 +1361,7 @@ function POSTerminalContent() {
           onComplete={handlePaymentComplete}
           onClose={() => !submitting && setShowPayment(null)}
           loyaltyCustomer={loyaltyCustomer}
-          posLang={tileLang === 'ar' ? 'ar' : 'en'}
+          posLang={posLanguage(tileLang)}
           prestoEnabled={settings?.presto_enabled === true}
         />
       )}
@@ -1368,7 +1375,7 @@ function POSTerminalContent() {
             loyaltyCustomer={showReceipt.loyaltyCustomer}
             onNewOrder={() => setShowReceipt(null)}
             onClose={() => setShowReceipt(null)}
-            posLang={tileLang === 'ar' ? 'ar' : 'en'}
+            posLang={posLanguage(tileLang)}
           />
         </Suspense>
       )}
@@ -1392,7 +1399,7 @@ function POSTerminalContent() {
         <ProductModifierModal
           product={modifierProduct.product}
           groups={modifierData.groupsForProduct(modifierProduct.product.id)}
-          posLang={tileLang === 'ar' ? 'ar' : 'en'}
+          posLang={posLanguage(tileLang)}
           onAdd={({ unit_price, modifiers }) => {
             addCartLine(modifierProduct.product, { unit_price, modifiers })
             setModifierProduct(null)
@@ -1457,7 +1464,7 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
   if (!data) {
     return (
       <div className="mt-2 bg-noch-card border border-noch-border rounded-xl p-3 text-xs text-noch-muted">
-        {loading ? 'Loading…' : 'No memory yet.'}
+        {msg(loading ? 'Loading…' : 'No memory yet.')}
       </div>
     )
   }
@@ -1475,18 +1482,18 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
   return (
     <div className="mt-2 bg-noch-card border border-noch-border rounded-xl p-3 text-xs space-y-1.5">
       {/* Phase 8 — memory summary + suggested greeting (AI-helper, never auto-sent) */}
-      {memory?.summary_en && (
+      {(savedPosLanguage() === 'ar' ? memory?.summary_ar : memory?.summary_en) && (
         <div className="bg-noch-dark/40 border border-noch-border/50 rounded-lg p-2.5 space-y-1.5">
-          <p className="text-white/90 leading-snug">{memory.summary_en}</p>
-          {memory.greeting_en && (
+          <p className="text-white/90 leading-snug">{savedPosLanguage() === 'ar' ? memory.summary_ar : memory.summary_en}</p>
+          {(savedPosLanguage() === 'ar' ? memory.greeting_ar : memory.greeting_en) && (
             <button
               type="button"
-              onClick={() => copyGreeting(memory.greeting_en)}
+              onClick={() => copyGreeting(savedPosLanguage() === 'ar' ? memory.greeting_ar : memory.greeting_en)}
               className="w-full text-left text-noch-green hover:text-noch-green/80 italic flex items-start gap-1.5 transition-colors"
-              title="Copy suggested greeting"
+              title={msg('Copy suggested greeting')}
             >
               <span className="opacity-60 not-italic shrink-0">💬</span>
-              <span className="flex-1">"{memory.greeting_en}"</span>
+              <span className="flex-1">"{savedPosLanguage() === 'ar' ? memory.greeting_ar : memory.greeting_en}"</span>
               <span className="opacity-60 not-italic text-[10px] shrink-0">{copied ? '✓' : '⧉'}</span>
             </button>
           )}
@@ -1497,8 +1504,8 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
         <p className="text-noch-muted">
           <span className="text-white font-medium">☕ </span>
           {drinks.join(' · ')}
-          {data.milk_preference && <span> · milk: {data.milk_preference}</span>}
-          {data.sweetness_preference && <span> · sweet: {data.sweetness_preference}</span>}
+          {data.milk_preference && <span> · {msg('milk')}: {data.milk_preference}</span>}
+          {data.sweetness_preference && <span> · {msg('sweet')}: {data.sweetness_preference}</span>}
         </p>
       )}
 
@@ -1533,7 +1540,7 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
           }`}
           title={consentTip(data.whatsapp_opt_in_at, data.consent_source)}
         >
-          WhatsApp: {data.whatsapp_opt_in ? 'yes' : 'no'}
+          {msg('WhatsApp')}: {msg(data.whatsapp_opt_in ? 'yes' : 'no')}
         </span>
         <span
           className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -1543,7 +1550,7 @@ function CustomerMemoryDrawer({ customerId, fallback }) {
           }`}
           title={consentTip(data.ugc_consent_at, data.consent_source)}
         >
-          UGC consent: {data.ugc_consent ? 'yes' : 'no'}
+          {msg('UGC consent')}: {msg(data.ugc_consent ? 'yes' : 'no')}
         </span>
       </div>
     </div>
@@ -1585,15 +1592,15 @@ function CustomerSearchModal({ onSelect, onClose }) {
     const m = token.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
     if (m) token = m[0]
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
-      toast.error("Couldn't read that code")
+      toast.error(msg("Couldn't read that code"))
       return
     }
     try {
       const c = await lookupCustomerByPassportToken(token)
-      if (!c) { toast.error('No customer matches this code'); return }
+      if (!c) { toast.error(msg('No customer matches this code')); return }
       onSelect(c)
     } catch (err) {
-      toast.error(err.message || 'Lookup failed')
+      toast.error(cashierError(err, 'Lookup failed'))
     }
   }
 
@@ -1607,7 +1614,7 @@ function CustomerSearchModal({ onSelect, onClose }) {
       <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 pt-20" onClick={onClose}>
         <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between p-4 border-b border-noch-border">
-            <h3 className="text-white font-bold">Attach customer</h3>
+            <h3 className="text-white font-bold">{msg('Attach customer')}</h3>
             <button onClick={onClose} className="text-noch-muted hover:text-white"><X size={18} /></button>
           </div>
           <div className="p-4">
@@ -1616,25 +1623,25 @@ function CustomerSearchModal({ onSelect, onClose }) {
               className="w-full flex items-center justify-center gap-2 mb-3 py-2.5 rounded-xl border border-noch-green/40 text-noch-green hover:bg-noch-green/10 text-sm font-medium transition-colors"
             >
               <QrCode size={16} />
-              Scan customer’s Pass code
+              {msg('Scan customer’s Pass code')}
             </button>
             <div className="flex items-center gap-2 mb-3">
               <div className="flex-1 h-px bg-noch-border" />
-              <span className="text-noch-muted text-[11px] uppercase tracking-wider">or search</span>
+              <span className="text-noch-muted text-[11px] uppercase tracking-wider">{msg('or search')}</span>
               <div className="flex-1 h-px bg-noch-border" />
             </div>
             <input
               autoFocus
               type="text"
-              placeholder="Phone or name..."
+              placeholder={msg('Phone or name...')}
               value={query}
               onChange={e => setQuery(e.target.value)}
               className="input w-full mb-3"
             />
             <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
-              {searching && <p className="text-noch-muted text-xs px-2 py-1">Searching…</p>}
+              {searching && <p className="text-noch-muted text-xs px-2 py-1">{msg('Searching…')}</p>}
               {!searching && query.trim().length >= 2 && results.length === 0 && (
-                <p className="text-noch-muted text-sm px-2 py-2">No matches.</p>
+                <p className="text-noch-muted text-sm px-2 py-2">{msg('No matches.')}</p>
               )}
               {results.map(c => (
                 <button
@@ -1644,7 +1651,7 @@ function CustomerSearchModal({ onSelect, onClose }) {
                 >
                   <p className="text-white text-sm font-medium">{c.full_name}</p>
                   <p className="text-noch-muted text-xs">
-                    {c.phone} · {c.tier} · {c.current_stamps ?? 0} stamps · {c.total_visits ?? 0} visits
+                    {c.phone} · {c.tier} · {c.current_stamps ?? 0} {msg('stamps')} · {c.total_visits ?? 0} {msg('visits')}
                   </p>
                 </button>
               ))}

@@ -76,6 +76,6 @@ test('customer claim page waits for payment and shows earned points after settle
 
   assert.match(source, /supabase\.rpc\('get_my_loyalty_checkout_v2'/)
   assert.match(source, /Waiting for payment/)
-  assert.match(source, /\+\{result\.points_earned\} points/)
+  assert.match(source, /\+\{result\.points_earned\} \{ar \? 'نقطة' : 'points'\}/)
   assert.match(source, /result\.missions\.map/)
 })

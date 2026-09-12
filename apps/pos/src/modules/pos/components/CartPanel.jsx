@@ -12,12 +12,12 @@ import { format } from '../lib/money'
 const posT = (key, lang) =>
   translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
 
-function CartItem({ item, onUpdateQty, onRemove }) {
+function CartItem({ item, onUpdateQty, onRemove, posLang }) {
   return (
     <div className="flex items-start gap-2 py-2.5 border-b border-noch-border/50 last:border-0">
       <div className="flex-1 min-w-0">
-        <p className="text-white text-sm font-medium truncate">{item.name}</p>
-        {item.name_ar && (
+        <p className="text-white text-sm font-medium truncate">{posLang === 'ar' ? (item.name_ar || item.name) : item.name}</p>
+        {posLang !== 'ar' && item.name_ar && (
           <p className="text-noch-muted text-xs text-right" dir="rtl">{item.name_ar}</p>
         )}
         {Array.isArray(item.modifiers) && item.modifiers.length > 0 && (
@@ -68,7 +68,7 @@ function CartItem({ item, onUpdateQty, onRemove }) {
 
 function CartPanel({
   items = [], onUpdateQty, onRemove, onDiscount, onClear, onCharge, onHold,
-  managerOverrideEnabled = false, posLang = 'en',
+  managerOverrideEnabled = false, posLang = 'ar',
   // Seed values used when a held order is resumed (CartPanel is remounted
   // with a fresh key, so these become the initial state).
   initialCustomerName = '', initialCustomerPhone = '',
@@ -158,6 +158,7 @@ function CartPanel({
             <CartItem
               key={item.id}
               item={item}
+              posLang={posLang}
               onUpdateQty={onUpdateQty}
               onRemove={onRemove}
             />

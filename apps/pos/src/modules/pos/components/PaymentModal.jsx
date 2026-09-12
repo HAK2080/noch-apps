@@ -18,6 +18,7 @@ import {
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'
+import { posMessage, posError } from '../lib/pos-messages'
 
 // Local-only POS translation — see CartPanel for rationale.
 const posT = (key, lang) =>
@@ -36,7 +37,7 @@ function Numpad({ value, onChange }) {
     }
   }
   return (
-    <div className="grid grid-cols-3 gap-2 mt-3">
+    <div dir="ltr" className="grid grid-cols-3 gap-2 mt-3">
       {NUMPAD_KEYS.map(k => (
         <button
           key={k}
@@ -76,8 +77,9 @@ const calculateRewardDiscount = (reward, cart, total) => {
   return Math.min(total, Math.min(...eligibleLines.map(line => Number(line.price || 0))))
 }
 
-export default function PaymentModal({ total, branchId, cart = [], onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'en', prestoEnabled = false }) {
+export default function PaymentModal({ total, branchId, cart = [], onComplete, onClose, submitting = false, loyaltyCustomer: initialLoyalty, posLang = 'ar', prestoEnabled = false }) {
   const t = (k) => posT(k, posLang)
+  const msg = (key, values) => posMessage(key, posLang, values)
   const [method, setMethod] = useState('cash') // cash | card | split | presto
   const [cashTendered, setCashTendered] = useState(total.toFixed(2))
   const [cardAmount, setCardAmount] = useState('0')
@@ -192,7 +194,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                 skipReason: null,
               })
               window.clearInterval(pollTimer)
-              toast.success(`Loyalty linked: ${status.full_name}`)
+              toast.success(posMessage('Loyalty linked: {name}', posLang, { name: status.full_name }))
             } else if (['expired', 'cancelled', 'settled'].includes(status.status)) {
               window.clearInterval(pollTimer)
             }
@@ -201,7 +203,8 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
           }
         }, 2000)
       } catch (err) {
-        if (active) setCheckoutError(err.message || 'Transaction QR unavailable')
+        console.error('Loyalty checkout QR failed', err)
+        if (active) setCheckoutError(posError(err, 'Transaction QR unavailable', posLang))
       }
     }
 
@@ -210,7 +213,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
       active = false
       if (pollTimer) window.clearInterval(pollTimer)
     }
-  }, [branchId, cartToken, loyaltyCustomer])
+  }, [branchId, cartToken, loyaltyCustomer, posLang])
 
   const handleClose = useCallback(() => {
     if (checkoutSession?.session_id) {
@@ -245,23 +248,23 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
           captureMethod: 'existing_card',
           skipReason: null,
         })
-        toast.success(`Loyalty card linked: ${customer.full_name}`)
+        toast.success(msg('Loyalty card linked: {name}', { name: customer.full_name }))
       } else {
-        toast.error('QR code not recognized')
+        toast.error(msg('QR code not recognized'))
       }
     } catch {
-      toast.error('Could not look up loyalty card')
+      toast.error(msg('Could not look up loyalty card'))
     }
   }
 
   const handleBarcodeScan = (result) => {
     setShowScanner(false)
     // QR contains customer ID or phone
-    setLoyaltyCustomer({ id: result, name: 'Loyalty Customer' })
+    setLoyaltyCustomer({ id: result, name: msg('Loyalty Customer') })
   }
 
   const handlePhoneAttach = async () => {
-    if (loyaltyPhone.replace(/\D/g, '').length < 7) return toast.error('Enter at least 7 phone digits')
+    if (loyaltyPhone.replace(/\D/g, '').length < 7) return toast.error(msg('Enter at least 7 phone digits'))
     setLinkingPhone(true)
     try {
       const customer = await lookupOrCreateLoyaltyMemberV2(loyaltyPhone)
@@ -276,9 +279,10 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
         captureMethod: 'phone_fallback',
         skipReason: null,
       })
-      toast.success(`Loyalty linked: ${customer.full_name}`)
+      toast.success(msg('Loyalty linked: {name}', { name: customer.full_name }))
     } catch (err) {
-      toast.error(err.message || 'Could not attach loyalty customer')
+      console.error('Loyalty attachment failed', err)
+      toast.error(posError(err, 'Could not attach loyalty customer', posLang))
     } finally {
       setLinkingPhone(false)
     }
@@ -296,7 +300,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
   }
 
   return (
-    <>
+    <div lang={posLang} dir={posLang === 'ar' ? 'rtl' : 'ltr'}>
       {showScanner && (
         <Suspense fallback={null}>
           <BarcodeScanner
@@ -320,9 +324,9 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
           <div className="flex items-center justify-between p-5 border-b border-noch-border">
             <div>
               <h2 className="text-white font-bold text-xl">{t('posPayment')}</h2>
-              <p className="text-noch-green text-2xl font-bold mt-1">{format(payableTotal)} LYD</p>
+              <p className="text-noch-green text-2xl font-bold mt-1">{format(payableTotal)} {msg('LYD')}</p>
               {rewardDiscount > 0 && (
-                <p className="text-xs text-yellow-300">Reward applied: −{format(rewardDiscount)} LYD</p>
+                <p className="text-xs text-yellow-300">{msg('Reward applied: {amount}', { amount: `−${format(rewardDiscount)} ${msg('LYD')}` })}</p>
               )}
             </div>
             <button onClick={handleClose} className="text-noch-muted hover:text-white p-1">
@@ -359,12 +363,12 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
               <div>
                 <p className="text-noch-muted text-sm mb-2">{t('posCashTendered')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
-                  <span className="text-white text-2xl font-bold">{format(cashTendered || 0)} LYD</span>
+                  <span className="text-white text-2xl font-bold">{format(cashTendered || 0)} {msg('LYD')}</span>
                 </div>
                 {changeDue > 0 && (
                   <div className="flex justify-between items-center mt-3 bg-noch-green/10 border border-noch-green/20 rounded-xl px-4 py-3">
                     <span className="text-noch-green font-medium">{t('posChangeDue')}</span>
-                    <span className="text-noch-green font-bold text-xl">{format(changeDue)} LYD</span>
+                    <span className="text-noch-green font-bold text-xl">{format(changeDue)} {msg('LYD')}</span>
                   </div>
                 )}
                 {/* Quick amounts — big tappable buttons, shown first */}
@@ -394,7 +398,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                 <p className="text-white font-semibold mb-1">{t('posVerifoneHint')}</p>
                 <p className="text-noch-muted text-sm mb-4">{t('posVerifoneSub')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{format(payableTotal)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(payableTotal)} {msg('LYD')}</p>
                 </div>
               </div>
             )}
@@ -404,12 +408,12 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
               <div>
                 <p className="text-noch-muted text-sm mb-2">{t('posCardAmount')}</p>
                 <div className="bg-noch-dark border border-noch-border rounded-xl px-4 py-3 text-right">
-                  <span className="text-white text-2xl font-bold">{format(cardAmount || 0)} LYD</span>
+                  <span className="text-white text-2xl font-bold">{format(cardAmount || 0)} {msg('LYD')}</span>
                 </div>
                 {splitValid && (
                   <div className="flex justify-between items-center mt-2 bg-noch-card border border-noch-border rounded-xl px-4 py-2">
                     <span className="text-noch-muted text-sm">{t('posCashRemaining')}</span>
-                    <span className="text-white font-semibold">{format(splitCash)} LYD</span>
+                    <span className="text-white font-semibold">{format(splitCash)} {msg('LYD')}</span>
                   </div>
                 )}
                 <Numpad value={cardAmount} onChange={setCardAmount} />
@@ -424,7 +428,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                 <p className="text-noch-muted text-sm mb-1">{t('posPrestoSub')}</p>
                 <p className="text-yellow-400 text-xs mb-4">{t('posPrestoNote')}</p>
                 <div className="bg-noch-green/10 border border-noch-green/20 rounded-xl p-4">
-                  <p className="text-noch-green text-3xl font-bold">{format(payableTotal)} LYD</p>
+                  <p className="text-noch-green text-3xl font-bold">{format(payableTotal)} {msg('LYD')}</p>
                 </div>
               </div>
             )}
@@ -442,7 +446,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                   {availableRewards.length > 0 && (
                     <div>
                       <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-yellow-300">
-                        <Gift size={14} /> Available rewards
+                        <Gift size={14} /> {msg('Available rewards')}
                       </p>
                       <div className="space-y-2">
                         {availableRewards.map(reward => {
@@ -462,9 +466,9 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                                     : 'cursor-not-allowed border-noch-border opacity-50'
                               }`}
                             >
-                              <span className="block text-sm font-medium text-white">{reward.title}</span>
+                              <span className="block text-sm font-medium text-white">{posLang === 'ar' ? (reward.title_ar || reward.title) : reward.title}</span>
                               <span className="text-xs text-noch-muted">
-                                {discount > 0 ? `Apply ${format(discount)} LYD reward` : 'No eligible item in this order'}
+                                {discount > 0 ? msg('Apply {amount} LYD reward', { amount: format(discount) }) : msg('No eligible item in this order')}
                               </span>
                             </button>
                           )
@@ -478,12 +482,12 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                   <div className="rounded-xl border border-noch-green/30 bg-noch-green/5 p-3 text-center">
                     <div className="flex items-center justify-center gap-2 text-noch-green font-semibold text-sm">
                       <QrCode size={16} />
-                      Customer scans to collect points
+                      {msg('Customer scans to collect points')}
                     </div>
                     {checkoutQr ? (
                       <img
                         src={checkoutQr}
-                        alt="Customer loyalty transaction QR"
+                        alt={msg('Customer loyalty transaction QR')}
                         className="mx-auto mt-3 h-40 w-40 rounded-lg bg-white p-1"
                       />
                     ) : checkoutError ? (
@@ -491,11 +495,11 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                     ) : (
                       <div className="mt-5 flex items-center justify-center gap-2 text-xs text-noch-muted">
                         <Loader2 size={14} className="animate-spin" />
-                        Preparing private transaction code…
+                        {msg('Preparing private transaction code…')}
                       </div>
                     )}
                     <p className="mt-2 text-xs text-noch-muted">
-                      No phone number is spoken or shown to the cashier.
+                      {msg('No phone number is spoken or shown to the cashier.')}
                     </p>
                   </div>
 
@@ -504,7 +508,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                     className="flex items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
                   >
                     <QrCode size={14} />
-                    Scan an existing membership card
+                    {msg('Scan an existing membership card')}
                   </button>
 
                   <button
@@ -512,7 +516,7 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                     className="flex w-full items-center gap-2 text-noch-muted hover:text-white text-sm transition-colors"
                   >
                     <Phone size={14} />
-                    Cashier phone lookup
+                    {msg('Cashier phone lookup')}
                     <ChevronDown size={14} className={`ml-auto transition-transform ${showPhoneFallback ? 'rotate-180' : ''}`} />
                   </button>
                   {showPhoneFallback && (
@@ -524,12 +528,14 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
                           value={loyaltyPhone}
                           onChange={e => setLoyaltyPhone(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); handlePhoneAttach() } }}
-                          placeholder="Phone — fallback only"
+                          placeholder={msg('Phone — fallback only')}
+                          aria-label={msg('Cashier phone lookup')}
+                          dir="ltr"
                           className="input w-full pl-9 text-sm"
                         />
                       </div>
                       <button onClick={handlePhoneAttach} disabled={linkingPhone} className="btn-secondary px-3">
-                        {linkingPhone ? <Loader2 size={14} className="animate-spin" /> : 'Attach'}
+                        {linkingPhone ? <Loader2 size={14} className="animate-spin" /> : msg('Attach')}
                       </button>
                     </div>
                   )}
@@ -599,6 +605,6 @@ export default function PaymentModal({ total, branchId, cart = [], onComplete, o
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

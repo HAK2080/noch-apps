@@ -4,6 +4,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { X } from 'lucide-react'
+import { posMessage, savedPosLanguage } from '../lib/pos-messages'
+
+const msg = (key) => posMessage(key, savedPosLanguage())
 
 export default function BarcodeScanner({ onScan, onClose }) {
   const videoRef = useRef(null)
@@ -21,7 +24,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
         const deviceId = devices.find(d => /back|rear|environment/i.test(d.label))?.deviceId
           || devices[0]?.deviceId
 
-        await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result, err) => {
+        await reader.decodeFromVideoDevice(deviceId, videoRef.current, (result) => {
           if (result) {
             setScanning(false)
             onScan(result.getText())
@@ -29,7 +32,8 @@ export default function BarcodeScanner({ onScan, onClose }) {
           // Ignore scan errors — they happen continuously while scanning
         })
       } catch (err) {
-        setError(err.message || 'Camera access denied')
+        console.error('Barcode camera failed', err)
+        setError(msg('Camera access denied'))
       }
     }
 
@@ -45,7 +49,7 @@ export default function BarcodeScanner({ onScan, onClose }) {
       <div className="w-full max-w-sm bg-noch-card rounded-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-noch-border">
-          <h2 className="text-white font-semibold">Scan Barcode / QR</h2>
+          <h2 className="text-white font-semibold">{msg('Scan Barcode / QR')}</h2>
           <button onClick={onClose} className="text-noch-muted hover:text-white p-1">
             <X size={20} />
           </button>
@@ -81,9 +85,9 @@ export default function BarcodeScanner({ onScan, onClose }) {
           {error ? (
             <p className="text-red-400 text-sm">{error}</p>
           ) : scanning ? (
-            <p className="text-noch-muted text-sm">Point camera at barcode or QR code</p>
+            <p className="text-noch-muted text-sm">{msg('Point camera at barcode or QR code')}</p>
           ) : (
-            <p className="text-noch-green text-sm font-medium">Scanned!</p>
+            <p className="text-noch-green text-sm font-medium">{msg('Scanned!')}</p>
           )}
         </div>
       </div>

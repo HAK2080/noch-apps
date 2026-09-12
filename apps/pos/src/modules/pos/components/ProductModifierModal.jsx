@@ -8,9 +8,11 @@ import { X, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import { getModifierGroupsForProduct } from '../lib/pos-supabase'
 import { format, round, lineTotal } from '../lib/money'
 import toast from 'react-hot-toast'
+import { posMessage, posError } from '../lib/pos-messages'
 
-export default function ProductModifierModal({ product, onAdd, onClose, groups: groupsProp = null, posLang = 'en' }) {
+export default function ProductModifierModal({ product, onAdd, onClose, groups: groupsProp = null, posLang = 'ar' }) {
   const isAr = posLang === 'ar'
+  const msg = (key, values) => posMessage(key, posLang, values)
   // Display name helpers — prefer Arabic when in AR mode
   const gName = (g) => (isAr && g.name_ar) ? g.name_ar : g.name
   const mName = (m) => (isAr && m.name_ar) ? m.name_ar : m.name
@@ -35,6 +37,8 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
       setCollapsed(col)
     }
     if (Array.isArray(groupsProp)) {
+      // Initialize the existing modal from the terminal's preloaded options.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGroups(groupsProp)
       initFromGroups(groupsProp)
       setLoading(false)
@@ -45,7 +49,10 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
         setGroups(g)
         initFromGroups(g)
       })
-      .catch(err => toast.error(err.message || 'Failed to load options'))
+      .catch(err => {
+        console.error('Modifier options failed', err)
+        toast.error(posError(err, 'Failed to load options', posLang))
+      })
       .finally(() => setLoading(false))
   }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -60,7 +67,7 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
         return { ...prev, [group.id]: cur.filter(m => m.id !== mod.id) }
       }
       if (cur.length >= group.max_select) {
-        toast(`Up to ${group.max_select} choices in ${group.name}`)
+        toast(msg('Up to {count} choices in {group}', { count: group.max_select, group: gName(group) }))
         return prev
       }
       return { ...prev, [group.id]: [...cur, mod] }
@@ -71,10 +78,10 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
     for (const g of groups) {
       const picked = selections[g.id] || []
       if (g.is_required && picked.length < Math.max(1, g.min_select)) {
-        return { ok: false, reason: `Pick at least ${Math.max(1, g.min_select)} in "${g.name}"` }
+        return { ok: false, reason: msg('Pick at least {count} in {group}', { count: Math.max(1, g.min_select), group: gName(g) }) }
       }
       if (picked.length < (g.min_select || 0)) {
-        return { ok: false, reason: `Pick at least ${g.min_select} in "${g.name}"` }
+        return { ok: false, reason: msg('Pick at least {count} in {group}', { count: g.min_select, group: gName(g) }) }
       }
     }
     return { ok: true }
@@ -185,6 +192,7 @@ export default function ProductModifierModal({ product, onAdd, onClose, groups: 
             <span className="text-noch-muted text-sm">{isAr ? 'المجموع' : 'Total'}</span>
             <span className="text-noch-green font-bold">{format(lineTtl)} LYD</span>
           </div>
+          {!loading && !validation.ok && <p role="status" className="text-yellow-400 text-sm mb-3">{validation.reason}</p>}
           <button
             onClick={handleAdd}
             disabled={loading || !validation.ok}

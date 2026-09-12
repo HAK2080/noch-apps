@@ -7,6 +7,7 @@ import { printReceipt, openCashDrawer, isPrinterConnected } from '../lib/escpos'
 import { translations } from '../../../lib/i18n'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'
+import { posMessage, posError } from '../lib/pos-messages'
 
 // Where the customer-facing Passport page lives. The clean URL is
 // served by /var/www/html/passport/index.html (a redirect file from the
@@ -46,8 +47,9 @@ function pickFooter(order, isAr) {
 const posT = (key, lang) =>
   translations[lang === 'ar' ? 'ar' : 'en']?.[key] || translations.en?.[key] || key
 
-export default function ReceiptModal({ order, items, branch, loyaltyCustomer, onNewOrder, onClose, posLang = 'en' }) {
+export default function ReceiptModal({ order, items, branch, loyaltyCustomer, onNewOrder, onClose, posLang = 'ar' }) {
   const t = (k) => posT(k, posLang)
+  const msg = (key) => posMessage(key, posLang)
   const [printing, setPrinting] = useState(false)
   const [openingDrawer, setOpeningDrawer] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState(null)
@@ -68,9 +70,10 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
     setPrinting(true)
     try {
       await printReceipt(order, branch, items, loyaltyCustomer)
-      toast.success('Sent to print queue')
+      toast.success(msg('Sent to print queue'))
     } catch (err) {
-      toast.error(err.message || t('receiptPrintFailed'))
+      console.error('Receipt print failed', err)
+      toast.error(posError(err, 'Print failed', posLang))
     } finally {
       setPrinting(false)
     }
@@ -86,7 +89,8 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
       await openCashDrawer()
       toast.success(t('receiptDrawerOpened'))
     } catch (err) {
-      toast.error(err.message || t('receiptDrawerFailed'))
+      console.error('Cash drawer failed', err)
+      toast.error(posError(err, 'Cash drawer could not open', posLang))
     } finally {
       setOpeningDrawer(false)
     }
@@ -97,7 +101,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
+    <div lang={posLang} dir={posLang === 'ar' ? 'rtl' : 'ltr'} className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-sm max-h-[90dvh] pos-scroll">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-noch-border">
@@ -182,7 +186,7 @@ export default function ReceiptModal({ order, items, branch, loyaltyCustomer, on
                     height={120}
                   />
                 )}
-                <p className="text-noch-muted text-[10px]">Scan for your Nochi Pass</p>
+                <p className="text-noch-muted text-[10px]">{msg('Scan for your Nochi Pass')}</p>
                 <p className="text-white text-[10px] break-all">{PASSPORT_BASE}/{passportToken}</p>
               </div>
             )}

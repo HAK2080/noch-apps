@@ -5,6 +5,9 @@
 import { useState } from 'react'
 import { Shield, X, Loader2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { posMessage, posError, savedPosLanguage } from '../lib/pos-messages'
+
+const msg = (key, values) => posMessage(key, savedPosLanguage(), values)
 
 export default function ManagerOverrideModal({ action, onApprove, onClose }) {
   const [pin, setPin] = useState('')
@@ -12,25 +15,26 @@ export default function ManagerOverrideModal({ action, onApprove, onClose }) {
   const [error, setError] = useState('')
 
   const handleSubmit = async () => {
-    if (pin.length < 4) { setError('Manager PIN required'); return }
+    if (pin.length < 4) { setError(msg('Manager PIN required')); return }
     setVerifying(true)
     setError('')
     try {
       const { data, error: rpcErr } = await supabase.rpc('verify_manager_pin', { p_pin: pin })
       if (rpcErr) throw rpcErr
       if (data?.locked) {
-        setError(`Too many failed attempts. Try in ${Math.ceil((data.retry_in_seconds || 900) / 60)} min.`)
+        setError(msg('Too many attempts. Try again in {minutes} min.', { minutes: Math.ceil((data.retry_in_seconds || 900) / 60) }))
         setPin('')
         return
       }
       if (!data?.matched) {
-        setError(data?.reason === 'not_a_manager' ? 'Not a manager PIN' : 'Incorrect PIN')
+        setError(msg(data?.reason === 'not_a_manager' ? 'Not a manager PIN' : 'Incorrect PIN'))
         setPin('')
         return
       }
       onApprove(data.profile)
     } catch (err) {
-      setError(err.message || 'Verification failed')
+      console.error('Manager verification failed', err)
+      setError(posError(err, 'Verification failed', savedPosLanguage()))
     } finally {
       setVerifying(false)
     }
@@ -42,13 +46,13 @@ export default function ManagerOverrideModal({ action, onApprove, onClose }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Shield size={18} className="text-yellow-400" />
-            <h2 className="text-white font-semibold">Manager approval</h2>
+            <h2 className="text-white font-semibold">{msg('Manager approval')}</h2>
           </div>
           <button onClick={onClose} className="text-noch-muted hover:text-white">
             <X size={18} />
           </button>
         </div>
-        <p className="text-noch-muted text-xs mb-4">{action || 'Enter a manager PIN to authorise this action.'}</p>
+        <p className="text-noch-muted text-xs mb-4">{msg(action || 'Enter a manager PIN to authorise this action.')}</p>
         <input
           type="password"
           inputMode="numeric"
@@ -57,7 +61,7 @@ export default function ManagerOverrideModal({ action, onApprove, onClose }) {
           value={pin}
           onChange={e => { setPin(e.target.value); setError('') }}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          placeholder="Manager PIN"
+          placeholder={msg('Manager PIN')}
           className="input w-full text-center text-lg tracking-widest mb-3"
           maxLength={6}
         />
@@ -68,7 +72,7 @@ export default function ManagerOverrideModal({ action, onApprove, onClose }) {
           className="btn-primary w-full py-2.5 flex items-center justify-center gap-2"
         >
           {verifying ? <Loader2 size={14} className="animate-spin" /> : null}
-          {verifying ? 'Checking…' : 'Approve'}
+          {msg(verifying ? 'Checking…' : 'Approve')}
         </button>
       </div>
     </div>

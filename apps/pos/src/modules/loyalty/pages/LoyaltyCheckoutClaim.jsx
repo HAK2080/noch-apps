@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { CheckCircle2, Loader2, LockKeyhole, Mail, Phone } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
-import { useLanguage } from '../../../contexts/LanguageContext'
+import { posMessage, posError } from '../../pos/lib/pos-messages'
 import {
   joinAndClaimLoyaltyCheckoutV2,
   updateMyLoyaltyProfileV2,
@@ -10,7 +10,7 @@ import {
 
 export default function LoyaltyCheckoutClaim() {
   const { token } = useParams()
-  const { lang } = useLanguage()
+  const [lang, setLang] = useState('ar')
   const ar = lang === 'ar'
   const [channel, setChannel] = useState('phone')
   const [identifier, setIdentifier] = useState('')
@@ -60,7 +60,8 @@ export default function LoyaltyCheckoutClaim() {
       if (otpError) throw otpError
       setCodeSent(true)
     } catch (err) {
-      setError(err.message || 'Could not send the verification code')
+      console.error('Verification delivery failed', err)
+      setError(posError(err, 'Could not send the verification code', lang))
     } finally {
       setBusy(false)
     }
@@ -77,7 +78,8 @@ export default function LoyaltyCheckoutClaim() {
       if (verifyError) throw verifyError
       setVerified(true)
     } catch (err) {
-      setError(err.message || 'That verification code did not work')
+      console.error('Verification failed', err)
+      setError(posError(err, 'That verification code did not work', lang))
     } finally {
       setBusy(false)
     }
@@ -85,7 +87,7 @@ export default function LoyaltyCheckoutClaim() {
 
   const claimCheckout = async () => {
     if (!fullName.trim()) {
-      setError('Please enter your name')
+      setError(posMessage('Please enter your name', lang))
       return
     }
     setBusy(true)
@@ -93,7 +95,8 @@ export default function LoyaltyCheckoutClaim() {
     try {
       setResult(await joinAndClaimLoyaltyCheckoutV2(token, fullName.trim()))
     } catch (err) {
-      setError(err.message || 'Could not link this transaction')
+      console.error('Checkout claim failed', err)
+      setError(posError(err, 'Could not link this transaction', lang))
     } finally {
       setBusy(false)
     }
@@ -115,15 +118,17 @@ export default function LoyaltyCheckoutClaim() {
         marketingOptIn,
       }))
     } catch (consentError) {
-      setError(consentError.message || (ar ? 'تعذر حفظ الموافقة' : 'Could not save consent'))
+      console.error('Contact choice failed', consentError)
+      setError(posError(consentError, 'Could not save consent', lang))
     } finally {
       setConsentBusy(false)
     }
   }
 
   return (
-    <main className="min-h-screen bg-noch-dark px-4 py-10 text-white">
+    <main lang={lang} dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-noch-dark px-4 py-10 text-white">
       <div className="mx-auto max-w-md">
+        <button type="button" className="btn-secondary mb-4" onClick={() => setLang(ar ? 'en' : 'ar')}>{ar ? 'English' : 'العربية'}</button>
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-noch-green/15 text-noch-green">
             {result ? <CheckCircle2 size={30} /> : <LockKeyhole size={28} />}
@@ -142,10 +147,10 @@ export default function LoyaltyCheckoutClaim() {
               </h2>
               <p className="mt-2 text-white">{result.full_name}</p>
               {result.status === 'settled' ? (
-                <p className="mt-3 text-2xl font-bold text-white">+{result.points_earned} points</p>
+                <p className="mt-3 text-2xl font-bold text-white">+{result.points_earned} {ar ? 'نقطة' : 'points'}</p>
               ) : (
                 <p className="mt-3 flex items-center justify-center gap-2 text-sm text-noch-muted">
-                  <Loader2 size={15} className="animate-spin" /> Waiting for payment…
+                  <Loader2 size={15} className="animate-spin" /> {ar ? 'بانتظار إتمام الدفع…' : 'Waiting for payment…'}
                 </p>
               )}
               <p className="mt-1 text-sm text-noch-muted">
@@ -153,15 +158,15 @@ export default function LoyaltyCheckoutClaim() {
               </p>
               {result.status === 'settled' && result.available_rewards > 0 && (
                 <p className="mt-3 rounded-lg bg-yellow-300/10 px-3 py-2 text-sm text-yellow-200">
-                  {result.available_rewards} reward{result.available_rewards === 1 ? '' : 's'} available
+                  {ar ? `المكافآت المتاحة: ${result.available_rewards}` : `${result.available_rewards} reward${result.available_rewards === 1 ? '' : 's'} available`}
                 </p>
               )}
               {result.status === 'settled' && result.missions?.length > 0 && (
                 <div className="mt-4 space-y-2 text-left">
                   {result.missions.map(mission => (
                     <div key={mission.mission_id} className="rounded-lg border border-noch-border px-3 py-2">
-                      <p className="text-sm font-medium text-white">{mission.title}</p>
-                      <p className="text-xs text-noch-muted">{mission.progress_count} of {mission.target_count} completed</p>
+                      <p className="text-sm font-medium text-white">{ar ? (mission.title_ar || mission.title) : mission.title}</p>
+                      <p className="text-xs text-noch-muted">{ar ? `تم إكمال ${mission.progress_count} من ${mission.target_count}` : `${mission.progress_count} of ${mission.target_count} completed`}</p>
                     </div>
                   ))}
                 </div>

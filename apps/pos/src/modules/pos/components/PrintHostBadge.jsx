@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { Printer } from 'lucide-react'
 import { observeHostPresence, isPrintHost } from '../lib/print-queue'
+import { posMessage, savedPosLanguage } from '../lib/pos-messages'
 
 export default function PrintHostBadge({ branchId }) {
   const [host, setHost] = useState(null)
@@ -20,12 +21,13 @@ export default function PrintHostBadge({ branchId }) {
 
   const online = !!host
   const color = online ? 'bg-noch-green' : 'bg-red-500'
-  const label = online ? 'Printer ready' : 'No host — prints will queue'
+  const msg = (key, values) => posMessage(key, savedPosLanguage(), values)
+  const label = msg(online ? 'Printer ready' : 'No host — prints will queue')
 
   return (
     <div
       className="fixed bottom-3 right-3 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-noch-card border border-noch-border shadow-lg"
-      title={online ? `Host: ${host?.deviceId?.slice(0, 16) || 'connected'}` : 'No print host detected on this branch'}
+      title={online ? msg('Host: {device}', { device: host?.deviceId?.slice(0, 16) || msg('connected') }) : msg('No print host detected on this branch')}
     >
       <span className={`w-2 h-2 rounded-full ${color} ${online ? '' : 'animate-pulse'}`} />
       <Printer size={12} className="text-noch-muted" />

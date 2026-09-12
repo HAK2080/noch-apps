@@ -17,6 +17,7 @@ import {
 } from './pos-offline'
 import { createPOSOrder } from './pos-supabase'
 import toast from 'react-hot-toast'
+import { posMessage, posError, savedPosLanguage } from './pos-messages'
 
 let _syncing = false
 
@@ -67,16 +68,18 @@ async function drainQueue() {
   const queue = await getOfflineQueue()
   if (!queue.length) return
 
-  toast.loading(`Syncing ${queue.length} offline order(s)…`, { id: 'pos-sync' })
+  const lang = savedPosLanguage()
+  toast.loading(posMessage('Syncing {count} offline order(s)…', lang, { count: queue.length }), { id: 'pos-sync' })
   try {
     const { synced, failed } = await syncOfflineOrders()
     if (failed === 0) {
-      toast.success(`Synced ${synced} offline order(s)`, { id: 'pos-sync' })
+      toast.success(posMessage('Synced {count} offline order(s)', lang, { count: synced }), { id: 'pos-sync' })
     } else {
-      toast.error(`Synced ${synced}, failed ${failed}`, { id: 'pos-sync' })
+      toast.error(posMessage('Synced {synced}, failed {failed}', lang, { synced, failed }), { id: 'pos-sync' })
     }
   } catch (err) {
-    toast.error('Sync failed: ' + err.message, { id: 'pos-sync' })
+    console.error('POS sync failed', err)
+    toast.error(posError(err, 'Sync failed. Saved orders remain on this device.', lang), { id: 'pos-sync' })
   }
 }
 
