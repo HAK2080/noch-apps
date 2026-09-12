@@ -123,7 +123,7 @@ function ProductGrid({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 flex-1 min-h-0 pt-2 pb-3 pos-scroll">
         {filtered.length === 0 && (
           <div className="col-span-full text-center text-noch-muted py-16 text-sm">
-            {searchQuery ? `No results for "${searchQuery}"` : 'No products in this category'}
+            {tileLang === 'ar' ? (searchQuery ? `لا توجد نتائج لـ "${searchQuery}"` : 'لا توجد منتجات في هذا التصنيف') : (searchQuery ? `No results for "${searchQuery}"` : 'No products in this category')}
           </div>
         )}
         {filtered.map(product => {
@@ -156,15 +156,15 @@ function ProductGrid({
                 <div className="absolute top-1.5 right-1.5 z-20 bg-noch-dark/90 text-white text-[10px] font-bold px-2 py-1 rounded-full">{product.sale_block_reason || 'Unavailable'}</div>
               ) : product.is_sold_out ? (
                 <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-red-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg select-none">
-                  <Ban size={10} /> Sold out
+                  <Ban size={10} /> {tileLang === 'ar' ? 'نفد' : 'Sold out'}
                 </div>
               ) : isOutOfStock(product) ? (
                 <div className="absolute top-1.5 right-1.5 z-20 bg-red-500/90 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg">
-                  Out
+                  {tileLang === 'ar' ? 'نفد المخزون' : 'Out'}
                 </div>
               ) : isLowStock(product) ? (
                 <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-yellow-500/90 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg">
-                  <AlertTriangle size={10} /> Low
+                  <AlertTriangle size={10} /> {tileLang === 'ar' ? 'مخزون قليل' : 'Low'}
                 </div>
               ) : null}
 
@@ -203,13 +203,13 @@ function ProductGrid({
               >
                 <div className="min-h-0">
                   {tileLang !== 'ar' && (
-                    <p className="text-white text-sm sm:text-[15px] font-semibold leading-tight line-clamp-1">
+                    <p className={`text-white text-sm sm:text-[15px] font-semibold leading-tight ${tileLang === 'both' ? 'line-clamp-1' : 'line-clamp-2'}`}>
                       {product.name}
                     </p>
                   )}
                   {tileLang !== 'en' && product.name_ar && (
                     <p
-                      className={`text-noch-muted leading-tight line-clamp-1 ${
+                      className={`text-noch-muted leading-tight ${tileLang === 'ar' ? 'line-clamp-2' : 'line-clamp-1'} ${
                         tileLang === 'ar'
                           ? 'text-white text-sm sm:text-[15px] font-semibold'
                           : 'text-[12px] sm:text-[13px] mt-0.5'

@@ -372,7 +372,7 @@ function POSTerminalContent() {
   const [showMore, setShowMore] = useState(false)
   const [modifierProduct, setModifierProduct] = useState(null)
   const [stockProduct, setStockProduct] = useState(null)
-  const [modifierData, setModifierData] = useState({ groupsForProduct: () => [] })
+  const [modifierData, setModifierData] = useState(null)
 
   // Load branch, products, categories
   useEffect(() => {
@@ -436,7 +436,7 @@ function POSTerminalContent() {
 
       const modifierGroupsByProduct = modData
         ? Object.fromEntries(prods.map(product => [product.id, modData.groupsForProduct(product.id)]))
-        : cachedConfig?.modifier_groups_by_product || {}
+        : cachedConfig?.modifier_groups_by_product
       cacheBranchConfig(branchId, {
         branch: b,
         shift: s,
@@ -645,14 +645,19 @@ function POSTerminalContent() {
       return
     }
     try {
-      const groups = await getModifierGroupsForProduct(product.id)
+      const groups = modifierData
+        ? modifierData.groupsForProduct(product.id)
+        : await withPOSNetworkTimeout(getModifierGroupsForProduct(product.id), 10000)
       if (groups && groups.length > 0) {
         setModifierProduct({ product, groups })
         return
       }
-    } catch { /* if the lookup fails, fall through to bare add */ }
+    } catch (err) {
+      toast.error(cashierError(err, 'Failed to load options'))
+      return
+    }
     addCartLine(product)
-  }, [settings, addCartLine, products])
+  }, [settings, addCartLine, products, modifierData])
 
   // Sold-out remains a separate manual availability control inside the stock modal.
   const handleSoldOutToggle = useCallback(async (product) => {
@@ -1398,7 +1403,7 @@ function POSTerminalContent() {
       {modifierProduct && (
         <ProductModifierModal
           product={modifierProduct.product}
-          groups={modifierData.groupsForProduct(modifierProduct.product.id)}
+          groups={modifierProduct.groups}
           posLang={posLanguage(tileLang)}
           onAdd={({ unit_price, modifiers }) => {
             addCartLine(modifierProduct.product, { unit_price, modifiers })

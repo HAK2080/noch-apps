@@ -747,10 +747,11 @@ export async function getSalesControlSummary(branchId, fromDate, toDate) {
 export async function getModifierGroupsForProduct(productId) {
   // Returns groups + their modifiers, scoped to the product via the
   // pos_product_modifier_groups link table.
-  const { data: links } = await supabase
+  const { data: links, error: linksError } = await supabase
     .from('pos_product_modifier_groups')
     .select('group_id')
     .eq('product_id', productId)
+  if (linksError) throw linksError
   const groupIds = (links || []).map(l => l.group_id)
   if (!groupIds.length) return []
   const { data: groups, error } = await supabase
@@ -767,10 +768,11 @@ export async function getModifierGroupsForProduct(productId) {
 }
 
 export async function getAllModifierData() {
-  const [{ data: links }, { data: groups, error }] = await Promise.all([
+  const [{ data: links, error: linksError }, { data: groups, error }] = await Promise.all([
     supabase.from('pos_product_modifier_groups').select('product_id, group_id'),
     supabase.from('pos_modifier_groups').select('*, pos_modifiers(*)').eq('is_active', true).order('sort_order'),
   ])
+  if (linksError) throw linksError
   if (error) throw error
 
   const groupMap = new Map()

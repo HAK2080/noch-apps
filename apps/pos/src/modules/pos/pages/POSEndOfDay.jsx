@@ -200,6 +200,8 @@ export default function POSEndOfDay() {
   const [summary, setSummary] = useState(null)
   const [shiftControl, setShiftControl] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
   const [actualCash, setActualCash] = useState('')
   const [closing, setClosing] = useState(false)
   const [notes, setNotes] = useState('')
@@ -227,13 +229,14 @@ export default function POSEndOfDay() {
           setShiftControl(normalizeShiftControl(control))
         }
       } catch (err) {
+        setLoadFailed(true)
         toast.error(err.message || t('eodLoadFailed'))
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [branchId, t])
+  }, [branchId, t, retry])
 
   const expectedCash = shiftControl?.expected_drawer_cash
     ?? (shift ? parseFloat(shift.expected_cash) : 0)
@@ -337,14 +340,15 @@ export default function POSEndOfDay() {
           </div>
         </div>
 
-        {!shift && (
+        {loadFailed && <div role="alert" className="card text-center py-8"><p className="text-red-300">{t('eodLoadFailed')}</p><button className="btn-secondary mt-3" onClick={() => { setLoading(true); setLoadFailed(false); setRetry(value => value + 1) }}>{lang === 'ar' ? 'أعد المحاولة' : 'Retry'}</button></div>}
+        {!shift && !loadFailed && (
           <div className="card text-center py-10">
             <p className="text-noch-muted">{t('eodNoOpenShift')}</p>
             <button onClick={() => navigate('/pos')} className="btn-secondary mt-4">{t('eodGoToPos')}</button>
           </div>
         )}
 
-        {shift && summary && (
+        {shift && summary && !loadFailed && (
           <>
             {shiftControl && (
               shiftControl.counterStatus === 'warning'
@@ -504,8 +508,9 @@ export default function POSEndOfDay() {
                 />
               </div>
 
-              <label className="label block mb-1 text-amber-200">{t('eodActualCash')}</label>
+              <label htmlFor="closing-cash" className="label block mb-1 text-amber-200">{t('eodActualCash')}</label>
               <input
+                id="closing-cash"
                 type="number"
                 value={actualCash}
                 onChange={e => setActualCash(e.target.value)}

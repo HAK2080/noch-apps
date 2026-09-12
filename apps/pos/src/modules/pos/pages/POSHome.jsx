@@ -1,7 +1,7 @@
 // POSHome.jsx — Branch selector for POS
 // Route: /pos
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, MapPin, Plus, Clock, Trash2, Power, AlertTriangle } from 'lucide-react'
 import { getPOSBranches, getOpenShift, openShift, updatePOSBranch } from '../lib/pos-supabase'
@@ -18,6 +18,7 @@ import { cacheBranchConfig, getCachedBranchConfig, isOnline, withPOSNetworkTimeo
 import toast from 'react-hot-toast'
 
 const BRANCH_LIST_CACHE_KEY = '__branch-list__'
+const copy = (en, ar) => localStorage.getItem('pos-tile-lang') === 'en' ? en : ar
 
 // In kiosk mode we render a minimal full-screen branch picker instead
 // of wrapping in <Layout> (which adds the app sidebar/back-to-dashboard).
@@ -28,18 +29,22 @@ function KioskWrapper({ children }) {
 function BranchCard({ branch, onOpen, onSelect, onWaste, onStatusChange, canManage }) {
   const [shift, setShift] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [shiftError, setShiftError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const isActive = isBranchSelectable(branch)
   const customerStatus = getBranchCustomerStatus(branch)
 
   useEffect(() => {
-    getOpenShift(branch.id)
-      .then(setShift)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [branch.id])
+    let cancelled = false
+    withPOSNetworkTimeout(getOpenShift(branch.id), 10000)
+      .then(value => { if (!cancelled) setShift(value) })
+      .catch(() => { if (!cancelled) setShiftError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [branch.id, retry])
 
   const handleClick = () => {
-    if (!loading && isActive) onSelect(branch)
+    if (!loading && !shiftError && isActive) onSelect(branch)
   }
 
   return (
@@ -76,12 +81,12 @@ function BranchCard({ branch, onOpen, onSelect, onWaste, onStatusChange, canMana
         </div>
       ) : <div className="border-t border-noch-border pt-3">
         {loading ? (
-          <p className="text-noch-muted text-xs">Loading shift...</p>
-        ) : shift ? (
+          <p className="text-noch-muted text-xs">{copy('Loading shift…', 'جارٍ تحميل الوردية…')}</p>
+        ) : shiftError ? <button className="btn-secondary text-sm" onClick={e => { e.stopPropagation(); setLoading(true); setShiftError(false); setRetry(value => value + 1) }}>{copy('Could not check shift — retry', 'تعذر التحقق من الوردية — أعد المحاولة')}</button> : shift ? (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-noch-green text-sm">
               <Clock size={12} />
-              <span>Shift open</span>
+              <span>{copy('Shift open', 'الوردية مفتوحة')}</span>
             </div>
             <span className="text-noch-muted text-xs">
               {new Date(shift.opened_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
@@ -89,13 +94,13 @@ function BranchCard({ branch, onOpen, onSelect, onWaste, onStatusChange, canMana
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <span className="text-noch-muted text-sm">No open shift</span>
+            <span className="text-noch-muted text-sm">{copy('No open shift', 'لا توجد وردية مفتوحة')}</span>
             <button
               onClick={(e) => { e.stopPropagation(); onOpen(branch) }}
               className="btn-primary text-xs px-3 py-1"
             >
               <Plus size={10} className="inline mr-1" />
-              Open Shift
+              {copy('Open Shift', 'فتح وردية')}
             </button>
           </div>
         )}
@@ -129,7 +134,7 @@ function BranchCard({ branch, onOpen, onSelect, onWaste, onStatusChange, canMana
           className="btn-secondary text-xs px-3 py-1.5 mt-3 w-full flex items-center justify-center gap-1.5"
         >
           <Trash2 size={12} />
-          Report waste
+          {copy('Report waste', 'تسجيل الهدر')}
         </button>
       )}
     </div>
@@ -141,6 +146,8 @@ export default function POSHome() {
   const [loading, setLoading] = useState(true)
   const [openingShift, setOpeningShift] = useState(null) // branch being opened
   const [openingCash, setOpeningCash] = useState('')
+  const [opening, setOpening] = useState(false)
+  const openingLock = useRef(false)
   const { user, isOwner } = useAuth()
   const navigate = useNavigate()
   const kiosk = isKioskMode()
@@ -193,14 +200,22 @@ export default function POSHome() {
   }
 
   const handleOpenShift = async () => {
-    if (!openingShift) return
+    if (!openingShift || openingLock.current) return
+    const cash = Number(openingCash)
+    if (!openingCash.trim() || !Number.isFinite(cash) || cash < 0) {
+      toast.error(copy('Enter the counted opening cash, including zero if empty.', 'أدخل النقدية المعدودة عند الفتح، أو صفر إذا كان الصندوق فارغاً.'))
+      return
+    }
+    openingLock.current = true; setOpening(true)
     try {
-      await openShift(openingShift.id, parseFloat(openingCash) || 0, user?.id)
-      toast.success('Shift opened')
+      await openShift(openingShift.id, cash, user?.id)
+      toast.success(copy('Shift opened', 'تم فتح الوردية'))
       setOpeningShift(null)
       navigate(`/pos/${openingShift.id}`)
     } catch (err) {
       toast.error(err.message || 'Failed to open shift')
+    } finally {
+      openingLock.current = false; setOpening(false)
     }
   }
 
@@ -217,9 +232,9 @@ export default function POSHome() {
         <div className="mb-6">
           <h1 className="text-white font-bold text-2xl flex items-center gap-2">
             <ShoppingCart size={22} className="text-noch-green" />
-            Point of Sale
+            {copy('Point of Sale', 'نقطة البيع')}
           </h1>
-          <p className="text-noch-muted text-sm mt-1">Select a branch to start selling</p>
+          <p className="text-noch-muted text-sm mt-1">{copy('Select a branch to start selling', 'اختر الفرع لبدء البيع')}</p>
         </div>
 
         {/* Branch cards */}
@@ -248,13 +263,16 @@ export default function POSHome() {
       {/* Open Shift Modal */}
       {openingShift && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-xs p-6">
-            <h2 className="text-white font-bold text-lg mb-1">Open Shift</h2>
+          <form role="dialog" aria-modal="true" aria-label={copy('Open Shift', 'فتح وردية')} onSubmit={e => { e.preventDefault(); handleOpenShift() }} className="bg-noch-card border border-noch-border rounded-2xl w-full max-w-xs p-6">
+            <h2 className="text-white font-bold text-lg mb-1">{copy('Open Shift', 'فتح وردية')}</h2>
             <p className="text-noch-muted text-sm mb-5">{openingShift.name}</p>
 
-            <label className="label block mb-1">Opening Cash (LYD)</label>
+            <label htmlFor="opening-cash" className="label block mb-1">{copy('Opening Cash (LYD)', 'نقدية بداية الوردية (د.ل)')}</label>
             <input
               type="number"
+              id="opening-cash"
+              required
+              disabled={opening}
               value={openingCash}
               onChange={e => setOpeningCash(e.target.value)}
               placeholder="0.000"
@@ -265,14 +283,14 @@ export default function POSHome() {
             />
 
             <div className="flex gap-3">
-              <button onClick={() => setOpeningShift(null)} className="btn-secondary flex-1">
-                Cancel
+              <button type="button" disabled={opening} onClick={() => setOpeningShift(null)} className="btn-secondary flex-1">
+                {copy('Cancel', 'إلغاء')}
               </button>
-              <button onClick={handleOpenShift} className="btn-primary flex-1">
-                Open
+              <button type="submit" disabled={opening} className="btn-primary flex-1">
+                {opening ? copy('Opening…', 'جارٍ الفتح…') : copy('Open', 'فتح')}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </Wrapper>
