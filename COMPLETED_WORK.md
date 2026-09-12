@@ -1194,3 +1194,9 @@ To find if something's been done:
 - Database: applied only 20260912160000_pos_popularity_completed_sales.sql; verified live top-five sales results.
 - Verification: prior 37 checks, targeted lint and production build passed. Live Arabic shift form, cancellation, owner terminal navigation, menu and stock labels verified without posting a sale or opening a shift.
 - Files: docs/pos-worker-review-2026-09-12.md updated with rollout evidence. Physical printer check remains an on-site recommendation. Unrelated active online-order and loyalty work preserved.
+
+## 2026-09-12 — Finance and Accounting workflow audit
+- Agent: Codex. Read-only source and production SQL audit; no financial writes or deployment.
+- File: docs/finance-accounting-audit-2026-09-12.md.
+- Verified: 334 paid expenses have source journals; zero unbalanced posted batches; 104 journal/payment date differences; no posted sales journals from August onward; automatic posting off, last sync July 31.
+- Findings: unsafe legacy expense reposting, refund date/tender mapping, bank import conflict-target mismatch, evidence-free reconciliation toggle, and disconnected payroll payment UI. Repair sequence documented; no historical corrections applied.
