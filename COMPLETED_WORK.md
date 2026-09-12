@@ -1288,3 +1288,9 @@ To find if something's been done:
 - Agent: Codex. Commit: 63e67cc. Files: migration 20260912180000_accounting_posting_accuracy.sql and accounting-posting-accuracy.test.mjs.
 - Changes: dated tender-based sales/refund posting, immutable posted source batches, paid-only expense sync using payment date/account, closed-business-day limit, and bank import dedupe index repair.
 - Verification: 21 focused database tests passed. Production migration succeeded; live definitions and index verified, with zero unbalanced posted journals. No historical journal, payment, sync or backfill was executed.
+
+## 2026-09-12 — Hide stock-blocked products from customer menus
+- Agent: Codex. Implementation commit: d99b13d.
+- Files: customer menu and shop loaders in apps/pos and apps/storefront, shared availability helpers, migration 20260912190000_hide_unavailable_customer_products.sql, and CEO/stock database tests.
+- Behavior: when the owner enables the global stock rule, unavailable or unconfigured products remain visible but disabled/shaded in staff POS and are omitted entirely from branch and general customer menus. The checkout database guard remains authoritative.
+- Verification: 15 database checks, both production builds, production RPC counts, live branch-menu load, admin deployment run 34681825979, and storefront deployment run 34681826028 passed. The global toggle remained off during rollout.
