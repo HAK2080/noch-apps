@@ -2,7 +2,7 @@
 
 This checkpoint supersedes earlier proposals where they conflict with the decisions below. It does not mean the whole rebuild is implemented.
 
-**Release status:** code commit `4fe0be0`, locally built and tested (26 targeted Node checks, 7 mocked browser tests; zero lint errors and one pre-existing scanner hook warning). Production push was blocked pending explicit owner approval. Not deployed. Existing points and printer settings unchanged.
+**Release status:** Arabic code commit `4fe0be0` is included in deployed descendant `0a3f518`. GitHub deployment run `34678009409` succeeded on 12 September 2026 at 06:26 UTC; the Arabic customer claim page was subsequently checked live. The prior deployment gate is superseded by this verification. This Arabic slice did not change points or printer settings. The complete two-tablet journey is **not** ready: see `10-customer-and-barista-test-report.md` for isolated test findings and release blockers.
 
 ## First release: Arabic cashier experience
 
