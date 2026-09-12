@@ -1,6 +1,21 @@
 // Cashier copy is independent of the owner's dashboard language.
 // Bilingual product tiles still use Arabic controls; English is an explicit choice.
 export const POS_MESSAGES_AR = {
+  'Review and collect payment': 'مراجعة وتحصيل الدفع',
+  'Payment method': 'طريقة الدفع',
+  'Cash': 'نقداً',
+  'Card': 'بطاقة',
+  'Split payment': 'نقد وبطاقة',
+  'Card amount': 'المبلغ بالبطاقة',
+  'Cash received': 'المبلغ النقدي المستلم',
+  'Change': 'الباقي للعميل',
+  'I checked the order and received payment': 'راجعت الطلب واستلمت المبلغ',
+  'Open a shift before collecting payment': 'افتح الوردية قبل تحصيل الدفع.',
+  'Confirm payment and prepare': 'تأكيد الدفع وبدء التحضير',
+  'Saving payment…': 'جارٍ حفظ الدفع…',
+  'Payment saved. Check the printer before preparing the order.': 'تم حفظ الدفع. تحقق من الطابعة قبل تحضير الطلب.',
+  'Payment already recorded. Do not collect it again.': 'تم تسجيل الدفع سابقاً. لا تُحصّل المبلغ مرة أخرى.',
+  'Online payment failed. Check connection and retry this same order.': 'تعذر تأكيد الدفع. تحقق من الاتصال وأعد المحاولة لنفس الطلب، ولا تُحصّل المبلغ مرة أخرى.',
   'Manager PIN required': 'أدخل الرقم السري للمدير.',
   'Not a manager PIN': 'هذا الرقم السري ليس لمدير مخوّل.',
   'Incorrect PIN': 'الرقم السري غير صحيح.',

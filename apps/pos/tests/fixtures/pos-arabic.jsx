@@ -19,8 +19,8 @@ const view = query.get('view')
 createRoot(document.getElementById('root')).render(
   <MemoryRouter><Toaster />
     <div id="result" />
-    {view === 'online' ? <NewOrderModal order={order} branchId={branch.id} branch={branch} onAccept={() => complete('accepted')} onDecline={() => complete('declined')} />
-      : view === 'collected' ? <OnlineOrderRow order={{ ...order, status: 'in_progress', awaiting_staff_confirm: false }} branchId={branch.id} branch={branch} onConfirmed={() => complete('collected')} onCancelled={() => complete('cancelled')} />
+    {view === 'online' ? <NewOrderModal order={order} branchId={branch.id} branch={branch} shiftId={query.has('noShift') ? null : 'test-shift'} onAccept={() => complete('accepted')} onDecline={() => complete('declined')} />
+      : view === 'collected' ? <OnlineOrderRow order={{ ...order, status: 'in_progress', awaiting_staff_confirm: false }} branchId={branch.id} branch={branch} shiftId="test-shift" onConfirmed={() => complete('collected')} onCancelled={() => complete('cancelled')} />
       : view === 'claim' ? <LoyaltyCheckoutClaim />
       : view === 'manager' ? <ManagerOverrideModal action="Approve a discount above the 10% staff cap." onApprove={complete} onClose={() => {}} />
       : view === 'modifiers' ? <ProductModifierModal product={{ id: 'test-product', name: 'Latte', name_ar: 'لاتيه', price: 15 }} groups={[{ id: 'milk', name: 'Milk', name_ar: 'الحليب', is_required: true, min_select: 1, max_select: 1, modifiers: [] }]} onAdd={complete} onClose={() => {}} />

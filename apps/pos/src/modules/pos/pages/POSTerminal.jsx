@@ -43,6 +43,7 @@ import { startSyncListener } from '../lib/pos-sync'
 import ProductGrid from '../components/ProductGrid'
 import CartPanel from '../components/CartPanel'
 import PaymentModal from '../components/PaymentModal'
+import OnlineOrderPaymentModal from '../components/OnlineOrderPaymentModal'
 import PrintHostBadge from '../components/PrintHostBadge'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getServedBy } from '../lib/pos-session'
@@ -85,42 +86,26 @@ function playOrderAlert() {
 }
 
 // ── New order popup modal ─────────────────────────────────────────────────────
-export function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) {
+export function NewOrderModal({ order, branchId, branch, shiftId, onAccept, onDecline }) {
   const [busy, setBusy] = useState(false)
+  const [collectPayment, setCollectPayment] = useState(false)
 
   const handle = async (action) => {
+    if (action === 'accept') { setCollectPayment(true); return }
     setBusy(true)
     try {
-      const fn = action === 'accept' ? 'approve_online_order' : 'cancel_online_order'
-      const { data, error } = await supabase.rpc(fn, { p_order_id: order.id, p_branch_id: branchId })
+      const { data, error } = await supabase.rpc('cancel_online_order', { p_order_id: order.id, p_branch_id: branchId })
       if (error) throw error
       if (data?.error) throw new Error(data.error)
-      if (action === 'accept') {
-        toast.success(msg('Order {number} accepted', { number: order.order_number }))
-        // Print drink ticket for the bar — customer name comes from the
-        // online order itself. Fire-and-forget.
-        // Always enqueue — the print host tablet picks it up. Silent on no-host.
-        printDrinkTicket(order, order.pos_order_items || [], branch)
-          .catch(err => console.warn(`Drink ticket enqueue failed: ${err.message}`))
-        // Vestaboard cheeky greeting for the customer.
-        if (order.customer_name) {
-          sendCustomerGreeting(order.customer_name, { seed: order.order_number })
-            .then(r => {
-              if (r?.simulated) toast(msg('Display greeting is in test mode'), { icon: '⚙️' })
-              else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
-              else toast.success(msg('Greeting sent for {name}', { name: order.customer_name }), { duration: 2500 })
-            })
-            .catch(err => toast.error(cashierError(err, 'Could not send the display greeting'), { duration: 5000 }))
-        }
-        onAccept()
-      }
-      else { toast(msg('Order {number} declined', { number: order.order_number }), { icon: '🚫' }); onDecline() }
+      toast(msg('Order {number} declined', { number: order.order_number }), { icon: '🚫' }); onDecline()
     } catch (err) {
       toast.error(cashierError(err, 'Could not update order. Please try again.'))
     } finally {
       setBusy(false)
     }
   }
+
+  if (collectPayment) return <OnlineOrderPaymentModal order={order} branchId={branchId} branch={branch} shiftId={shiftId} onClose={() => setCollectPayment(false)} onPaid={() => { setCollectPayment(false); onAccept() }} />
 
   return (
     <div role="dialog" aria-label={msg('New Online Order!')} lang={savedPosLanguage()} dir={savedPosLanguage() === 'ar' ? 'rtl' : 'ltr'} className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -179,7 +164,7 @@ export function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) 
             disabled={busy}
             className="flex-1 py-3 rounded-xl bg-noch-green text-black font-bold hover:bg-noch-green/80 transition-colors disabled:opacity-50"
           >
-            ✓ {msg('Accept')}
+            ✓ {msg('Review and collect payment')}
           </button>
         </div>
       </div>
@@ -188,43 +173,14 @@ export function NewOrderModal({ order, branchId, branch, onAccept, onDecline }) 
 }
 
 // ── Pending order row in the panel ───────────────────────────────────────────
-export function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancelled }) {
+export function OnlineOrderRow({ order, branchId, branch, shiftId, onConfirmed, onCancelled }) {
   const [busy, setBusy] = useState(false)
+  const [collectPayment, setCollectPayment] = useState(false)
 
   const handleAction = async (action) => {
+    if (action === 'confirm_pickup' || action === 'accept') { setCollectPayment(true); return }
     setBusy(true)
     try {
-      if (action === 'confirm_pickup') {
-        const { data, error } = await supabase.rpc('confirm_pickup_order', {
-          p_pickup_code: order.pickup_code, p_branch_id: branchId,
-        })
-        if (error) throw error
-        if (data?.error) throw new Error(data.error)
-        toast.success(msg('Order {number} collected', { number: order.order_number }))
-        onConfirmed()
-      } else if (action === 'accept') {
-        const { data, error } = await supabase.rpc('approve_online_order', {
-          p_order_id: order.id, p_branch_id: branchId,
-        })
-        if (error) throw error
-        if (data?.error) throw new Error(data.error)
-        toast.success(msg('Order {number} accepted', { number: order.order_number }))
-        // Print drink ticket for the bar.
-        // Always enqueue — the print host tablet picks it up. Silent on no-host.
-        printDrinkTicket(order, order.pos_order_items || [], branch)
-          .catch(err => console.warn(`Drink ticket enqueue failed: ${err.message}`))
-        // Vestaboard cheeky greeting.
-        if (order.customer_name) {
-          sendCustomerGreeting(order.customer_name, { seed: order.order_number })
-            .then(r => {
-              if (r?.simulated) toast(msg('Display greeting is in test mode'), { icon: '⚙️' })
-              else if (r?.skipped) console.log('[Vestaboard] skipped:', r.reason)
-              else toast.success(msg('Greeting sent for {name}', { name: order.customer_name }), { duration: 2500 })
-            })
-            .catch(err => toast.error(cashierError(err, 'Could not send the display greeting'), { duration: 5000 }))
-        }
-        onConfirmed()
-      } else {
         const { data, error } = await supabase.rpc('cancel_online_order', {
           p_order_id: order.id, p_branch_id: branchId,
         })
@@ -232,7 +188,6 @@ export function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancell
         if (data?.error) throw new Error(data.error)
         toast(msg('Order {number} cancelled', { number: order.order_number }), { icon: '🚫' })
         onCancelled()
-      }
     } catch (err) {
       toast.error(cashierError(err, 'Could not update order. Please try again.'))
     } finally {
@@ -242,6 +197,8 @@ export function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancell
 
   const isPending = order.awaiting_staff_confirm
   const isInProgress = order.status === 'in_progress'
+
+  if (collectPayment) return <OnlineOrderPaymentModal order={order} branchId={branchId} branch={branch} shiftId={shiftId} onClose={() => setCollectPayment(false)} onPaid={() => { setCollectPayment(false); onConfirmed() }} />
 
   return (
     <div className={`rounded-lg px-3 py-2 text-sm border ${
@@ -274,7 +231,7 @@ export function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancell
             </button>
             <button onClick={() => handleAction('accept')} disabled={busy}
               className="flex-1 py-1 text-xs rounded-lg bg-noch-green/20 text-noch-green hover:bg-noch-green/30 font-medium disabled:opacity-50">
-              ✓ {msg('Accept')}
+              ✓ {msg('Review and collect payment')}
             </button>
           </>
         )}
@@ -286,7 +243,7 @@ export function OnlineOrderRow({ order, branchId, branch, onConfirmed, onCancell
             </button>
             <button onClick={() => handleAction('confirm_pickup')} disabled={busy}
               className="flex-1 py-1 text-xs rounded-lg bg-noch-green text-black hover:bg-noch-green/80 font-bold disabled:opacity-50">
-              ✓ {msg('Collected')}
+              ✓ {msg('Review and collect payment')}
             </button>
           </>
         )}
@@ -1184,6 +1141,7 @@ function POSTerminalContent() {
       {newOrderAlert && (
         <NewOrderModal
           order={newOrderAlert}
+          shiftId={shift?.id}
           branchId={branchId}
           branch={branch}
           onAccept={() => { setNewOrderAlert(null); fetchOnlineOrders() }}
@@ -1212,6 +1170,7 @@ function POSTerminalContent() {
                 <OnlineOrderRow
                   key={order.id}
                   order={order}
+                  shiftId={shift?.id}
                   branchId={branchId}
                   branch={branch}
                   onConfirmed={fetchOnlineOrders}

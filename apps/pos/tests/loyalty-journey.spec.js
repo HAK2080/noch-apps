@@ -154,18 +154,18 @@ test('phone fallback links customer but cancels/removes transaction QR (current 
   expect(state.requests.find(x => x.path.endsWith('/close_loyalty_checkout_v2')).body.p_cancel).toBe(true)
 })
 
-test('incoming order acceptance has no payment capture; collection calls pickup completion', async ({ page, context }) => {
+test('incoming order and collection require explicit payment before completion', async ({ page, context }) => {
   const state = await isolate(context)
   await page.goto('/tests/fixtures/pos-arabic.html?view=online')
-  await page.getByRole('button', { name: 'قبول الطلب' }).click()
-  await expect(page.locator('#result')).toHaveText('"accepted"')
-  expect(state.requests.some(x => x.path.endsWith('/approve_online_order'))).toBe(true)
+  await page.getByRole('button', { name: 'مراجعة وتحصيل الدفع' }).click()
+  await expect(page.locator('#result')).toBeEmpty()
+  expect(state.requests.some(x => x.path.endsWith('/approve_online_order'))).toBe(false)
   expect(state.requests.some(x => /create_pos_order|create_loyalty_checkout/.test(x.path))).toBe(false)
   await expect(page.getByRole('button', { name: 'إنهاء البيع', exact: true })).toHaveCount(0)
   await page.goto('/tests/fixtures/pos-arabic.html?view=collected')
-  await page.getByRole('button', { name: 'تم الاستلام' }).click()
-  await expect(page.locator('#result')).toHaveText('"collected"')
-  expect(state.requests.find(x => x.path.endsWith('/confirm_pickup_order')).body).toEqual({ p_pickup_code: '1234', p_branch_id: 'test-branch' })
+  await page.getByRole('button', { name: 'مراجعة وتحصيل الدفع' }).click()
+  await expect(page.getByRole('button', { name: 'تأكيد الدفع وبدء التحضير' })).toBeDisabled()
+  expect(state.requests.some(x => x.path.endsWith('/confirm_pickup_order'))).toBe(false)
 })
 
 test('OTP delivery error stays Arabic and does not link purchase', async ({ page, context }) => {

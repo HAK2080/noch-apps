@@ -16,7 +16,7 @@ test('incoming order controls and decline confirmation are Arabic', async ({ pag
   await page.goto('/tests/fixtures/pos-arabic.html?view=online')
   await expect(page.getByRole('dialog')).toHaveAttribute('dir', 'rtl')
   await expect(page.getByText('طلب جديد من المنيو!')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'قبول الطلب' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'مراجعة وتحصيل الدفع' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('arabic-online-order.png') })
   await page.getByRole('button', { name: 'رفض الطلب' }).click()
   await expect(page.getByText('تم رفض الطلب ONL-TEST-1')).toBeVisible()
@@ -47,16 +47,16 @@ test('payment, phone validation and loyalty instructions are Arabic; amounts are
 
 test('bilingual tiles retain Arabic controls; English is an explicit option', async ({ page }) => {
   await page.goto('/tests/fixtures/pos-arabic.html?view=online&lang=both')
-  await expect(page.getByRole('button', { name: 'قبول الطلب' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'مراجعة وتحصيل الدفع' })).toBeVisible()
   await page.goto('/tests/fixtures/pos-arabic.html?view=online&lang=en')
-  await expect(page.getByRole('button', { name: 'Accept' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Review and collect payment' })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveAttribute('dir', 'ltr')
 })
 
-test('collection confirmation and customer verification page are Arabic', async ({ page }) => {
+test('collection payment review and customer verification page are Arabic', async ({ page }) => {
   await page.goto('/tests/fixtures/pos-arabic.html?view=collected')
-  await page.getByRole('button', { name: 'تم الاستلام' }).click()
-  await expect(page.getByText('تم تسليم الطلب ONL-TEST-1')).toBeVisible()
+  await page.getByRole('button', { name: 'مراجعة وتحصيل الدفع' }).click()
+  await expect(page.getByRole('button', { name: 'تأكيد الدفع وبدء التحضير' })).toBeDisabled()
   await page.goto('/tests/fixtures/pos-arabic.html?view=claim')
   await expect(page.locator('main')).toHaveAttribute('lang', 'ar')
   await expect(page.getByRole('button', { name: 'إرسال رمز خاص' })).toBeVisible()
