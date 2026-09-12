@@ -172,10 +172,13 @@ async function handlePhoto(botToken: string, msg: TgMessage, fileId: string, mim
 async function sendPaymentButtons(
   botToken: string,
   chatId: string,
-  res: { snap_id: string; extracted?: Record<string, unknown> },
+  res: { snap_id: string; extracted?: Record<string, unknown>; cost_centers?: { code: string; name: string }[]; suggested_code?: string | null },
   header: string,
 ) {
   const ex = res.extracted || {}
+  if (ex.payment_defaulted === true) {
+    return sendBranchButtons(botToken, chatId, res, header)
+  }
   const readLine = [
     ex.vendor ? '🏪 ' + ex.vendor : null,
     ex.amount ? '💰 ' + ex.amount + ' ' + (ex.currency || 'LYD') : null,
@@ -223,10 +226,16 @@ async function sendBranchButtons(
 
   await tg(botToken, 'sendMessage', {
     chat_id: chatId,
-    text: header + '\n' + readLine + '\n\nلأي فرع؟',
+    text: header + '\n' + readLine + (ex.payment_defaulted === true
+      ? '\n💵 مدفوع نقداً افتراضياً / Paid cash by default.\nيمكنك تغيير الدفع أدناه / Change payment below.' : '') + '\n\nلأي فرع؟',
     reply_markup: {
       inline_keyboard: [
         ...ccButtons,
+        [
+          { text: '⏳ غير مدفوع / Unpaid', callback_data: `epay|${res.snap_id}|unpaid` },
+          { text: '💵 نقداً / Cash', callback_data: `epay|${res.snap_id}|paid|cash` },
+          { text: '💳 بطاقة / Card', callback_data: `epay|${res.snap_id}|paid|card` },
+        ],
         [
           { text: '⚖️ تقسيم بالتساوي', callback_data: 'esnap|' + res.snap_id + '|even' },
           { text: '✏️ تقسيم مخصص', callback_data: 'esnap|' + res.snap_id + '|custom' },

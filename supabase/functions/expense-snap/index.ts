@@ -301,6 +301,10 @@ Extract and return ONLY valid JSON (no markdown):
   };
   // Caption may carry the amount even when the photo is unreadable
   if (!extracted.amount && caption) extracted.amount = parseAmount(caption);
+  // Owner policy: photo receipts start paid in cash; a manual choice overrides it.
+  extracted.payment_status_reported = "paid";
+  extracted.payment_method_reported = "cash";
+  extracted.payment_defaulted = true;
 
   const needsAmount = !extracted.amount;
 
@@ -425,12 +429,13 @@ async function actionSetPayment(body: Record<string, unknown>, actor: RequestAct
   if (owned.response) return owned.response;
   const snap = owned.snap;
   if (snap.status === "completed") return json({ error: "already_completed" }, 409);
-  if (snap.status !== "awaiting_payment") return json({ error: "payment_already_set" }, 409);
+  if (!["awaiting_payment", "awaiting_branch"].includes(snap.status)) return json({ error: "payment_already_set" }, 409);
 
   const extracted = {
     ...(snap.extracted || {}),
     payment_status_reported: status,
     payment_method_reported: status === "paid" ? method : null,
+    payment_defaulted: false,
   };
   await sbPatch("expense_snaps?id=eq." + snapId, { extracted, status: "awaiting_branch" });
 
@@ -457,6 +462,8 @@ async function actionFinalize(body: Record<string, unknown>, actor: RequestActor
   const ex = snap.extracted || {};
   const totalAmount = Number(ex.amount) || 0;
   const currency = (ex.currency as string) || "LYD";
+  const paymentStatus = ex.payment_status_reported === "unpaid" ? "unpaid"
+    : ex.payment_status_reported === "paid" || snap.receipt_url ? "paid" : "unpaid";
 
   const [costCenters, categories, rates] = await Promise.all([
     loadCostCenters(),
@@ -520,8 +527,8 @@ async function actionFinalize(body: Record<string, unknown>, actor: RequestActor
     receipt_url: snap.receipt_url,
     expense_date: ex.expense_date || new Date().toISOString().slice(0, 10),
     status: "pending",
-    payment_status_reported: ex.payment_status_reported === "paid" ? "paid" : "unpaid",
-    payment_method_reported: ex.payment_status_reported === "paid"
+    payment_status_reported: paymentStatus,
+    payment_method_reported: paymentStatus === "paid"
       ? (ex.payment_method_reported === "card" ? "card" : "cash")
       : null,
     payment_reported_by: snap.submitted_by,

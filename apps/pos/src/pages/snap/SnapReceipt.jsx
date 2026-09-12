@@ -38,12 +38,13 @@ export default function SnapReceipt() {
   const { user } = useAuth()
   const fileRef = useRef(null)
 
-  // phase: idle | reading | payment | pick | custom | saving | done | error
+  // phase: idle | reading | amount | payment | pick | custom | saving | done | error
   const [phase, setPhase] = useState('idle')
   const [snap, setSnap] = useState(null)          // { snap_id, extracted, cost_centers, suggested_code }
   const [summary, setSummary] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [customText, setCustomText] = useState('')
+  const [amountText, setAmountText] = useState('')
 
   // The app already owns the root service worker. Swap only the manifest while
   // this route is mounted so Android installs Receipt Snap at /snap without
@@ -58,6 +59,7 @@ export default function SnapReceipt() {
 
   const reset = () => {
     setPhase('idle'); setSnap(null); setSummary(''); setErrorMsg(''); setCustomText('')
+    setAmountText('')
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -76,11 +78,26 @@ export default function SnapReceipt() {
       })
       if (!res?.snap_id) throw new Error(res?.error || 'extract failed')
       setSnap(res)
-      setPhase('payment')
+      setPhase(res.needs_amount ? 'amount' : res.extracted?.payment_defaulted ? 'pick' : 'payment')
     } catch (err) {
       setErrorMsg(err.message || 'unknown')
       setPhase('error')
     }
+  }
+
+  const reportAmount = async () => {
+    setPhase('saving')
+    try {
+      const res = await callSnap({ action: 'set_amount', snap_id: snap.snap_id, text: amountText })
+      if (!res?.ok) {
+        setErrorMsg('أدخل مبلغاً صحيحاً / Enter a valid amount')
+        setPhase('amount')
+        return
+      }
+      setErrorMsg('')
+      setSnap(res)
+      setPhase(res.extracted?.payment_defaulted ? 'pick' : 'payment')
+    } catch (err) { setErrorMsg(err.message); setPhase('error') }
   }
 
   const reportPayment = async (status, method = null) => {
@@ -169,6 +186,15 @@ export default function SnapReceipt() {
         </div>
       )}
 
+      {phase === 'amount' && snap && (
+        <div className="w-full max-w-sm flex flex-col gap-4">
+          <label htmlFor="receipt-amount">مبلغ الفاتورة / Receipt amount</label>
+          <input id="receipt-amount" inputMode="decimal" value={amountText} onChange={e => setAmountText(e.target.value)} className="input" />
+          {errorMsg && <p role="alert" className="text-amber-300">{errorMsg}</p>}
+          <button onClick={reportAmount} className="btn-primary">متابعة / Continue</button>
+        </div>
+      )}
+
       {phase === 'payment' && snap && (
         <div className="w-full max-w-sm flex flex-col gap-4">
           <div className="bg-white/5 rounded-2xl p-4 text-center">
@@ -206,6 +232,12 @@ export default function SnapReceipt() {
 
       {phase === 'pick' && snap && (
         <div className="w-full max-w-sm flex flex-col gap-4">
+          <div className="text-center text-sm">
+            <p>{ex.payment_status_reported === 'unpaid' ? 'غير مدفوع / Unpaid'
+              : ex.payment_method_reported === 'card' ? 'مدفوع بالبطاقة / Paid card'
+                : 'مدفوع نقداً / Paid cash'}{ex.payment_defaulted ? ' (افتراضي / Default)' : ''}</p>
+            <button onClick={() => setPhase('payment')} className="text-noch-green underline mt-1">تغيير الدفع / Change payment</button>
+          </div>
           <div className="bg-white/5 rounded-2xl p-4 text-center">
             <p className="font-bold text-lg">{ex.vendor || 'فاتورة'}</p>
             <p className="text-noch-green text-2xl font-bold">

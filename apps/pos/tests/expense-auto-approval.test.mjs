@@ -45,7 +45,8 @@ before(async () => {
       status text default 'pending' check(status in ('pending','approved','paid','rejected')),
       paid_by text default 'Business', funding_type text default 'business', vendor text, description text,
       paid_at date, payment_account_key text, payment_reference text, payment_notes text,
-      payment_journal_batch_id uuid, updated_at timestamptz default now()
+      payment_journal_batch_id uuid, updated_at timestamptz default now(),
+      source text,receipt_url text,submitted_at timestamptz default now()
     );
     create table expense_approvals(id uuid primary key default gen_random_uuid(),
       expense_id uuid not null references expenses(id) on delete cascade,
@@ -79,6 +80,7 @@ before(async () => {
   await db.exec(funding.slice(start, funding.indexOf(';', end) + 1))
   await db.exec(await readMigration('20260725121000_expense_submitter_payment_declaration'))
   await db.exec(await readMigration('20260911100000_expense_auto_approval_and_pos_instance_setting'))
+  await db.exec(await readMigration('20260912130000_scanned_receipt_payment_entry_date'))
 })
 
 beforeEach(async () => {
@@ -87,6 +89,21 @@ beforeEach(async () => {
     update pos_settings set block_duplicate_tabs = false;`)
 })
 after(() => db.close())
+
+test('scanned payments use Libya entry date and preserve unpaid/card choices through delayed approval', async () => {
+  await asUser(staff)
+  for (const [status,method] of [['paid','cash'],['paid','card'],['unpaid',null]]) {
+    await db.query(`insert into expenses(submitted_by,amount,amount_lyd,source,receipt_url,expense_date,submitted_at,payment_status_reported,payment_method_reported)
+      values($1,125,125,'snap_pwa','receipt.jpg','2020-07-01','2026-09-01T22:30:00Z',$2,$3)`,[staff,status,method])
+  }
+  await asUser(owner)
+  const rows = (await db.query('select id from expenses')).rows
+  for (const row of rows) await db.query('select approve_expense_with_reported_payment($1)',[row.id])
+  const paid = (await db.query("select paid_at::text,payment_account_key from expenses where status='paid' order by payment_account_key")).rows
+  assert.deepEqual(paid,[{paid_at:'2026-09-02',payment_account_key:'bank'},{paid_at:'2026-09-02',payment_account_key:'cash'}])
+  assert.equal((await scalar("select count(*)::int n from expenses where status='approved' and paid_at is null")).n,1)
+  assert.equal((await scalar('select count(*)::int n from gl_journal_batches')).n,2)
+})
 
 test('default off: staff expenses remain pending and POS allows duplicate tabs', async () => {
   await asUser(staff)
