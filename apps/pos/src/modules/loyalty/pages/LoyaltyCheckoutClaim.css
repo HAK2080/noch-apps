@@ -1,0 +1,102 @@
+/* Reuse the public menu's palette and typography; scope staff utility overrides. */
+.menu-root.nochi-claim {
+  padding-bottom: 32px;
+  font-family: 'Inter', 'IBM Plex Sans Arabic', Arial, sans-serif;
+}
+.nochi-claim[dir="rtl"] { font-family: 'Cairo', 'IBM Plex Sans Arabic', Arial, sans-serif; }
+.nochi-claim .menu-header { position: relative; padding: 18px 16px; }
+.nochi-claim-header {
+  max-width: 700px;
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.nochi-claim-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nochi-claim-brand img { object-fit: contain; flex-shrink: 0; }
+.nochi-claim-brand h1 {
+  color: white;
+  font-family: 'Baloo 2', 'Cairo', Arial, sans-serif;
+  font-size: clamp(20px, 5vw, 28px);
+  font-weight: 800;
+  line-height: 1.5;
+}
+.nochi-claim[dir="rtl"] h1 { font-family: 'Cairo', Arial, sans-serif; }
+.nochi-claim .lang-toggle { min-height: 44px; flex-shrink: 0; }
+.nochi-claim-content { max-width: 480px; margin: 28px auto 0; padding: 0 18px; }
+.nochi-claim-face {
+  display: block;
+  width: 144px;
+  height: 144px;
+  margin: 0 auto 12px;
+  object-fit: contain;
+  border: 3px solid var(--text);
+  border-radius: 28px;
+  box-shadow: 4px 4px 0 var(--text);
+  background: white;
+}
+.nochi-claim-card {
+  background: var(--card);
+  border: 3px solid var(--border);
+  border-radius: 28px;
+  padding: 24px 20px;
+}
+.nochi-claim .text-white { color: var(--text); }
+.nochi-claim .text-noch-muted { color: var(--muted); }
+.nochi-claim .text-noch-green { color: var(--brand-blue); }
+.nochi-claim .border-noch-border { border-color: var(--border); }
+.nochi-claim .bg-noch-green { background: var(--brand); }
+.nochi-claim .bg-white\/10 { background: var(--border); }
+.nochi-claim-earned {
+  color: var(--brand-blue);
+  font-size: clamp(32px, 9vw, 44px);
+  font-weight: 800;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.nochi-claim-reward {
+  margin-top: 20px;
+  padding: 14px;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-inline-start: 5px solid var(--brand);
+  border-radius: 16px;
+  color: var(--text);
+  font-weight: 800;
+}
+.nochi-claim .btn-primary,
+.nochi-claim .btn-secondary {
+  min-height: 46px;
+  padding: 10px 20px;
+  border: 2px solid var(--text);
+  border-radius: 999px;
+  box-shadow: 3px 3px 0 var(--text);
+  font-family: inherit;
+  font-weight: 800;
+  background: var(--brand);
+  color: white;
+}
+.nochi-claim .btn-secondary { background: white; color: var(--text); }
+.nochi-claim .btn-primary:not(:disabled):hover { background: var(--brand-dark); }
+.nochi-claim .btn-secondary:not(:disabled):hover { background: var(--bg); }
+.nochi-claim button:disabled { opacity: .55; cursor: not-allowed; }
+.nochi-claim button:focus-visible,
+.nochi-claim .input:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 4px; }
+.nochi-claim .input {
+  min-height: 50px;
+  padding: 12px 14px;
+  background: var(--bg);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  font-family: inherit;
+}
+.nochi-claim .input::placeholder { color: var(--muted); opacity: .8; }
+.nochi-claim .text-red-300 { color: #a32222; }
+@media (max-width: 360px) {
+  .nochi-claim-brand img { width: 36px; }
+  .nochi-claim-brand { gap: 6px; }
+  .nochi-claim .lang-toggle { padding: 6px 10px; }
+  .nochi-claim-card { padding: 20px 16px; }
+}

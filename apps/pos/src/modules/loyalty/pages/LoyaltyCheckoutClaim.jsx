@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, Loader2, LockKeyhole, Mail, Phone } from 'lucide-react'
+import { Loader2, Mail, Phone } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../../lib/supabase'
 import { posMessage, posError } from '../../pos/lib/pos-messages'
 import nochiCustomerFace from '../../../assets/nochi-customer-face.png'
+import nochLogo from '../../../assets/noch-logo-menu.webp'
+import '../../../pages/storefront/styles/Menu.css'
+import './LoyaltyCheckoutClaim.css'
 import {
   joinAndClaimLoyaltyCheckoutV2,
   updateMyLoyaltyProfileV2,
@@ -134,9 +137,17 @@ export default function LoyaltyCheckoutClaim() {
   }
 
   return (
-    <main lang={lang} dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-noch-dark px-4 py-10 text-white">
-      <div className="mx-auto max-w-md">
-        <button type="button" className="btn-secondary mb-4" onClick={() => setLang(ar ? 'en' : 'ar')}>{ar ? 'English' : 'العربية'}</button>
+    <main lang={lang} dir={ar ? 'rtl' : 'ltr'} className="menu-root nochi-claim">
+      <header className="menu-header">
+        <div className="nochi-claim-header">
+          <div className="nochi-claim-brand">
+            <img src={nochLogo} alt="Noch" width="48" height="40" />
+            <h1>{ar ? 'صديق نوتشي' : 'Nochi Friend'}</h1>
+          </div>
+          <button type="button" className="lang-toggle" onClick={() => setLang(ar ? 'en' : 'ar')}>{ar ? 'English' : 'العربية'}</button>
+        </div>
+      </header>
+      <div className="nochi-claim-content">
         <div className="relative mb-5 text-center">
           {result?.status === 'settled' && <>
             <style>{`@keyframes nochi-celebrate { 0% { opacity: 0; transform: translateY(8px) scale(.5) rotate(0deg) } 30% { opacity: 1 } 100% { opacity: 0; transform: translateY(-32px) scale(1) rotate(140deg) } } @media (prefers-reduced-motion: reduce) { .nochi-celebration { animation: none !important; opacity: .8 !important; } }`}</style>
@@ -147,19 +158,17 @@ export default function LoyaltyCheckoutClaim() {
           <img
             src={nochiCustomerFace}
             alt={ar ? 'وجه نوتشي' : 'Nochi face'}
-            className="mx-auto mb-2 h-24 w-24 rounded-2xl object-contain"
+            className="nochi-claim-face"
+            width="144"
+            height="144"
           />
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-noch-green/15 text-noch-green">
-            {result ? <CheckCircle2 size={22} /> : <LockKeyhole size={20} />}
-          </div>
-          <h1 className="text-2xl font-bold">{ar ? 'صديق نوتشي' : 'Nochi Friend'}</h1>
           {!result && <p className="mt-1 text-sm text-noch-muted">
             {ar ? 'اربط طلبك واجمع نقاطك.' : 'Link your purchase and collect points.'}
           </p>
           }
         </div>
 
-        <section className="card space-y-4">
+        <section className="nochi-claim-card space-y-4">
           {result ? (
             <div className="py-2 text-center">
               <h2 className="text-xl font-bold text-noch-green">
@@ -167,7 +176,7 @@ export default function LoyaltyCheckoutClaim() {
               </h2>
               {result.status === 'settled' ? (
                 <>
-                  <p className="mt-2 text-3xl font-bold text-white">+{result.points_earned} {ar ? 'نقطة' : 'points'}</p>
+                  <p className="nochi-claim-earned"><bdi dir="ltr">+{result.points_earned}</bdi> {ar ? 'نقطة' : 'points'}</p>
                   <p className="mt-1 text-sm text-noch-muted">
                     {ar ? 'رصيدك الآن' : 'Your balance'} <span className="font-semibold text-white">{result.points_balance} {ar ? 'نقطة' : 'points'}</span>
                   </p>
@@ -178,7 +187,7 @@ export default function LoyaltyCheckoutClaim() {
                 </p>
               )}
               {result.status === 'settled' && result.available_rewards > 0 && (
-                <p className="mt-4 rounded-xl bg-yellow-300/10 px-3 py-3 text-sm font-semibold text-yellow-200">
+                <p className="nochi-claim-reward">
                   {ar ? `لديك ${result.available_rewards} مكافأة جاهزة` : `${result.available_rewards} reward${result.available_rewards === 1 ? '' : 's'} ready`}
                 </p>
               )}
@@ -289,9 +298,9 @@ export default function LoyaltyCheckoutClaim() {
           {error && <p className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-300">{error}</p>}
         </section>
 
-        <p className="mt-4 text-center text-xs text-noch-muted">
+        {!result && <p className="mt-4 text-center text-xs text-noch-muted">
           {ar ? 'رمز الطلب لمرة واحدة وينتهي خلال خمس دقائق.' : 'This one-time transaction code expires in five minutes and cannot be reused.'}
-        </p>
+        </p>}
       </div>
     </main>
   )
