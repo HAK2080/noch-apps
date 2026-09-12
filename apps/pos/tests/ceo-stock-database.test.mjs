@@ -40,7 +40,7 @@ before(async () => {
     create function create_pos_order_test(v_item jsonb) returns boolean language sql as $$select coalesce((v_item->>'track_inventory')::boolean, false)$$;
     create table expenses(id uuid primary key default gen_random_uuid(),amount numeric,amount_lyd numeric,exchange_rate_to_lyd numeric default 1,
       status text,paid_at date,expense_date date,payment_account_key text,payment_journal_batch_id uuid);
-    create table pos_tender_events(id uuid primary key default gen_random_uuid(),tender_type text,signed_amount_lyd numeric,occurred_at timestamptz,source_quality text default 'recorded');
+    create table pos_tender_events(id uuid primary key default gen_random_uuid(),tender_type text,signed_amount_lyd numeric,occurred_at timestamptz,source_quality text default 'recorded',event_type text default 'sale');
     create table gl_accounts(id uuid primary key,key text);
     insert into gl_accounts values('${id(10)}','cash'),('${id(11)}','bank');
     create function gl_acct(text) returns uuid language sql as $$select id from gl_accounts where key=$1$$;
@@ -55,10 +55,36 @@ before(async () => {
   const beans = await migration('20260721180000_coffee_bean_consumption')
   await db.exec(beans.slice(beans.indexOf('create or replace function public.adjust_order_item_coffee_stock('), beans.indexOf('--', beans.indexOf('create trigger pos_orders_adjust_coffee_status')) > 0 ? beans.indexOf('--', beans.indexOf('create trigger pos_orders_adjust_coffee_status')) : undefined))
   await db.exec(await migration('20260912100000_ceo_money_overview'))
+  await db.exec(await migration('20260912120000_ceo_payment_correction_reporting'))
   await db.exec(await migration('20260912110000_global_stock_sales_guard'))
   await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false)`)
 })
 after(async () => db.close())
+
+test('payment corrections adjust receipts while refunds remain outflows and date boundaries hold', async () => {
+  await db.exec('begin')
+  try {
+    await db.exec(`select set_config('request.jwt.claim.sub','${owner}',true);
+      insert into pos_tender_events(tender_type,event_type,signed_amount_lyd,occurred_at) values
+        ('cash','sale',1000,'2027-09-01T10:00:00Z'),
+        ('cash','payment_correction',-300,'2027-09-01T11:00:00Z'),
+        ('card','payment_correction',300,'2027-09-01T11:00:00Z'),
+        ('cash','payment_correction',50,'2027-09-01T12:00:00Z'),
+        ('card','payment_correction',-50,'2027-09-01T12:00:00Z'),
+        ('cash','refund',-25,'2027-09-01T13:00:00Z'),
+        ('cash','payment_correction',-80,'2027-09-01T22:00:00Z');`)
+    const day = (await first("select ceo_money_overview('2027-09-01','2027-09-01') value")).value
+    assert.equal(day.money_in,750)
+    assert.equal(day.money_out,25)
+    assert.equal(day.balance,725)
+    const correctionOnly = (await first("select ceo_money_overview('2027-09-02','2027-09-02') value")).value
+    assert.equal(correctionOnly.money_in,-80)
+    assert.equal(correctionOnly.money_out,0)
+    assert.equal(correctionOnly.balance,-80)
+    const net = await first("select sum(cash_lyd+bank_lyd) amount from ceo_money_movements('2027-09-01','2027-09-01')")
+    assert.equal(Number(net.amount),day.balance)
+  } finally { await db.exec('rollback') }
+})
 
 test('only owners can change stock policy or view/save CEO money', async () => {
   await db.exec(`select set_config('request.jwt.claim.sub','${staff}',false)`)

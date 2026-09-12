@@ -73,8 +73,8 @@ export default function CEOOverview() {
       {error && <p role="alert" className="text-red-400">{error}</p>}
       <div aria-busy={loading} className="grid sm:grid-cols-3 gap-4">
         {[
-          ['Money in', data?.money_in, 'text-noch-green', 'Cash received and bank settlements'],
-          ['Money out', data?.money_out, 'text-red-300', 'Payments, including paid salaries'],
+          ['Money in', data?.money_in, 'text-noch-green', 'Cash receipts, corrected payment methods and bank settlements'],
+          ['Money out', data?.money_out, 'text-red-300', 'Paid expenses, salaries and cash refunds'],
           ['Balance', data?.balance, 'text-white', 'Money in minus money out for these dates'],
         ].map(([label, value, color, hint]) => <section key={label} className="bg-noch-card border border-noch-border rounded-2xl p-4 sm:p-5">
           <h2 className="text-noch-muted text-sm">{label}</h2>
