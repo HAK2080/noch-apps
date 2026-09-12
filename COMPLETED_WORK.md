@@ -1265,3 +1265,8 @@ To find if something's been done:
 - File: docs/finance-accounting-audit-2026-09-12.md.
 - Verified: 334 paid expenses have source journals; zero unbalanced posted batches; 104 journal/payment date differences; no posted sales journals from August onward; automatic posting off, last sync July 31.
 - Findings: unsafe legacy expense reposting, refund date/tender mapping, bank import conflict-target mismatch, evidence-free reconciliation toggle, and disconnected payroll payment UI. Repair sequence documented; no historical corrections applied.
+
+## 2026-09-12 — Accounting posting accuracy deployed
+- Agent: Codex. Commit: 63e67cc. Files: migration 20260912180000_accounting_posting_accuracy.sql and accounting-posting-accuracy.test.mjs.
+- Changes: dated tender-based sales/refund posting, immutable posted source batches, paid-only expense sync using payment date/account, closed-business-day limit, and bank import dedupe index repair.
+- Verification: 21 focused database tests passed. Production migration succeeded; live definitions and index verified, with zero unbalanced posted journals. No historical journal, payment, sync or backfill was executed.

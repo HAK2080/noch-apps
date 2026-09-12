@@ -1,6 +1,6 @@
 # Finance and Accounting workflow audit — 12 September 2026
 
-Agent: Codex. Scope: source tracing and read-only production SQL inspection. No posting, payments, syncs, imports or financial corrections were executed. This is an engineering workflow audit, not an assurance opinion on the accounts.
+Agent: Codex. Scope: source tracing, read-only production SQL inspection, and the approved posting-safety deployment. Migration `20260912180000_accounting_posting_accuracy.sql` was applied on 12 September 2026. It replaced future posting functions and the bank dedupe index; it did not post, edit or delete historical financial transactions or journals. This is an engineering workflow audit, not an assurance opinion on the accounts.
 
 ## Production evidence
 
@@ -54,4 +54,4 @@ Agent: Codex. Scope: source tracing and read-only production SQL inspection. No 
 - supabase/migrations/20260719170000_shareholder_funding.sql
 - supabase/migrations/20260731230000_workforce_control_v2.sql
 
-Production pg_get_functiondef confirmed gl_post_sales_day, gl_post_expense and gl_sync_period match the audited legacy paths. Live pg_indexes confirmed the bank deduplication index. No financial writes or full transaction simulations were needed for this read-only audit. Historical balance correctness and individual supplier transaction evidence still require reconciliation; balanced journals alone do not establish correctness.
+Before repair, production pg_get_functiondef confirmed gl_post_sales_day, gl_post_expense and gl_sync_period matched the audited legacy paths. After deployment, production verification confirmed that sales posting uses tender events, expense posting no longer deletes posted source journals, period sync stops at the last completed Libya business day, the bank index uses `NULLS NOT DISTINCT`, and posted journals remain balanced. Historical balance correctness and individual supplier transaction evidence still require reconciliation; balanced journals alone do not establish correctness.
