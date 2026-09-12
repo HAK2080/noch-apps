@@ -7,7 +7,7 @@
 
 | English | العربية |
 |---|---|
-| Customers can browse the Noch menu, add items, enter their name and phone number, and send an order to the cashier. | يمكن للعميل تصفح قائمة نوخ، إضافة المنتجات، إدخال الاسم ورقم الهاتف، ثم إرسال الطلب إلى الكاشير. |
+| Customers can browse the Noch menu, add items, enter their name and phone number, and send an order to the cashier. | يمكن للعميل تصفح قائمة نوتش، إضافة المنتجات، إدخال الاسم ورقم الهاتف، ثم إرسال الطلب إلى الكاشير. |
 | The cashier receives the order, checks it, takes cash, card or split payment, then starts preparation. | يستلم الكاشير الطلب، يراجعه، يستلم نقداً أو بالبطاقة أو بالطريقتين، ثم يبدأ التحضير. |
 | The POS is Arabic-first. English is available where needed. | نظام الكاشير بالعربية بشكل أساسي، والإنجليزية متاحة عند الحاجة. |
 | Existing loyalty and points records are still protected. A completed payment is recorded once, so points and stock are not repeated by a retry. | سجلات الولاء والنقاط الحالية محفوظة. يتم تسجيل الدفع المكتمل مرة واحدة، لذلك لا تتكرر النقاط أو خصم المخزون عند إعادة المحاولة. |
@@ -17,7 +17,7 @@
 
 1. **Browse the menu / تصفح القائمة**  
    Customer opens the Noch menu, chooses products and quantities.  
-   يفتح العميل قائمة نوخ ويختار المنتجات والكميات.
+   يفتح العميل قائمة نوتش ويختار المنتجات والكميات.
 
 2. **Send to cashier / إرسال إلى الكاشير**  
    Customer adds name and phone number. Location checking is used by the menu where available, then the order is sent to the café POS.  
@@ -85,7 +85,7 @@
 ## 6. Customer-facing copy | نص قصير للعميل
 
 **Arabic**  
-اطلب من قائمة نوخ، وأرسل طلبك للكاشير، ثم ادفع واستلم طلبك من الكاونتر. احتفظ برقم هاتفك معنا لتسهيل التعرف على حسابك ومزاياك الحالية.
+اطلب من قائمة نوتش، وأرسل طلبك للكاشير، ثم ادفع واستلم طلبك من الكاونتر. احتفظ برقم هاتفك معنا لتسهيل التعرف على حسابك ومزاياك الحالية.
 
 **English**  
 Order from the Noch menu, send your order to the cashier, then pay and collect at the counter. Keep your phone number with us so we can recognise your account and current benefits more easily.
