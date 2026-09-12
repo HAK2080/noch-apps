@@ -1166,3 +1166,8 @@ To find if something's been done:
 - Agent: Codex. Commit: 37efc42 (pushed to main).
 - Added supabase/migrations/20260912140000_september_payroll_estimate.sql and extended apps/pos/tests/ceo-stock-database.test.mjs. September provisional monthly estimate is 32,460 LYD per owner; a September payroll run takes precedence. Other months retain their existing calculation. Planning data creates no payment or journal.
 - Verification: all 12 database tests and production build passed. Migration deployed to production; live CEO overview verified September 1–12 payroll 12,984 LYD, money out 9,393.50 LYD and balance 15,528 LYD. No frontend or Edge Function change required.
+
+## 2026-09-12 — CEO smoke test and business-health assessment
+- Agent: Codex. Report commit: 43afe69. File: docs/finance-ceo-smoke-test-2026-09-12.md.
+- Read-only production reconciliation confirms September 1–12 receipts 24,921.50 LYD, payments/refunds 9,393.50 and net cash change 15,528; zero selected payment journal mismatches or unbalanced posted journals. Live overview and balance editor inspected without saving.
+- Verification: 28 database/receipt checks and four browser fixture checks passed. Findings: missing recurring costs, first balance baseline, invoice-date/entry-date label mismatch, August draft-versus-paid payroll difference, and unusual scanned invoice dates. Suggested CEO cash-after-commitments view; no financial records or application code changed.
