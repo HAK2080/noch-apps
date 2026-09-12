@@ -47,6 +47,7 @@ const Transfers        = lazy(() => import('./pages/inventory/Transfers'))
 const InTransit        = lazy(() => import('./pages/inventory/InTransit'))
 const MovementHistory  = lazy(() => import('./pages/inventory/MovementHistory'))
 const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
+const CEOOverview = lazy(() => import('./modules/finance/CEOOverview'))
 const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
 
 const POSEndOfDay      = lazy(() => import('./modules/pos/pages/POSEndOfDay'))
@@ -312,6 +313,7 @@ export default function App() {
         {/* Analytics: finance is canonical, analytics-legacy kept as a safe alias */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />
         <Route path="/finance" element={<ProtectedRoute><AccessRoute policy={featurePolicy('finance')}><FinanceDashboard /></AccessRoute></ProtectedRoute>} />
+        <Route path="/overview" element={<ProtectedRoute><AccessRoute policy={{ type: 'owner' }}><CEOOverview /></AccessRoute></ProtectedRoute>} />
         <Route path="/marketing" element={<ProtectedRoute><AccessRoute policy={featurePolicy('marketing')}><MarketingDashboard /></AccessRoute></ProtectedRoute>} />
         <Route path="/analytics-legacy" element={<LegacyRedirect to="/finance" />} />
 

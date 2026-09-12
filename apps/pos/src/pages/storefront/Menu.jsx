@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { getSaleAvailability } from '../../modules/pos/lib/global-stock'
 import { formatFixed } from '../../lib/numbers'
 import { buildStoredProductImageUrl } from '../../lib/product-images'
 import { productBelongsToCategory } from '../../lib/product-categories'
@@ -778,8 +779,13 @@ export default function Menu() {
       if (ce) throw new Error('Failed to load categories: ' + ce.message)
       setBranch(b)
       setCategories(cats || [])
-      setProducts(prods || [])
-      writeCachedMenu(branchParam, b, cats || [], prods || [])
+      const availability = await getSaleAvailability(id)
+      const availableProducts = (prods || []).map(product => ({
+        ...product,
+        is_available: product.is_available !== false && availability[product.id]?.blocked === false,
+      }))
+      setProducts(availableProducts)
+      writeCachedMenu(branchParam, b, cats || [], availableProducts)
     } catch (err) {
       if (!cached) setError(err.message || 'Failed to load menu')
     } finally {
@@ -811,7 +817,10 @@ export default function Menu() {
     )
   }, [showCheckout, branch])
 
-  const addToCart    = (id) => setCart(c => ({ ...c, [id]: (c[id] || 0) + 1 }))
+  const addToCart = (id) => {
+    if (products.find(product => product.id === id)?.is_available === false) return
+    setCart(c => ({ ...c, [id]: (c[id] || 0) + 1 }))
+  }
   const removeFromCart = (id) => setCart(c => {
     const n = { ...c }
     if (n[id] > 1) n[id]--; else delete n[id]

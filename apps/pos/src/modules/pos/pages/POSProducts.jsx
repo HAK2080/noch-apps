@@ -13,6 +13,7 @@ import {
 import BarcodeScanner from '../components/BarcodeScanner'
 import CoffeeConsumptionField from '../components/CoffeeConsumptionField'
 import Layout from '../../../components/Layout'
+import GlobalStockControl from '../components/GlobalStockControl'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import {
@@ -1020,6 +1021,7 @@ export default function POSProducts() {
           </button>
         </div>
 
+        <div className="mb-4"><GlobalStockControl /></div>
         {/* Tabs */}
         <div className="flex gap-2 mb-4">
           {[

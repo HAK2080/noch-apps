@@ -42,7 +42,7 @@ const LANDING_CANDIDATES = [
 ]
 
 export function getLandingRoute(context) {
-  if (context?.isOwner || context?.profile?.role === 'owner') return '/dashboard'
+  if (context?.isOwner || context?.profile?.role === 'owner') return '/overview'
   return LANDING_CANDIDATES.find(([, policy]) => canAccessPolicy(policy, context))?.[0] || '/staff/my-profile'
 }
 

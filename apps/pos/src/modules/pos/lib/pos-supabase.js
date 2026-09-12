@@ -130,6 +130,10 @@ export async function getPOSProducts(branchId, { includeHidden = false } = {}) {
 
   let products = data || []
   if (branchId) {
+    const { getSaleAvailability, applySaleAvailability } = await import('./global-stock')
+    products = applySaleAvailability(products, await getSaleAvailability(branchId))
+  }
+  if (branchId) {
     const { data: location } = await supabase
       .from('inventory_locations')
       .select('id')

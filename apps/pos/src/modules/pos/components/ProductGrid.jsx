@@ -62,7 +62,7 @@ function ProductGrid({
     p.track_inventory && parseFloat(p.stock_qty) <= parseFloat(p.low_stock_alert)
   const isOutOfStock = (p) =>
     p.track_inventory && Number.isFinite(parseFloat(p.stock_qty)) && parseFloat(p.stock_qty) <= 0
-  const isUnavailable = (p) => p.is_sold_out || (blockOutOfStock && isOutOfStock(p))
+  const isUnavailable = (p) => p.sale_blocked || p.is_sold_out || (blockOutOfStock && isOutOfStock(p))
 
   // Long-press opens the product stock receiver in the terminal.
   const longPressTimer = useRef(null)
@@ -134,6 +134,8 @@ function ProductGrid({
           return (
             <button
               key={product.id}
+              aria-disabled={!!unavailable}
+              title={unavailable ? product.sale_block_reason || 'Out of stock' : product.name}
               onClick={() => handleClick(product)}
               onMouseDown={() => startPress(product)}
               onMouseUp={cancelPress}
@@ -146,11 +148,13 @@ function ProductGrid({
                 bg-noch-card border border-noch-border/40
                 transition-transform duration-75
                 ${unavailable
-                  ? 'opacity-40 grayscale cursor-not-allowed'
+                  ? 'cursor-not-allowed'
                   : 'active:scale-[0.96] hover:brightness-110'}`}
             >
               {/* Status pill — top-right, sits over the photo */}
-              {product.is_sold_out ? (
+              {product.sale_blocked ? (
+                <div className="absolute top-1.5 right-1.5 z-20 bg-noch-dark/90 text-white text-[10px] font-bold px-2 py-1 rounded-full">{product.sale_block_reason || 'Unavailable'}</div>
+              ) : product.is_sold_out ? (
                 <div className="absolute top-1.5 right-1.5 z-20 flex items-center gap-1 bg-red-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-lg select-none">
                   <Ban size={10} /> Sold out
                 </div>
@@ -167,7 +171,7 @@ function ProductGrid({
               {/* Hero photo — top ~60% of the tile. Falls back to a big
                   coloured monogram on the tinted bg when no image. */}
               <div
-                className="flex-[3] relative overflow-hidden flex items-center justify-center"
+                className={`flex-[3] relative overflow-hidden flex items-center justify-center ${unavailable ? 'brightness-50 saturate-50' : ''}`}
                 style={{ backgroundColor: tint.bg }}
               >
                 {product.image_url ? (

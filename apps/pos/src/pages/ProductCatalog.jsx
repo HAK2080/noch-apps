@@ -7,6 +7,7 @@ import {
   ScanLine, Image, ChevronDown, Eye, EyeOff, History, ShoppingBag, Loader2, Sparkles, Video
 } from 'lucide-react'
 import Layout from '../components/Layout'
+import GlobalStockControl from '../modules/pos/components/GlobalStockControl'
 import toast from 'react-hot-toast'
 import {
   getPOSBranches, getAllProducts, getAllCategories,
@@ -1063,6 +1064,7 @@ export default function ProductCatalog() {
           </div>
         </div>
 
+        <div className="mb-5"><GlobalStockControl /></div>
         {backfill && (
           <div className="bg-noch-card border border-noch-border rounded-xl p-4 mb-5" role="status">
             <p className="text-white text-sm font-medium">

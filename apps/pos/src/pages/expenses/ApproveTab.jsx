@@ -23,6 +23,7 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
   const [saving, setSaving] = useState(false)
   const [selectedPaid, setSelectedPaid] = useState([])
   const [paymentAccount, setPaymentAccount] = useState('cash')
+  const [paymentDate, setPaymentDate] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tripoli', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
   const [payingBatch, setPayingBatch] = useState(false)
 
   useEffect(() => { load() }, [refreshKey])
@@ -75,12 +76,13 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
   }
 
   async function markPaid(expenseIds) {
+    if (!paymentDate) { toast.error('Choose the payment date'); return }
     setPayingBatch(true)
     try {
       const { error } = await supabase.rpc('mark_expenses_paid_batch', {
         p_expense_ids: expenseIds,
         p_payment_account_key: paymentAccount,
-        p_paid_at: new Date().toLocaleDateString('en-CA'),
+        p_paid_at: paymentDate,
         p_reference: null,
         p_notes: expenseIds.length > 1 ? 'Batch settlement from Expenses' : null,
       })
@@ -198,6 +200,7 @@ export default function ApproveTab({ actorId, isOwner, refreshKey, onAction, cos
       {isOwner && tab === 'all' && filtered.some(exp => exp.status === 'approved' && !exp.paid_at) && (
         <div className="card !p-3 flex flex-col sm:flex-row sm:items-center gap-3">
           <p className="text-sm text-white flex-1">{selectedPaid.length} approved expense{selectedPaid.length === 1 ? '' : 's'} selected</p>
+          <label className="text-xs text-noch-muted">Payment date<input type="date" aria-label="Payment date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} className="input py-2 text-sm" /></label>
           <select value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)} className="input py-2 text-sm">
             <option value="cash">Cash account</option>
             <option value="bank">Bank account</option>

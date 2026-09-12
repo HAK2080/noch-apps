@@ -24,6 +24,7 @@ import {
   setProductSoldOut, receiveProductStock, getAllModifierData, getModifierGroupsForProduct,
 } from '../lib/pos-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
+import { getGlobalStockPolicy, getSaleAvailability, applySaleAvailability } from '../lib/global-stock'
 import { getProductLongPressAction } from '../lib/product-long-press'
 import POSPinLogin from './POSPinLogin'
 import ShiftAttendees from '../components/ShiftAttendees'
@@ -302,6 +303,20 @@ function POSTerminalContent() {
   const [categories, setCategories] = useState([])
   const [shift, setShift] = useState(null)
   const [settings, setSettings] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    const refresh = async () => {
+      if (!branchId || !navigator.onLine) return
+      try {
+        const availability = await getSaleAvailability(branchId)
+        if (!cancelled) setProducts(current => applySaleAvailability(current, availability))
+      } catch { /* Checkout must still obtain a fresh policy and server stock validation. */ }
+    }
+    const timer = setInterval(refresh, 15000)
+    window.addEventListener('focus', refresh)
+    window.addEventListener('pos-settings-changed', refresh)
+    return () => { cancelled = true; clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('pos-settings-changed', refresh) }
+  }, [branchId])
   const [loading, setLoading] = useState(true)
   const [online, setOnline] = useState(isOnline())
   const [offlineQueue, setOfflineQueue] = useState(0)
@@ -603,6 +618,10 @@ function POSTerminalContent() {
   // Checks stock guards, then (for non-barcode taps) consults modifier
   // groups; if any exist, opens the modifier modal instead of adding.
   const addToCart = useCallback(async (product, opts = {}) => {
+    if (product.sale_blocked || products.find(item => item.id === product.id)?.sale_blocked) {
+      toast.error(product.sale_block_reason || 'This product is blocked until stock is available')
+      return
+    }
     if (product.is_sold_out) {
       toast.error(`${product.name} is sold out`)
       return
@@ -626,7 +645,7 @@ function POSTerminalContent() {
       }
     } catch { /* if the lookup fails, fall through to bare add */ }
     addCartLine(product)
-  }, [settings, addCartLine])
+  }, [settings, addCartLine, products])
 
   // Sold-out remains a separate manual availability control inside the stock modal.
   const handleSoldOutToggle = useCallback(async (product) => {
@@ -860,10 +879,16 @@ function POSTerminalContent() {
 
     try {
       let order
+      // A fresh policy is necessary even when the last cached setting was off.
+      // Otherwise a disconnected terminal could ignore an owner enabling protection.
+      let strictStock
+      try { strictStock = await withPOSNetworkTimeout(getGlobalStockPolicy()) }
+      catch { throw new Error('Connect to the internet to check the stock policy before checkout') }
       if (loyaltyRewardEntitlementId && !isOnline()) {
         throw new Error('Reward redemption requires an internet connection')
       }
       const saveOffline = async () => {
+        if (strictStock) throw new Error('Stock protection is on. Reconnect before completing this sale.')
         // Offline: queue with the pre-generated idempotency_key so sync
         // dedupes correctly even if the queue runs twice.
         const localId = await queueOfflineOrder({ ...orderData, synced: false, items })
@@ -886,7 +911,7 @@ function POSTerminalContent() {
           order = await withPOSNetworkTimeout(submitOnlineOrder())
           setOnline(true)
         } catch (networkError) {
-          if (loyaltyRewardEntitlementId || !isRetryablePOSNetworkError(networkError)) throw networkError
+          if (strictStock || loyaltyRewardEntitlementId || !isRetryablePOSNetworkError(networkError)) throw networkError
           // A timeout is ambiguous: the RPC may have reached the server. The
           // same idempotency key remains in the queued copy, so retrying later
           // returns the original sale instead of creating a duplicate.

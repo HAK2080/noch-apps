@@ -57,6 +57,7 @@ export const FEATURE_GROUPS = [
 export const ALL_FEATURES = FEATURE_GROUPS.flatMap(group => group.features.map(feature => feature.key))
 
 export const NAV_ITEMS = [
+  { to: '/overview', icon: BarChart3, labelEn: 'CEO overview', labelAr: 'نظرة المدير التنفيذي', policy: OWNER_POLICY },
   // Primary owner/staff journey. Keep these in the requested order.
   { to: '/sales', icon: ListOrdered, labelEn: 'Sales', labelAr: 'المبيعات', policy: featurePolicy('sales') },
   { to: '/pos', icon: ShoppingCart, labelEn: 'POS', labelAr: 'نقطة البيع', policy: featurePolicy('pos'), mobilePriority: 1 },

@@ -19,6 +19,7 @@ import {
 } from '../lib/print-queue'
 import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
+import GlobalStockControl from '../components/GlobalStockControl'
 import toast from 'react-hot-toast'
 
 function FlagRow({ label, hint, value, onChange, disabled = false }) {
@@ -676,6 +677,7 @@ export default function POSSettings({ onClose } = {}) {
                 value={!!posSettings.block_out_of_stock}
                 onChange={v => handleToggleFlag('block_out_of_stock', v)}
               />
+              <GlobalStockControl />
               <FlagRow
                 label="Require PIN to use POS"
                 hint="When on, the terminal cannot be opened without a verified staff PIN. Records `served_by` on every order."
