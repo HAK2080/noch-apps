@@ -1171,3 +1171,9 @@ To find if something's been done:
 - Agent: Codex. Report commit: 43afe69. File: docs/finance-ceo-smoke-test-2026-09-12.md.
 - Read-only production reconciliation confirms September 1–12 receipts 24,921.50 LYD, payments/refunds 9,393.50 and net cash change 15,528; zero selected payment journal mismatches or unbalanced posted journals. Live overview and balance editor inspected without saving.
 - Verification: 28 database/receipt checks and four browser fixture checks passed. Findings: missing recurring costs, first balance baseline, invoice-date/entry-date label mismatch, August draft-versus-paid payroll difference, and unusual scanned invoice dates. Suggested CEO cash-after-commitments view; no financial records or application code changed.
+
+## 2026-09-12 — Saved CEO forecast with manual incoming and payments
+- Agent: Codex. Implementation commit: 1c805d1. Files: CEOForecast.jsx, CEOOverview.jsx, finance/lib/ceo-money.js, migration 20260912150000_ceo_saved_forecast.sql, CEO database/browser tests, docs/ceo-forecast-guide.md.
+- Added owner-only monthly plans with editable signed items, dates, inclusion/removal, calculate/save, expected payments/incoming and cash-left results. Planning never posts expenses/payments/journals. Lease and other bills remain flagged until reviewed. Renamed Balance and invoice card to reflect their actual definitions.
+- Verification: 14 database tests, five browser tests, targeted ESLint and production build passed. Production migration applied; rollback save test returned 10,540 LYD as expected. GitHub Actions 34677491103 succeeded. Live CEO page verified and initial payroll-only plan saved: funds 40,000, payments 32,460, cash left 7,540 LYD, missing-cost flags retained.
+- Pending owner facts: allocation of August's 5,560 LYD payroll difference and a later actual closing cash/bank count/date. Neither historical payroll nor balance observations were changed without those facts.
