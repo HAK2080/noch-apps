@@ -1,3 +1,12 @@
+## 2026-09-12 — Nochi Friend Customer Claim Screen
+
+- **Agent**: Codex
+- **Status**: Approved by owner and live.
+- **Commit / deployment**: `78ae44f`; [GitHub deployment 34680851725](https://github.com/HAK2080/noch-apps/actions/runs/34680851725) succeeded at 07:32 UTC.
+- **Files**: `apps/pos/src/modules/loyalty/pages/LoyaltyCheckoutClaim.jsx`, `apps/pos/src/assets/nochi-customer-face.png`, `apps/pos/tests/loyalty-journey.spec.js`.
+- **Change**: Replaced technical V2 heading with `صديق نوتشي`, using the owner's provided Nochi face unchanged (SHA-256 matched source). The finished customer view shows a small celebration, points earned, current balance and exactly one next-value message: an available reward or progress to the next goal. Marketing consent is a simple Yes / Not now choice.
+- **Verification**: Targeted real-component browser journey passed; targeted ESLint and production build passed. Live public claim bundle verified to contain the Nochi Friend label, original image asset and celebration code. No customer account, balance, order or message was changed during verification.
+
 ## 2026-09-12 — Online Order Payment and Stock Safety
 
 - **Agent**: Codex
