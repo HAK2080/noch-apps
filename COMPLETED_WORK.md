@@ -1133,3 +1133,10 @@ To find if something's been done:
 - **Verification**: 30 focused Node/PostgreSQL checks (10 new finance/stock/RLS checks plus 20 existing access/expense checks), four browser checks including editable balances, failed-query stale-data protection, blocked pointer/keyboard selection and mobile overflow. POS production build and targeted ESLint passed; unrelated existing hook warnings remain outside the new modules.
 - **Production**: Both migrations compiled and executed in rolled-back production transactions before application. Applied `20260912100000` and `20260912110000`; authenticated owner RPC read verified and stock switch remains false. GitHub Actions run `34673440158` successfully deployed `7f26c01`. Authenticated production browser verified month-to-date totals, cash/bank edit fields and the owner global switch showing Off.
 - **Commits**: `bb14131` implementation, `7f26c01` mobile date layout. Follow-up test/log changes do not alter product behavior. Unrelated loyalty research and existing work-log edits preserved and excluded.
+
+## 2026-09-12 — Shade the Presto website tile
+- **Agent**: Codex.
+- **Files**: `apps/storefront/index.html`.
+- **Change**: Apply a muted grey shade to the Presto delivery tile, including its mascot, while keeping the coming-soon text and existing link. The selector also matches cached storefront app code.
+- **Verification**: Storefront and POS production builds passed; Arabic desktop and English mobile screenshots reviewed; diff checks passed. Live browser confirmed the Presto filter is `grayscale(1) brightness(0.9)` and adjacent tiles remain unfiltered. No JavaScript logic changed.
+- **Commits / deployment**: `f1e2b1c`, `d3e7237` pushed to main; storefront deployment run `34674046731`; production appearance verified at noch.cloud. No database changes. Unrelated research and work-log edits preserved.
