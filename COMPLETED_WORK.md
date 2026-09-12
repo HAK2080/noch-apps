@@ -1177,3 +1177,8 @@ To find if something's been done:
 - Added owner-only monthly plans with editable signed items, dates, inclusion/removal, calculate/save, expected payments/incoming and cash-left results. Planning never posts expenses/payments/journals. Lease and other bills remain flagged until reviewed. Renamed Balance and invoice card to reflect their actual definitions.
 - Verification: 14 database tests, five browser tests, targeted ESLint and production build passed. Production migration applied; rollback save test returned 10,540 LYD as expected. GitHub Actions 34677491103 succeeded. Live CEO page verified and initial payroll-only plan saved: funds 40,000, payments 32,460, cash left 7,540 LYD, missing-cost flags retained.
 - Pending owner facts: allocation of August's 5,560 LYD payroll difference and a later actual closing cash/bank count/date. Neither historical payroll nor balance observations were changed without those facts.
+
+## 2026-09-12 — Include saved forecast in top CEO cards
+- Agent: Codex. Commit: 0a3f518. Files: CEOOverview.jsx, CEOForecast.jsx, ceo-stock-controls.spec.js and docs/ceo-forecast-guide.md.
+- Top cards now add saved expected incoming/payments to recorded totals when the selected range includes today. Projected net balance is green above zero, red below zero; historical ranges remain actual-only. Unsaved edits and forecast errors hide stale projected totals. Financial records and saved planning amounts are unchanged.
+- Verification: targeted ESLint, production build and all six browser tests passed (red/green transition, save/reload and historical isolation included). GitHub Actions 34678009409 succeeded. Live page verified 24,921.50 in, 29,393.50 out and -4,472 LYD red, including the owner's saved 20,000 LYD plan.
