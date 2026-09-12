@@ -65,8 +65,8 @@ export default function CEOOverview() {
         <Link to="/finance" className="text-noch-muted text-sm hover:text-white">Open Finance →</Link>
       </div>
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-noch-muted text-sm flex-1 min-w-0">From<input aria-label="From" type="date" className={`${inputClass} min-w-0`} value={period.from} onChange={e => setPeriod({ ...period, from: e.target.value })} /></label>
-        <label className="text-noch-muted text-sm flex-1 min-w-0">To<input aria-label="To" type="date" className={`${inputClass} min-w-0`} value={period.to} onChange={e => setPeriod({ ...period, to: e.target.value })} /></label>
+        <label className="text-noch-muted text-sm w-[calc(50%-6px)] sm:w-auto sm:flex-1 min-w-0">From<input aria-label="From" type="date" className={`${inputClass} min-w-0`} value={period.from} onChange={e => setPeriod({ ...period, from: e.target.value })} /></label>
+        <label className="text-noch-muted text-sm w-[calc(50%-6px)] sm:w-auto sm:flex-1 min-w-0">To<input aria-label="To" type="date" className={`${inputClass} min-w-0`} value={period.to} onChange={e => setPeriod({ ...period, to: e.target.value })} /></label>
         <button className="btn-secondary" onClick={() => setPeriod(monthToDate())}>This month</button>
         <button className="btn-secondary p-2" aria-label="Refresh overview" onClick={() => setRevision(value => value + 1)} disabled={loading}><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></button>
       </div>

@@ -16,6 +16,7 @@ test('CEO defaults to month to date, supports dates and saves real balances with
   await page.route('**/rpc/save_ceo_balances', route => { saved = route.request().postDataJSON(); return route.fulfill({ json: 'observation-id' }) })
   await page.goto(fixture)
   await expect(page.getByText('3,000.00 LYD', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/ceo-desktop.png', fullPage: true })
   expect(dates.p_from).toBe(`${dates.p_to.slice(0, 7)}-01`)
   await page.getByLabel('From', { exact: true }).fill('2026-08-01')
   await expect.poll(() => dates.p_from).toBe('2026-08-01')
