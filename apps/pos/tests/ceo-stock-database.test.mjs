@@ -156,3 +156,15 @@ test('payroll estimates prorate monthly drafts without counting them as cash out
   assert.equal(result.money_out,30)
   await assert.rejects(db.query("select ceo_money_overview('2026-09-10','2026-09-01')"),/valid date/)
 })
+
+test('database grants prevent anonymous financial access and direct policy/balance edits', async () => {
+  await db.exec(`grant select on profiles to authenticated; set role anon`)
+  await assert.rejects(db.query("select ceo_money_overview('2026-09-01','2026-09-12')"),/permission denied/)
+  await assert.rejects(db.query('select set_global_stock_block(false)'),/permission denied/)
+  await db.query('select * from get_sale_availability($1)',[branch])
+  await db.exec(`reset role; select set_config('request.jwt.claim.sub','${staff}',false); set role authenticated`)
+  assert.equal((await first('select count(*) n from finance_balance_observations')).n,0)
+  await assert.rejects(db.query('update pos_global_settings set block_unavailable_stock=false'),/permission denied/)
+  await assert.rejects(db.query("insert into finance_balance_observations(as_of,cash_lyd,bank_lyd,created_by) values('2026-09-12',0,0,$1)",[staff]),/permission denied/)
+  await db.exec('reset role')
+})
