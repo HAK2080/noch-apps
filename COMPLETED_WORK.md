@@ -1294,3 +1294,10 @@ To find if something's been done:
 - Files: customer menu and shop loaders in apps/pos and apps/storefront, shared availability helpers, migration 20260912190000_hide_unavailable_customer_products.sql, and CEO/stock database tests.
 - Behavior: when the owner enables the global stock rule, unavailable or unconfigured products remain visible but disabled/shaded in staff POS and are omitted entirely from branch and general customer menus. The checkout database guard remains authoritative.
 - Verification: 15 database checks, both production builds, production RPC counts, live branch-menu load, admin deployment run 34681825979, and storefront deployment run 34681826028 passed. The global toggle remained off during rollout.
+
+## 2026-09-23 — Weekly encrypted backup and Telegram webhook recovery
+- Agent: Codex. Backup implementation commit: e9d38f4.
+- Files: `.github/workflows/weekly-supabase-backup.yml`, `scripts/backup-supabase.mjs`, and `docs/operations/weekly-backup.md`.
+- Backup: added a Sunday 04:00 Tripoli GitHub Action that exports exposed database relations, Auth users, storage-bucket metadata and the PostgREST schema, encrypts the archive, and retains it for 35 days. Repository secrets were installed without committing their values.
+- Verification: manual workflow run 35831818650 completed successfully in 2m 43s and produced the 8 MB encrypted artifact `noch-supabase-backup-35831818650`. Storage object contents and a native PostgreSQL schema dump are not included; source migrations and the API schema snapshot remain the recovery references.
+- Telegram: the live webhook was re-registered at the production Edge Function URL. Telegram reported the correct URL and zero pending updates; a harmless synthetic update returned HTTP 200. The recorded prior 500 coincided with the Supabase downgrade restart. No expense, loyalty, customer, or financial records were changed.
