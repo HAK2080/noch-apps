@@ -46,6 +46,7 @@ const TransferRequests = lazy(() => import('./pages/inventory/TransferRequests')
 const Transfers        = lazy(() => import('./pages/inventory/Transfers'))
 const InTransit        = lazy(() => import('./pages/inventory/InTransit'))
 const MovementHistory  = lazy(() => import('./pages/inventory/MovementHistory'))
+const LossControl      = lazy(() => import('./pages/inventory/LossControl'))
 const FinanceDashboard = lazy(() => import('./modules/finance/FinanceDashboard'))
 const CEOOverview = lazy(() => import('./modules/finance/CEOOverview'))
 const MarketingDashboard = lazy(() => import('./modules/marketing/MarketingDashboard'))
@@ -309,6 +310,7 @@ export default function App() {
         <Route path="/inventory/in-transit" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><InTransit /></AccessRoute></ProtectedRoute>} />
         <Route path="/inventory/movements" element={<ProtectedRoute><AccessRoute policy={featurePolicy('inventory')}><MovementHistory /></AccessRoute></ProtectedRoute>} />
         <Route path="/inventory/intelligence" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><InventoryIntelligence /></AccessRoute></ProtectedRoute>} />
+        <Route path="/inventory/loss-control" element={<ProtectedRoute><AccessRoute policy={OWNER_POLICY}><LossControl /></AccessRoute></ProtectedRoute>} />
 
         {/* Analytics: finance is canonical, analytics-legacy kept as a safe alias */}
         <Route path="/analytics" element={<Navigate to="/finance" replace />} />

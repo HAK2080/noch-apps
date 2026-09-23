@@ -9,6 +9,7 @@ import {
   MapPin,
   Package,
   PackagePlus,
+  PackageSearch,
   RefreshCw,
   ShoppingCart,
   Store,
@@ -234,18 +235,32 @@ export default function InventoryHub() {
         )}
 
         {isOwner && (
-          <button
-            onClick={() => navigate('/inventory/intelligence')}
-            className="w-full rounded-xl border border-blue-400/30 bg-blue-400/5 p-4 text-start flex items-center justify-between gap-4"
-          >
-            <div>
-              <p className="text-blue-200 font-semibold">{copy('Owner control report', 'تقرير الرقابة للمالك')}</p>
-              <p className="text-blue-200/70 text-xs mt-1">
-                {copy('Definitions, freshness, recipe evidence, location reconciliation, and export.', 'التعريفات والحداثة وأدلة الوصفات ومطابقة المواقع والتصدير.')}
-              </p>
-            </div>
-            <MapPin size={20} className="text-blue-300 shrink-0" />
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate('/inventory/loss-control')}
+              className="rounded-xl border border-red-400/30 bg-red-400/5 p-4 text-start flex items-center justify-between gap-4"
+            >
+              <div>
+                <p className="text-red-200 font-semibold">{copy('Loss control', 'مراقبة الفاقد')}</p>
+                <p className="text-red-200/70 text-xs mt-1">
+                  {copy('See only products with unexplained missing stock.', 'اعرض فقط المنتجات ذات النقص غير المفسّر.')}
+                </p>
+              </div>
+              <PackageSearch size={20} className="text-red-300 shrink-0" />
+            </button>
+            <button
+              onClick={() => navigate('/inventory/intelligence')}
+              className="rounded-xl border border-blue-400/30 bg-blue-400/5 p-4 text-start flex items-center justify-between gap-4"
+            >
+              <div>
+                <p className="text-blue-200 font-semibold">{copy('Owner control report', 'تقرير الرقابة للمالك')}</p>
+                <p className="text-blue-200/70 text-xs mt-1">
+                  {copy('Definitions, freshness, recipe evidence, location reconciliation, and export.', 'التعريفات والحداثة وأدلة الوصفات ومطابقة المواقع والتصدير.')}
+                </p>
+              </div>
+              <MapPin size={20} className="text-blue-300 shrink-0" />
+            </button>
+          </div>
         )}
 
         <div>
