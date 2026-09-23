@@ -103,7 +103,7 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
         {/* Hidden badge */}
         {!product.is_active && (
           <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-zinc-800/90 text-zinc-400 border border-zinc-600/40">
-            <EyeOff size={9} /> Hidden
+            <EyeOff size={9} /> Inactive
           </span>
         )}
         {/* Delete on hover (owner only) */}
@@ -888,7 +888,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
                   </div>
                   <div>
                     <p className="text-white text-sm">Active product</p>
-                    <p className="text-zinc-600 text-xs">{form.is_active ? 'Live in catalog' : 'Archived — hidden everywhere'}</p>
+                    <p className="text-zinc-600 text-xs">{form.is_active ? 'Active for selling' : 'Inactive — kept in the backend catalog'}</p>
                   </div>
                 </label>
               </div>
@@ -960,7 +960,7 @@ export default function ProductCatalog() {
     setLoading(true)
     try {
       const [p, c, s] = await Promise.all([
-        getAllProducts(),
+        getAllProducts({ includeInactive: true }),
         getAllCategories(),
         // sales stats still per-branch; default to first branch if none active
         activeBranch ? getProductSalesStats(activeBranch.id, dateFrom, dateTo) : Promise.resolve({}),
@@ -999,11 +999,11 @@ export default function ProductCatalog() {
   }
 
   const handleDelete = async (product) => {
-    if (!confirm(`Delete "${product.name}"?`)) return
+    if (!confirm(`Make "${product.name}" inactive? It will remain in the backend catalog.`)) return
     try {
       await deletePOSProduct(product.id)
-      setProducts(ps => ps.filter(p => p.id !== product.id))
-      toast.success('Deleted')
+      setProducts(ps => ps.map(p => p.id === product.id ? { ...p, is_active: false } : p))
+      toast.success('Product made inactive')
     } catch (err) {
       toast.error(err.message || 'Delete failed')
     }

@@ -198,13 +198,15 @@ export async function getProductPopularity(branchId) {
   return map
 }
 
-// All products across all branches (for catalog page)
-export async function getAllProducts() {
-  const { data, error } = await supabase
+// All products across all branches. Admin catalogs can include inactive rows so
+// temporarily unavailable products remain manageable and can be reactivated.
+export async function getAllProducts({ includeInactive = false } = {}) {
+  let query = supabase
     .from('pos_products')
     .select(ALL_PRODUCTS_SELECT)
-    .eq('is_active', true)
     .order('name')
+  if (!includeInactive) query = query.eq('is_active', true)
+  const { data, error } = await query
   if (error) throw error
   return data
 }
