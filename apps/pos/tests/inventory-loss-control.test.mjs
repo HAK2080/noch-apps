@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL('../../../supabase/migrations/20260923140000_inventory_loss_control.sql', import.meta.url),
   'utf8',
 )
+const catalogMigration = readFileSync(
+  new URL('../../../supabase/migrations/20260923150000_inventory_loss_control_catalog_items.sql', import.meta.url),
+  'utf8',
+)
 const page = readFileSync(new URL('../src/pages/inventory/LossControl.jsx', import.meta.url), 'utf8')
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
 const hub = readFileSync(new URL('../src/pages/InventoryHub.jsx', import.meta.url), 'utf8')
@@ -28,6 +32,17 @@ test('the first count is a baseline and later checks calculate unexplained loss'
 test('ingredients require explicit recipe evidence', () => {
   assert.match(migration, /Link this ingredient to a sold recipe before loss checks/i)
   assert.match(migration, /join public\.recipe_ingredients/i)
+})
+
+test('the first count can start before a location stock row exists', () => {
+  assert.match(catalogMigration, /from public\.pos_products p[\s\S]*left join public\.location_product_stock/i)
+  assert.match(catalogMigration, /from public\.ingredients i[\s\S]*left join public\.inventory_location_stock/i)
+  assert.match(catalogMigration, /coalesce\(lps\.qty, 0\)/i)
+})
+
+test('owner access matches the existing account policy while supervisors remain active-only', () => {
+  assert.match(catalogMigration, /p\.role in \('owner', 'supervisor'\)/i)
+  assert.match(catalogMigration, /p\.role = 'owner' or coalesce\(p\.is_active, true\)/i)
 })
 
 test('loss control stays simple and provides dated drill-down', () => {

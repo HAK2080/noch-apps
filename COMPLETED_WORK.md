@@ -656,7 +656,7 @@
   - `supabase/migrations/20260923140000_inventory_loss_control.sql`
 - **Description**: A simple owner-only view that shows only missing/unaccounted products. Physical counts establish a safe baseline, later checks compare stock movements and recipe-based sales consumption, and drill-down shows the dated movement trail.
 - **Safety**: No historical balances were rewritten and no sample counts were created. Ingredients without a linked recipe are excluded from automated accountability rather than estimated.
-- **Verification**: ESLint passed, production build passed, 15/15 focused tests passed, migration compiled in a rollback transaction, and all production database objects plus the migration ledger were verified live.
+- **Verification**: ESLint passed, production build passed, focused tests passed, migrations compiled in rollback transactions, and production database objects plus both migration-ledger entries were verified live. GitHub deployment run #215 succeeded. A live owner walkthrough confirmed the page, branch selection, and count picker; it exposes 68 tracked products and 79 ingredients without creating a count.
 
 ---
 
