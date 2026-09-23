@@ -1,0 +1,55 @@
+name: Weekly Supabase backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Sunday 04:00 Tripoli (02:00 UTC).
+    - cron: '0 2 * * 0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-supabase-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Export Supabase data
+        env:
+          SUPABASE_URL: https://kxqjasdvoohiexedtfqw.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_OUTPUT_DIR: tmp/supabase-backup
+        run: node scripts/backup-supabase.mjs
+
+      - name: Encrypt backup
+        env:
+          BACKUP_PASSWORD: ${{ secrets.SUPABASE_BACKUP_PASSWORD }}
+        run: |
+          test -n "$BACKUP_PASSWORD"
+          tar -C tmp/supabase-backup -czf tmp/noch-supabase-backup.tar.gz .
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in tmp/noch-supabase-backup.tar.gz \
+            -out tmp/noch-supabase-backup.tar.gz.enc \
+            -pass env:BACKUP_PASSWORD
+          sha256sum tmp/noch-supabase-backup.tar.gz.enc > tmp/noch-supabase-backup.tar.gz.enc.sha256
+          rm -rf tmp/supabase-backup tmp/noch-supabase-backup.tar.gz
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: noch-supabase-backup-${{ github.run_id }}
+          path: |
+            tmp/noch-supabase-backup.tar.gz.enc
+            tmp/noch-supabase-backup.tar.gz.enc.sha256
+          if-no-files-found: error
+          retention-days: 35
