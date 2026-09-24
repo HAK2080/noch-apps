@@ -239,12 +239,31 @@ async function resolveProfile(
 
 // Live schema: cost_centers.id IS the code ('CC01'); categories have only id+name.
 async function loadCostCenters() {
-  const raw = await sbGet("cost_centers?select=id,name,include_in_split&order=id");
+  const raw = await sbGet("cost_centers?select=id,name,include_in_split,pos_branch_id&order=id");
   return (Array.isArray(raw) ? raw : []).map(
-    (c: { id: string; name: string; include_in_split: boolean }) => ({
+    (c: { id: string; name: string; include_in_split: boolean; pos_branch_id: string | null }) => ({
       code: c.id, name: c.name, include_in_split: c.include_in_split,
+      pos_branch_id: c.pos_branch_id,
     }),
   );
+}
+
+async function loadAllocationCenters(actor: RequestActor) {
+  const centers = await loadCostCenters();
+  if (!actor.internalTelegram) return centers;
+
+  // Telegram asks for operating branches only. A cost center without a mapped
+  // branch (including shared/management) must not become an invoice button.
+  const branches = await sbGet("pos_branches?select=id,name,name_ar,is_active,operational_status&is_active=eq.true");
+  if (!Array.isArray(branches)) throw new Error("Could not load active branches");
+  const activeBranches: { id: string; name?: string; name_ar?: string | null }[] = branches
+    .filter((branch: { operational_status?: string | null }) =>
+      !branch.operational_status || branch.operational_status === "operating")
+  return centers.filter((center) => center.pos_branch_id && activeBranches.some((branch) => branch.id === center.pos_branch_id))
+    .map((center) => {
+      const branch = activeBranches.find((item) => item.id === center.pos_branch_id);
+      return { ...center, name: branch?.name_ar || branch?.name || center.name };
+    });
 }
 
 // ── extract (photo) ─────────────────────────────────────────
@@ -275,9 +294,10 @@ async function actionExtract(body: Record<string, unknown>, actor: RequestActor)
 
   // 2) Reference data
   const [ccList, categories] = await Promise.all([
-    loadCostCenters(),
+    loadAllocationCenters(actor),
     sbGet("expense_categories?select=name"),
   ]);
+  if (actor.internalTelegram && !ccList.length) return json({ error: "no_active_branches" }, 409);
   const catNames = (Array.isArray(categories) ? categories : []).map((c: { name: string }) => c.name);
 
   // 3) AI-read the receipt (Gemini free tier → Claude → none)
@@ -343,9 +363,10 @@ async function actionManual(body: Record<string, unknown>, actor: RequestActor) 
   if (!submittedBy) return json({ error: "unlinked", message: "No profile found for this submitter" }, 403);
 
   const [ccList, categories] = await Promise.all([
-    loadCostCenters(),
+    loadAllocationCenters(actor),
     sbGet("expense_categories?select=name"),
   ]);
+  if (actor.internalTelegram && !ccList.length) return json({ error: "no_active_branches" }, 409);
   const catNames = (Array.isArray(categories) ? categories : []).map((c: { name: string }) => c.name);
 
   // Regex first (free, instant), AI to enrich vendor/category if available
@@ -404,7 +425,7 @@ async function actionSetAmount(body: Record<string, unknown>, actor: RequestActo
   const extracted = { ...(snap.extracted || {}), amount };
   await sbPatch("expense_snaps?id=eq." + snapId, { extracted, status: "awaiting_payment" });
 
-  const ccList = await loadCostCenters();
+  const ccList = await loadAllocationCenters(actor);
   return json({
     ok: true,
     snap_id: snapId,
@@ -439,7 +460,7 @@ async function actionSetPayment(body: Record<string, unknown>, actor: RequestAct
   };
   await sbPatch("expense_snaps?id=eq." + snapId, { extracted, status: "awaiting_branch" });
 
-  const costCenters = await loadCostCenters();
+  const costCenters = await loadAllocationCenters(actor);
   return json({
     ok: true,
     snap_id: snapId,
@@ -466,7 +487,7 @@ async function actionFinalize(body: Record<string, unknown>, actor: RequestActor
     : ex.payment_status_reported === "paid" || snap.receipt_url ? "paid" : "unpaid";
 
   const [costCenters, categories, rates] = await Promise.all([
-    loadCostCenters(),
+    loadAllocationCenters(actor),
     sbGet("expense_categories?select=id,name"),
     sbGet("cc_exchange_rates?select=currency,rate_to_lyd"),
   ]);
@@ -565,7 +586,7 @@ async function actionCustomParse(body: Record<string, unknown>, actor: RequestAc
   let parts = heuristicSplit(text);
 
   if (!parts.length) {
-    const costCenters = await loadCostCenters();
+    const costCenters = await loadAllocationCenters(actor);
     const total = Number(snap.extracted?.amount) || null;
     const ai = await aiTextJson(`A staff member wants to split a receipt${total ? ` of ${total} ${snap.extracted?.currency || "LYD"}` : ""} between branches.
 Branches: ${costCenters.map((c) => `${c.code} = ${c.name}`).join("; ")}

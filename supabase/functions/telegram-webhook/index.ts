@@ -151,7 +151,9 @@ async function handlePhoto(botToken: string, msg: TgMessage, fileId: string, mim
 
   if (!res.snap_id) {
     console.error('extract failed', res)
-    await tg(botToken, 'sendMessage', { chat_id: chatId, text: '⚠️ حدث خطأ في معالجة الفاتورة. حاول مرة أخرى.' })
+    await tg(botToken, 'sendMessage', { chat_id: chatId, text: res.error === 'no_active_branches'
+      ? '⚠️ لا يوجد فرع نشط مرتبط بالمصروفات حالياً. اطلب من الإدارة تفعيل الفرع وربطه، ثم أرسل الفاتورة مجدداً.'
+      : '⚠️ حدث خطأ في معالجة الفاتورة. حاول مرة أخرى.' })
     return Response.json({ ok: false, error: res }, { headers: CORS })
   }
 
@@ -215,6 +217,13 @@ async function sendBranchButtons(
 
   // Branch buttons — suggested branch first, then the rest, then split options
   const ccs = res.cost_centers || []
+  if (!ccs.length) {
+    await tg(botToken, 'sendMessage', {
+      chat_id: chatId,
+      text: '⚠️ لا يوجد فرع نشط مرتبط بالمصروفات حالياً. اطلب من الإدارة تفعيل الفرع وربطه قبل التسجيل.',
+    })
+    return
+  }
   const suggested = res.suggested_code
   const ordered = suggested
     ? [...ccs.filter((c) => c.code === suggested), ...ccs.filter((c) => c.code !== suggested)]
@@ -236,10 +245,10 @@ async function sendBranchButtons(
           { text: '💵 نقداً / Cash', callback_data: `epay|${res.snap_id}|paid|cash` },
           { text: '💳 بطاقة / Card', callback_data: `epay|${res.snap_id}|paid|card` },
         ],
-        [
+        ...(ccs.length > 1 ? [[
           { text: '⚖️ تقسيم بالتساوي', callback_data: 'esnap|' + res.snap_id + '|even' },
           { text: '✏️ تقسيم مخصص', callback_data: 'esnap|' + res.snap_id + '|custom' },
-        ],
+        ]] : []),
       ],
     },
   })
@@ -696,6 +705,11 @@ async function handleCallback(botToken: string, cb: TgCallbackQuery) {
     }
   } else if (res.error === 'already_completed') {
     await tg(botToken, 'sendMessage', { chat_id: chatId, text: 'هذه الفاتورة مسجلة مسبقاً ✅' })
+  } else if (res.error === 'bad_code' || res.error === 'no_split_centers' || res.error === 'bad_parts') {
+    await tg(botToken, 'sendMessage', {
+      chat_id: chatId,
+      text: '⚠️ تغيّر وضع الفرع قبل التسجيل. أرسل الفاتورة مجدداً لاختيار فرع نشط. لم تُسجّل هذه الفاتورة.',
+    })
   } else {
     console.error('finalize failed', res)
     await tg(botToken, 'sendMessage', { chat_id: chatId, text: '⚠️ حدث خطأ في التسجيل. حاول مرة أخرى.' })
@@ -772,6 +786,10 @@ async function handleText(botToken: string, msg: TgMessage): Promise<Response> {
     if (res.error === 'unlinked') {
       await tg(botToken, 'sendMessage', { chat_id: chatId, text: 'حسابك غير مربوط بالنظام. تواصل مع الإدارة لربط حسابك.' })
       return Response.json({ ok: true, ignored: true, reason: 'unlinked chat' }, { headers: CORS })
+    }
+    if (res.error === 'no_active_branches') {
+      await tg(botToken, 'sendMessage', { chat_id: chatId, text: '⚠️ لا يوجد فرع نشط مرتبط بالمصروفات حالياً. اطلب من الإدارة تفعيل الفرع وربطه.' })
+      return Response.json({ ok: true, ignored: true, reason: 'no active expense branch' }, { headers: CORS })
     }
     if (res.snap_id) {
       if (res.needs_amount) {
