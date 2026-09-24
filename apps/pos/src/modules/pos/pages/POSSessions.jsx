@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -17,11 +17,13 @@ import { useLanguage } from '../../../contexts/LanguageContext'
 import { usePermissions } from '../../../contexts/PermissionsContext'
 import {
   businessToday,
+  getSalesControlSummary,
   getShiftControls,
   localYmd,
 } from '../lib/pos-supabase'
 import {
   combineShiftControls,
+  normalizeSalesControl,
   normalizeShiftControl,
 } from '../lib/sales-control'
 import { getServedBy } from '../lib/pos-session'
@@ -42,10 +44,14 @@ const COPY = {
     loading: 'Loading shifts…',
     loadFailed: 'Failed to load sales control',
     empty: 'No sales or shift data in this business-day range.',
+    emptyShifts: 'No shifts opened in this business-day range.',
     shifts: 'shifts',
-    totalSales: 'Total sales',
-    totalSalesHelp: 'Before refunds',
+    totalSales: 'Net sales',
+    totalSalesHelp: 'After refunds · by business day',
+    beforeRefunds: 'Sales before refunds',
     netSales: 'Net sales after refunds',
+    shiftDifference: 'Difference from shifts shown',
+    shiftDifferenceHelp: 'Daily sales include orders without a shift and orders in shifts opened on another day. Shift rows are grouped by opening date.',
     salesByShift: 'Sales and reconciliation by shift',
     orders: 'Orders',
     netCash: 'Net cash tender',
@@ -89,10 +95,14 @@ const COPY = {
     loading: 'جارٍ تحميل الورديات…',
     loadFailed: 'تعذر تحميل رقابة المبيعات',
     empty: 'لا توجد بيانات مبيعات أو ورديات في نطاق أيام العمل المحدد.',
+    emptyShifts: 'لا توجد ورديات بدأت في نطاق أيام العمل المحدد.',
     shifts: 'ورديات',
-    totalSales: 'إجمالي المبيعات',
-    totalSalesHelp: 'قبل المرتجعات',
+    totalSales: 'صافي المبيعات',
+    totalSalesHelp: 'بعد المرتجعات · حسب يوم العمل',
+    beforeRefunds: 'المبيعات قبل المرتجعات',
     netSales: 'صافي المبيعات بعد المرتجعات',
+    shiftDifference: 'الفرق عن الورديات المعروضة',
+    shiftDifferenceHelp: 'تشمل المبيعات اليومية الطلبات بلا وردية والطلبات ضمن ورديات بدأت في يوم آخر. تُعرض الورديات حسب تاريخ بدايتها.',
     salesByShift: 'المبيعات والمطابقة حسب الوردية',
     orders: 'الطلبات',
     netCash: 'صافي النقدية',
@@ -182,7 +192,9 @@ export default function POSSessions() {
     || profile?.role === 'supervisor'
 
   const [shifts, setShifts] = useState([])
+  const [periodControl, setPeriodControl] = useState(null)
   const [loading, setLoading] = useState(true)
+  const requestId = useRef(0)
   const presets = [
     { key: 'today', label: copy.today, days: 0 },
     { key: '7d', label: copy.sevenDays, days: 6 },
@@ -196,20 +208,28 @@ export default function POSSessions() {
   })
 
   const load = async () => {
+    const currentRequest = ++requestId.current
     if (!allowed) {
       setLoading(false)
       return
     }
-    // Keep the last reconciled shift view visible while refreshing. This avoids
-    // replacing valid evidence with an indefinite loading state on a slow RPC.
-    setLoading(shifts.length === 0)
+    // Never show a prior date range under the newly selected range label.
+    setLoading(true)
+    setPeriodControl(null)
+    setShifts([])
     try {
-      const controlRows = await getShiftControls(branchId, range.fromDate, range.toDate)
+      const [dailyControl, controlRows] = await Promise.all([
+        getSalesControlSummary(branchId, range.fromDate, range.toDate),
+        getShiftControls(branchId, range.fromDate, range.toDate),
+      ])
+      if (currentRequest !== requestId.current) return
+      setPeriodControl(normalizeSalesControl(dailyControl))
       setShifts((controlRows || []).map(normalizeShiftControl))
     } catch (error) {
+      if (currentRequest !== requestId.current) return
       toast.error(error.message || copy.loadFailed)
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }
 
@@ -232,8 +252,9 @@ export default function POSSessions() {
   }
 
   const totals = combineShiftControls(shifts)
-  const totalSales = totals.netSales + totals.refunds
-  const paymentReconciled = Math.abs(totals.paymentVariance) < 0.005
+  const shiftDifference = (periodControl?.net_sales || 0) - totals.netSales
+  const paymentReconciled = Math.abs(periodControl?.payment_reconciliation_variance || 0) < 0.005
+    && Math.abs(periodControl?.timing_variance || 0) < 0.005
 
   return (
     <Layout>
@@ -266,7 +287,7 @@ export default function POSSessions() {
           />
         </div>
 
-        {!loading && shifts.length > 0 && (
+        {!loading && periodControl && (
           <>
             <div className="card p-4 mb-4">
               <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
@@ -275,16 +296,16 @@ export default function POSSessions() {
                   className="col-span-2 rounded-xl bg-noch-green px-4 py-3 text-black"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-black/70">{copy.totalSales}</p>
-                  <p className="text-2xl font-bold leading-tight">{money(totalSales)}</p>
+                  <p className="text-2xl font-bold leading-tight">{money(periodControl.net_sales)}</p>
                   <p className="text-[10px] text-black/70">{copy.totalSalesHelp} · {copy.currency}</p>
                 </div>
                 {[
-                  [copy.netSales, totals.netSales, 'text-noch-green'],
-                  [copy.orders, totals.orderCount, 'text-white'],
-                  [copy.netCash, totals.cash, 'text-yellow-300'],
-                  [copy.netCard, totals.card, 'text-blue-300'],
-                  [copy.netPresto, totals.presto, 'text-purple-300'],
-                  [copy.refunds, totals.refunds, 'text-red-300'],
+                  [copy.beforeRefunds, periodControl.completed_sales, 'text-white'],
+                  [copy.orders, periodControl.order_count, 'text-white'],
+                  [copy.netCash, periodControl.period_cash_movement, 'text-yellow-300'],
+                  [copy.netCard, periodControl.period_card_movement, 'text-blue-300'],
+                  [copy.netPresto, periodControl.period_presto_movement, 'text-purple-300'],
+                  [copy.refunds, periodControl.linked_refunds, 'text-red-300'],
                 ].map(([label, value, tone]) => (
                   <div key={label}>
                     <p className="text-noch-muted text-[10px] uppercase tracking-wider">{label}</p>
@@ -301,11 +322,18 @@ export default function POSSessions() {
                   </span>
                 ) : (
                   <span className="text-yellow-300 flex items-center gap-1">
-                    <AlertTriangle size={13} /> {copy.gap} {money(totals.paymentVariance)} {copy.currency}
+                    <AlertTriangle size={13} /> {copy.gap} {money(Math.abs(periodControl.timing_variance || periodControl.payment_reconciliation_variance))} {copy.currency}
                   </span>
                 )}
               </div>
             </div>
+
+            {shifts.length > 0 && Math.abs(shiftDifference) >= 0.005 && (
+              <div className="rounded-xl border border-yellow-400/30 bg-yellow-400/10 p-3 mb-4 text-xs text-yellow-100">
+                <p className="font-semibold">{copy.shiftDifference}: {shiftDifference > 0 ? '+' : '−'}{money(Math.abs(shiftDifference))} {copy.currency}</p>
+                <p className="mt-1">{copy.shiftDifferenceHelp}</p>
+              </div>
+            )}
 
             {(totals.reconstructedEvents > 0 || totals.untrackedOrders > 0 || totals.missingCounts > 0) && (
               <div className="rounded-xl border border-yellow-400/30 bg-yellow-400/10 p-3 mb-4 text-xs text-yellow-100">
@@ -320,7 +348,7 @@ export default function POSSessions() {
         {loading ? (
           <p className="text-noch-muted text-center py-12">{copy.loading}</p>
         ) : shifts.length === 0 ? (
-          <p className="text-noch-muted text-center py-12 text-sm">{copy.empty}</p>
+          <p className="text-noch-muted text-center py-12 text-sm">{periodControl?.order_count ? copy.emptyShifts : copy.empty}</p>
         ) : (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3 px-1">
