@@ -102,6 +102,7 @@ export const SUB_NAV = [
   { to: '/content-studio', label: 'Overview', labelAr: 'نظرة عامة', end: true },
   { to: '/content-studio/businesses', label: 'Businesses', labelAr: 'الأنشطة' },
   { to: '/content-studio/signals', label: 'Signals', labelAr: 'الإشارات' },
+  { to: '/content-studio/groups', label: 'Groups', labelAr: 'المجموعات' },
   { to: '/content-studio/inspiration', label: 'Inspiration', labelAr: 'الإلهام' },
   { to: '/content-studio/concepts', label: 'Concepts', labelAr: 'الأفكار' },
   { to: '/content-studio/briefs', label: 'Briefs', labelAr: 'الملخصات' },

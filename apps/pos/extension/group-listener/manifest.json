@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Group Listener Pilot",
+  "version": "0.3.0",
+  "description": "Flags relevant posts already loaded in Facebook Groups you visit.",
+  "permissions": ["storage", "notifications", "activeTab", "tabs"],
+  "host_permissions": ["https://www.facebook.com/*", "https://web.facebook.com/*", "https://apps.noch.cloud/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "Group Listener Pilot",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/groups/*", "https://web.facebook.com/groups/*"],
+      "js": ["matching.js", "content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://apps.noch.cloud/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

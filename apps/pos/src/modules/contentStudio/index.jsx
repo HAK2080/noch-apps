@@ -19,6 +19,7 @@ import BriefDetail from './pages/BriefDetail'
 import Signals from './pages/Signals'
 import Campaigns from './pages/Campaigns'
 import CampaignDetail from './pages/CampaignDetail'
+import GroupListening from './pages/GroupListening'
 
 /**
  * Mount at <Route path="/content-studio/*" element={<ContentStudio />}/>.
@@ -39,6 +40,7 @@ export default function ContentStudio() {
         <Route path="briefs" element={<Briefs />} />
         <Route path="briefs/:id" element={<BriefDetail />} />
         <Route path="signals" element={<Signals />} />
+        <Route path="groups" element={<GroupListening />} />
         <Route path="campaigns" element={<Campaigns />} />
         <Route path="campaigns/:id" element={<CampaignDetail />} />
         <Route path="drafts" element={<Drafts />} />

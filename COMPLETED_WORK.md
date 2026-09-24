@@ -1318,3 +1318,10 @@ To find if something's been done:
 - Backup: added a Sunday 04:00 Tripoli GitHub Action that exports exposed database relations, Auth users, storage-bucket metadata and the PostgREST schema, encrypts the archive, and retains it for 35 days. Repository secrets were installed without committing their values.
 - Verification: manual workflow run 35831818650 completed successfully in 2m 43s and produced the 8 MB encrypted artifact `noch-supabase-backup-35831818650`. Storage object contents and a native PostgreSQL schema dump are not included; source migrations and the API schema snapshot remain the recovery references.
 - Telegram: the live webhook was re-registered at the production Edge Function URL. Telegram reported the correct URL and zero pending updates; a harmless synthetic update returned HTTP 200. The recorded prior 500 coincided with the Supabase downgrade restart. No expense, loyalty, customer, or financial records were changed.
+## 2026-09-24 — One-person Facebook Group listening pilot
+
+- **Agent**: Codex
+- **Status**: Implemented in `codex/facebook-group-listener`; pending live Group and production deployment validation.
+- **Files**: `apps/pos/extension/group-listener/`, `apps/pos/src/modules/contentStudio/pages/GroupListening.jsx`, `apps/pos/src/modules/contentStudio/lib/groupListener.js`, Content Studio route/navigation, and `apps/pos/tests/group-listener.test.mjs`.
+- **Change**: Added keyword/area matching for posts already loaded in joined Facebook Group tabs, a local Groups review inbox, Inspiration promotion for the selected business, and exact-text reply approval before manual copy/paste. No automatic Facebook publishing or multi-identity behavior.
+- **Verification**: Extension tests (5), app listener tests (2), targeted ESLint, production build and `git diff --check` passed. No live Facebook Group page or production deployment was exercised.

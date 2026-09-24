@@ -43,6 +43,12 @@ root `.env`.
   publication records with objective, product, campaign, spend, and fixed
   24-hour/7-day snapshots. Associated orders and revenue are never presented as
   causal lift without a recorded experiment and control.
+- **Facebook Group listening pilot:** `/content-studio/groups` receives matches
+  from the optional browser extension in
+  [`apps/pos/extension/group-listener`](apps/pos/extension/group-listener).
+  It checks posts loaded in joined Group tabs against keywords and optional
+  areas. Matches and reply review stay in one browser; useful posts can be
+  saved to the selected business's Inspiration workspace. It never publishes.
 - **Access and acceptance:** navigation and direct URLs use the same role
   policy, denied access fails closed with an English/Arabic explanation, and
   mobile users can reach every granted page. Full profile rows are owner-or-self;

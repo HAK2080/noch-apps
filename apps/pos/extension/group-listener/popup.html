@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Group Listener Pilot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand-mark" aria-hidden="true">◎</div>
+    <div>
+      <h1>Group Listener</h1>
+      <p>Find relevant posts in groups you visit</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="status" id="status" role="status">Checking the current page…</div>
+
+    <form id="settings-form">
+      <label for="keywords">Keywords or phrases</label>
+      <textarea id="keywords" rows="3" placeholder="looking for a plumber&#10;roof repair&#10;water leak" required></textarea>
+      <div class="hint">One per line or separated by commas. At least one is required.</div>
+
+      <label for="areas">Areas</label>
+      <textarea id="areas" rows="2" placeholder="Istanbul&#10;Kadıköy"></textarea>
+      <div class="hint">Optional. A place must appear in the post or group name.</div>
+
+      <label for="exclusions">Ignore phrases</label>
+      <input id="exclusions" type="text" placeholder="hiring, job opening">
+
+      <div class="actions">
+        <button type="submit" class="primary">Save filters</button>
+        <button type="button" id="scan">Check this page</button>
+      </div>
+      <p class="feedback" id="feedback" role="status"></p>
+    </form>
+
+    <section class="engine-form">
+      <h2>NOCH Apps</h2>
+      <div class="hint">Open Content Studio → Groups to receive matching posts.</div>
+      <div class="actions">
+        <button type="button" id="sync">Retry pending</button>
+      </div>
+      <p class="feedback" id="sync-status" role="status"></p>
+    </section>
+
+    <section aria-labelledby="matches-heading">
+      <div class="section-heading">
+        <h2 id="matches-heading">Matches <span id="count">0</span></h2>
+        <button type="button" id="clear" class="text-button">Clear</button>
+      </div>
+      <div id="matches" class="matches"></div>
+    </section>
+  </main>
+
+  <footer>Matches stay in this browser until you review them in NOCH Apps.</footer>
+  <script src="popup.js"></script>
+</body>
+</html>
