@@ -29,6 +29,17 @@ export async function recordLossCount({ branchId, itemKind, itemId, countedQty, 
   return data
 }
 
+export async function uploadLossProductStock({ branchId, productId, quantity, unit }) {
+  const { data, error } = await supabase.rpc('inventory_loss_upload_product_stock', {
+    p_branch_id: branchId,
+    p_product_id: productId,
+    p_quantity: Number(quantity),
+    p_unit: unit,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function getLossControlDetail(checkId) {
   const { data, error } = await supabase.rpc('inventory_loss_control_detail', {
     p_check_id: checkId,

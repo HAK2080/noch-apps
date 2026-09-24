@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Loader2,
+  PackagePlus,
   PackageSearch,
   RefreshCw,
   X,
@@ -18,6 +19,7 @@ import {
   listLossControlRows,
   listLossCountItems,
   recordLossCount,
+  uploadLossProductStock,
 } from './lib/loss-control'
 
 const quantity = value => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 3 })
@@ -103,7 +105,9 @@ function CountModal({ branchId, arabic, copy, onClose, onSaved }) {
                     disabled={!item.ready_for_loss_check}
                   >
                     {arabic ? item.item_name_ar || item.item_name : item.item_name}
-                    {!item.ready_for_loss_check ? ` — ${copy('recipe required', 'تحتاج وصفة')}` : ''}
+                    {!item.ready_for_loss_check ? ` — ${item.readiness_note === 'Recipe link required'
+                      ? copy('recipe required', 'تحتاج وصفة')
+                      : copy('upload stock first', 'حمّل المخزون أولًا')}` : ''}
                   </option>
                 ))}
               </select>
@@ -111,10 +115,15 @@ function CountModal({ branchId, arabic, copy, onClose, onSaved }) {
 
             {selected && (
               <div className="rounded-xl border border-noch-border bg-noch-dark/40 px-4 py-3 flex items-center justify-between">
-                <span className="text-noch-muted text-sm">{copy('System expects', 'المتوقع في النظام')}</span>
+                <span className="text-noch-muted text-sm">{copy('Current system stock', 'المخزون الحالي بالنظام')}</span>
                 <span className="text-white font-semibold tabular-nums">{quantity(selected.expected_qty)} {selected.unit}</span>
               </div>
             )}
+
+            <p className="text-noch-muted text-xs">
+              {copy('The first count sets a baseline. Later counts reveal unexplained differences.',
+                'الجرد الأول يحدد نقطة البداية. الجرد التالي يُظهر أي فرق غير مفسّر.')}
+            </p>
 
             <div>
               <label className="label">{copy('Physical quantity', 'الكمية الفعلية')}</label>
@@ -135,6 +144,93 @@ function CountModal({ branchId, arabic, copy, onClose, onSaved }) {
             <button type="submit" disabled={saving || !selected} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
               {copy('Save count', 'حفظ الجرد')}
+            </button>
+          </div>
+        )}
+      </form>
+    </div>
+  )
+}
+
+function UploadStockModal({ branchId, arabic, copy, onClose, onSaved }) {
+  const [items, setItems] = useState([])
+  const [productId, setProductId] = useState('')
+  const [amount, setAmount] = useState('')
+  const [unit, setUnit] = useState('pc')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    listLossCountItems(branchId)
+      .then(data => { if (active) setItems(data.filter(item => item.item_kind === 'product')) })
+      .catch(error => toast.error(error.message || copy('Could not load stock items', 'تعذر تحميل عناصر المخزون')))
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [branchId, copy])
+
+  const selected = items.find(item => item.item_id === productId)
+  const unitChoices = selected?.unit === 'g' ? ['kg', 'g']
+    : selected?.unit === 'ml' ? ['l', 'ml'] : [selected?.unit || 'pc']
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!selected || !Number.isFinite(Number(amount)) || Number(amount) <= 0) return
+    setSaving(true)
+    try {
+      await uploadLossProductStock({ branchId, productId, quantity: amount, unit })
+      toast.success(copy('Stock uploaded', 'تم تحميل المخزون'))
+      await onSaved()
+      onClose()
+    } catch (error) {
+      toast.error(error.message || copy('Stock could not be uploaded', 'تعذر تحميل المخزون'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center" role="dialog" aria-modal="true">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl border border-noch-border bg-noch-card p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-white text-lg font-bold">{copy('Upload branch stock', 'تحميل مخزون الفرع')}</h2>
+            <p className="text-noch-muted text-xs mt-1">
+              {copy('Add stock actually received. This starts reliable tracking for that item.',
+                'أضف المخزون المستلم فعليًا. يبدأ التتبع من هذه الكمية.')}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="p-2 text-noch-muted hover:text-white" aria-label={copy('Close', 'إغلاق')}><X size={18} /></button>
+        </div>
+        {loading ? <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-noch-green" /></div> : (
+          <div className="space-y-4 mt-5">
+            <div>
+              <label className="label">{copy('Product', 'المنتج')}</label>
+              <select value={productId} onChange={event => {
+                const id = event.target.value
+                const item = items.find(candidate => candidate.item_id === id)
+                setProductId(id)
+                setUnit(item?.unit === 'g' ? 'kg' : item?.unit === 'ml' ? 'l' : item?.unit || 'pc')
+              }} className="input w-full" required>
+                <option value="">{copy('Select a product', 'اختر منتجًا')}</option>
+                {items.map(item => <option key={item.item_id} value={item.item_id}>
+                  {arabic ? item.item_name_ar || item.item_name : item.item_name}
+                </option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">{copy('Quantity received', 'الكمية المستلمة')}</label>
+              <div className="flex gap-2">
+                <input type="number" min="0.001" max="1000000" step="0.001" value={amount}
+                  onChange={event => setAmount(event.target.value)} className="input flex-1" required />
+                <select value={unit} onChange={event => setUnit(event.target.value)} className="input w-20" disabled={!selected}>
+                  {unitChoices.map(choice => <option key={choice} value={choice}>{choice}</option>)}
+                </select>
+              </div>
+            </div>
+            <button type="submit" disabled={saving || !selected} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <PackagePlus size={16} />}
+              {copy('Upload stock', 'تحميل المخزون')}
             </button>
           </div>
         )}
@@ -224,6 +320,7 @@ export default function LossControl() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [countOpen, setCountOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
 
   const load = useCallback(async selectedBranch => {
@@ -263,6 +360,13 @@ export default function LossControl() {
               <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
+              onClick={() => setUploadOpen(true)}
+              disabled={!branchId}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+            >
+              <PackagePlus size={16} /> {copy('Upload stock', 'تحميل المخزون')}
+            </button>
+            <button
               onClick={() => setCountOpen(true)}
               disabled={!branchId}
               className="btn-primary flex items-center gap-2 disabled:opacity-50"
@@ -286,7 +390,8 @@ export default function LossControl() {
             <PackageSearch size={34} className="text-noch-muted mx-auto mb-3" />
             <p className="text-white font-semibold">{copy('No unaccounted stock found', 'لا يوجد مخزون غير مفسّر')}</p>
             <p className="text-noch-muted text-sm mt-1">
-              {copy('Differences will appear after a physical count.', 'ستظهر الفروقات بعد إجراء جرد فعلي.')}
+              {copy('Upload stock, then count it. Differences appear from the next count.',
+                'حمّل المخزون ثم اجرِ الجرد. تظهر الفروقات بدءًا من الجرد التالي.')}
             </p>
           </div>
         ) : (
@@ -319,6 +424,10 @@ export default function LossControl() {
           onClose={() => setCountOpen(false)}
           onSaved={() => load(branchId)}
         />
+      )}
+      {uploadOpen && branchId && (
+        <UploadStockModal branchId={branchId} arabic={arabic} copy={copy}
+          onClose={() => setUploadOpen(false)} onSaved={() => load(branchId)} />
       )}
       {selectedRow && <DetailModal row={selectedRow} arabic={arabic} copy={copy} onClose={() => setSelectedRow(null)} />}
     </Layout>
