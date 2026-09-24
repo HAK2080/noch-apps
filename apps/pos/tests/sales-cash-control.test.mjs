@@ -162,7 +162,7 @@ test('critical sales and cash-control journeys use the authoritative interfaces'
   assert.match(sessions, /periodControl\.period_card_movement/)
   assert.match(sessions, /const shiftDifference = \(periodControl\?\.net_sales \|\| 0\) - totals\.netSales/)
   assert.match(sessions, /data-testid="total-sales"/)
-  assert.match(sessions, /shift\.net_sales \+ shift\.refunds/)
+  assert.match(sessions, /\[copy\.totalSales, shift\.net_sales, 'text-noch-green'\]/)
   assert.doesNotMatch(sessions, /getShiftRefundTotals/)
   assert.match(endOfDay, /getShiftControl/)
   assert.match(endOfDay, /cash_counted: !cashCloseState\.isMissing/)

@@ -383,7 +383,7 @@ export default function POSSessions() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
                       {[
-                        [copy.totalSales, shift.net_sales + shift.refunds, 'text-noch-green'],
+                        [copy.totalSales, shift.net_sales, 'text-noch-green'],
                         [copy.netCash, shift.net_cash_tender, 'text-white'],
                         [copy.netCard, shift.net_card_tender, 'text-white'],
                         [copy.netPresto, shift.net_presto_tender, 'text-white'],
