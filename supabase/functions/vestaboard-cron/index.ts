@@ -469,17 +469,17 @@ async function buildChannelMessage(admin: ReturnType<typeof createClient>, chann
     lines = ['TRIPOLI NOW', `${Math.round(weather.current?.temperature_2m || 0)} C`, 'HAVE A NOCH DAY']
   } else if (channel.channel_type === 'sales') {
     const { data: latest } = await admin
-      .from('pos_sales_daily')
+      .from('pos_sales_daily_reconciled')
       .select('day')
       .order('day', { ascending: false })
       .limit(1)
       .maybeSingle()
     const { data: rows } = latest?.day
-      ? await admin.from('pos_sales_daily').select('gross,orders').eq('day', latest.day)
+      ? await admin.from('pos_sales_daily_reconciled').select('net_sales,orders').eq('day', latest.day)
       : { data: [] }
-    const gross = (rows || []).reduce((sum, row) => sum + Number(row.gross || 0), 0)
+    const netSales = (rows || []).reduce((sum, row) => sum + Number(row.net_sales || 0), 0)
     const orders = (rows || []).reduce((sum, row) => sum + Number(row.orders || 0), 0)
-    lines = ['NOCH DAILY', `${orders} ORDERS`, `${gross.toFixed(0)} LYD`]
+    lines = ['NOCH DAILY', `${orders} ORDERS`, `${netSales.toFixed(0)} LYD NET`]
   } else if (channel.channel_type === 'loyalty') {
     const { data } = await admin.rpc('loyalty_checkout_metrics', { p_days: 7 })
     const metric = Array.isArray(data) ? data[0] : data

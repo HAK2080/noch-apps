@@ -6,6 +6,7 @@ import { formatCurrency } from '../lib/numbers'
 import { getStaffProfiles } from '../lib/profiles'
 import { getDashboardAlerts, getTaskStats, getPendingApprovals, createTask, assignStaffToTask, uploadAttachment } from '../lib/tasks'
 import { getPnL } from '../modules/finance/lib/finance-supabase'
+import { businessYmd } from '../modules/pos/lib/business-time'
 import { listSuggestedActions, runAllEventProducers } from '../lib/businessEvents'
 import { sendTelegram } from '../lib/telegram'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -122,11 +123,8 @@ export default function Dashboard() {
     loadSuggestedActions()
     // P&L for today — silently fails if RPC doesn't exist or no data
     if (isOwner) {
-      const today = new Date()
-      const y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0')
-      const from = `${y}-${m}-${d}T00:00:00`
-      const to = `${y}-${m}-${d}T23:59:59`
-      getPnL({ from, to, netOfRefunds: true }).then(setPnl).catch(() => {})
+      const day = businessYmd()
+      getPnL({ from: day, to: day, netOfRefunds: true }).then(setPnl).catch(() => {})
     }
   }, [isOwner, loadAccessRequests, loadFoundersClub, loadSuggestedActions, t])
 
@@ -318,8 +316,8 @@ export default function Dashboard() {
       <StatsBar stats={stats} />
 
       {/* Today's P&L — owner only, compact KPI strip */}
-      {isOwner && pnl && (pnl.revenue > 0 || pnl.cogs > 0) && (() => {
-        const revenue = Number(pnl.revenue) || 0
+      {isOwner && pnl && (pnl.revenue_net > 0 || pnl.cogs > 0) && (() => {
+        const revenue = Number(pnl.revenue_net) || 0
         const cogs = Number(pnl.cogs) || 0
         const labor = Number(pnl.labor) || 0
         const opex = Number(pnl.opex) || 0

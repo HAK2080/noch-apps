@@ -116,12 +116,12 @@ test('management report exposes a reconciled operating-profit model', () => {
       completeSource('payments', [{
         order_count: 20,
         completed_sales: 1050,
-        cash_collected: 400,
-        card_collected: 500,
-        presto_collected: 150,
-        other_collected: 0,
-        refunds: 50,
-        net_sales: 1000,
+        period_cash_movement: 400,
+        period_card_movement: 500,
+        period_presto_movement: 100,
+        period_other_movement: 0,
+        period_refunds: 50,
+        period_net_tender_movement: 1000,
         latest_order_at: '2026-07-30T20:00:00.000Z',
       }]),
       completeSource('inventory', [{
@@ -151,6 +151,8 @@ test('management report exposes a reconciled operating-profit model', () => {
   assert.equal(report.metrics.revenueChangePct, 25)
   assert.equal(report.payments.reconciliationStatus, 'reconciled')
   assert.equal(report.payments.cashCollected, 400)
+  assert.equal(report.payments.cardCollected, 500)
+  assert.equal(report.payments.netSales, 1000)
   assert.equal(report.branchPerformance.reconciliation.status, 'reconciled')
   assert.equal(report.metrics.lowStockCount, 1)
   assert.equal(report.stockRisk[0].theoreticalQty, 2)
@@ -227,8 +229,8 @@ test('corporate unallocated costs are a visible balancing row, not a hidden bran
     optionalSources: [
       completeSource('payments', [{
         completed_sales: 1000,
-        cash_collected: 1000,
-        net_sales: 1000,
+        period_cash_movement: 1000,
+        period_net_tender_movement: 1000,
       }]),
       completeSource('inventory'),
       completeSource('expenses'),

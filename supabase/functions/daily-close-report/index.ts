@@ -17,13 +17,16 @@ type Report = {
   branch_name: string
   day: string
   orders: number
-  gross: number
+  completed_sales: number
+  net_sales: number
   cash: number
   card: number
-  split: number
+  presto: number
+  other: number
   refunds: number
-  last_week_gross: number
-  gross_change_pct: number | null
+  order_tender_variance: number
+  last_week_net_sales: number | null
+  net_change_pct: number | null
   top_products: Array<{ name: string; qty: number }>
   stamps: number
   snapped_expenses: number
@@ -40,17 +43,20 @@ function money(value: number) {
 }
 
 function render(report: Report) {
-  const comparison = report.gross_change_pct == null
+  const comparison = report.net_change_pct == null
     ? 'No same-day comparison last week'
-    : `${report.gross_change_pct >= 0 ? '▲' : '▼'} ${Math.abs(report.gross_change_pct)}% vs last week`
+    : `${report.net_change_pct >= 0 ? '▲' : '▼'} ${Math.abs(report.net_change_pct)}% vs last week`
   const products = report.top_products?.length
     ? report.top_products.map((item, index) => `${index + 1}. ${item.name} — ${item.qty}`).join('\n')
     : 'No product sales'
 
   return `*${report.branch_name} — Daily close*\n${report.day}\n\n` +
-    `Gross: *${money(report.gross)} LYD* (${report.orders} orders)\n` +
-    `Cash ${money(report.cash)} · Card ${money(report.card)} · Split ${money(report.split)}\n` +
-    `Refunds ${money(report.refunds)}\n${comparison}\n\n` +
+    `Net sales: *${money(report.net_sales)} LYD* (${report.orders} orders)\n` +
+    `Cash net ${money(report.cash)} · Card net ${money(report.card)}\n` +
+    `Before refunds ${money(report.completed_sales)} · Refunds ${money(report.refunds)}\n` +
+    (Math.abs(Number(report.order_tender_variance || 0)) > 0.01
+      ? `⚠️ Order/payment difference ${money(report.order_tender_variance)}\n` : '') +
+    `${comparison}\n\n` +
     `*Top products*\n${products}\n\n` +
     `Loyalty stamps: ${report.stamps}\nReceipts snapped: ${report.snapped_expenses}`
 }

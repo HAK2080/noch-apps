@@ -705,7 +705,7 @@ export async function getSalesByBarista(branchId, fromIso, toIso) {
 // ── Business day (trading day) helpers ──────────────────────────────
 // The cafes trade 9 AM → ~1 AM next day. A "business day" runs 5 AM → 5 AM
 // local (Africa/Tripoli), so post-midnight sales belong to the evening's
-// trading day. MUST stay in sync with the pos_sales_daily view
+// trading day. MUST stay in sync with the reconciled daily sales view
 // (migration 20260717120000_business_day_sales.sql).
 const pad2 = n => String(n).padStart(2, '0')
 export function localYmd(d = new Date()) {
@@ -725,7 +725,7 @@ export function businessToday() {
 // column is a business day — 5 AM to 5 AM, see helpers above).
 export async function getDailySalesRange(branchId, fromDate, toDate) {
   const { data, error } = await supabase
-    .from('pos_sales_daily')
+    .from('pos_sales_daily_reconciled')
     .select('*')
     .eq('branch_id', branchId)
     .gte('day', String(fromDate).slice(0, 10))

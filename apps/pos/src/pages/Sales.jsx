@@ -2,9 +2,8 @@
 // then drill into Orders or Sessions views.
 // Route: /sales
 //
-// Figures come from the pos_sales_daily view, which buckets by BUSINESS day
-// (5 AM → 5 AM Africa/Tripoli) so post-midnight sales count toward the
-// evening's trading day.
+// Figures come from POS sales control, which buckets by BUSINESS day
+// (5 AM → 5 AM Africa/Tripoli) and reconciles signed payment events.
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'

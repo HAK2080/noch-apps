@@ -82,7 +82,7 @@ export async function getManagementReport({
     ),
     loadOptionalSource(
       'payments',
-      supabase.rpc('finance_payment_reconciliation', {
+      supabase.rpc('pos_sales_control_summary', {
         p_branch_id: branchId,
         p_from: from,
         p_to: to,

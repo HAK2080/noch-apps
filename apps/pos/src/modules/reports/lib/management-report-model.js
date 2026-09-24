@@ -130,18 +130,18 @@ function normalizePayments(source, financeNetSales) {
   }
 
   const row = source.rows?.[0] || {}
-  const paymentNetSales = money(row.net_sales)
+  const paymentNetSales = money(row.period_net_tender_movement)
   const variance = paymentNetSales - financeNetSales
 
   return {
     status: 'complete',
     orderCount: money(row.order_count),
     completedSales: money(row.completed_sales),
-    cashCollected: money(row.cash_collected),
-    cardCollected: money(row.card_collected),
-    prestoCollected: money(row.presto_collected),
-    otherCollected: money(row.other_collected),
-    refunds: money(row.refunds),
+    cashCollected: money(row.period_cash_movement),
+    cardCollected: money(row.period_card_movement),
+    prestoCollected: money(row.period_presto_movement),
+    otherCollected: money(row.period_other_movement),
+    refunds: money(row.period_refunds),
     netSales: paymentNetSales,
     financeNetSales,
     variance,

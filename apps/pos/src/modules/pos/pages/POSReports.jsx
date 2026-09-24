@@ -2,7 +2,7 @@
 // Route: /pos/:branchId/reports
 // Range presets (today/week/month/custom) + summary KPIs + by-product
 // + by-barista. Backed by:
-//   - pos_sales_daily view (totals by day, by payment method)
+//   - pos_sales_daily_reconciled view (POS closing totals by business day)
 //   - pos_sales_by_product RPC
 //   - pos_sales_by_barista RPC
 
@@ -276,17 +276,18 @@ export default function POSReports() {
   }, [branchId, fromDate, toDate])
 
   const totals = useMemo(() => {
-    const acc = { orders: 0, gross: 0, discounts: 0, cash: 0, card: 0, split: 0, presto: 0, refunds: 0, voided: 0 }
+    const acc = { orders: 0, gross: 0, net: 0, discounts: 0, cash: 0, card: 0, presto: 0, other: 0, refunds: 0, variance: 0 }
     for (const row of daily) {
       acc.orders += Number(row.orders) || 0
-      acc.gross  += Number(row.gross)  || 0
+      acc.gross  += Number(row.completed_sales) || 0
+      acc.net    += Number(row.net_sales) || 0
       acc.discounts += Number(row.discounts) || 0
-      acc.cash   += Number(row.cash_sales)  || 0
-      acc.card   += Number(row.card_sales)  || 0
-      acc.split  += Number(row.split_sales) || 0
-      acc.presto += Number(row.presto_sales) || 0
-      acc.refunds += Number(row.refunds) || 0
-      acc.voided += Number(row.voided) || 0
+      acc.cash   += Number(row.cash_net) || 0
+      acc.card   += Number(row.card_net) || 0
+      acc.presto += Number(row.presto_net) || 0
+      acc.other  += Number(row.other_net) || 0
+      acc.refunds += Number(row.period_refunds) || 0
+      acc.variance += Number(row.order_tender_variance) || 0
     }
     return acc
   }, [daily])
@@ -366,18 +367,19 @@ export default function POSReports() {
             <p className="text-noch-muted text-sm">{branch?.name}</p>
           </div>
           <ExportButtons onCsv={() => downloadCsv(`sales_${branch?.name || 'branch'}_${fromDate}_${toDate}`,
-            ['Day', 'Orders', 'Gross (LYD)', 'Discounts', 'Cash', 'Card', 'Split', 'Presto', 'Refunds', 'Voided'],
+            ['Day', 'Orders', 'Net sales (LYD)', 'Completed sales', 'Discounts', 'Cash net', 'Card net', 'Presto net', 'Other net', 'Refunds', 'Order/payment difference'],
             daily.map(d => [
               d.day,
               d.orders,
-              Number(d.gross || 0).toFixed(2),
+              Number(d.net_sales || 0).toFixed(2),
+              Number(d.completed_sales || 0).toFixed(2),
               Number(d.discounts || 0).toFixed(2),
-              Number(d.cash_sales || 0).toFixed(2),
-              Number(d.card_sales || 0).toFixed(2),
-              Number(d.split_sales || 0).toFixed(2),
-              Number(d.presto_sales || 0).toFixed(2),
-              Number(d.refunds || 0).toFixed(2),
-              Number(d.voided || 0).toFixed(2),
+              Number(d.cash_net || 0).toFixed(2),
+              Number(d.card_net || 0).toFixed(2),
+              Number(d.presto_net || 0).toFixed(2),
+              Number(d.other_net || 0).toFixed(2),
+              Number(d.period_refunds || 0).toFixed(2),
+              Number(d.order_tender_variance || 0).toFixed(2),
             ]))} />
         </div>
 
@@ -431,15 +433,16 @@ export default function POSReports() {
           <>
             {/* KPIs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-              <StatCard label="Gross sales" value={`${formatAmount(totals.gross)} LYD`} sub={`${totals.orders.toLocaleString('en-US')} orders`} icon={TrendingUp} />
-              <StatCard label="Cash" value={formatAmount(totals.cash)} icon={ShoppingCart} color="text-yellow-400" />
-              <StatCard label="Card" value={formatAmount(totals.card)} icon={ShoppingCart} color="text-blue-400" />
-              <StatCard label="Split" value={formatAmount(totals.split)} icon={ShoppingCart} color="text-cyan-400" />
+              <StatCard label="Net sales" value={`${formatAmount(totals.net)} LYD`} sub={`${totals.orders.toLocaleString('en-US')} orders · 05:00 business day`} icon={TrendingUp} />
+              <StatCard label="Before refunds" value={formatAmount(totals.gross)} icon={TrendingUp} />
+              <StatCard label="Cash net" value={formatAmount(totals.cash)} icon={ShoppingCart} color="text-yellow-400" />
+              <StatCard label="Card net" value={formatAmount(totals.card)} icon={ShoppingCart} color="text-blue-400" />
               {totals.presto > 0 && <StatCard label="Presto" value={formatAmount(totals.presto)} icon={ShoppingCart} color="text-purple-400" />}
+              {totals.other !== 0 && <StatCard label="Other" value={formatAmount(totals.other)} icon={ShoppingCart} color="text-cyan-400" />}
               <StatCard label="Refunds" value={formatAmount(totals.refunds)} color="text-red-400" />
               <StatCard label="Discounts" value={formatAmount(totals.discounts)} color="text-yellow-400" />
-              <StatCard label="Cancelled" value={formatAmount(totals.voided)} color="text-red-400" />
-              <StatCard label="Avg ticket" value={totals.orders ? formatAmount(totals.gross / totals.orders) : '—'} />
+              {Math.abs(totals.variance) > 0.01 && <StatCard label="Order/payment difference" value={formatAmount(totals.variance)} color="text-red-400" />}
+              <StatCard label="Avg ticket" value={totals.orders ? formatAmount(totals.net / totals.orders) : '—'} />
               <StatCard label="Days" value={daily.length} />
             </div>
 
@@ -455,12 +458,14 @@ export default function POSReports() {
                       <tr className="text-noch-muted">
                         <th className="text-left py-1">Day</th>
                         <th className="text-right py-1">Orders</th>
-                        <th className="text-right py-1">Gross</th>
-                        <th className="text-right py-1">Cash</th>
-                        <th className="text-right py-1">Card</th>
-                        <th className="text-right py-1">Split</th>
+                        <th className="text-right py-1">Net sales</th>
+                        <th className="text-right py-1">Before refunds</th>
+                        <th className="text-right py-1">Cash net</th>
+                        <th className="text-right py-1">Card net</th>
                         <th className="text-right py-1">Presto</th>
+                        <th className="text-right py-1">Other</th>
                         <th className="text-right py-1">Refunds</th>
+                        <th className="text-right py-1">Difference</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -468,12 +473,14 @@ export default function POSReports() {
                         <tr key={d.day} className="border-t border-noch-border/40">
                           <td className="py-1 text-white">{d.day}</td>
                           <td className="py-1 text-right text-white">{d.orders}</td>
-                          <td className="py-1 text-right text-noch-green">{formatAmount(d.gross)}</td>
-                          <td className="py-1 text-right text-yellow-400">{formatAmount(d.cash_sales)}</td>
-                          <td className="py-1 text-right text-blue-400">{formatAmount(d.card_sales)}</td>
-                          <td className="py-1 text-right text-cyan-400">{formatAmount(d.split_sales)}</td>
-                          <td className="py-1 text-right text-purple-400">{formatAmount(d.presto_sales)}</td>
-                          <td className="py-1 text-right text-red-400">{formatAmount(d.refunds)}</td>
+                          <td className="py-1 text-right text-noch-green">{formatAmount(d.net_sales)}</td>
+                          <td className="py-1 text-right text-white">{formatAmount(d.completed_sales)}</td>
+                          <td className="py-1 text-right text-yellow-400">{formatAmount(d.cash_net)}</td>
+                          <td className="py-1 text-right text-blue-400">{formatAmount(d.card_net)}</td>
+                          <td className="py-1 text-right text-purple-400">{formatAmount(d.presto_net)}</td>
+                          <td className="py-1 text-right text-cyan-400">{formatAmount(d.other_net)}</td>
+                          <td className="py-1 text-right text-red-400">{formatAmount(d.period_refunds)}</td>
+                          <td className={`py-1 text-right ${Math.abs(Number(d.order_tender_variance)) > 0.01 ? 'text-red-400' : 'text-noch-muted'}`}>{formatAmount(d.order_tender_variance)}</td>
                         </tr>
                       ))}
                     </tbody>
