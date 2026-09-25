@@ -62,6 +62,20 @@ test('unreadable receipt retains cash default after amount entry', async () => {
   assert.equal(s.expenses[0].payment_method_reported,'cash')
 })
 
+test('receipt scan does not silently book an AI-invented old year', async () => {
+  const s = scanner()
+  const reference = new Date('2026-09-20T23:30:00Z')
+  assert.equal(s.context.resolveReceiptExpenseDate('2019-09-19', reference).date, '2026-09-21')
+  assert.equal(s.context.resolveReceiptExpenseDate('2026-09-19', reference).needsReview, false)
+  assert.equal(s.context.resolveReceiptExpenseDate('2026-02-30', reference).needsReview, true)
+  await photo(s)
+  s.snap.extracted.expense_date = '2019-09-19'
+  await finalize(s)
+  assert.notEqual(s.expenses[0].expense_date, '2019-09-19')
+  assert.match(s.expenses[0].description, /تاريخ الفاتورة غير مؤكد/)
+  assert.equal(s.expenses[0].payment_status_reported, 'paid')
+})
+
 test('manual unpaid and card overrides persist, including changing an earlier choice', async () => {
   for (const [status,method] of [['unpaid',null],['paid','card']]) {
     const s = scanner()

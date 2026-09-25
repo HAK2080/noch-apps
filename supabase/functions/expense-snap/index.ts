@@ -248,6 +248,19 @@ async function loadCostCenters() {
   );
 }
 
+function resolveReceiptExpenseDate(value: unknown, now = new Date()) {
+  const entryDate = now.toLocaleDateString("sv-SE", { timeZone: "Africa/Tripoli" });
+  const date = typeof value === "string" ? value.trim() : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { date: entryDate, needsReview: true };
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    return { date: entryDate, needsReview: true };
+  }
+  const ageDays = (Date.parse(`${entryDate}T00:00:00Z`) - parsed.getTime()) / 86400000;
+  if (ageDays > 366 || ageDays < -7) return { date: entryDate, needsReview: true };
+  return { date, needsReview: false };
+}
+
 async function loadAllocationCenters(actor: RequestActor) {
   const centers = await loadCostCenters();
   if (!actor.internalTelegram) return centers;
@@ -308,7 +321,7 @@ Extract and return ONLY valid JSON (no markdown):
   "vendor": "who was paid (business/person name) or null",
   "amount": total amount as number or null,
   "currency": "LYD|USD|EUR|TRY|EGP|... (default LYD if unclear)",
-  "expense_date": "YYYY-MM-DD or null",
+  "expense_date": "YYYY-MM-DD only if the full year is legible on the receipt; otherwise null. Never infer a year from today's date or the invoice number",
   "description": "one short line: what was purchased",
   "category": "best match from: ${catNames.join(", ")}",
   "branch_hint": "best match from: ${ccList.map((c) => c.code + "=" + c.name).join(", ")} — code only, or null if no clue on the receipt/note",
@@ -529,6 +542,7 @@ async function actionFinalize(body: Record<string, unknown>, actor: RequestActor
   }
 
   // Amount may be 0 (unreadable) — still record; office fixes at review
+  const receiptDate = resolveReceiptExpenseDate(ex.expense_date);
   const groupId = parts.length > 1 ? crypto.randomUUID() : null;
   const rows = parts.map((p, i) => ({
     submitted_by: snap.submitted_by,
@@ -544,9 +558,11 @@ async function actionFinalize(body: Record<string, unknown>, actor: RequestActor
       groupId ? `(split ${i + 1}/${parts.length})` : null,
       totalAmount === 0 ? "[AMOUNT MISSING — fill at review]" : null,
       ex.confidence === "low" ? "[AI low confidence — verify]" : null,
+      snap.receipt_url && receiptDate.needsReview ? "[تاريخ الفاتورة غير مؤكد — استُخدم تاريخ الإدخال؛ راجع الصورة]" : null,
     ].filter(Boolean).join(" "),
     receipt_url: snap.receipt_url,
-    expense_date: ex.expense_date || new Date().toISOString().slice(0, 10),
+    expense_date: snap.receipt_url ? receiptDate.date
+      : (ex.expense_date || receiptDate.date),
     status: "pending",
     payment_status_reported: paymentStatus,
     payment_method_reported: paymentStatus === "paid"
