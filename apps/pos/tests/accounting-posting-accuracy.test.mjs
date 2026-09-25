@@ -5,6 +5,7 @@ import { PGlite } from '@electric-sql/pglite'
 
 const db = new PGlite()
 const migration = await fs.readFile(new URL('../../../supabase/migrations/20260912180000_accounting_posting_accuracy.sql', import.meta.url), 'utf8')
+const businessDayMigration = await fs.readFile(new URL('../../../supabase/migrations/20260925120000_gl_business_day_posting.sql', import.meta.url), 'utf8')
 const rows = async (sql) => (await db.query(sql)).rows
 
 before(async () => {
@@ -35,6 +36,7 @@ before(async () => {
     create function gl_account_for_expense_name(p_name text) returns uuid language sql stable as $$select coalesce(gl_acct(case when p_name ilike 'rent%' then 'expense_rent' else 'expense_other_opex' end),gl_acct('expense_other_opex'))$$;
   `)
   await db.exec(migration)
+  await db.exec(businessDayMigration)
 })
 
 after(async () => db.close())
@@ -57,6 +59,50 @@ test('sales and dated card refund produce separate balanced immutable batches', 
   assert.deepEqual(totals.map(x => [x.journal_date.toISOString().slice(0,10),Number(x.total_debit),Number(x.total_credit)]), [['2026-09-01',140,140],['2026-09-02',20,20]])
   const [again] = await rows("select gl_post_sales_day('2026-09-01','00000000-0000-0000-0000-000000000001') id")
   assert.equal(again.id,sale.id)
+})
+
+test('sales either side of 05:00 Tripoli post to the correct business days', async () => {
+  await db.exec(`
+    insert into pos_branches values('00000000-0000-0000-0000-000000000021',true);
+    insert into pos_orders values
+      ('00000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000021','completed',10,0,10),
+      ('00000000-0000-0000-0000-000000000023','00000000-0000-0000-0000-000000000021','completed',20,0,20);
+    insert into pos_tender_events(branch_id,order_id,event_type,tender_type,signed_amount_lyd,occurred_at) values
+      ('00000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000022','sale','cash',10,'2026-09-03 04:59+02'),
+      ('00000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000023','sale','card',20,'2026-09-03 05:00+02'),
+      ('00000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000023','refund','card',-5,'2026-09-04 04:59+02');
+  `)
+  const [before] = await rows("select gl_post_sales_day('2026-09-02','00000000-0000-0000-0000-000000000021') id")
+  const [after] = await rows("select gl_post_sales_day('2026-09-03','00000000-0000-0000-0000-000000000021') id")
+  const journals = await rows(`
+    select b.journal_date, a.code, l.debit_lyd, l.credit_lyd
+    from gl_journal_batches b
+    join gl_journal_lines l on l.batch_id=b.id
+    join gl_accounts a on a.id=l.account_id
+    where b.id in ('${before.id}','${after.id}') and a.code in ('1010','1020')
+    order by b.journal_date
+  `)
+  assert.deepEqual(journals.map(x => [x.journal_date.toISOString().slice(0,10),x.code,Number(x.debit_lyd)]), [
+    ['2026-09-02','1010',10],
+    ['2026-09-03','1020',15],
+  ])
+  const [refund] = await rows(`select l.debit_lyd from gl_journal_lines l join gl_accounts a on a.id=l.account_id where l.batch_id='${after.id}' and a.code='4095'`)
+  assert.equal(Number(refund.debit_lyd),5)
+  const [settings] = await rows("select auto_post_enabled, last_synced_date from gl_settings where id='default'")
+  assert.equal(settings.auto_post_enabled,false)
+  assert.equal(settings.last_synced_date,null)
+})
+
+test('nightly posting waits until the 05:00 business-day boundary', async () => {
+  const dates = await rows(`
+    select
+      gl_last_closed_business_day('2026-09-25 04:59+02') before_cutoff,
+      gl_last_closed_business_day('2026-09-25 05:00+02') after_cutoff
+  `)
+  assert.deepEqual([
+    dates[0].before_cutoff.toISOString().slice(0,10),
+    dates[0].after_cutoff.toISOString().slice(0,10),
+  ], ['2026-09-23','2026-09-24'])
 })
 
 test('paid bank expense posts on payment date; approved unpaid expense does not post', async () => {
