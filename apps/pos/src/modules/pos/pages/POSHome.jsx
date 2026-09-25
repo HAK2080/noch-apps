@@ -15,6 +15,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import Layout from '../../../components/Layout'
 import { isKioskMode } from '../lib/pos-kiosk'
 import { cacheBranchConfig, getCachedBranchConfig, isOnline, withPOSNetworkTimeout } from '../lib/pos-offline'
+import { shiftNeedsReview } from '../lib/shift-age'
 import toast from 'react-hot-toast'
 
 const BRANCH_LIST_CACHE_KEY = '__branch-list__'
@@ -83,14 +84,24 @@ function BranchCard({ branch, onOpen, onSelect, onWaste, onStatusChange, canMana
         {loading ? (
           <p className="text-noch-muted text-xs">{copy('Loading shift…', 'جارٍ تحميل الوردية…')}</p>
         ) : shiftError ? <button className="btn-secondary text-sm" onClick={e => { e.stopPropagation(); setLoading(true); setShiftError(false); setRetry(value => value + 1) }}>{copy('Could not check shift — retry', 'تعذر التحقق من الوردية — أعد المحاولة')}</button> : shift ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-noch-green text-sm">
-              <Clock size={12} />
-              <span>{copy('Shift open', 'الوردية مفتوحة')}</span>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-noch-green text-sm">
+                <Clock size={12} />
+                <span>{copy('Shift open', 'الوردية مفتوحة')}</span>
+              </div>
+              <span className="text-noch-muted text-xs">
+                {new Date(shift.opened_at).toLocaleString(copy('en-GB', 'ar-LY'), {
+                  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+              </span>
             </div>
-            <span className="text-noch-muted text-xs">
-              {new Date(shift.opened_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-            </span>
+            {shiftNeedsReview(shift.opened_at) && (
+              <p role="alert" className="mt-2 flex items-start gap-1.5 text-amber-300 text-xs">
+                <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                {copy('Shift open over 18 hours. Close and reconcile it before the next shift.', 'الوردية مفتوحة منذ أكثر من ١٨ ساعة. أقفلها وطابق المبيعات قبل الوردية التالية.')}
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-between">
