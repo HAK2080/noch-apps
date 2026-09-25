@@ -197,6 +197,27 @@ test('unavailable optional sources stay unavailable instead of becoming zero', (
   )
 })
 
+test('management report flags historical cost estimates separately from missing costs', () => {
+  const report = buildManagementReport({
+    period,
+    currentPnl: {
+      shared_costs_allocated: 0,
+      net_contribution_before_shared: 0,
+      data_quality: {
+        missing_product_cost_count: 0,
+        unverified_historical_cost_items: 3,
+        unverified_historical_modifier_cost_items: 2,
+      },
+    },
+    previousPnl: { shared_costs_allocated: 0, net_contribution_before_shared: 0 },
+    optionalSources: ['payments', 'inventory', 'expenses', 'loyalty', 'messaging'].map(id => completeSource(id)),
+  })
+  const issue = report.completeness.issues.find(item => item.id === 'historical_cost_estimate')
+  assert.ok(issue)
+  assert.match(issue.detail, /5 older sale line/)
+  assert.equal(report.completeness.issues.some(item => item.id === 'missing_product_costs'), false)
+})
+
 test('corporate unallocated costs are a visible balancing row, not a hidden branch variance', () => {
   const report = buildManagementReport({
     period,

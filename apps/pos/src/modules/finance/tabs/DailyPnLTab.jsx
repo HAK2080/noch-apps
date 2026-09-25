@@ -178,6 +178,10 @@ export default function DailyPnLTab() {
             {pnl.data_quality.missing_product_cost_count} sold product(s) missing cost
           </span>
         )}
+        {(Number(pnl.data_quality?.unverified_historical_cost_items || 0)
+          + Number(pnl.data_quality?.unverified_historical_modifier_cost_items || 0)) > 0 && (
+          <span className="text-yellow-300">Older sales use estimated costs</span>
+        )}
         {Number(pnl.data_quality?.unallocated_expense_count || 0) > 0 && (
           <span className="text-yellow-300">
             {pnl.data_quality.unallocated_expense_count} unallocated expense(s)

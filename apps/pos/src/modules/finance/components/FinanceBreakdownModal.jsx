@@ -182,7 +182,7 @@ function CogsSection({ pnl, matrix, branchName }) {
         </p>
       )}
       <p className="text-noch-muted text-[11px] mt-2">
-        COGS uses current product costs (cost_lyd) — editing a cost rewrites history.
+        New sales keep their product and modifier costs at payment. Older sales without a cost snapshot still use current costs, so their historical profit can change.
         {branchName ? ` Branch: ${branchName}.` : ''}
       </p>
     </>

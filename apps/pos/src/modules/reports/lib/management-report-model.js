@@ -292,6 +292,16 @@ function buildCompleteness({
       detail: `${money(quality.missing_product_cost_count)} sold product(s) have no cost, so COGS and profit are understated.`,
     })
   }
+  const unverifiedCostRows = money(quality.unverified_historical_cost_items)
+    + money(quality.unverified_historical_modifier_cost_items)
+  if (unverifiedCostRows > 0) {
+    issues.push({
+      id: 'historical_cost_estimate',
+      severity: 'warn',
+      title: 'Older product costs are estimates',
+      detail: `${unverifiedCostRows} older sale line(s) have no cost snapshot and use today's cost. Historical profit may change.`,
+    })
+  }
   if (money(quality.unallocated_expense_count) > 0) {
     issues.push({
       id: 'unallocated_expenses',

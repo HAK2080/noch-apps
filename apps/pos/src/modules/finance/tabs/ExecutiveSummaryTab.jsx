@@ -60,12 +60,15 @@ export default function ExecutiveSummaryTab() {
   const rows = summary?.branches || []
   const reconciliation = summary?.reconciliation
   const dataQuality = total?.dataQuality || {}
+  const legacyCostRows = Number(dataQuality.unverified_historical_cost_items || 0)
+    + Number(dataQuality.unverified_historical_modifier_cost_items || 0)
   const statusCounts = rows.reduce((accumulator, row) => {
     accumulator[row.status] = (accumulator[row.status] || 0) + 1
     return accumulator
   }, {})
   const attentionRows = rows.filter(row => !['healthy', 'pre_opening'].includes(row.status))
   const hasCompletenessIssue = Number(dataQuality.missing_product_cost_count || 0) > 0
+    || legacyCostRows > 0
     || Number(dataQuality.unallocated_expense_count || 0) > 0
     || reconciliation?.status === 'warning'
 
@@ -128,6 +131,9 @@ export default function ExecutiveSummaryTab() {
           <div className="space-y-1 text-noch-muted text-xs">
             {Number(dataQuality.missing_product_cost_count || 0) > 0 && (
               <p>{dataQuality.missing_product_cost_count} sold product(s) have no cost; COGS and profit are understated.</p>
+            )}
+            {legacyCostRows > 0 && (
+              <p>{legacyCostRows} older sale line(s) have no cost snapshot; their profit uses today's cost estimate.</p>
             )}
             {Number(dataQuality.unallocated_expense_count || 0) > 0 && (
               <p>{dataQuality.unallocated_expense_count} approved expense(s) are consolidated-only until assigned to a cost center.</p>

@@ -6,6 +6,8 @@ import { PGlite } from '@electric-sql/pglite'
 const db = new PGlite()
 const migration = await fs.readFile(new URL('../../../supabase/migrations/20260912180000_accounting_posting_accuracy.sql', import.meta.url), 'utf8')
 const businessDayMigration = await fs.readFile(new URL('../../../supabase/migrations/20260925120000_gl_business_day_posting.sql', import.meta.url), 'utf8')
+const costSnapshotMigration = await fs.readFile(new URL('../../../supabase/migrations/20260925130000_order_cost_at_sale.sql', import.meta.url), 'utf8')
+const snapshottedGlMigration = await fs.readFile(new URL('../../../supabase/migrations/20260925150000_gl_snapshotted_cogs.sql', import.meta.url), 'utf8')
 const rows = async (sql) => (await db.query(sql)).rows
 
 before(async () => {
@@ -24,6 +26,8 @@ before(async () => {
     create table pos_orders(id uuid primary key,branch_id uuid,status text,subtotal numeric,discount_amount numeric,total numeric);
     create table pos_products(id uuid primary key,cost_lyd numeric);
     create table pos_order_items(id uuid primary key,order_id uuid,product_id uuid,quantity numeric);
+    create table pos_modifiers(id uuid primary key,cost_delta_lyd numeric);
+    create table pos_order_item_modifiers(id uuid primary key,order_item_id uuid,modifier_id uuid);
     create table pos_tender_events(id uuid primary key default gen_random_uuid(),branch_id uuid,order_id uuid,event_type text,tender_type text,signed_amount_lyd numeric,occurred_at timestamptz);
     create table expense_categories(id uuid primary key,name text);
     create table expense_entries(id uuid primary key,amount_lyd numeric,paid_at date,branch_id uuid,category text,vendor text,notes text,status text);
@@ -37,6 +41,8 @@ before(async () => {
   `)
   await db.exec(migration)
   await db.exec(businessDayMigration)
+  await db.exec(costSnapshotMigration)
+  await db.exec(snapshottedGlMigration)
 })
 
 after(async () => db.close())
@@ -45,8 +51,12 @@ test('sales and dated card refund produce separate balanced immutable batches', 
   await db.exec(`
     insert into pos_branches values('00000000-0000-0000-0000-000000000001',true);
     insert into pos_products values('00000000-0000-0000-0000-000000000002',20);
+    insert into pos_modifiers values('00000000-0000-0000-0000-000000000006',3);
     insert into pos_orders values('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','completed',100,10,90);
     insert into pos_order_items values('00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000002',2);
+    insert into pos_order_item_modifiers values('00000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000006');
+    update pos_products set cost_lyd=30 where id='00000000-0000-0000-0000-000000000002';
+    update pos_modifiers set cost_delta_lyd=5 where id='00000000-0000-0000-0000-000000000006';
     insert into pos_tender_events(branch_id,order_id,event_type,tender_type,signed_amount_lyd,occurred_at) values
       ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','sale','cash',40,'2026-09-01 10:00+02'),
       ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','sale','card',50,'2026-09-01 10:00+02'),
@@ -56,7 +66,7 @@ test('sales and dated card refund produce separate balanced immutable batches', 
   const [refund] = await rows("select gl_post_sales_day('2026-09-02','00000000-0000-0000-0000-000000000001') id")
   assert.notEqual(sale.id, refund.id)
   const totals = await rows(`select journal_date,total_debit,total_credit from gl_journal_batches order by journal_date`)
-  assert.deepEqual(totals.map(x => [x.journal_date.toISOString().slice(0,10),Number(x.total_debit),Number(x.total_credit)]), [['2026-09-01',140,140],['2026-09-02',20,20]])
+  assert.deepEqual(totals.map(x => [x.journal_date.toISOString().slice(0,10),Number(x.total_debit),Number(x.total_credit)]), [['2026-09-01',146,146],['2026-09-02',20,20]])
   const [again] = await rows("select gl_post_sales_day('2026-09-01','00000000-0000-0000-0000-000000000001') id")
   assert.equal(again.id,sale.id)
 })
