@@ -10,6 +10,11 @@ import nochLogo from '../../assets/noch-logo-menu.webp'
 import './styles/Menu.css'
 
 // ── Category icon helpers ────────────────────────────────────────────────────
+function categoryCustomerLabel(category, lang) {
+  if (lang === 'ar') return category.customer_menu_name_ar || category.name_ar || category.customer_menu_name || category.name
+  return category.customer_menu_name || category.name
+}
+
 function MatchaIcedIcon({ size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'inline-block', verticalAlign: '-3px' }}>
@@ -524,7 +529,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
 
 // ── Category section wrapper ─────────────────────────────────────────────────
 function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, currency, catColorMap, lang, onViewAll, onOpenDetail, expanded, priorityImages = false }) {
-  const catLabel = lang === 'ar' && cat.name_ar ? cat.name_ar : cat.name
+  const catLabel = categoryCustomerLabel(cat, lang)
   const col = catColorMap[cat.id] || CARD_COLORS[0]
   const baseStyle = cat.menu_display_style || 'scroll'
   const koreaEdition = isKoreaEditionCategory(cat)
@@ -664,7 +669,7 @@ function ProductDetailModal({ p, qty, onAdd, onRemove, onClose, name_, currency,
 
 // ── Main page ────────────────────────────────────────────────────────────────
 const BRANCH_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MENU_CACHE_VERSION = 2
+const MENU_CACHE_VERSION = 3
 const MENU_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000
 
 function readCachedMenu(branchParam) {
@@ -760,7 +765,7 @@ export default function Menu() {
       setBranchId(id)
       const [{ data: cats, error: ce }, { data: prods, error: pe }] = await Promise.all([
         supabase.from('pos_categories')
-          .select('id, name, name_ar, color, image_url, sort_order, menu_display_style, show_on_website')
+          .select('id, name, name_ar, customer_menu_name, customer_menu_name_ar, color, image_url, sort_order, menu_display_style, show_on_website')
           .eq('is_active', true)
           .eq('show_on_website', true)
           .or(`visible_branch_ids.cs.{${id}},branch_id.eq.${id}`)
@@ -982,7 +987,7 @@ export default function Menu() {
           🍽️&nbsp;{t('All', 'الكل')}
         </button>
         {categories.map(c => {
-          const label = lang === 'ar' && c.name_ar ? c.name_ar : c.name
+          const label = categoryCustomerLabel(c, lang)
           return (
             <button
               key={c.id}

@@ -663,6 +663,8 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
   const isEdit = !!category
   const [name, setName] = useState(category?.name || '')
   const [nameAr, setNameAr] = useState(category?.name_ar || '')
+  const [customerMenuName, setCustomerMenuName] = useState(category?.customer_menu_name || '')
+  const [customerMenuNameAr, setCustomerMenuNameAr] = useState(category?.customer_menu_name_ar || '')
   const [color, setColor] = useState(category?.color || '#10b981')
   const [imageUrl, setImageUrl] = useState(category?.image_url || '')
   const [showInPos, setShowInPos] = useState(category?.show_in_pos ?? true)
@@ -699,7 +701,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
     if (!name) return toast.error('Name required')
     setSaving(true)
     try {
-      const payload = { name, name_ar: nameAr, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, show_in_online_store: showInOnlineStore, visible_branch_ids: visibleBranchIds, menu_display_style: menuDisplayStyle }
+      const payload = { name, name_ar: nameAr, customer_menu_name: customerMenuName.trim() || null, customer_menu_name_ar: customerMenuNameAr.trim() || null, color, image_url: imageUrl || null, show_in_pos: showInPos, show_on_website: showOnWebsite, show_in_online_store: showInOnlineStore, visible_branch_ids: visibleBranchIds, menu_display_style: menuDisplayStyle }
       if (isEdit) {
         await updatePOSCategory(category.id, payload)
         toast.success('Category updated')
@@ -746,6 +748,10 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
         <input value={name} onChange={e => setName(e.target.value)} className="input w-full mb-3" placeholder="Hot Drinks" />
         <label className="label block mb-1">Name (AR)</label>
         <input value={nameAr} onChange={e => setNameAr(e.target.value)} className="input w-full mb-3 text-right" dir="rtl" placeholder="المشروبات الساخنة" />
+        <label className="label block mb-1">Customer menu name (EN)</label>
+        <input value={customerMenuName} onChange={e => setCustomerMenuName(e.target.value)} className="input w-full mb-3" placeholder="Leave blank to use category name" />
+        <label className="label block mb-1">Customer menu name (AR)</label>
+        <input value={customerMenuNameAr} onChange={e => setCustomerMenuNameAr(e.target.value)} className="input w-full mb-3 text-right" dir="rtl" placeholder="اتركه فارغاً لاستخدام اسم التصنيف" />
         <label className="label block mb-1">Color</label>
         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-full h-10 rounded cursor-pointer mb-4" />
         {/* Customer menu layout style */}
