@@ -20,16 +20,17 @@ export default function PrintHostBadge({ branchId }) {
   if (!branchId || isPrintHost()) return null
 
   const online = !!host
-  const color = online ? 'bg-noch-green' : 'bg-red-500'
+  const ready = !!host?.printerConnected
+  const color = ready ? 'bg-noch-green' : 'bg-red-500'
   const msg = (key, values) => posMessage(key, savedPosLanguage(), values)
-  const label = msg(online ? 'Printer ready' : 'No host — prints will queue')
+  const label = msg(ready ? 'Printer ready' : online ? 'Host printer disconnected — prints will queue' : 'No host — prints will queue')
 
   return (
     <div
       className="fixed bottom-3 right-3 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-noch-card border border-noch-border shadow-lg"
       title={online ? msg('Host: {device}', { device: host?.deviceId?.slice(0, 16) || msg('connected') }) : msg('No print host detected on this branch')}
     >
-      <span className={`w-2 h-2 rounded-full ${color} ${online ? '' : 'animate-pulse'}`} />
+      <span className={`w-2 h-2 rounded-full ${color} ${ready ? '' : 'animate-pulse'}`} />
       <Printer size={12} className="text-noch-muted" />
       <span className="text-xs text-noch-muted">{label}</span>
     </div>

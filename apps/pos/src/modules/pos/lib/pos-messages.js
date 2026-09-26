@@ -156,6 +156,7 @@ export const POS_MESSAGES_AR = {
   'Cash drawer could not open': 'تعذر فتح درج النقد. تحقق من اتصال الطابعة.',
   'Scan for your Nochi Pass': 'امسح الرمز لعرض عضويتك في نوتشي',
   'Printer ready': 'الطابعة جاهزة',
+  'Host printer disconnected — prints will queue': 'جهاز الطباعة موجود لكن الطابعة غير متصلة — ستنتظر مهام الطباعة',
   'No host — prints will queue': 'جهاز الطباعة غير متصل — تم حفظ مهام الطباعة في الانتظار',
   'No print host detected on this branch': 'لا يوجد جهاز طباعة متصل في هذا الفرع',
   'Host: {device}': 'جهاز الطباعة: {device}',

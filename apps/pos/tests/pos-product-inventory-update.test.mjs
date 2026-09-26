@@ -48,7 +48,7 @@ test('manual stock adjustment is one audited database operation', async () => {
   )
 })
 
-test('product changes refresh shared-branch terminals and their offline cache', async () => {
+test('product changes update one branch product and keep its offline cache', async () => {
   const terminalSource = await readFile(terminalUrl, 'utf8')
   const realtimeSection = terminalSource.slice(
     terminalSource.indexOf('Keep product data live'),
@@ -56,6 +56,8 @@ test('product changes refresh shared-branch terminals and their offline cache', 
   )
 
   assert.doesNotMatch(realtimeSection, /filter:\s*`branch_id=eq\.\$\{branchId\}`/)
+  assert.match(realtimeSection, /getPOSProduct\(productId\)/)
   assert.match(realtimeSection, /getPOSProducts\(branchId\)/)
-  assert.match(realtimeSection, /cacheProducts\(branchId,\s*prods\)/)
+  assert.match(terminalSource, /cacheProducts\(branchId, products\)/)
+  assert.doesNotMatch(realtimeSection, /\}, refreshProducts\)/)
 })

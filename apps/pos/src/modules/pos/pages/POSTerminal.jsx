@@ -19,9 +19,9 @@ const BarcodeScanner = lazy(() => import('../components/BarcodeScanner'))
 // small component in the shell. Camera scanners remain lazy below.
 import ReceiptModal from '../components/ReceiptModal'
 import {
-  getPOSBranch, getPOSProducts, getPOSCategories,
+  getPOSBranch, getPOSProducts, getPOSCategories, getPOSProduct,
   getPOSProductByBarcode, createPOSOrder, getOpenShift,
-  setProductSoldOut, receiveProductStock, getAllModifierData, getModifierGroupsForProduct,
+  setProductSoldOut, receiveProductStock, getModifierGroupsForProduct,
 } from '../lib/pos-supabase'
 import { getPOSSettings } from '../lib/pos-settings'
 import { getGlobalStockPolicy, getSaleAvailability, applySaleAvailability } from '../lib/global-stock'
@@ -332,7 +332,15 @@ function POSTerminalContent() {
   const [showMore, setShowMore] = useState(false)
   const [modifierProduct, setModifierProduct] = useState(null)
   const [stockProduct, setStockProduct] = useState(null)
-  const [modifierData, setModifierData] = useState(null)
+  const modifierCache = useRef(new Map())
+  const modifierRequests = useRef(new Map())
+  const productsRef = useRef(products)
+  useEffect(() => { productsRef.current = products }, [products])
+  useEffect(() => {
+    if (!branchId || products.length === 0) return
+    const timer = setTimeout(() => cacheProducts(branchId, products).catch(() => {}), 500)
+    return () => clearTimeout(timer)
+  }, [branchId, products])
 
   // Load branch, products, categories
   useEffect(() => {
@@ -353,23 +361,22 @@ function POSTerminalContent() {
       if (cachedConfig?.shift !== undefined) setShift(cachedConfig.shift)
       if (cachedConfig?.settings) setSettings(cachedConfig.settings)
       if (cachedConfig?.modifier_groups_by_product) {
-        setModifierData({
-          groupsForProduct: productId => cachedConfig.modifier_groups_by_product[productId] || [],
-        })
+        for (const [productId, groups] of Object.entries(cachedConfig.modifier_groups_by_product)) {
+          modifierCache.current.set(productId, { groups, fetchedAt: 0 })
+        }
       }
       setLoading(false)
 
       if (!isOnline()) return
 
       const request = promise => withPOSNetworkTimeout(promise, 10000)
-      const [branchResult, shiftResult, settingsResult, productsResult, categoriesResult, modifiersResult] =
+      const [branchResult, shiftResult, settingsResult, productsResult, categoriesResult] =
         await Promise.allSettled([
           request(getPOSBranch(branchId)),
           request(getOpenShift(branchId)),
           request(getPOSSettings(branchId)),
           request(getPOSProducts(branchId)),
           request(getPOSCategories(branchId, { posOnly: true })),
-          request(getAllModifierData()),
         ])
 
       if (cancelled) return
@@ -379,33 +386,26 @@ function POSTerminalContent() {
       const st = valueOr(settingsResult, cachedConfig?.settings || null)
       const prods = valueOr(productsResult, cachedProds)
       const cats = valueOr(categoriesResult, cachedCats)
-      const modData = valueOr(modifiersResult, null)
 
       if (b) setBranch(b)
       setShift(s)
       if (st) setSettings(st)
       if (prods.length > 0) {
         setProducts(prods)
-        cacheProducts(branchId, prods).catch(() => {})
       }
       if (cats.length > 0) {
         setCategories(cats)
         cacheCategories(branchId, cats).catch(() => {})
       }
-      if (modData) setModifierData(modData)
-
-      const modifierGroupsByProduct = modData
-        ? Object.fromEntries(prods.map(product => [product.id, modData.groupsForProduct(product.id)]))
-        : cachedConfig?.modifier_groups_by_product
       cacheBranchConfig(branchId, {
         branch: b,
         shift: s,
         settings: st,
-        modifier_groups_by_product: modifierGroupsByProduct,
+        modifier_groups_by_product: cachedConfig?.modifier_groups_by_product || {},
       }).catch(() => {})
 
       const menuUnavailable = productsResult.status === 'rejected' && cachedProds.length === 0
-      const anyNetworkSuccess = [branchResult, shiftResult, productsResult, categoriesResult, modifiersResult]
+      const anyNetworkSuccess = [branchResult, shiftResult, productsResult, categoriesResult]
         .some(result => result.status === 'fulfilled')
       setOnline(anyNetworkSuccess)
       if (menuUnavailable) {
@@ -461,8 +461,9 @@ function POSTerminalContent() {
   // Keep product data live across POS devices and Telegram receipts. Product
   // rows can be shared through visible_branch_ids while their legacy
   // branch_id points elsewhere, so a branch_id Realtime filter misses valid
-  // updates. Refreshing the branch projection also keeps IndexedDB current.
+  // updates. Persist the resulting product list through the shared cache effect.
   useEffect(() => {
+    let cancelled = false
     let refreshTimer = null
     let refreshInFlight = false
     let refreshQueued = false
@@ -474,12 +475,12 @@ function POSTerminalContent() {
         refreshInFlight = true
         try {
           const prods = await getPOSProducts(branchId)
+          if (cancelled) return
           setProducts(prods)
           setStockProduct(current => {
             if (!current?.id) return current
             return prods.find(product => product.id === current.id) || null
           })
-          cacheProducts(branchId, prods).catch(() => {})
         } catch {
           // Initial load and online recovery remain the fallback.
         } finally {
@@ -489,16 +490,63 @@ function POSTerminalContent() {
       }, 100)
     }
 
+    const refreshOneProduct = async (payload) => {
+      const productId = payload.new?.id
+      if (!productId || !isOnline() || document.hidden) return
+      const existing = productsRef.current.find(product => product.id === productId)
+      // A newly visible product needs the initial popularity/stock projection.
+      if (!existing) {
+        if (payload.new.is_active && payload.new.visible_on_menu &&
+          (payload.new.visible_branch_ids?.includes(branchId) || payload.new.branch_id === branchId)) refreshProducts()
+        return
+      }
+      try {
+        const updated = await getPOSProduct(productId)
+        if (cancelled) return
+        if (!updated.is_active || !updated.visible_on_menu ||
+          !(updated.visible_branch_ids?.includes(branchId) || updated.branch_id === branchId)) {
+          setProducts(current => current.filter(product => product.id !== productId))
+          setStockProduct(current => current?.id === productId ? null : current)
+          return
+        }
+        const locationId = existing.stock_location_id
+        let locationStock = null
+        if (locationId) {
+          const { data, error } = await supabase.from('location_product_stock')
+            .select('qty, updated_at').eq('location_id', locationId).eq('product_id', productId).maybeSingle()
+          if (error) throw error
+          locationStock = data
+        }
+        if (cancelled) return
+        const mergeUpdated = product => {
+          if (product.id !== productId) return product
+          const stock = locationId ? {
+            stock_qty: locationStock ? Number(locationStock.qty) || 0 : (updated.track_inventory ? 0 : updated.stock_qty),
+            stock_location_id: locationId,
+            stock_updated_at: locationStock?.updated_at || null,
+            stock_source: locationStock ? 'location_product_stock' : (updated.track_inventory ? 'missing_location_balance' : 'not_tracked'),
+          } : {}
+          return { ...product, ...updated, ...stock }
+        }
+        setProducts(current => current.map(mergeUpdated))
+        setStockProduct(current => current?.id === productId ? mergeUpdated(current) : current)
+        // The separate stock-policy refresh remains authoritative for sale_blocked.
+      } catch {
+        refreshProducts()
+      }
+    }
+
     const channel = supabase
       .channel(`pos-product-stock-${branchId}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'pos_products',
-      }, refreshProducts)
+      }, refreshOneProduct)
       .subscribe()
 
     return () => {
+      cancelled = true
       clearTimeout(refreshTimer)
       supabase.removeChannel(channel)
     }
@@ -612,9 +660,28 @@ function POSTerminalContent() {
       return
     }
     try {
-      const groups = modifierData
-        ? modifierData.groupsForProduct(product.id)
-        : await withPOSNetworkTimeout(getModifierGroupsForProduct(product.id), 10000)
+      const cached = modifierCache.current.get(product.id)
+      let groups = cached?.groups
+      if (isOnline() && (!cached?.fetchedAt || Date.now() - cached.fetchedAt > 300000)) {
+        let request = modifierRequests.current.get(product.id)
+        if (!request) {
+          request = withPOSNetworkTimeout(getModifierGroupsForProduct(product.id), 10000)
+            .finally(() => modifierRequests.current.delete(product.id))
+          modifierRequests.current.set(product.id, request)
+        }
+        try {
+          groups = await request
+          modifierCache.current.set(product.id, { groups, fetchedAt: Date.now() })
+          getCachedBranchConfig(branchId).then(config => cacheBranchConfig(branchId, {
+            ...config,
+            modifier_groups_by_product: { ...config?.modifier_groups_by_product, [product.id]: groups },
+          })).catch(() => {})
+        } catch (error) {
+          if (!cached) throw error
+        }
+      } else if (!cached) {
+        throw new Error('Connect to the internet to load product options')
+      }
       if (groups && groups.length > 0) {
         setModifierProduct({ product, groups })
         return
@@ -624,7 +691,7 @@ function POSTerminalContent() {
       return
     }
     addCartLine(product)
-  }, [settings, addCartLine, products, modifierData])
+  }, [settings, addCartLine, products, branchId])
 
   // Sold-out remains a separate manual availability control inside the stock modal.
   const handleSoldOutToggle = useCallback(async (product) => {

@@ -71,6 +71,8 @@ export async function enqueuePrintJob(branchId, jobType, payload) {
 // ── Host subscriber ─────────────────────────────────────────────────
 let _channel = null
 let _presenceChannel = null
+let _presenceTimer = null
+let _lastPrinterConnected = null
 let _processing = false
 let _activeBranchId = null
 
@@ -107,28 +109,44 @@ export function startHostSubscriber(branchId) {
   _presenceChannel = supabase.channel(`print-host-${branchId}`, {
     config: { presence: { key: getDeviceId() } },
   })
-  _presenceChannel
+  const presenceChannel = _presenceChannel
+  const publishPrinterState = async () => {
+    if (_presenceChannel !== presenceChannel) return
+    const connected = isPrinterConnected()
+    if (connected === _lastPrinterConnected) return
+    try {
+      await presenceChannel.track({
+        deviceId: getDeviceId(),
+        role: 'host',
+        printerConnected: connected,
+        since: new Date().toISOString(),
+      })
+      _lastPrinterConnected = connected
+      if (connected) processQueue(branchId)
+    } catch { /* Recheck on the next local timer tick. */ }
+  }
+  presenceChannel
     .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await _presenceChannel.track({
-          deviceId: getDeviceId(),
-          role: 'host',
-          since: new Date().toISOString(),
-        })
+      if (status === 'SUBSCRIBED' && _presenceChannel === presenceChannel) {
+        await publishPrinterState()
+        if (!_presenceTimer) _presenceTimer = setInterval(publishPrinterState, 5000)
       }
     })
 }
 
 export function stopHostSubscriber() {
+  if (_presenceTimer) clearInterval(_presenceTimer)
+  _presenceTimer = null
+  _lastPrinterConnected = null
   if (_channel) {
-    try { supabase.removeChannel(_channel) } catch {}
+    try { supabase.removeChannel(_channel) } catch { /* Channel may already be closed. */ }
     _channel = null
   }
   if (_presenceChannel) {
     try {
       _presenceChannel.untrack()
       supabase.removeChannel(_presenceChannel)
-    } catch {}
+    } catch { /* Presence may already be closed. */ }
     _presenceChannel = null
   }
   _activeBranchId = null
@@ -147,9 +165,12 @@ export function observeHostPresence(branchId, onChange) {
     for (const key of Object.keys(state)) {
       const arr = state[key] || []
       for (const p of arr) {
-        if (p?.role === 'host') { host = p; break }
+        if (p?.role === 'host') {
+          host = p
+          if (p.printerConnected) break
+        }
       }
-      if (host) break
+      if (host?.printerConnected) break
     }
     onChange(host)
   }
@@ -168,7 +189,7 @@ export function observeHostPresence(branchId, onChange) {
     try {
       channel.untrack()
       supabase.removeChannel(channel)
-    } catch {}
+    } catch { /* Observer may already be closed. */ }
   }
 }
 
