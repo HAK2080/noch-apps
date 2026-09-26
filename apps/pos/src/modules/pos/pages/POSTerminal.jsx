@@ -269,14 +269,17 @@ function POSTerminalContent() {
   const [settings, setSettings] = useState(null)
   useEffect(() => {
     let cancelled = false
+    let inFlight = false
     const refresh = async () => {
-      if (!branchId || !navigator.onLine) return
+      if (!branchId || !navigator.onLine || document.hidden || inFlight) return
+      inFlight = true
       try {
         const availability = await getSaleAvailability(branchId)
         if (!cancelled) setProducts(current => applySaleAvailability(current, availability))
       } catch { /* Checkout must still obtain a fresh policy and server stock validation. */ }
+      finally { inFlight = false }
     }
-    const timer = setInterval(refresh, 15000)
+    const timer = setInterval(refresh, 60000)
     window.addEventListener('focus', refresh)
     window.addEventListener('pos-settings-changed', refresh)
     return () => { cancelled = true; clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('pos-settings-changed', refresh) }
@@ -461,10 +464,14 @@ function POSTerminalContent() {
   // updates. Refreshing the branch projection also keeps IndexedDB current.
   useEffect(() => {
     let refreshTimer = null
+    let refreshInFlight = false
+    let refreshQueued = false
     const refreshProducts = () => {
       if (!isOnline() || document.hidden) return
+      if (refreshInFlight) { refreshQueued = true; return }
       clearTimeout(refreshTimer)
       refreshTimer = setTimeout(async () => {
+        refreshInFlight = true
         try {
           const prods = await getPOSProducts(branchId)
           setProducts(prods)
@@ -475,6 +482,9 @@ function POSTerminalContent() {
           cacheProducts(branchId, prods).catch(() => {})
         } catch {
           // Initial load and online recovery remain the fallback.
+        } finally {
+          refreshInFlight = false
+          if (refreshQueued) { refreshQueued = false; refreshProducts() }
         }
       }, 100)
     }

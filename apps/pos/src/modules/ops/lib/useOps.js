@@ -9,16 +9,32 @@
 import { useEffect, useState, useCallback } from 'react'
 import { getOpsSettings } from './ops-supabase'
 
-export function useOpsSettings() {
-  const [settings, setSettings] = useState(null)
-  const [loading, setLoading] = useState(true)
+let cachedSettings = null
+let lastFetchedAt = 0
+let pendingSettings = null
+const SETTINGS_TTL_MS = 60_000
 
-  const refresh = useCallback(async () => {
+async function loadSharedSettings(force = false) {
+  if (pendingSettings) return pendingSettings
+  if (!force && lastFetchedAt && Date.now() - lastFetchedAt < SETTINGS_TTL_MS) return cachedSettings
+  pendingSettings = getOpsSettings().then(settings => {
+    cachedSettings = settings
+    lastFetchedAt = Date.now()
+    return settings
+  }).finally(() => { pendingSettings = null })
+  return pendingSettings
+}
+
+export function useOpsSettings() {
+  const [settings, setSettings] = useState(cachedSettings)
+  const [loading, setLoading] = useState(!lastFetchedAt)
+
+  const refresh = useCallback(async (force = false) => {
     try {
-      const s = await getOpsSettings()
+      const s = await loadSharedSettings(force)
       setSettings(s)
     } catch {
-      setSettings(null)
+      // Keep the last known setting through a transient network failure.
     } finally {
       setLoading(false)
     }
@@ -35,5 +51,5 @@ export function useOpsSettings() {
     }
   }, [refresh])
 
-  return { settings, loading, refresh, moduleEnabled: !!settings?.module_enabled }
+  return { settings, loading, refresh: () => refresh(true), moduleEnabled: !!settings?.module_enabled }
 }
