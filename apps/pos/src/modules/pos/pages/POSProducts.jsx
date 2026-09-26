@@ -1,7 +1,7 @@
 // POSProducts.jsx — Product & category management
 // Route: /pos/:branchId/products
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Edit2, Trash2, Package, Tag, ScanLine, X, Check, Globe, Star, GripVertical, LayoutList, Grid2X2, Copy, ImagePlus, Sparkles, Loader2, Video } from 'lucide-react'
 import {
@@ -820,6 +820,7 @@ export default function POSProducts() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
   const [tab, setTab] = useState('products') // products | categories
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')   // 'all' | category.id
@@ -830,8 +831,14 @@ export default function POSProducts() {
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [editCategory, setEditCategory] = useState(null)
   const [showShare, setShowShare] = useState(false)
+  const retryTimer = useRef(null)
+  const retryAttempt = useRef(0)
+  const loadInFlight = useRef(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (loadInFlight.current) return
+    loadInFlight.current = true
+    clearTimeout(retryTimer.current)
     try {
       const [b, p, c, allBranches] = await Promise.all([
         getPOSBranch(branchId),
@@ -840,14 +847,25 @@ export default function POSProducts() {
         getPOSBranches(),
       ])
       setBranch(b); setProducts(p); setCategories(c); setBranches(allBranches)
+      setCatalogError('')
+      retryAttempt.current = 0
     } catch (err) {
-      toast.error(err.message || 'Failed to load')
+      setCatalogError(err.message || 'Could not load products')
+      if (retryAttempt.current < 5) {
+        retryAttempt.current += 1
+        retryTimer.current = setTimeout(load, Math.min(30000, 2000 * 2 ** retryAttempt.current))
+      }
     } finally {
+      loadInFlight.current = false
       setLoading(false)
     }
-  }
+  }, [branchId])
 
-  useEffect(() => { load() }, [branchId])
+  useEffect(() => {
+    retryAttempt.current = 0
+    load()
+    return () => clearTimeout(retryTimer.current)
+  }, [load])
 
   const handleDeleteProduct = async (id) => {
     if (!confirm('Delete this product?')) return
@@ -1012,6 +1030,7 @@ export default function POSProducts() {
           </div>
           <button
             onClick={() => setShowShare(true)}
+            disabled={!!catalogError && products.length === 0}
             className="btn-secondary flex items-center gap-2 text-sm"
             title="Share menu from another branch"
           >
@@ -1020,6 +1039,7 @@ export default function POSProducts() {
           </button>
           <button
             onClick={() => tab === 'products' ? setShowAddProduct(true) : setShowAddCategory(true)}
+            disabled={!!catalogError && products.length === 0}
             className="btn-primary flex items-center gap-2 text-sm"
           >
             <Plus size={14} />
@@ -1028,6 +1048,12 @@ export default function POSProducts() {
         </div>
 
         <div className="mb-4"><GlobalStockControl /></div>
+        {catalogError && (
+          <div role="alert" className="card mb-4 border-red-500/40 text-sm text-red-300">
+            <p>Products could not be loaded. Your products have not been deleted. Retrying automatically.</p>
+            <button onClick={load} className="btn-secondary mt-3 text-sm">Retry loading</button>
+          </div>
+        )}
         {/* Tabs */}
         <div className="flex gap-2 mb-4">
           {[
@@ -1150,7 +1176,9 @@ export default function POSProducts() {
 
             {filtered.length === 0 ? (
               <div className="card text-center py-10 text-noch-muted">
-                {products.length === 0 ? (
+                {catalogError && products.length === 0 ? (
+                  <p>Product list temporarily unavailable. Retry loading above.</p>
+                ) : products.length === 0 ? (
                   <>
                     <p>No products yet.</p>
                     <button onClick={() => setShowAddProduct(true)} className="btn-primary mt-3 text-sm">Add first product</button>
