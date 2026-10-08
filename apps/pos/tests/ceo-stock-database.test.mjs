@@ -62,6 +62,7 @@ before(async () => {
   await db.exec(await migration('20260912150000_ceo_saved_forecast'))
   await db.exec(await migration('20260912110000_global_stock_sales_guard'))
   await db.exec(await migration('20260912190000_hide_unavailable_customer_products'))
+  await db.exec(await migration('20261008050000_sale_availability_set_based'))
   await db.exec(`select set_config('request.jwt.claim.sub','${owner}',false)`)
 })
 after(async () => db.close())

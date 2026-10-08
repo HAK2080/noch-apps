@@ -1,3 +1,12 @@
+## 2026-10-08 — Pre-opening database availability optimization
+
+- Replaced per-product stock helper calls with grouped requirements and stock joins in `get_sale_availability`, preserving branch filters, sold-out flags, bean rounding, overlapping requirements, reason precedence, and existing RPC privileges.
+- Added a guarded migration removing only the redundant product index when an identical valid counterpart remains.
+- Added isolated database regression coverage for strict stock on/off, branches, missing stock, rounding, permissions, and idempotent index cleanup. Existing stock/order tests now exercise the replacement. Full suite: 289 passed; whitespace check passed.
+- Applied both migrations in production. Availability replacement was compared against the previous output for all branches and the general menu within the same transaction; any mismatch would roll back.
+- Bounded same-connection live benchmark: warm original 4.739–4.938 ms / 856 cached blocks; replacement 0.255–0.280 ms / 26 cached blocks. This measures cached query work, not an equivalent reduction in physical disk IO.
+- Verified the customer menu loads. Photo assets and checkout/stock mutation logic remain unchanged. Previous guarded scheduled jobs are running successfully; confirming daily IO budget recovery and the next scheduled backup remains follow-up work.
+
 ## 2026-10-08 — Reduce avoidable database Disk IO on the current tier
 
 - **Problem**: A redundant Vestaboard scheduler, empty notification HTTP dispatches, and source/archive schema drift produced unnecessary database work. The snapshot function copied earlier tables before failing on a later table; it now preflights all schemas and copies explicitly named columns. Full snapshots remain daily with the existing retention policy.
