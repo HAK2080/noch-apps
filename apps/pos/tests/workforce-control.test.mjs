@@ -59,7 +59,7 @@ test('normal owner journey is consolidated under staff workforce control', async
   assert.match(app, /path="\/staff".*WorkforceHub/s)
   assert.match(app, /path="\/staff\/team".*Staff/s)
   assert.match(hub, /Tripoli business day starts at 05:00/)
-  assert.match(hub, /Ø§Ù„ÙØ±ÙŠÙ‚ ÙˆØ§Ù„Ø­Ø¶ÙˆØ± ÙˆØ§Ù„Ø±ÙˆØ§ØªØ¨/)
+  assert.match(hub, /الفريق والحضور والجدول/)
   assert.match(profiles, /rpc\('workforce_team_v2'\)/)
   assert.doesNotMatch(finance, /ShiftsTab|PayrollTab/)
   assert.match(payroll, /getAllTeamMembers\(\)/)
@@ -105,7 +105,10 @@ test('payroll employee fields wrap inside cards without a horizontal table scrol
   assert.match(payroll, /data-testid="payroll-item-card"/)
   assert.match(payroll, /2xl:grid-cols-11/)
   assert.match(payroll, /className="input[^\"]*w-full[^\"]*min-w-0/)
-  assert.match(hub, /tab === 'payroll' \? 'max-w-none' : 'max-w-7xl'/)
+  const payrollPage = await readFile(new URL('../src/pages/PayrollPage.jsx', import.meta.url), 'utf8')
+  assert.match(payrollPage, /max-w-none/)
+  assert.match(payrollPage, /<PayrollTab/)
+  assert.match(hub, /max-w-7xl/)
 })
 
 test('manual overtime hours use the 9-hour, 26-day salary standard and persist the result', async () => {

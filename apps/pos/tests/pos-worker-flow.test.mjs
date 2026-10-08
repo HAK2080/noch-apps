@@ -10,7 +10,9 @@ const end=source.indexOf('}, [settings, addCartLine',start)+1
 function handler(cached,fetcher) {
   const calls={added:[],options:[],errors:[]}
   const fn=vm.runInNewContext('('+source.slice(start,end)+')',{
-    modifierData:cached,settings:{},products:[],getModifierGroupsForProduct:fetcher,
+    modifierCache:{current:new Map(cached ? [['water',{groups:cached.groupsForProduct(),fetchedAt:Date.now()}],['latte',{groups:cached.groupsForProduct(),fetchedAt:Date.now()}]] : [])},
+    modifierRequests:{current:new Map()},isOnline:()=>true,branchId:'branch',
+    getCachedBranchConfig:async()=>({}),cacheBranchConfig:async()=>{},settings:{},products:[],getModifierGroupsForProduct:fetcher,
     withPOSNetworkTimeout:p=>p,addCartLine:p=>calls.added.push(p),setModifierProduct:p=>calls.options.push(p),
     toast:{error:e=>calls.errors.push(e)},cashierError:(_e,fallback)=>fallback,msg:s=>s,
   })

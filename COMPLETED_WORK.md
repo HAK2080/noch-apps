@@ -1,3 +1,11 @@
+## 2026-10-08 — Reduce avoidable database Disk IO on the current tier
+
+- **Problem**: A redundant Vestaboard scheduler, empty notification HTTP dispatches, and source/archive schema drift produced unnecessary database work. The snapshot function copied earlier tables before failing on a later table; it now preflights all schemas and copies explicitly named columns. Full snapshots remain daily with the existing retention policy.
+- **Changes**: Disable the legacy Vestaboard schedule while the canonical schedule is active; guard the existing notification command with the same due-row predicate used by the claim RPC, preserving credentials and the five-minute cadence. Add nullable archive columns without rewriting historical rows. Restrict archive Data API access and snapshot execution to database recovery/service operations. No customer media changes or compute-tier upgrade.
+- **Tests**: 287 unit/database tests passed, including isolated PostgreSQL regression cases for migration replay, reordered archive columns, future schema drift, historical-row preservation, empty/future/due queues and unchanged job cadence. Seven stale source/mock assertions were updated to current refund-net labels, separate payroll routing, RTL points markup, available menu products and modifier caches. Both POS and storefront builds passed. Local Playwright fixture checks could not launch: Chrome is unavailable and the official browser download failed; these are not counted as passed.
+- **Deployment**: Both database migrations were applied through the project SQL Editor in transactions; post-deployment checks confirmed the redundant scheduler inactive, canonical scheduler active, notification guard present and zero archive column mismatches. Snapshot/purge was not invoked during deployment.
+- **Action plan / acceptance**: Observe a full day and representative busy period on the unchanged Nano tier; verify the next scheduled backup succeeds, due notifications still dispatch, idle notification runs produce no HTTP requests, and Disk IO consumption stops reaching its limit. The historical resource chart remains high. Fixes are deployed, but sustained budget recovery and exclusive root-cause attribution are not yet established. Avoid production load tests while the budget is constrained.
+
 ## 2026-09-12 — Customer Menu Styling for Nochi Friend
 
 - **Agent**: Codex

@@ -30,7 +30,7 @@ test('customer menu keeps first-screen image downloads small and targeted', asyn
   assert.doesNotMatch(menu, /buildOptimizedProductImageUrl/)
   assert.match(menu, /function readCachedMenu/)
   assert.match(menu, /function writeCachedMenu/)
-  assert.match(menu, /writeCachedMenu\(branchParam, b, cats \|\| \[\], prods \|\| \[\]\)/)
+  assert.match(menu, /writeCachedMenu\(branchParam, b, cats \|\| \[\], availableProducts\)/)
   assert.match(menu, /select\('id, name, lat, lng, geofence_radius_m'\)/)
   assert.doesNotMatch(menu, /from\('pos_products'\)[\s\S]{0,100}\.select\('\*'\)/)
 })
