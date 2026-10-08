@@ -44,7 +44,7 @@ test('product editors upload and persist optional menu videos', async () => {
   assert.match(dataSource, /cacheControl: '31536000'/)
 })
 
-test('both customer menus prefer lazy muted video with photo fallback', async () => {
+test('deployed customer menus load video only after a tap with photo fallback', async () => {
   const [posMenu, posCss, websiteMenu, websiteCss, deployedWebsite] = await Promise.all([
     readFile(posMenuUrl, 'utf8'),
     readFile(posMenuCssUrl, 'utf8'),
@@ -53,10 +53,11 @@ test('both customer menus prefer lazy muted video with photo fallback', async ()
     readFile(deployedWebsiteUrl, 'utf8'),
   ])
 
-  for (const source of [posMenu, websiteMenu]) {
+  for (const source of [posMenu, deployedWebsite]) {
     assert.match(source, /video_url|videoSrc/)
-    assert.match(source, /IntersectionObserver/)
-    assert.match(source, /navigator\.connection\?\.saveData/)
+    assert.match(source, /useState\(false\)/)
+    assert.match(source, /Play video:/)
+    assert.match(source, /navigator\.connection.*saveData/)
     assert.match(source, /preload="none"/)
     assert.match(source, /muted/)
     assert.match(source, /playsInline/)
@@ -65,7 +66,7 @@ test('both customer menus prefer lazy muted video with photo fallback', async ()
   assert.match(websiteCss, /\.card-menu-image,\.card-menu-video/)
   assert.match(deployedWebsite, /function ProductMenuMedia/)
   assert.match(deployedWebsite, /image_url,video_url/)
-  assert.match(deployedWebsite, /IntersectionObserver/)
+  assert.match(websiteMenu, /preload="none"/) // Legacy React source is not the deployed inline app.
   assert.match(deployedWebsite, /preload="none"/)
 })
 

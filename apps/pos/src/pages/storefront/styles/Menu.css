@@ -1733,3 +1733,21 @@
   font-weight: 700;
   color: var(--muted);
 }
+
+.menu-product-video-play {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #0b1020cc;
+  color: #fff;
+  cursor: pointer;
+  font-size: 20px;
+}
+.menu-product-video-play:focus-visible { outline: 3px solid #e86a1e; outline-offset: 3px; }
+
+span.menu-product-video-play { display: grid; place-items: center; pointer-events: none; }

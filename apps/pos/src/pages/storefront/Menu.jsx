@@ -154,27 +154,34 @@ function MenuProductImage({ src, videoSrc, alt, className, fallback, priority = 
 }
 
 function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, priority, detail }) {
-  const videoRef = useRef(null)
-  const [shouldLoad, setShouldLoad] = useState(priority)
+  const [shouldLoad, setShouldLoad] = useState(false)
   const [status, setStatus] = useState('loading')
   const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData === true
 
-  useEffect(() => {
-    if (saveData || shouldLoad) return undefined
-    const video = videoRef.current
-    if (!video || typeof IntersectionObserver === 'undefined') {
-      const timer = window.setTimeout(() => setShouldLoad(true), 0)
-      return () => window.clearTimeout(timer)
-    }
-    const observer = new IntersectionObserver(entries => {
-      if (entries.some(entry => entry.isIntersecting)) {
-        setShouldLoad(true)
-        observer.disconnect()
-      }
-    }, { rootMargin: '160px' })
-    observer.observe(video)
-    return () => observer.disconnect()
-  }, [saveData, shouldLoad])
+  // A visible card should fetch only its photo. Attach the video source only
+  // after a deliberate tap, including in the product detail view.
+  if (!shouldLoad && !saveData) {
+    return (
+      <div className={`${className} menu-product-image-shell`}>
+        <MenuProductImageState
+          src={posterSrc}
+          alt={alt}
+          className={className}
+          fallback={fallback}
+          priority={priority}
+          detail={detail}
+        />
+        {detail ? (
+          <button
+            type="button"
+            className="menu-product-video-play"
+            aria-label={`Play video: ${alt}`}
+            onClick={event => { event.stopPropagation(); setShouldLoad(true) }}
+          >▶</button>
+        ) : <span className="menu-product-video-play" aria-hidden="true">▶</span>}
+      </div>
+    )
+  }
 
   if (status === 'failed' || saveData) {
     return (
@@ -193,8 +200,7 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
     <div className={`${className} menu-product-image-shell${status === 'loaded' ? ' is-loaded' : ''}`}>
       <span className="menu-product-image-skeleton" aria-hidden="true" />
       <video
-        ref={videoRef}
-        src={shouldLoad ? videoSrc : undefined}
+        src={videoSrc}
         poster={posterSrc ? buildStoredProductImageUrl(posterSrc, detail ? 'full' : 'card') : undefined}
         aria-label={alt}
         className="menu-product-video-media"
@@ -202,6 +208,8 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
         loop
         playsInline
         autoPlay
+        controls
+        onClick={event => event.stopPropagation()}
         preload="none"
         onLoadedData={() => setStatus('loaded')}
         onError={() => setStatus('failed')}

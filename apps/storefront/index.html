@@ -685,6 +685,9 @@
     .bp-row{padding:14px 14px;min-height:64px}
     .bp-row-name{font-size:16px}
   }
+  .shop-card-img,.ps-img{position:relative}
+  .menu-video-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;width:48px;height:48px;border:2px solid #fff;border-radius:50%;background:#0b1020cc;color:#fff;cursor:pointer;font-size:20px}
+  .menu-video-play:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
 </style>
 </head>
 <body>
@@ -703,6 +706,13 @@
 </div>
 <div id="root"></div>
 
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/media-sw.js', {updateViaCache: 'none'}).catch(function () {});
+  });
+}
+</script>
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
@@ -1165,40 +1175,49 @@ function relativeDays(iso, lt){
   return days + ' ' + lt.daysAgo;
 }
 
+// Stored sizes use the same immutable filenames as the POS uploader. Never
+// request a paid Storage transformation, and retain older photos as fallback.
+function storedMenuPhoto(source, variant='card'){
+  if(!source) return '';
+  try{
+    const url = new URL(source);
+    if(!url.pathname.includes('/storage/v1/object/public/product-images/')) return source;
+    const suffix = variant === 'thumb' ? '-160' : '-720';
+    const match = url.pathname.match(/^(.*)(\.[^./]+)$/);
+    if(!match) return source;
+    url.pathname = `${match[1]}${suffix}${match[2]}`;
+    return url.toString();
+  }catch{ return source; }
+}
+
+function MenuPhoto({source, name='', detail=false, thumb=false}){
+  const [failed, setFailed] = useState(false);
+  const photo = detail || failed ? source : storedMenuPhoto(source, thumb ? 'thumb' : 'card');
+  return source
+    ? <img src={photo} alt={name} loading={detail ? 'eager' : 'lazy'} decoding="async"
+           onError={()=>{ if(photo !== source) setFailed(true); }}/>
+    : <img className="placeholder" src="assets/nochi-shopping.png" alt=""/>;
+}
+
 function ProductMenuMedia({ product, name, detail=false }){
-  const videoRef = useRef(null);
-  const [shouldLoad, setShouldLoad] = useState(detail);
+  const [shouldLoad, setShouldLoad] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const saveData = typeof navigator !== 'undefined' && navigator.connection && navigator.connection.saveData === true;
 
-  useEffect(()=>{
-    if(!product.video_url || saveData || shouldLoad) return;
-    const video = videoRef.current;
-    if(!video || typeof IntersectionObserver === 'undefined'){
-      const timer = window.setTimeout(()=>setShouldLoad(true), 0);
-      return ()=>window.clearTimeout(timer);
-    }
-    const observer = new IntersectionObserver(entries=>{
-      if(entries.some(entry=>entry.isIntersecting)){
-        setShouldLoad(true);
-        observer.disconnect();
-      }
-    }, {rootMargin:'160px'});
-    observer.observe(video);
-    return ()=>observer.disconnect();
-  }, [product.video_url, saveData, shouldLoad]);
-
-  if(product.video_url && !saveData && !videoFailed){
-    return <video ref={videoRef}
-                  src={shouldLoad ? product.video_url : undefined}
-                  poster={product.image_url || undefined}
+  if(product.video_url && !saveData && !videoFailed && shouldLoad){
+    return <video src={product.video_url}
+                  poster={detail ? product.image_url : storedMenuPhoto(product.image_url)}
                   aria-label={name}
-                  muted loop playsInline autoPlay preload="none"
+                  muted loop playsInline autoPlay controls preload="none"
+                  onClick={e=>e.stopPropagation()}
                   onError={()=>setVideoFailed(true)}/>;
   }
-  return product.image_url
-    ? <img src={product.image_url} alt={name} loading={detail ? 'eager' : 'lazy'}/>
-    : <img className="placeholder" src="assets/nochi-shopping.png" alt=""/>;
+  return <>
+    <MenuPhoto key={product.image_url} source={product.image_url} name={name} detail={detail}/>
+    {product.video_url && !saveData && !videoFailed && <button type="button"
+      className="menu-video-play" aria-label={`Play video: ${name}`}
+      onClick={e=>{e.stopPropagation();setShouldLoad(true);}}>▶</button>}
+  </>;
 }
 
 // 10 Nochi poses ordered chill → champion; one per stamp slot.
@@ -1283,7 +1302,7 @@ function CartDrawer({ open, onClose, cart, products, lang, lt, onQty, onRemove, 
                 <div key={l.product_id} className="cart-line">
                   <div className="cart-line-img">
                     {l.product.image_url
-                      ? <img src={l.product.image_url} alt=""/>
+                      ? <MenuPhoto key={l.product.image_url} source={l.product.image_url} thumb/>
                       : <img src="assets/nochi-shopping.png" alt="" style={{padding:8,opacity:.6}}/>}
                   </div>
                   <div className="cart-line-info">

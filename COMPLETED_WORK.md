@@ -1318,3 +1318,13 @@ To find if something's been done:
 - Backup: added a Sunday 04:00 Tripoli GitHub Action that exports exposed database relations, Auth users, storage-bucket metadata and the PostgREST schema, encrypts the archive, and retains it for 35 days. Repository secrets were installed without committing their values.
 - Verification: manual workflow run 35831818650 completed successfully in 2m 43s and produced the 8 MB encrypted artifact `noch-supabase-backup-35831818650`. Storage object contents and a native PostgreSQL schema dump are not included; source migrations and the API schema snapshot remain the recovery references.
 - Telegram: the live webhook was re-registered at the production Edge Function URL. Telegram reported the correct URL and zero pending updates; a harmless synthetic update returned HTTP 200. The recorded prior 500 coincided with the Supabase downgrade restart. No expense, loyalty, customer, or financial records were changed.
+
+
+## 2026-10-08 — Reduce customer media downloads
+- **Agent**: Codex.
+- **Files**: apps/pos/src/pages/storefront/Menu.jsx; apps/pos/src/pages/storefront/styles/Menu.css; apps/storefront/index.html; apps/storefront/public/media-sw.js; apps/pos/tests/customer-media-egress.test.mjs; apps/pos/tests/product-menu-video.test.mjs.
+- **Change**: Customer videos require an explicit play action rather than downloading when a card becomes visible. Storefront cards and cart thumbnails use stored 720/160 variants with original-image fallback. A bounded persistent storefront photo cache shares concurrent requests, works offline after the first download, and excludes API/auth/private objects/video ranges. Existing staff photo caching and product media remain intact.
+- **Verification**: 26 focused media/image tests pass; both production builds pass; targeted POS ESLint has zero errors and two existing hook-dependency warnings; git diff --check passes. Behavioral tests confirm no video element/source before a tap, one download for concurrent photos, later offline cache hits, and uncached API/private/video traffic.
+- **Commit**: This entry belongs to the perf(media) commit.
+- **Deployment**: Pushing to main triggers the existing apps and storefront GitHub Actions deployments; final deployment outcome will be recorded after verification. No database migrations or Edge Function changes.
+- **Limits**: Used transfer cannot be reversed. Current Supabase dashboard requires sign-in again, so live per-file attribution is unverified. Public storefront returned no available branches before these changes, preventing an end-to-end menu test without restored branch/API availability.
