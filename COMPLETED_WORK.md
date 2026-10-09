@@ -1354,3 +1354,11 @@ To find if something's been done:
 - Recovery: Baseline e8d3d6145dcc2dfbedfebe67c98e3de293e1945e is tagged archive/pre-autumn-2026-10-09 and stored with complete history in ../noch-original-2026-10-09.bundle (verified).
 - Commit: This entry accompanies the homepage decoration commit on design/autumn-2026-preview.
 - Deployment: Local preview only for user review. Not pushed or deployed. No database, product, price, availability, or ordering changes. The separate local preview server blocks write operations.
+
+## 2026-10-09 — Compact menu autumn banner preview
+- Agent: Codex.
+- Files: apps/pos/src/pages/storefront/Menu.jsx, AutumnBanner.jsx, styles/AutumnBanner.css; apps/pos/public/assets/autumn/{leaf.svg,pumpkin.svg,nochi-walking.png}.
+- Scope: User approved only a compact seasonal banner above existing categories. Nochi, a pumpkin, and falling leaves contained within the artwork. Arabic/English text and pause/resume control; respects reduced motion. Existing menu layout, products, prices, availability and ordering logic unchanged.
+- Verification: POS production build passed; targeted ESLint has no errors (two existing Menu.jsx hook warnings); git diff --check passed; browser verified banner, both languages, and pause/resume.
+- Commit: This entry accompanies the compact-banner commit on design/autumn-2026-preview.
+- Deployment: Local read-only preview only. Not pushed or deployed. No database changes.

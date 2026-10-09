@@ -8,6 +8,7 @@ import { productBelongsToCategory } from '../../lib/product-categories'
 import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
 import nochLogo from '../../assets/noch-logo-menu.webp'
 import './styles/Menu.css'
+import AutumnBanner from './AutumnBanner'
 
 // ── Category icon helpers ────────────────────────────────────────────────────
 function categoryCustomerLabel(category, lang) {
@@ -976,6 +977,8 @@ export default function Menu() {
           </button>
         </div>
       </header>
+
+      <AutumnBanner lang={lang} />
 
       {/* ── Category pill strip + Best Sellers ─────────────────────────────── */}
       <div className="cat-strip" dir={lang === 'ar' ? 'rtl' : 'ltr'} ref={catStripRef}>
