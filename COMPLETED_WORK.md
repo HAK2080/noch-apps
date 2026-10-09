@@ -1394,3 +1394,11 @@ To find if something's been done:
 - Verification: POS build and both focused collection tests passed. ESLint has zero errors and two pre-existing hook warnings. Browser confirmed exact Arabic heading, no added bunny, no horizontal overflow and correct artwork; screenshot saved in parent output directory.
 - Commit: Included with the botanical autumn theme commit on design/autumn-2026-preview.
 - Deployment: Local preview only; not pushed or deployed. No database changes.
+
+## 2026-10-09 — Continuous autumn background behind drinks
+- Agent: Codex.
+- Files: apps/pos/src/pages/storefront/styles/AutumnBackground.css; public/assets/autumn/harvest-section.png; tests/korea-edition-menu.test.mjs.
+- Scope: Extend autumn artwork across the entire seasonal section behind cards. New botanical parchment background includes pumpkins and cinnamon bundles in the lower corners, with space below cards to expose decorations. Heading background is transparent. Product cards and data remain unchanged.
+- Verification: POS production build and two collection checks passed. Browser inspected cards, background and cinnamon/pumpkin decoration. Reduced-motion behavior retained.
+- Commit: Included in the continuous autumn section commit on design/autumn-2026-preview.
+- Deployment: Local preview only. No push, deployment or database changes.
