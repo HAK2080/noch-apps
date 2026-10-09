@@ -1418,3 +1418,10 @@ To find if something's been done:
 - Successful workflows: apps run 37917010663; storefront run 37917010737.
 - Live verification: noch.cloud returned HTTP 200 with autumn CSS and falling-leaf markup; apps.noch.cloud served harvest-flat.svg with cinnamon illustration. Browser confirmed exact Arabic seasonal heading, 24 leaf elements, flat background URL, and real menu content.
 - No database or Edge Function changes. Original baseline backup remains preserved.
+
+## 2026-10-09 — Fix cached homepage hiding autumn animation
+- Agent: Codex.
+- File: apps/storefront/scripts/precompile.mjs.
+- Cause: Live browser loaded homepage with autumn stylesheet but no season-leaves DOM; unversioned app.js could reuse old cached JavaScript.
+- Change: Emit a content-hashed app filename and reference it from HTML. Retain app.js compatibility copy.
+- Verification: Storefront build passed; generated HTML points to existing hashed script containing season-leaves. Publishing fix under existing live-site authorization.

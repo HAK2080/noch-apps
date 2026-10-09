@@ -19,6 +19,7 @@ import esbuild from 'esbuild'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const distHtml = resolve(root, 'dist/index.html')
@@ -38,6 +39,9 @@ const { code } = esbuild.transformSync(jsx, {
 
 mkdirSync(dirname(appOut), { recursive: true })
 writeFileSync(appOut, code, 'utf8')
+// A new URL prevents long-lived browser/CDN caches from serving an older app.
+const appVersion = createHash('sha256').update(code).digest('hex').slice(0, 12)
+writeFileSync(resolve(root, `dist/assets/app-${appVersion}.js`), code, 'utf8')
 
 // 3. Rewrite index.html.
 html = html
@@ -49,7 +53,7 @@ html = html
   // Integrity hashes no longer match the prod files — strip them.
   .replace(/\s+integrity="[^"]*"/g, '')
   // Swap the inline app for the precompiled bundle.
-  .replace(/<script type="text\/babel">[\s\S]*?<\/script>/, '<script defer src="./assets/app.js"></script>')
+  .replace(/<script type="text\/babel">[\s\S]*?<\/script>/, `<script defer src="./assets/app-${appVersion}.js"></script>`)
 
 writeFileSync(distHtml, html, 'utf8')
 
