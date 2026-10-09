@@ -8,7 +8,7 @@ import { productBelongsToCategory } from '../../lib/product-categories'
 import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
 import nochLogo from '../../assets/noch-logo-menu.webp'
 import './styles/Menu.css'
-import AutumnBanner from './AutumnBanner'
+import './styles/AutumnBackground.css'
 
 // ── Category icon helpers ────────────────────────────────────────────────────
 function categoryCustomerLabel(category, lang) {
@@ -957,7 +957,7 @@ export default function Menu() {
   if (!branch) return <div className="menu-error">Branch not found</div>
 
   return (
-    <div className="menu-root">
+    <div className="menu-root menu-autumn-background">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="menu-header">
@@ -977,8 +977,6 @@ export default function Menu() {
           </button>
         </div>
       </header>
-
-      <AutumnBanner lang={lang} />
 
       {/* ── Category pill strip + Best Sellers ─────────────────────────────── */}
       <div className="cat-strip" dir={lang === 'ar' ? 'rtl' : 'ltr'} ref={catStripRef}>

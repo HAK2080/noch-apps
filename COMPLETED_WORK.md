@@ -1362,3 +1362,11 @@ To find if something's been done:
 - Verification: POS production build passed; targeted ESLint has no errors (two existing Menu.jsx hook warnings); git diff --check passed; browser verified banner, both languages, and pause/resume.
 - Commit: This entry accompanies the compact-banner commit on design/autumn-2026-preview.
 - Deployment: Local read-only preview only. Not pushed or deployed. No database changes.
+
+## 2026-10-09 — Replace menu banner with subtle autumn background
+- Agent: Codex.
+- Files: apps/pos/src/pages/storefront/Menu.jsx; styles/AutumnBackground.css; removed AutumnBanner.jsx and styles/AutumnBanner.css.
+- Scope: Per user correction, remove seasonal banner and its copy/controls. Apply only pale autumn cream and small static leaf/pumpkin background decorations at the sides. Background images cannot intercept clicks; existing menu layout, product data and ordering remain intact. Homepage unchanged.
+- Verification: POS production build and git diff --check passed; browser confirmed original categories follow header directly and background decorations render.
+- Commit: This entry accompanies the background-only revision on design/autumn-2026-preview.
+- Deployment: Local preview only, not pushed or deployed. No database changes.
