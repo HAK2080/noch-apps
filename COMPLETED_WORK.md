@@ -1410,3 +1410,4 @@ To find if something's been done:
 - Verification: Both production builds and nine focused collection/media checks pass. Targeted lint has zero errors and two pre-existing hook warnings. Local browser visually confirms flat artwork and unobstructed cards. Original theme remains archived under archive/pre-autumn-2026-10-09 and the local Git bundle.
 - Commit: Included in the flat autumn theme commit.
 - Deployment: User now authorized upload and publication of the reviewed autumn design. Publishing through existing GitHub production workflows; deployment results to be verified.
+- Upload result: Design commit 8a3dec3 uploaded successfully to origin/design/autumn-2026-preview. Automatic approval review rejected the attempted main push because live deployment requires explicit publication approval. No main update or production deployment occurred. Awaiting user approval to publish.
