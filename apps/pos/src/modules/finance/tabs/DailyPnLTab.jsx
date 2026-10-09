@@ -8,7 +8,7 @@ import PeriodSelector from '../components/PeriodSelector'
 import KPICard from '../components/KPICard'
 import FinanceBreakdownModal from '../components/FinanceBreakdownModal'
 import { addYmdDays, businessYmd } from '../../pos/lib/pos-supabase'
-import { getPnL, getFinanceSettings, listBranches, listProductsMissingCost } from '../lib/finance-supabase'
+import { getPnL, getFinanceSettings, listReportingBranches, listProductsMissingCost } from '../lib/finance-supabase'
 import { STATUS, statusForRatio, lyd, pct } from '../lib/thresholds'
 import { downloadCsv, ExportButtons } from '../../../lib/exportCsv'
 import toast from 'react-hot-toast'
@@ -38,7 +38,7 @@ export default function DailyPnLTab() {
   const [breakdown, setBreakdown] = useState(null) // 'prime' | 'revenue' | 'cogs' | 'labor' | 'opex' | 'net'
 
   useEffect(() => {
-    Promise.all([listBranches(), getFinanceSettings()])
+    Promise.all([listReportingBranches(), getFinanceSettings()])
       .then(([bs, s]) => { setBranches(bs); setSettings(s) })
       .catch(err => toast.error(err.message || 'Failed to load setup'))
   }, [])

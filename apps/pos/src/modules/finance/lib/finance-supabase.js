@@ -2,7 +2,7 @@
 // Reads from migrations 20260508010000_finance_mvp.sql.
 
 import { supabase } from '../../../lib/supabase'
-import { reconcileExecutiveSummary } from './finance-reporting'
+import { reconcileExecutiveSummary, selectReportingBranches } from './finance-reporting'
 import { STATUS, statusForRatio } from './thresholds'
 
 // ── Settings (singleton row id='default') ──────────────────────────────
@@ -82,7 +82,7 @@ export async function listProductsMissingCost(branchId = null) {
 // here so every future summary surface uses the same definition.
 export async function getExecutiveSummary({ from, to, netOfRefunds = true }) {
   const [branches, settings, totalPnl] = await Promise.all([
-    listBranches(),
+    listReportingBranches(),
     getFinanceSettings(),
     getPnL({ from, to, netOfRefunds }),
   ])
@@ -554,6 +554,17 @@ export async function listBranches() {
     .order('name')
   if (error) throw error
   return data || []
+}
+
+// Reporting includes expense-only branches even while their POS remains closed.
+export async function listReportingBranches() {
+  const [branchResult, centerResult] = await Promise.all([
+    supabase.from('pos_branches').select('id, name, name_ar, is_active, operational_status').order('name'),
+    supabase.from('cost_centers').select('pos_branch_id').eq('allow_telegram_receipts', true),
+  ])
+  if (branchResult.error) throw branchResult.error
+  if (centerResult.error) throw centerResult.error
+  return selectReportingBranches(branchResult.data || [], centerResult.data || [])
 }
 
 // ── Payroll (runs, items, staff loans) ──────────────────────────────

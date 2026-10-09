@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase'
-import { getPnL, listBranches } from '../../finance/lib/finance-supabase'
+import { getPnL, listReportingBranches } from '../../finance/lib/finance-supabase'
 import { businessDayWindow } from '../../pos/lib/business-time'
 import { buildManagementReport } from './management-report-model'
 import { rollingBusinessPeriod } from './reporting-periods'
@@ -70,7 +70,7 @@ export async function getManagementReport({
   const [currentPnl, previousPnl, branches] = await Promise.all([
     getPnL({ branchId, from, to, netOfRefunds: true }),
     getPnL({ branchId, from: previousFrom, to: previousTo, netOfRefunds: true }),
-    listBranches(),
+    listReportingBranches(),
   ])
 
   const [branchPnls, ...optionalSources] = await Promise.all([

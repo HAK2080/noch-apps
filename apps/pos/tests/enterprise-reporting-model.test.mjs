@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { reconcileExecutiveSummary } from '../src/modules/finance/lib/finance-reporting.js'
+import { reconcileExecutiveSummary, selectReportingBranches } from '../src/modules/finance/lib/finance-reporting.js'
 import { buildManagementReport } from '../src/modules/reports/lib/management-report-model.js'
 import {
   completedExecutivePeriod,
@@ -43,6 +43,19 @@ const period = {
   timeZone: 'Africa/Tripoli',
   cutoffHour: 5,
 }
+
+test('reporting includes expense-only Gallery Mall without opening closed Bloom', () => {
+  const branches = [
+    { id: 'city', is_active: true },
+    { id: 'gallery', is_active: false, operational_status: 'closed' },
+    { id: 'bloom', is_active: false, operational_status: 'closed' },
+  ]
+  assert.deepEqual(
+    selectReportingBranches(branches, [{ pos_branch_id: 'gallery' }]).map(branch => branch.id),
+    ['city', 'gallery'],
+  )
+  assert.equal(branches[1].is_active, false)
+})
 
 test('reporting periods use the Tripoli business date before the 05:00 cutoff', () => {
   const now = new Date('2026-07-31T01:30:00.000Z')
