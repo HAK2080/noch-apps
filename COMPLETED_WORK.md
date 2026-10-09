@@ -1386,3 +1386,11 @@ To find if something's been done:
 - Verification: POS production build passed; targeted ESLint has no errors (two existing hook warnings). Browser confirmed changing fall/wind transforms across observations, pointer-events none, no horizontal overflow, and intact menu appearance. Screenshot saved in parent output folder.
 - Commit: Included in the wind-animation commit on design/autumn-2026-preview.
 - Deployment: Local preview only, not pushed or deployed. No database changes.
+
+## 2026-10-09 — Botanical autumn menu theme
+- Agent: Codex.
+- Files: Menu.jsx; styles/AutumnBackground.css; public/assets/autumn/botanical-banner.png; tests/korea-edition-menu.test.mjs (all under apps/pos).
+- Scope: Remove the added banner bunny and banner pumpkins. Use a generated botanical parchment backdrop inspired by the supplied reference. Change seasonal category heading and tab display to مشروبات موسم الخريف / Autumn Seasonal Drinks, with a leaf icon. Keep underlying category identifiers/products and existing wind motion. Homepage unchanged.
+- Verification: POS build and both focused collection tests passed. ESLint has zero errors and two pre-existing hook warnings. Browser confirmed exact Arabic heading, no added bunny, no horizontal overflow and correct artwork; screenshot saved in parent output directory.
+- Commit: Included with the botanical autumn theme commit on design/autumn-2026-preview.
+- Deployment: Local preview only; not pushed or deployed. No database changes.

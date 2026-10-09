@@ -12,6 +12,7 @@ import './styles/AutumnBackground.css'
 
 // ── Category icon helpers ────────────────────────────────────────────────────
 function categoryCustomerLabel(category, lang) {
+  if (isKoreaEditionCategory(category)) return lang === 'ar' ? 'مشروبات موسم الخريف' : 'Autumn Seasonal Drinks'
   if (lang === 'ar') return category.customer_menu_name_ar || category.name_ar || category.customer_menu_name || category.name
   return category.customer_menu_name || category.name
 }
@@ -36,6 +37,7 @@ function V60Icon({ size = 16 }) {
 }
 function CatIcon({ name, imageUrl, size = 16 }) {
   const [failedImageUrl, setFailedImageUrl] = useState(null)
+  if (/autumn|الخريف/i.test(name || '')) return <span style={{ fontSize: size }} aria-hidden="true">🍁</span>
   // Category uploads do not have the stored variants generated for products.
   if (imageUrl && failedImageUrl !== imageUrl) return (
     <img
@@ -84,18 +86,13 @@ function isKoreaEditionCategory(cat = {}) {
   return /korea|korean|한국|كوريا|كوري/.test(categoryNames)
 }
 
-function AutumnCollectionArtwork({ catLabel, priority = false }) {
+function AutumnCollectionArtwork({ catLabel }) {
   return (
     <div className="autumn-collection-art">
       <div className="autumn-collection-leaves" aria-hidden="true">
         {[0, 1, 2, 3, 4, 5].map(i => <img key={i} src="/assets/autumn/leaf.svg" alt="" />)}
       </div>
-      <span className="autumn-collection-star" aria-hidden="true">✦</span>
       <h2>{catLabel}</h2>
-      <img className="autumn-collection-nochi" src="/assets/autumn/nochi-walking.png" alt="" aria-hidden="true"
-        loading={priority ? 'eager' : 'lazy'} decoding="async" />
-      <img className="autumn-collection-pumpkin" src="/assets/autumn/pumpkin.svg" alt="" aria-hidden="true" />
-      <img className="autumn-collection-pumpkin-small" src="/assets/autumn/pumpkin.svg" alt="" aria-hidden="true" />
     </div>
   )
 }
@@ -535,7 +532,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
 
   return (
     <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}`} id={`cat-${cat.id}`}>
-      {koreaEdition && <AutumnCollectionArtwork catLabel={catLabel} priority={priorityImages} />}
+      {koreaEdition && <AutumnCollectionArtwork catLabel={catLabel} />}
       {!koreaEdition && <div className="cat-section-header">
         <h2 className="cat-section-title">
           <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />

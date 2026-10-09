@@ -1,6 +1,6 @@
 /* Seasonal background only; all menu layout and controls keep their styling. */
 .menu-root.menu-autumn-background {
-  --bg: #fbefdc;
+  --bg: #f2ecdc;
   isolation: isolate;
   background-color: var(--bg);
   background-image:
@@ -17,7 +17,7 @@
 
 /* Replace the collection's landmark artwork; live product cards stay below it. */
 .menu-autumn-background .cat-section.korea-edition {
-  background: #fff7e7;
+  background: #f8f2e5;
   border-color: #e0bd8c;
 }
 .autumn-collection-art {
@@ -25,37 +25,26 @@
   isolation: isolate;
   display: grid;
   place-items: center;
-  min-height: 210px;
+  min-height: 235px;
   margin: 0 -22px 18px;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 0, #fff9e9, #f6dfb9);
+  background: #f2ead8 url('/assets/autumn/botanical-banner.png') center / cover no-repeat;
   border-bottom: 1px solid #e4c79b;
-}
-.autumn-collection-art::after {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  border: 1px dashed #ca9b5966;
-  border-radius: 20px;
-  pointer-events: none;
 }
 .autumn-collection-art h2 {
   position: relative;
   z-index: 2;
   max-width: 650px;
   margin: 0;
-  padding: 34px 145px;
+  padding: 38px 100px;
   text-align: center;
-  font: 800 34px/1.5 'Baloo 2', 'Cairo', sans-serif;
-  color: #1e3a9f;
+  font: 800 40px/1.6 'Cairo', sans-serif;
+  color: #713b20;
+  text-shadow: 0 2px 14px #fff9e9, 0 0 25px #fff9e9;
 }
-[dir=rtl] .autumn-collection-art h2 { font-family: 'Cairo', sans-serif; font-size: 31px; }
-.autumn-collection-star { position: absolute; top: 15px; left: 49%; color: #ba7134; font-size: 22px; }
-.autumn-collection-nochi { position: absolute; left: 26px; bottom: 17px; width: 108px; height: 132px; object-fit: contain; transform: rotate(-7deg); }
-.autumn-collection-pumpkin { position: absolute; right: 25px; bottom: 18px; width: 102px; transform: rotate(8deg); }
-.autumn-collection-pumpkin-small { position: absolute; right: 100px; bottom: 14px; width: 58px; transform: rotate(-12deg); }
+[dir=rtl] .autumn-collection-art h2 { font-family: 'Cairo', sans-serif; font-size: 40px; }
 .autumn-collection-leaves { position: absolute; inset: 0; pointer-events: none; }
-.autumn-collection-leaves img { position: absolute; width: 30px; }
+.autumn-collection-leaves img { position: absolute; width: 24px; opacity: .7; }
 .autumn-collection-leaves img:nth-child(1) { top: 16px; left: 4%; transform: rotate(-40deg); }
 .autumn-collection-leaves img:nth-child(2) { top: 16px; right: 9%; transform: rotate(38deg); filter: hue-rotate(32deg); }
 .autumn-collection-leaves img:nth-child(3) { bottom: 9px; left: 38%; transform: rotate(75deg); filter: hue-rotate(325deg); width: 24px; }
@@ -63,20 +52,14 @@
 .autumn-collection-leaves img:nth-child(5) { top: 13px; left: 23%; transform: rotate(100deg); filter: hue-rotate(40deg); width: 20px; }
 .autumn-collection-leaves img:nth-child(6) { bottom: 12px; right: 30%; transform: rotate(-50deg); width: 20px; }
 @media(max-width:899px) {
-  .autumn-collection-art { margin: 0 -12px 14px; min-height: 180px; }
-  .autumn-collection-art h2 { font-size: 28px; padding: 34px 110px; }
-  [dir=rtl] .autumn-collection-art h2 { font-size: 27px; }
-  .autumn-collection-nochi { width: 88px; height: 110px; left: 14px; }
-  .autumn-collection-pumpkin { width: 80px; right: 14px; }
-  .autumn-collection-pumpkin-small { width: 42px; right: 71px; }
+  .autumn-collection-art { margin: 0 -12px 14px; min-height: 210px; }
+  .autumn-collection-art h2 { font-size: 32px; padding: 34px 65px; }
+  [dir=rtl] .autumn-collection-art h2 { font-size: 32px; }
 }
 @media(max-width:480px) {
   .autumn-collection-art { min-height: 190px; }
-  .autumn-collection-art h2 { font-size: 23px; padding: 29px 52px 52px; }
-  [dir=rtl] .autumn-collection-art h2 { font-size: 23px; }
-  .autumn-collection-nochi { width: 53px; height: 68px; left: 8px; bottom: 7px; }
-  .autumn-collection-pumpkin { width: 59px; right: 11px; bottom: 8px; }
-  .autumn-collection-pumpkin-small { width: 33px; right: 54px; bottom: 6px; }
+  .autumn-collection-art h2 { font-size: 27px; padding: 35px 32px; }
+  [dir=rtl] .autumn-collection-art h2 { font-size: 27px; }
   .autumn-collection-leaves img { width: 22px; }
 }
 @media (max-width: 700px) {
@@ -141,3 +124,4 @@
   .autumn-wind { display: none; }
   .autumn-wind > span, .autumn-wind img, .autumn-collection-leaves img { animation: none; }
 }
+
