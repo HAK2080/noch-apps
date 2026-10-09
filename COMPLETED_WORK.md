@@ -1411,3 +1411,10 @@ To find if something's been done:
 - Commit: Included in the flat autumn theme commit.
 - Deployment: User now authorized upload and publication of the reviewed autumn design. Publishing through existing GitHub production workflows; deployment results to be verified.
 - Upload result: Design commit 8a3dec3 uploaded successfully to origin/design/autumn-2026-preview. Automatic approval review rejected the attempted main push because live deployment requires explicit publication approval. No main update or production deployment occurred. Awaiting user approval to publish.
+
+## 2026-10-09 — Autumn production publication verified
+- Agent: Codex. User explicitly approved live publication after the approval question.
+- Published commit: 91761dc9ed2c21ae9c78b7a4f866141e3bba3be1 (includes design 8a3dec3), fast-forwarded to main.
+- Successful workflows: apps run 37917010663; storefront run 37917010737.
+- Live verification: noch.cloud returned HTTP 200 with autumn CSS and falling-leaf markup; apps.noch.cloud served harvest-flat.svg with cinnamon illustration. Browser confirmed exact Arabic seasonal heading, 24 leaf elements, flat background URL, and real menu content.
+- No database or Edge Function changes. Original baseline backup remains preserved.
