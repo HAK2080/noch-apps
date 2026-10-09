@@ -1402,3 +1402,11 @@ To find if something's been done:
 - Verification: POS production build and two collection checks passed. Browser inspected cards, background and cinnamon/pumpkin decoration. Reduced-motion behavior retained.
 - Commit: Included in the continuous autumn section commit on design/autumn-2026-preview.
 - Deployment: Local preview only. No push, deployment or database changes.
+
+## 2026-10-09 — Flat autumn theme and increased falling leaves
+- Agent: Codex.
+- Files: apps/pos/src/pages/storefront/Menu.jsx; styles/AutumnBackground.css; public/assets/autumn/harvest-flat.svg; tests/korea-edition-menu.test.mjs.
+- Scope: Replace textured harvest background with code-native flat SVG reusing the falling leaf and pumpkin shapes, plus matching cinnamon sticks. Increase falling leaves to 24 desktop / 12 mobile, preserving reduced-motion support and non-interactive decoration.
+- Verification: Both production builds and nine focused collection/media checks pass. Targeted lint has zero errors and two pre-existing hook warnings. Local browser visually confirms flat artwork and unobstructed cards. Original theme remains archived under archive/pre-autumn-2026-10-09 and the local Git bundle.
+- Commit: Included in the flat autumn theme commit.
+- Deployment: User now authorized upload and publication of the reviewed autumn design. Publishing through existing GitHub production workflows; deployment results to be verified.

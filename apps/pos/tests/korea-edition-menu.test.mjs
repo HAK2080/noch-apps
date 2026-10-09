@@ -25,7 +25,7 @@ test('autumn artwork stays separate from product content and original assets are
   assert.match(css, /\.autumn-collection-art/)
   assert.match(css, /pointer-events: none/)
   assert.match(css, /@media\(max-width:480px\)/)
-  for (const asset of ['autumn/leaf.svg', 'autumn/pumpkin.svg', 'autumn/harvest-section.png', 'korea-japan-menu-header.webp', 'korea-japan-menu-stage.webp']) {
+  for (const asset of ['autumn/leaf.svg', 'autumn/pumpkin.svg', 'autumn/harvest-flat.svg', 'korea-japan-menu-header.webp', 'korea-japan-menu-stage.webp']) {
     assert.ok((await stat(new URL('../public/assets/' + asset, import.meta.url))).size > 0)
   }
 })

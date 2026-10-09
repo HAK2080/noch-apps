@@ -17,7 +17,7 @@
 
 /* Replace the collection's landmark artwork; live product cards stay below it. */
 .menu-autumn-background .cat-section.korea-edition {
-  background: #f8f2e5 url('/assets/autumn/harvest-section.png') center / 100% 100% no-repeat;
+  background: #f8f2e5 url('/assets/autumn/harvest-flat.svg') center / 100% 100% no-repeat;
   border-color: #e0bd8c;
   padding-bottom: 180px;
 }
@@ -82,7 +82,7 @@
 .autumn-wind > span {
   position: absolute;
   top: -50px;
-  left: calc(2% + var(--leaf) * 10.5%);
+  left: calc(2% + var(--leaf) * 4.3%);
   animation: autumn-fall calc(19s + var(--leaf) * 1.3s) linear infinite;
   animation-delay: calc(var(--leaf) * -4.7s);
 }
@@ -117,8 +117,8 @@
   80%, 100% { translate: 6px -5px; rotate: 5deg; }
 }
 @media (max-width: 700px) {
-  .autumn-wind > span:nth-child(n + 7) { display: none; }
-  .autumn-wind > span { left: calc(var(--leaf) * 19%); }
+  .autumn-wind > span:nth-child(n + 13) { display: none; }
+  .autumn-wind > span { left: calc(var(--leaf) * 8.5%); }
   .autumn-wind img { max-width: 23px; opacity: .5; }
 }
 @media (prefers-reduced-motion: reduce) {
