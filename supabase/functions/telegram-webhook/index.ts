@@ -829,12 +829,30 @@ Deno.serve(async (req: Request) => {
       // X-Telegram-Bot-Api-Secret-Token header we verify below.
       body: JSON.stringify({
         url: fnUrl,
+        // Telegram retains the previous filter when omitted. Receipt photos,
+        // typed expenses and inline branch buttons all depend on these types.
+        allowed_updates: ['message', 'callback_query'],
         ...(Deno.env.get('TELEGRAM_WEBHOOK_SECRET')
           ? { secret_token: Deno.env.get('TELEGRAM_WEBHOOK_SECRET') }
           : {}),
       }),
     })
-    return Response.json(await r.json(), { headers: CORS })
+    const registration = await r.json()
+    const [webhookInfo, botInfo] = await Promise.all([
+      tg(botToken, 'getWebhookInfo', {}),
+      tg(botToken, 'getMe', {}),
+    ])
+    const current = webhookInfo?.result ?? {}
+    return Response.json({
+      ok: registration.ok === true && webhookInfo.ok === true && current.url === fnUrl,
+      registration: registration.description,
+      bot_username: botInfo?.result?.username ?? null,
+      url_matches: current.url === fnUrl,
+      allowed_updates: current.allowed_updates ?? null,
+      pending_update_count: current.pending_update_count ?? null,
+      last_error_date: current.last_error_date ?? null,
+      last_error_message: current.last_error_message ?? null,
+    }, { status: registration.ok && webhookInfo.ok ? 200 : 502, headers: CORS })
   }
 
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
