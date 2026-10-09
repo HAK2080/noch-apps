@@ -18,6 +18,71 @@
     2% 22%, 98% 33%, 3% 60%, 97% 70%,
     1% 246px, 99% 276px, 0 0, 0 0;
 }
+
+/* Replace the collection's landmark artwork; live product cards stay below it. */
+.menu-autumn-background .cat-section.korea-edition {
+  background: #fff7e7;
+  border-color: #e0bd8c;
+}
+.autumn-collection-art {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-height: 210px;
+  margin: 0 -22px 18px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0, #fff9e9, #f6dfb9);
+  border-bottom: 1px solid #e4c79b;
+}
+.autumn-collection-art::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border: 1px dashed #ca9b5966;
+  border-radius: 20px;
+  pointer-events: none;
+}
+.autumn-collection-art h2 {
+  position: relative;
+  z-index: 2;
+  max-width: 650px;
+  margin: 0;
+  padding: 34px 145px;
+  text-align: center;
+  font: 800 34px/1.5 'Baloo 2', 'Cairo', sans-serif;
+  color: #1e3a9f;
+}
+[dir=rtl] .autumn-collection-art h2 { font-family: 'Cairo', sans-serif; font-size: 31px; }
+.autumn-collection-star { position: absolute; top: 15px; left: 49%; color: #ba7134; font-size: 22px; }
+.autumn-collection-nochi { position: absolute; left: 26px; bottom: 17px; width: 108px; height: 132px; object-fit: contain; transform: rotate(-7deg); }
+.autumn-collection-pumpkin { position: absolute; right: 25px; bottom: 18px; width: 102px; transform: rotate(8deg); }
+.autumn-collection-pumpkin-small { position: absolute; right: 100px; bottom: 14px; width: 58px; transform: rotate(-12deg); }
+.autumn-collection-leaves { position: absolute; inset: 0; pointer-events: none; }
+.autumn-collection-leaves img { position: absolute; width: 30px; }
+.autumn-collection-leaves img:nth-child(1) { top: 16px; left: 4%; transform: rotate(-40deg); }
+.autumn-collection-leaves img:nth-child(2) { top: 16px; right: 9%; transform: rotate(38deg); filter: hue-rotate(32deg); }
+.autumn-collection-leaves img:nth-child(3) { bottom: 9px; left: 38%; transform: rotate(75deg); filter: hue-rotate(325deg); width: 24px; }
+.autumn-collection-leaves img:nth-child(4) { top: 40%; right: 2%; transform: rotate(-25deg); width: 20px; }
+.autumn-collection-leaves img:nth-child(5) { top: 13px; left: 23%; transform: rotate(100deg); filter: hue-rotate(40deg); width: 20px; }
+.autumn-collection-leaves img:nth-child(6) { bottom: 12px; right: 30%; transform: rotate(-50deg); width: 20px; }
+@media(max-width:899px) {
+  .autumn-collection-art { margin: 0 -12px 14px; min-height: 180px; }
+  .autumn-collection-art h2 { font-size: 28px; padding: 34px 110px; }
+  [dir=rtl] .autumn-collection-art h2 { font-size: 27px; }
+  .autumn-collection-nochi { width: 88px; height: 110px; left: 14px; }
+  .autumn-collection-pumpkin { width: 80px; right: 14px; }
+  .autumn-collection-pumpkin-small { width: 42px; right: 71px; }
+}
+@media(max-width:480px) {
+  .autumn-collection-art { min-height: 190px; }
+  .autumn-collection-art h2 { font-size: 23px; padding: 29px 52px 52px; }
+  [dir=rtl] .autumn-collection-art h2 { font-size: 23px; }
+  .autumn-collection-nochi { width: 53px; height: 68px; left: 8px; bottom: 7px; }
+  .autumn-collection-pumpkin { width: 59px; right: 11px; bottom: 8px; }
+  .autumn-collection-pumpkin-small { width: 33px; right: 54px; bottom: 6px; }
+  .autumn-collection-leaves img { width: 22px; }
+}
 @media (max-width: 700px) {
   .menu-root.menu-autumn-background {
     background-size: 21px, 17px, 17px, 21px, 43px, 38px, 100% 100%, 100% 100%;

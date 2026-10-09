@@ -1370,3 +1370,11 @@ To find if something's been done:
 - Verification: POS production build and git diff --check passed; browser confirmed original categories follow header directly and background decorations render.
 - Commit: This entry accompanies the background-only revision on design/autumn-2026-preview.
 - Deployment: Local preview only, not pushed or deployed. No database changes.
+
+## 2026-10-09 — Autumn artwork for the Korean/Japanese collection
+- Agent: Codex.
+- Files: apps/pos/src/pages/storefront/Menu.jsx; styles/AutumnBackground.css; tests/korea-edition-menu.test.mjs.
+- Scope: Replace landmark/cherry-blossom artwork with warm cream, leaves, pumpkins and existing blue Nochi. Keep the real category label, product data, prices, and controls. Render live cards below the artwork for all product counts, replacing the old special four-card overlay. Original artwork files and baseline archive remain available.
+- Verification: Production build passed; nine focused collection/media tests passed; targeted lint has no errors (two pre-existing hook warnings); git diff --check passed; browser verified real category and product display.
+- Commit: Included in the seasonal collection artwork commit on design/autumn-2026-preview.
+- Deployment: Local preview only. Not pushed or deployed. No database changes.
