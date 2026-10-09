@@ -8,7 +8,7 @@ const snapSource = await readFile(new URL('../../../supabase/functions/expense-s
 const webhookSource = await readFile(new URL('../../../supabase/functions/telegram-webhook/index.ts', import.meta.url), 'utf8')
 const telegramActor = { profileId: null, internalTelegram: true }
 
-function scanner() {
+function scanner(allowClosedBranchReceipts = false) {
   let snap
   const expenses = []
   const context = vm.createContext({
@@ -21,12 +21,13 @@ function scanner() {
       if (path.endsWith('/profiles')) return Response.json([{ id: 'staff' }])
       if (path.endsWith('/cost_centers')) return Response.json([
         { id: 'CC01', name: 'City Walk', pos_branch_id: 'city', include_in_split: true },
-        { id: 'CC02', name: 'Closed branch', pos_branch_id: 'closed', include_in_split: true },
+        { id: 'CC02', name: 'Closed branch', pos_branch_id: 'closed', include_in_split: true, allow_telegram_receipts: allowClosedBranchReceipts },
         { id: 'CC03', name: 'Coming soon', pos_branch_id: 'soon', include_in_split: true },
         { id: 'SHARED', name: 'Shared', pos_branch_id: null, include_in_split: false },
       ])
       if (path.endsWith('/pos_branches')) return Response.json([
         { id: 'city', name: 'City Walk', name_ar: 'نوتش - سيتي ووك', is_active: true, operational_status: 'operating' },
+        { id: 'closed', name: 'Gallery Mall', name_ar: 'نوتش - جاليري مول', is_active: false, operational_status: 'closed' },
         { id: 'soon', name: 'Coming soon', is_active: true, operational_status: 'pre_opening' },
       ])
       if (path.endsWith('/expense_categories')) return Response.json([{ id: 'category', name: 'Miscellaneous' }])
@@ -61,6 +62,15 @@ test('Telegram asks only for mapped operating branches and rejects stale closed-
   const saved = await s.context.actionFinalize({ snap_id: 'scan', allocation: { mode: 'single', code: 'CC01' } }, telegramActor)
   assert.equal(saved.status, 200)
   assert.equal(s.expenses[0].cost_center_id, 'CC01')
+})
+
+test('explicit expense-only branch can receive Telegram receipts while remaining closed for POS', async () => {
+  const s = scanner(true)
+  const draft = await (await s.context.actionManual({ text: '125 beans', source: 'telegram', telegram_chat_id: '123' }, telegramActor)).json()
+  assert.deepEqual(Array.from(draft.cost_centers, center => center.code), ['CC01', 'CC02'])
+  const saved = await s.context.actionFinalize({ snap_id: 'scan', allocation: { mode: 'single', code: 'CC02' } }, telegramActor)
+  assert.equal(saved.status, 200)
+  assert.equal(s.expenses[0].cost_center_id, 'CC02')
 })
 
 test('scanned Telegram invoices return the active branch choice', async () => {

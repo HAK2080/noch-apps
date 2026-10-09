@@ -239,11 +239,11 @@ async function resolveProfile(
 
 // Live schema: cost_centers.id IS the code ('CC01'); categories have only id+name.
 async function loadCostCenters() {
-  const raw = await sbGet("cost_centers?select=id,name,include_in_split,pos_branch_id&order=id");
+  const raw = await sbGet("cost_centers?select=id,name,include_in_split,pos_branch_id,allow_telegram_receipts&order=id");
   return (Array.isArray(raw) ? raw : []).map(
-    (c: { id: string; name: string; include_in_split: boolean; pos_branch_id: string | null }) => ({
+    (c: { id: string; name: string; include_in_split: boolean; pos_branch_id: string | null; allow_telegram_receipts: boolean }) => ({
       code: c.id, name: c.name, include_in_split: c.include_in_split,
-      pos_branch_id: c.pos_branch_id,
+      pos_branch_id: c.pos_branch_id, allow_telegram_receipts: c.allow_telegram_receipts,
     }),
   );
 }
@@ -265,16 +265,17 @@ async function loadAllocationCenters(actor: RequestActor) {
   const centers = await loadCostCenters();
   if (!actor.internalTelegram) return centers;
 
-  // Telegram asks for operating branches only. A cost center without a mapped
-  // branch (including shared/management) must not become an invoice button.
-  const branches = await sbGet("pos_branches?select=id,name,name_ar,is_active,operational_status&is_active=eq.true");
-  if (!Array.isArray(branches)) throw new Error("Could not load active branches");
-  const activeBranches: { id: string; name?: string; name_ar?: string | null }[] = branches
-    .filter((branch: { operational_status?: string | null }) =>
-      !branch.operational_status || branch.operational_status === "operating")
-  return centers.filter((center) => center.pos_branch_id && activeBranches.some((branch) => branch.id === center.pos_branch_id))
+  // Telegram asks for operating branches plus explicit expense-only opt-ins.
+  // Never expose an unmapped shared/management cost center.
+  const branches = await sbGet("pos_branches?select=id,name,name_ar,is_active,operational_status");
+  if (!Array.isArray(branches)) throw new Error("Could not load branches");
+  const eligibleBranches: { id: string; name?: string; name_ar?: string | null }[] = branches
+    .filter((branch: { id: string; is_active: boolean; operational_status?: string | null }) =>
+      (branch.is_active && (!branch.operational_status || branch.operational_status === "operating")) ||
+      centers.some((center) => center.pos_branch_id === branch.id && center.allow_telegram_receipts))
+  return centers.filter((center) => center.pos_branch_id && eligibleBranches.some((branch) => branch.id === center.pos_branch_id))
     .map((center) => {
-      const branch = activeBranches.find((item) => item.id === center.pos_branch_id);
+      const branch = eligibleBranches.find((item) => item.id === center.pos_branch_id);
       return { ...center, name: branch?.name_ar || branch?.name || center.name };
     });
 }
