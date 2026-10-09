@@ -1,0 +1,22 @@
+/* Decorative layer only. The existing homepage design stays intact. */
+.season-leaves { position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:4; }
+.season-leaves img { position:absolute; top:-70px; left:calc(3% + var(--leaf)*13%); width:calc(23px + var(--leaf)*2px); opacity:.78; animation:season-leaf-fall calc(17s + var(--leaf)*1.7s) linear infinite; animation-delay:calc(var(--leaf)*-3.4s); }
+.season-leaves img:nth-child(3n) { filter:hue-rotate(35deg) saturate(.85); }
+.season-leaves img:nth-child(3n + 2) { filter:hue-rotate(325deg) saturate(.8); }
+@keyframes season-leaf-fall {
+  0% { transform:translate3d(0,-70px,0) rotate(-30deg); }
+  35% { transform:translate3d(38px,35vh,0) rotate(90deg); }
+  70% { transform:translate3d(-22px,74vh,0) rotate(200deg); }
+  100% { transform:translate3d(20px,calc(100vh + 100px),0) rotate(320deg); }
+}
+.season-pumpkins { pointer-events:none; }
+.season-pumpkins img { position:absolute; bottom:5px; z-index:4; width:110px; filter:drop-shadow(0 5px 3px #49210c18); }
+.season-pumpkin-left { left:max(12px,calc((100vw - 1220px)/2)); transform:rotate(-9deg); }
+.season-pumpkins .season-pumpkin-right { right:max(12px,calc((100vw - 1220px)/2)); width:145px; transform:rotate(8deg); }
+@media(max-width:600px) {
+ .season-leaves img { width:22px; }
+ .season-leaves img:nth-child(n + 5) { display:none; }
+ .season-pumpkins img { width:66px; bottom:0; }
+ .season-pumpkins .season-pumpkin-right { width:83px; }
+}
+@media(prefers-reduced-motion:reduce) { .season-leaves { display:none; } }

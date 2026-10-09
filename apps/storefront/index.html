@@ -689,6 +689,7 @@
   .menu-video-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;width:48px;height:48px;border:2px solid #fff;border-radius:50%;background:#0b1020cc;color:#fff;cursor:pointer;font-size:20px}
   .menu-video-play:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
 </style>
+<link rel="stylesheet" href="/assets/autumn/autumn.css"/>
 </head>
 <body>
 <div class="rolling-bg">
@@ -2468,6 +2469,13 @@ const [slots, setSlots] = useState(TWEAK_DEFAULTS);
   return (
     <React.Fragment>
       <section className="hero">
+        <div className="season-leaves" aria-hidden="true">
+          {Array.from({length:8},(_,i)=><img key={i} src="/assets/autumn/leaf.svg" alt="" style={{'--leaf':i}}/>)}
+        </div>
+        <div className="season-pumpkins" aria-hidden="true">
+          <img className="season-pumpkin-left" src="/assets/autumn/pumpkin.svg" alt=""/>
+          <img className="season-pumpkin-right" src="/assets/autumn/pumpkin.svg" alt=""/>
+        </div>
         <div className="nav-bar">
           <nav className="nav">
             <a href="#"><img className="nav-logo" src="assets/noch-logo.png" alt="Noch" style={{height:52,width:"auto",marginTop:-10,marginBottom:-10}}/></a>

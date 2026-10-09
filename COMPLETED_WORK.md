@@ -1345,3 +1345,12 @@ To find if something's been done:
 - **Commit**: `1957388` (`perf(media): reduce repeated customer photo and video downloads`).
 - **Deployment**: Both existing GitHub Actions jobs succeeded: apps run `37714114819`, storefront run `37714114988`. Live storefront `/media-sw.js` and `/assets/app.js` returned HTTP 200 with the photo cache and tap-to-play code. No database migrations or Edge Function changes.
 - **Limits**: Used transfer cannot be reversed. Current Supabase dashboard requires sign-in again, so live per-file attribution is unverified. Public storefront returned no available branches before these changes, preventing an end-to-end menu test without restored branch/API availability.
+
+## 2026-10-09 — Homepage autumn decorations preview
+- Agent: Codex.
+- Files: apps/storefront/index.html; apps/storefront/public/assets/autumn/{autumn.css,leaf.svg,pumpkin.svg}.
+- Result: Preserve the existing homepage layout, colors, copy, Nochi, and navigation. Add a non-interactive falling-leaf overlay and two decorative pumpkins. Respect reduced-motion preferences and reduce decoration size/count on small screens. Customer menu source is unchanged.
+- Verification: Both production builds passed; four storefront branch-picker checks passed; desktop preview visually inspected; git diff --check passed.
+- Recovery: Baseline e8d3d6145dcc2dfbedfebe67c98e3de293e1945e is tagged archive/pre-autumn-2026-10-09 and stored with complete history in ../noch-original-2026-10-09.bundle (verified).
+- Commit: This entry accompanies the homepage decoration commit on design/autumn-2026-preview.
+- Deployment: Local preview only for user review. Not pushed or deployed. No database, product, price, availability, or ordering changes. The separate local preview server blocks write operations.
