@@ -934,6 +934,13 @@ export default function Menu() {
 
   return (
     <div className="menu-root menu-autumn-background">
+      <div className="autumn-wind" aria-hidden="true">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span key={i} style={{ '--leaf': i }}>
+            <img src="/assets/autumn/leaf.svg" alt="" decoding="async" />
+          </span>
+        ))}
+      </div>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="menu-header">

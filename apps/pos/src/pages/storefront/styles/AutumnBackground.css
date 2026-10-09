@@ -1,21 +1,17 @@
 /* Seasonal background only; all menu layout and controls keep their styling. */
 .menu-root.menu-autumn-background {
   --bg: #fbefdc;
+  isolation: isolate;
   background-color: var(--bg);
   background-image:
-    url('/assets/autumn/leaf.svg'),
-    url('/assets/autumn/leaf.svg'),
-    url('/assets/autumn/leaf.svg'),
-    url('/assets/autumn/leaf.svg'),
     url('/assets/autumn/pumpkin.svg'),
     url('/assets/autumn/pumpkin.svg'),
     radial-gradient(ellipse at 0 30%, #f3d5ae70, transparent 45%),
     radial-gradient(ellipse at 100% 80%, #edc89c60, transparent 45%);
   background-repeat: no-repeat;
   background-attachment: fixed;
-  background-size: 28px, 23px, 24px, 30px, 60px, 48px, 100% 100%, 100% 100%;
+  background-size: 60px, 48px, 100% 100%, 100% 100%;
   background-position:
-    2% 22%, 98% 33%, 3% 60%, 97% 70%,
     1% 246px, 99% 276px, 0 0, 0 0;
 }
 
@@ -85,9 +81,63 @@
 }
 @media (max-width: 700px) {
   .menu-root.menu-autumn-background {
-    background-size: 21px, 17px, 17px, 21px, 43px, 38px, 100% 100%, 100% 100%;
+    background-size: 43px, 38px, 100% 100%, 100% 100%;
     background-position:
-      -8px 23%, calc(100% + 6px) 32%, -7px 60%, calc(100% + 8px) 71%,
       -13px 252px, calc(100% + 12px) 300px, 0 0, 0 0;
   }
+}
+
+/* Separate fall and wind transforms keep the motion light and irregular. */
+.autumn-wind {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.autumn-wind > span {
+  position: absolute;
+  top: -50px;
+  left: calc(2% + var(--leaf) * 10.5%);
+  animation: autumn-fall calc(19s + var(--leaf) * 1.3s) linear infinite;
+  animation-delay: calc(var(--leaf) * -4.7s);
+}
+.autumn-wind img {
+  display: block;
+  width: 26px;
+  opacity: .65;
+  animation: autumn-gust calc(7s + var(--leaf) * .4s) ease-in-out infinite;
+  animation-delay: calc(var(--leaf) * -1.7s);
+}
+.autumn-wind > span:nth-child(3n) img { width: 19px; filter: hue-rotate(32deg); }
+.autumn-wind > span:nth-child(3n + 1) img { width: 32px; filter: hue-rotate(325deg); }
+@keyframes autumn-fall {
+  from { transform: translateY(-40px); }
+  to { transform: translateY(calc(100dvh + 100px)); }
+}
+@keyframes autumn-gust {
+  0%, 100% { transform: translateX(-12px) rotate(-25deg); }
+  30% { transform: translateX(18px) rotate(35deg); }
+  48% { transform: translateX(8px) rotate(5deg); }
+  70% { transform: translateX(65px) rotate(120deg); }
+  85% { transform: translateX(28px) rotate(65deg); }
+}
+.autumn-collection-leaves img {
+  animation: autumn-collection-breeze 8s ease-in-out infinite alternate;
+}
+.autumn-collection-leaves img:nth-child(even) { animation-delay: -4s; animation-duration: 10s; }
+.autumn-collection-leaves img:nth-child(3n) { animation-delay: -6s; }
+@keyframes autumn-collection-breeze {
+  0%, 15% { translate: -5px 0; rotate: -10deg; }
+  55% { translate: 20px 8px; rotate: 25deg; }
+  80%, 100% { translate: 6px -5px; rotate: 5deg; }
+}
+@media (max-width: 700px) {
+  .autumn-wind > span:nth-child(n + 7) { display: none; }
+  .autumn-wind > span { left: calc(var(--leaf) * 19%); }
+  .autumn-wind img { max-width: 23px; opacity: .5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .autumn-wind { display: none; }
+  .autumn-wind > span, .autumn-wind img, .autumn-collection-leaves img { animation: none; }
 }

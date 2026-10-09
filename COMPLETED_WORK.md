@@ -1378,3 +1378,11 @@ To find if something's been done:
 - Verification: Production build passed; nine focused collection/media tests passed; targeted lint has no errors (two pre-existing hook warnings); git diff --check passed; browser verified real category and product display.
 - Commit: Included in the seasonal collection artwork commit on design/autumn-2026-preview.
 - Deployment: Local preview only. Not pushed or deployed. No database changes.
+
+## 2026-10-09 — Wind-driven menu leaves
+- Agent: Codex.
+- Files: apps/pos/src/pages/storefront/Menu.jsx; styles/AutumnBackground.css.
+- Scope: Animate background leaves with staggered falling, swaying and rotating wind gusts, plus a subtle breeze through collection artwork. Keep pumpkins and the existing menu layout. Decoration sits behind content and ignores pointer input. Fewer/smaller leaves on mobile; reduced-motion preference disables animation.
+- Verification: POS production build passed; targeted ESLint has no errors (two existing hook warnings). Browser confirmed changing fall/wind transforms across observations, pointer-events none, no horizontal overflow, and intact menu appearance. Screenshot saved in parent output folder.
+- Commit: Included in the wind-animation commit on design/autumn-2026-preview.
+- Deployment: Local preview only, not pushed or deployed. No database changes.
