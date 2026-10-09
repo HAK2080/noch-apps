@@ -1425,3 +1425,4 @@ To find if something's been done:
 - Cause: Live browser loaded homepage with autumn stylesheet but no season-leaves DOM; unversioned app.js could reuse old cached JavaScript.
 - Change: Emit a content-hashed app filename and reference it from HTML. Retain app.js compatibility copy.
 - Verification: Storefront build passed; generated HTML points to existing hashed script containing season-leaves. Publishing fix under existing live-site authorization.
+- Production verification: Fix commit 090b5b1 deployed successfully in workflow 37917596454. Live homepage now loads app-71d4f08dcecf.js, renders eight leaf images, and shows changing animation transforms across observations. Screenshot saved in output directory.
