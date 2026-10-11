@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import Layout from '../components/Layout'
 import GlobalStockControl from '../modules/pos/components/GlobalStockControl'
+import CatalogImport from '../modules/pos/components/CatalogImport'
 import toast from 'react-hot-toast'
 import {
   getPOSBranches, getAllProducts, getAllCategories,
@@ -939,6 +940,7 @@ export default function ProductCatalog() {
   const [dateTo, setDateTo] = useState(() => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` })
   const [editProduct, setEditProduct] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [backfill, setBackfill] = useState(null)
 
   // Load branches once.
@@ -1044,6 +1046,7 @@ export default function ProductCatalog() {
             <p className="text-zinc-500 text-sm mt-0.5">Central catalog — synced with POS, inventory & cost calculator</p>
           </div>
           <div className="flex items-center gap-2">
+            {profile?.role === 'owner' && <button onClick={() => setShowImport(true)} className="btn-secondary">Import retail catalogue</button>}
             {profile?.role === 'owner' && (
               <button
                 onClick={handleBackfillImages}
@@ -1159,6 +1162,8 @@ export default function ProductCatalog() {
           </>
         )}
       </div>
+
+      {showImport && profile?.role === 'owner' && <CatalogImport products={products} branches={branches} categories={categories} onClose={() => setShowImport(false)} onSaved={load} />}
 
       {/* Modal */}
       {(showAdd || editProduct) && (

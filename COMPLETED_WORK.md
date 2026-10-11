@@ -1426,3 +1426,11 @@ To find if something's been done:
 - Change: Emit a content-hashed app filename and reference it from HTML. Retain app.js compatibility copy.
 - Verification: Storefront build passed; generated HTML points to existing hashed script containing season-leaves. Publishing fix under existing live-site authorization.
 - Production verification: Fix commit 090b5b1 deployed successfully in workflow 37917596454. Live homepage now loads app-71d4f08dcecf.js, renders eight leaf images, and shows changing animation transforms across observations. Screenshot saved in output directory.
+
+## 2026-10-11 — Owner retail catalogue importer
+- Agent: Codex. Owner explicitly requested automatic import and publication of reviewed 3Bomber/Timemore stock with professional actual photos and bilingual descriptions.
+- Files: ProductCatalog.jsx; CatalogImport.jsx; catalog-import.js; catalog-import.test.mjs.
+- Change: Owner-only reviewed JSON import through existing authenticated product/storage writes. SKU deduplication, ambiguity refusal, source-photo requirement, finite source pricing with max(sheet LYD, wholesale USD x10) rounded upward to 5 LYD. Stored photo sizes use existing optimizer. Failures stop the run; new rows remain hidden until photo upload succeeds; saved SKUs allow retry.
+- Stock: Existing counts/costs are not rewritten; owner reports counts inaccurate, so imported retail rows disable count tracking pending verification. Unavailable matches hide customer visibility. No changes to unrelated cafe products, global stock policy or access rules.
+- Verification: Production build passed; targeted ESLint zero errors, one existing hook warning; three meaningful import tests passed; whitespace check passed.
+- Deployment: Publishing through existing production GitHub workflow under owner authorization; production verification and catalogue results to follow.
