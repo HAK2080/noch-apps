@@ -28,3 +28,10 @@ test('update preserves counted stock and costs; unavailable only hides customer 
   assert.deepEqual(catalogImportPayload({ available: false }, {}, '', ''), { visible_on_website: false, visible_on_customer_menu: false })
   assert.equal(planCatalogImport(validateCatalogImport([{ sku: 'X', available: false }]), [])[0].action, 'Skip')
 })
+test('verified product ID resolves duplicate names and rejects stale IDs', () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  const rows = validateCatalogImport([{ ...raw, match_product_id: id }])
+  assert.equal(planCatalogImport(rows, [{ id, name: 'Pitcher' }, { id: 'other', name: 'Pitcher' }])[0].existing.id, id)
+  assert.throws(() => planCatalogImport(rows, [{ id: 'other', name: 'Pitcher' }]))
+  assert.throws(() => validateCatalogImport([{ ...raw, match_product_id: 'invalid' }]))
+})

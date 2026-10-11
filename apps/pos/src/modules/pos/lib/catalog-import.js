@@ -8,20 +8,22 @@ export function validateCatalogImport(rows) {
     seen.add(sku.toLowerCase())
     if (typeof row.available !== 'boolean') throw new Error(`${sku}: availability required`)
     if (!Array.isArray(row.aliases || []) || (row.aliases || []).some(x => typeof x !== 'string')) throw new Error(`${sku}: invalid aliases`)
-    if (!row.available) return { sku, available: false, aliases: row.aliases || [] }
+    if (row.match_product_id && !/^[a-f0-9-]{36}$/i.test(row.match_product_id)) throw new Error(`${sku}: invalid existing product ID`)
+    if (!row.available) return { sku, available: false, aliases: row.aliases || [], match_product_id: row.match_product_id }
     const sale = Number(row.sheet_sale_lyd), wholesale = Number(row.wholesale_usd)
     if (!(sale > 0) || !(wholesale > 0) || !Number.isFinite(sale + wholesale)) throw new Error(`${sku}: positive source prices required`)
     if (![row.name, row.name_ar, row.description_en, row.description_ar].every(v => typeof v === 'string' && v.trim())) throw new Error(`${sku}: bilingual name and description required`)
     if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(row.photo_data || '')) throw new Error(`${sku}: actual product photo required`)
     if (!Array.isArray(row.source_urls) || !row.source_urls.length || row.source_urls.some(u => !/^https:\/\//.test(u))) throw new Error(`${sku}: source URLs required`)
-    return { sku, available: true, aliases: row.aliases || [], name: row.name.trim(), name_ar: row.name_ar.trim(), description_en: row.description_en.trim(), description_ar: row.description_ar.trim(), photo_data: row.photo_data, price: Math.ceil(Math.max(sale, wholesale * 10) / 5) * 5, source_urls: row.source_urls }
+    return { sku, available: true, aliases: row.aliases || [], match_product_id: row.match_product_id, name: row.name.trim(), name_ar: row.name_ar.trim(), description_en: row.description_en.trim(), description_ar: row.description_ar.trim(), photo_data: row.photo_data, price: Math.ceil(Math.max(sale, wholesale * 10) / 5) * 5, source_urls: row.source_urls }
   })
 }
 const normalized = value => String(value || '').trim().toLowerCase()
 export function planCatalogImport(rows, products) {
   const used = new Set()
   return rows.map(row => {
-    let matches = products.filter(p => normalized(p.sku) === normalized(row.sku))
+    let matches = row.match_product_id ? products.filter(p => p.id === row.match_product_id) : products.filter(p => normalized(p.sku) === normalized(row.sku))
+    if (row.match_product_id && !matches.length) throw new Error(`${row.sku}: existing product ID no longer exists`)
     if (!matches.length) {
       const names = [row.name, ...row.aliases].map(normalized).filter(Boolean)
       matches = products.filter(p => names.includes(normalized(p.name)))
