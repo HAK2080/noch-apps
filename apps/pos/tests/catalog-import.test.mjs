@@ -35,3 +35,16 @@ test('verified product ID resolves duplicate names and rejects stale IDs', () =>
   assert.throws(() => planCatalogImport(rows, [{ id: 'other', name: 'Pitcher' }]))
   assert.throws(() => validateCatalogImport([{ ...raw, match_product_id: 'invalid' }]))
 })
+test('corrections require an existing ID and cannot change inventory, cost, price or POS visibility', () => {
+  const id = '11111111-1111-4111-8111-111111111111'
+  const rawPatch = { sku: 'review-1', match_product_id: id, patch: { name: 'Filter 01', visible_on_website: true } }
+  const row = validateCatalogImport([rawPatch])[0]
+  assert.equal(planCatalogImport([row], [{ id, name: 'Old' }])[0].action, 'Correct')
+  assert.deepEqual(catalogImportPayload(row, { id }, 'branch', 'category'), rawPatch.patch)
+  for (const key of ['price', 'stock_qty', 'cost_price', 'track_inventory', 'is_active', 'visible_on_customer_menu']) {
+    assert.throws(() => validateCatalogImport([{ ...rawPatch, patch: { [key]: 5 } }]))
+  }
+  assert.throws(() => validateCatalogImport([{ ...rawPatch, match_product_id: undefined }]))
+  assert.throws(() => planCatalogImport([row], []))
+  assert.throws(() => validateCatalogImport([{ ...rawPatch, photo_data: 'data:image/jpeg;base64,AA==' }]))
+})

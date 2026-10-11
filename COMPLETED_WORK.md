@@ -1434,3 +1434,10 @@ To find if something's been done:
 - Stock: Existing counts/costs are not rewritten; owner reports counts inaccurate, so imported retail rows disable count tracking pending verification. Unavailable matches hide customer visibility. No changes to unrelated cafe products, global stock policy or access rules.
 - Verification: Production build passed; targeted ESLint zero errors, one existing hook warning; three meaningful import tests passed; whitespace check passed.
 - Deployment: Publishing through existing production GitHub workflow under owner authorization; production verification and catalogue results to follow.
+
+## 2026-10-11 — Retail catalogue smoke-test refinements
+- Agent: Codex. Owner requested duplicate review, online price comparison, sourced cup photos, coffee bags and retail departments. Owner confirmed keeping USD ×10.
+- Files: storefront index.html, public/shop-catalogue.js, shop-catalogue.test.mjs; POS CatalogImport.jsx, catalog-import.js and catalog-import.test.mjs.
+- Change: Bilingual departments with counts, brand and price facets, availability filter, SKU/multiword search, reset and loading/error states; coffee bag weights. Owner import corrections require verified existing IDs and an explicit allowlist of names, store visibility and sourced photos. Corrections preserve prices, inventory, costs and POS flags.
+- Verification: Seven meaningful filter/import tests passed; POS build and targeted lint passed; storefront build/precompile passed; whitespace check passed.
+- Deployment: GitHub production workflows; live verification and correction receipt recorded after publication.

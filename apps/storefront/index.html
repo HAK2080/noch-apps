@@ -236,8 +236,16 @@
   .shop-sort{padding:10px 14px;border-radius:14px;border:2.5px solid var(--ink);background:#fff;font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);box-shadow:3px 3px 0 var(--ink);cursor:pointer}
   [lang="ar"] .shop-sort,[lang="ar"] .shop-search{font-family:'Cairo',sans-serif}
 
-  .shop-cats{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px;scrollbar-width:none}
+  .shop-cats{display:flex;flex-wrap:wrap;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:14px;scrollbar-width:none}
   .shop-cats::-webkit-scrollbar{display:none}
+  .shop-facets{display:flex;flex-wrap:wrap;align-items:end;gap:12px;padding:14px;background:rgba(255,255,255,.5);border:1px solid rgba(20,41,116,.2);border-radius:18px}
+  .shop-facets label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:#142974;flex:1;min-width:130px}
+  .shop-facets select,.shop-facets input[type=number]{font:inherit;width:100%;padding:10px;border:1px solid #142974;border-radius:10px;background:white;color:#142974;box-sizing:border-box}
+  .shop-facets .shop-stock-filter{flex-direction:row;align-items:center;min-height:40px;white-space:nowrap}
+  .shop-filter-reset{padding:10px 14px;border:1px solid #142974;border-radius:10px;background:white;color:#142974;font:inherit;cursor:pointer}
+  .shop-pack-size{font-size:12px;color:#3a436b;margin-top:5px}
+  .shop-results{font-size:14px;color:#3a436b;margin:16px 0}
+  @media(max-width:680px){.shop-facets label{min-width:calc(50% - 12px)}.shop-cat{font-size:13px}}
   .shop-cat{flex-shrink:0;padding:12px 22px;border-radius:999px;border:2.5px solid var(--ink);background:#fff;font-family:'Baloo 2',sans-serif;font-weight:800;font-size:26px;color:var(--ink);cursor:pointer;box-shadow:2px 2px 0 var(--ink);transition:transform .12s,box-shadow .12s;white-space:nowrap}
   [lang="ar"] .shop-cat{font-family:'BehanceAr','Cairo',sans-serif}
   .shop-cat:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
@@ -714,6 +722,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<script src="/shop-catalogue.js?v=20261011"></script>
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
@@ -1224,7 +1233,7 @@ function ProductMenuMedia({ product, name, detail=false }){
 // 10 Nochi poses ordered chill → champion; one per stamp slot.
 // Uses /assets/stamp-01.png … stamp-10.png — overwrite same filenames to swap art.
 function ShopProductCard({ product, lang, lt, onAdd, onOpen }){
-  const inStock = !product.track_inventory || (product.stock_qty > 0);
+  const inStock = NochRetail.inStock(product);
   const name = (lang === 'ar' && product.name_ar) ? product.name_ar : product.name;
   return (
     <div className="shop-card" onClick={()=>onOpen(product)}>
@@ -1234,6 +1243,7 @@ function ShopProductCard({ product, lang, lt, onAdd, onOpen }){
       </div>
       <div className="shop-card-body">
         <div className="shop-card-name">{name}</div>
+        {product.is_coffee_bean && product.retail_pack_size_base_units > 0 && <div className="shop-pack-size">{product.retail_pack_size_base_units} {lang==='ar'?'غرام · حبوب قهوة':'g · Coffee beans'}</div>}
         <div className="shop-card-foot">
           <div className="shop-card-price">{Number(product.price).toFixed(0)} LYD</div>
           <button type="button" className="shop-card-add"
@@ -1254,7 +1264,7 @@ function ProductSheet({ product, lang, lt, onClose, onAdd }){
   const name = (lang === 'ar' && product.name_ar) ? product.name_ar : product.name;
   const desc = (lang === 'ar' && product.menu_description_ar) ? product.menu_description_ar :
                (product.menu_description || product.description || '');
-  const inStock = !product.track_inventory || (product.stock_qty > 0);
+  const inStock = NochRetail.inStock(product);
   return (
     <div className="ps-overlay" onClick={onClose}>
       <div className="ps-card" onClick={(e)=>e.stopPropagation()}>
@@ -1471,6 +1481,12 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
   const [activeCat, setCat]     = useState('all');
   const [search, setSearch]     = useState('');
   const [sort, setSort]         = useState('featured');
+  const [brand, setBrand]       = useState('all');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [stockOnly, setStockOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [openProduct, setOpenP] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart]         = useState(()=>{
@@ -1488,13 +1504,21 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
   useEffect(()=>{
     if (!sb) return;
     Promise.all([
-      sb.from('pos_products').select('id,name,name_ar,price,description,menu_description,menu_description_ar,image_url,video_url,is_active,visible_on_website,track_inventory,stock_qty,featured,category_id,created_at')
+      sb.from('pos_products').select('id,name,name_ar,price,description,menu_description,menu_description_ar,image_url,video_url,is_active,visible_on_website,track_inventory,stock_qty,featured,category_id,created_at,sku,is_coffee_bean,retail_pack_size_base_units,is_available,is_sold_out')
         .eq('visible_on_website', true).eq('is_active', true).order('featured', {ascending:false}).order('name'),
       sb.from('pos_categories').select('id,name,name_ar')
         .eq('show_in_online_store', true).eq('is_active', true).order('name'),
     ]).then(([pr, cr]) => {
-      setProducts(pr.data || []);
-      setCats(cr.data || []);
+      if (pr.error || cr.error) throw (pr.error || cr.error);
+      const allowed = new Set((cr.data || []).map(c => c.id));
+      const items = (pr.data || []).filter(p => !p.category_id || allowed.has(p.category_id) || p.is_coffee_bean);
+      setProducts(items);
+      setCats(NochRetail.departments.map(c => ({...c, count: items.filter(p => NochRetail.department(p) === c.id).length})).filter(c => c.count));
+      setLoading(false);
+    }).catch(e => {
+      console.warn('Shop load failed', e);
+      setLoadError(lang === 'ar' ? 'تعذر تحميل المتجر. حاول مرة أخرى.' : 'Could not load the shop. Please try again.');
+      setLoading(false);
     });
   }, []);
 
@@ -1532,17 +1556,8 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
   }
 
   // Filter/search/sort
-  const filtered = products.filter(p => {
-    const catIds = new Set(categories.map(c => c.id));
-    if (p.category_id && !catIds.has(p.category_id)) return false;
-    if (activeCat !== 'all' && p.category_id !== activeCat) return false;
-    if (search.trim()) {
-      const s = search.trim().toLowerCase();
-      const hay = ((p.name||'') + ' ' + (p.name_ar||'') + ' ' + (p.description||'') + ' ' + (p.menu_description||'')).toLowerCase();
-      if (!hay.includes(s)) return false;
-    }
-    return true;
-  });
+  const filtered = NochRetail.filter(products, { department: activeCat, search, brand, min: minPrice, max: maxPrice, inStock: stockOnly });
+  function resetFilters() { setCat('all'); setSearch(''); setBrand('all'); setMinPrice(''); setMaxPrice(''); setStockOnly(false); }
   const sorted = [...filtered].sort((a,b)=>{
     if (sort === 'priceAsc')  return Number(a.price) - Number(b.price);
     if (sort === 'priceDesc') return Number(b.price) - Number(a.price);
@@ -1578,9 +1593,9 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
             </div>
 
             <div className="shop-controls">
-              <input className="shop-search" type="search" placeholder={lt.searchPh}
+              <input className="shop-search" type="search" aria-label={lt.searchPh} placeholder={lt.searchPh}
                      value={search} onChange={(e)=>setSearch(e.target.value)}/>
-              <select className="shop-sort" value={sort} onChange={(e)=>setSort(e.target.value)}>
+              <select className="shop-sort" aria-label={lang==='ar'?'ترتيب المنتجات':'Sort products'} value={sort} onChange={(e)=>setSort(e.target.value)}>
                 <option value="featured">{lt.sortFeatured}</option>
                 <option value="priceAsc">{lt.sortPriceAsc}</option>
                 <option value="priceDesc">{lt.sortPriceDesc}</option>
@@ -1589,23 +1604,35 @@ function ShopOverlay({ lang, setLang, lt, onClose }){
             </div>
 
             <div className="shop-cats">
-              <button type="button" className={'shop-cat' + (activeCat==='all'?' active':'')} onClick={()=>setCat('all')}>{lt.catAll}</button>
+              <button type="button" className={'shop-cat' + (activeCat==='all'?' active':'')} aria-pressed={activeCat==='all'} onClick={()=>setCat('all')}>{lt.catAll} ({products.length})</button>
               {categories.map(c => (
                 <button key={c.id} type="button"
                         className={'shop-cat' + (activeCat===c.id?' active':'')}
-                        onClick={()=>setCat(c.id)}>
-                  {(lang === 'ar' && c.name_ar) ? c.name_ar : c.name}
+                        aria-pressed={activeCat===c.id} onClick={()=>setCat(c.id)}>
+                  {(lang === 'ar' && c.name_ar) ? c.name_ar : c.name} ({c.count})
                 </button>
               ))}
             </div>
 
+            <div className="shop-facets">
+              <label>{lang==='ar'?'العلامة التجارية':'Brand'}<select value={brand} onChange={e=>setBrand(e.target.value)}>
+                <option value="all">{lang==='ar'?'كل العلامات':'All brands'}</option>
+                {[...new Set(products.map(NochRetail.brand))].sort().map(b=><option key={b} value={b}>{b==='Other'?(lang==='ar'?'أخرى':'Other brands'):b}</option>)}
+              </select></label>
+              <label>{lang==='ar'?'السعر من (د.ل)':'Min price (LYD)'}<input type="number" min="0" value={minPrice} onChange={e=>setMinPrice(e.target.value)} placeholder="0" /></label>
+              <label>{lang==='ar'?'السعر إلى (د.ل)':'Max price (LYD)'}<input type="number" min="0" value={maxPrice} onChange={e=>setMaxPrice(e.target.value)} placeholder="—" /></label>
+              <label className="shop-stock-filter"><input type="checkbox" checked={stockOnly} onChange={e=>setStockOnly(e.target.checked)} />{lang==='ar'?'المتوفر فقط':'In stock only'}</label>
+              <button type="button" className="shop-filter-reset" onClick={resetFilters}>{lang==='ar'?'مسح الفلاتر':'Clear filters'}</button>
+            </div>
+            <p className="shop-results" role="status">{loading ? (lang==='ar'?'جاري تحميل المنتجات…':'Loading products…') : `${sorted.length} ${lang==='ar'?'منتج':'products'}`}</p>
+            {loadError && <p role="alert">{loadError}</p>}
             <div className="shop-grid">
               {sorted.map(p => (
                 <ShopProductCard key={p.id} product={p} lang={lang} lt={lt}
                                  onAdd={addToCart} onOpen={setOpenP}/>
               ))}
             </div>
-            {sorted.length === 0 && (
+            {!loading && !loadError && sorted.length === 0 && (
               <div style={{textAlign:'center',color:'#3a436b',padding:'40px 0'}}>
                 {lang==='ar' ? 'ما لقينا شي.' : 'Nothing found.'}
               </div>

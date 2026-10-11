@@ -6,6 +6,16 @@ export function validateCatalogImport(rows) {
     const sku = String(row.sku || '').trim()
     if (!sku || seen.has(sku.toLowerCase())) throw new Error(`Missing or duplicate SKU: ${sku}`)
     seen.add(sku.toLowerCase())
+    if (row.patch) {
+      if (!/^[a-f0-9-]{36}$/i.test(row.match_product_id || '')) throw new Error(`${sku}: verified existing product ID required for corrections`)
+      if (typeof row.patch !== 'object' || Array.isArray(row.patch)) throw new Error(`${sku}: invalid correction`)
+      const allowed = ['name', 'name_ar', 'visible_on_website']
+      if (!Object.keys(row.patch).length || Object.keys(row.patch).some(k => !allowed.includes(k))) throw new Error(`${sku}: unsupported correction field`)
+      for (const key of ['name', 'name_ar']) if (key in row.patch && (typeof row.patch[key] !== 'string' || !row.patch[key].trim())) throw new Error(`${sku}: invalid ${key}`)
+      if ('visible_on_website' in row.patch && typeof row.patch.visible_on_website !== 'boolean') throw new Error(`${sku}: invalid visibility`)
+      if (row.photo_data && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(row.photo_data) || !Array.isArray(row.source_urls) || !row.source_urls.length || row.source_urls.some(u => !/^https:\/\//.test(u)))) throw new Error(`${sku}: sourced product photo required`)
+      return { sku, patch: row.patch, match_product_id: row.match_product_id, aliases: [], name: row.patch.name, photo_data: row.photo_data, source_urls: row.source_urls }
+    }
     if (typeof row.available !== 'boolean') throw new Error(`${sku}: availability required`)
     if (!Array.isArray(row.aliases || []) || (row.aliases || []).some(x => typeof x !== 'string')) throw new Error(`${sku}: invalid aliases`)
     if (row.match_product_id && !/^[a-f0-9-]{36}$/i.test(row.match_product_id)) throw new Error(`${sku}: invalid existing product ID`)
@@ -32,10 +42,11 @@ export function planCatalogImport(rows, products) {
     const existing = matches[0]
     if (existing && used.has(existing.id)) throw new Error(`${row.sku}: another row targets the same product`)
     if (existing) used.add(existing.id)
-    return { row, existing, action: existing ? (row.available ? 'Update' : 'Hide') : (row.available ? 'Add' : 'Skip') }
+    return { row, existing, action: row.patch ? 'Correct' : existing ? (row.available ? 'Update' : 'Hide') : (row.available ? 'Add' : 'Skip') }
   })
 }
 export function catalogImportPayload(row, existing, branchId, categoryId) {
+  if (row.patch) return { ...row.patch }
   if (!row.available) return { visible_on_website: false, visible_on_customer_menu: false }
   return {
     ...(!existing ? { branch_id: branchId, stock_qty: 0, stock_base_unit: 'pc', stock_display_unit: 'pc' } : {}),
