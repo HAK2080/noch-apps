@@ -875,15 +875,43 @@
 
 .korea-edition .scroll-row {
   gap: 12px;
-  padding: 2px 2px 14px;
+  padding: 2px 2px 16px;
+  scrollbar-width: auto;
+  scrollbar-color: #c96e34 #f1dfbd;
 }
+.korea-edition .scroll-row::-webkit-scrollbar { display: block; height: 10px; }
+.korea-edition .scroll-row::-webkit-scrollbar-track { background: #f1dfbd; border-radius: 999px; }
+.korea-edition .scroll-row::-webkit-scrollbar-thumb { background: #c96e34; border-radius: 999px; }
 .korea-edition .scroll-card {
-  flex: 0 0 calc((100% - 36px) / 4);
+  flex: 0 0 calc((100% - 36px) / 3.7);
   width: auto;
   border: 1px solid rgba(42, 31, 25, 0.12);
   border-radius: 18px;
   box-shadow: 0 5px 14px rgba(54, 38, 28, 0.07);
 }
+.collection-scroll-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 12px;
+  color: #633b26;
+  font-size: 14px;
+  font-weight: 800;
+}
+.collection-scroll-controls > div { display: flex; gap: 8px; }
+.collection-scroll-controls button {
+  width: 38px;
+  height: 38px;
+  border: 2px solid #17182b;
+  border-radius: 50%;
+  background: #d47232;
+  color: white;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.collection-scroll-controls button:focus-visible { outline: 3px solid #3452a4; outline-offset: 2px; }
 .korea-japan-stage .scroll-row {
   position: absolute;
   top: 48.83%;

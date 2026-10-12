@@ -266,9 +266,9 @@ function ProductMenuBadge({ product, lang, inline = false, compact = false, deta
 
 // ── Section layout components ────────────────────────────────────────────────
 
-function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priorityCount = 0 }) {
+function ScrollSection({ products, cart, onAdd, onRemove, name_, desc_, currency, catColor, lang, onOpenDetail, priorityCount = 0, scrollRef }) {
   return (
-    <div className="scroll-row">
+    <div className="scroll-row" ref={scrollRef}>
       {products.map((p, index) => (
         <ScrollCard key={p.id} p={p} qty={cart[p.id] || 0}
           onAdd={() => onAdd(p.id)} onRemove={() => onRemove(p.id)}
@@ -520,6 +520,7 @@ function AddonsStrip({ products, cart, onAdd, onRemove, name_, currency, catColo
 
 // ── Category section wrapper ─────────────────────────────────────────────────
 function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, currency, catColorMap, lang, onViewAll, onOpenDetail, expanded, priorityImages = false }) {
+  const scrollRef = useRef(null)
   const catLabel = categoryCustomerLabel(cat, lang)
   const col = catColorMap[cat.id] || CARD_COLORS[0]
   const baseStyle = cat.menu_display_style || 'scroll'
@@ -528,11 +529,28 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
   // render a full vertical grid so every item is visible at once — no sideways scroll.
   const style = expanded ? 'grid' : baseStyle
 
+  const scrollCards = direction => {
+    const row = scrollRef.current
+    if (!row) return
+    const cardWidth = row.firstElementChild?.getBoundingClientRect().width || row.clientWidth / 3
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0
+    row.scrollBy({ left: direction * (cardWidth + gap) * (lang === 'ar' ? -1 : 1), behavior: 'smooth' })
+  }
+
   if (products.length === 0) return null
 
   return (
     <section className={`cat-section${expanded ? ' cat-section-expanded' : ''}${koreaEdition ? ' korea-edition' : ''}`} id={`cat-${cat.id}`}>
       {koreaEdition && <AutumnCollectionArtwork catLabel={catLabel} />}
+      {koreaEdition && style === 'scroll' && products.length >= 4 && (
+        <div className="collection-scroll-controls">
+          <span>{lang === 'ar' ? 'مرّر لرؤية المزيد' : 'Scroll for more'}</span>
+          <div>
+            <button type="button" onClick={() => scrollCards(-1)} aria-label={lang === 'ar' ? 'المنتج السابق' : 'Previous product'}>{lang === 'ar' ? '›' : '‹'}</button>
+            <button type="button" onClick={() => scrollCards(1)} aria-label={lang === 'ar' ? 'المنتج التالي' : 'Next product'}>{lang === 'ar' ? '‹' : '›'}</button>
+          </div>
+        </div>
+      )}
       {!koreaEdition && <div className="cat-section-header">
         <h2 className="cat-section-title">
           <CatIcon name={catLabel} imageUrl={cat.image_url} size={18} />
@@ -553,7 +571,7 @@ function CategorySection({ cat, products, cart, onAdd, onRemove, name_, desc_, c
       {style === 'scroll' && (
         <ScrollSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
           name_={name_} desc_={desc_} currency={currency} catColor={col} lang={lang} onOpenDetail={onOpenDetail}
-          priorityCount={priorityImages ? 2 : 0} />
+          priorityCount={priorityImages ? 2 : 0} scrollRef={scrollRef} />
       )}
       {style === 'list' && (
         <ListSection products={products} cart={cart} onAdd={onAdd} onRemove={onRemove}
