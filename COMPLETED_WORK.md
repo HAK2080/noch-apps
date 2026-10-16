@@ -1469,4 +1469,4 @@ To find if something's been done:
 - **Agent**: Codex.
 - **Change**: Set the shared Arabic application name to the owner's exact wording, `نوتش كافيه`, replacing `نوخ أومني`. This also feeds automatic translation of the app's visible branding.
 - **Files**: `apps/pos/src/lib/i18n.js`.
-- **Verification / deployment**: Targeted lint, production build, GitHub publication and live Arabic-brand verification performed for this wording change; release receipt follows.
+- **Verification / deployment**: Targeted lint and production build passed. Commit `e39557b` is on GitHub main; production workflow [38935046827](https://github.com/HAK2080/noch-apps/actions/runs/38935046827) succeeded. A fresh 390px mobile browser session verified the live Arabic login heading is exactly `نوتش كافيه`.
