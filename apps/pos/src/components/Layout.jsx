@@ -82,9 +82,9 @@ export default function Layout({ children }) {
       navItems.push({ type: 'group', label: ar ? pendingGroup.labelAr : pendingGroup.labelEn })
       pendingGroup = null
     }
-    navItems.push({ to: item.to, icon: item.icon, label: navLabel(item), end: item.end })
+    navItems.push({ to: item.to, icon: item.icon, label: navLabel(item), end: item.end, mobilePriority: item.mobilePriority })
   }
-  const navLinkItems = navItems.filter(item => item.type !== 'group')
+  const navLinkItems = navItems.filter(item => item.to && item.icon)
   const mobileItems = [...navLinkItems]
     .sort((a, b) => (a.mobilePriority || 99) - (b.mobilePriority || 99))
     .slice(0, 4)

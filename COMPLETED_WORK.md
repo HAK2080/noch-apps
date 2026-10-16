@@ -1453,3 +1453,13 @@ To find if something's been done:
 - **Verification**: Six focused tests and both production builds passed; targeted POS lint had zero errors and two existing warnings. Live Worker GET, HEAD, missing-object, original fallback, and byte-range smoke tests passed. After deployment, the City Walk menu loaded product images from the Worker with no broken images observed.
 - **GitHub / live**: PR #7 merged at `9e24ec4`. GitHub Actions deployments [apps.noch.cloud](https://github.com/HAK2080/noch-apps/actions/runs/38860904296) and [noch.cloud](https://github.com/HAK2080/noch-apps/actions/runs/38860904259) succeeded. Cloudflare Worker `noch-menu-media.2080testing.workers.dev` is live. R2 bucket `noch-menu-media` remains private.
 - **Follow-up**: Compare Supabase storage egress over the next billing period; existing usage is not reset. Watch Cloudflare Workers Free's 100,000-request daily limit. No original media was deleted.
+
+## 2026-10-16 — Repair blank staff/mobile workspace startup
+
+- **Agent**: Codex.
+- **Cause**: `Layout.jsx` removed group headings but left separator rows in the list consumed as clickable links. Staff grants put an icon-less separator into the first four bottom-navigation items, causing React error 130. Search and More could also render the invalid rows for other roles. Mobile priorities were lost when copying the feature catalogue into rendered navigation.
+- **Change**: Require a destination and icon for clickable navigation, and preserve the configured mobile priority. Add an independent startup recovery display and scrubbed same-origin error capture; retry unregisters the app worker and removes only app shell caches, preserving login, image cache, IndexedDB and pending sales. Reject cached HTML masquerading as JS/CSS and fall back to network when cache access fails.
+- **Files**: POS `src/components/Layout.jsx`, `index.html`, `public/sw.js`, `playwright.mobile-startup.config.js`, `tests/mobile-startup.spec.js`, and `tests/startup-recovery.test.mjs`.
+- **Evidence**: Live mobile startup capture reported React error 130 on `/pos`; the existing live build reproduced the blank staff screen with mocked representative grants. Live account/RLS probes returned the staff profile, POS grant, and active branch successfully. Server HTTPS and certificate checks passed.
+- **Verification**: Production build and 12 focused access/recovery/worker tests passed. Android staff and owner navigation/search smoke tests passed; desktop and production release checks recorded below after completion. Test account/API responses are mocked and no sale or customer record is written.
+- **Deployment**: Publish to GitHub and live under the existing repair authorization; release details follow.

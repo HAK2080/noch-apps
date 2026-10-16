@@ -126,10 +126,13 @@ self.addEventListener('fetch', (event) => {
   // Same-origin static asset: cache-first.
   if (isCacheableAsset(url)) {
     event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached
-        return fetch(req).then((res) => {
-          if (res && res.ok) {
+      caches.match(req).catch(() => null).then((cached) => {
+        const isCode = /\.(?:js|css)$/.test(url.pathname)
+        // A stale fallback HTML response is not an executable bundle. Repair
+        // that entry instead of replaying it forever on installed phones.
+        if (cached && (!isCode || !cached.headers.get('content-type')?.includes('text/html'))) return cached
+        return fetch(req, cached ? { cache: 'reload' } : undefined).then((res) => {
+          if (res && res.ok && (!isCode || !res.headers.get('content-type')?.includes('text/html'))) {
             const clone = res.clone()
             caches.open(CACHE).then((c) => c.put(req, clone)).catch(() => {})
           }

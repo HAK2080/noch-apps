@@ -9,6 +9,64 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>noch.apps</title>
+    <script>
+      // Run before the app modules: a failed bundle must not leave a blank phone.
+      ;(function () {
+        var reported = false
+        function report(reason) {
+          if (reported) return
+          reported = true
+          // Only startup errors; never include session data, page queries or forms.
+          var safe = String(reason).replace(/https?:\/\/\S+/g, '[resource]').slice(0, 240)
+          var beacon = new Image()
+          beacon.src = '/favicon.svg?noch_startup_error=' + encodeURIComponent(safe)
+        }
+        function showRecovery() {
+          var root = document.getElementById('root')
+          if (!root || root.childElementCount) return
+          report('startup-timeout')
+          root.innerHTML = '<main style="min-height:100vh;display:grid;place-content:center;text-align:center;padding:24px;box-sizing:border-box;background:#09090b;color:#fafafa;font:17px system-ui,sans-serif"><h1 style="font-size:24px">تعذر فتح نوتش</h1><p>Noch could not open. Please try again.</p><button id="noch-startup-retry" style="padding:14px 24px;border:0;border-radius:12px;background:#86d98b;color:#09090b;font:inherit;cursor:pointer">إعادة المحاولة / Try again</button><p id="noch-startup-note" style="font-size:14px;color:#a1a1aa">طلباتك المحفوظة تبقى محفوظة · Saved orders are preserved</p></main>'
+          document.getElementById('noch-startup-retry').onclick = function () {
+            this.disabled = true
+            this.textContent = 'جارٍ المحاولة… / Retrying…'
+            var jobs = []
+            if ('serviceWorker' in navigator) {
+              jobs.push(navigator.serviceWorker.getRegistrations().then(function (items) {
+                return Promise.all(items.map(function (item) { return item.unregister() }))
+              }))
+            }
+            if ('caches' in window) {
+              jobs.push(caches.keys().then(function (keys) {
+                return Promise.all(keys.filter(function (key) {
+                  return key.indexOf('noch-pos-') === 0 && key !== 'noch-pos-images-v1'
+                }).map(function (key) { return caches.delete(key) }))
+              }))
+            }
+            // Do not clear localStorage or IndexedDB: these contain login and queued sales.
+            Promise.all(jobs).catch(function () {}).then(function () {
+              var url = new URL(location.href)
+              url.searchParams.set('noch_reload', Date.now())
+              location.replace(url.href)
+            })
+          }
+        }
+        window.addEventListener('error', function (event) {
+          var root = document.getElementById('root')
+          if (root && root.childElementCount) return
+          var source = event.target && (event.target.src || event.target.href)
+          if (!event.message && event.target && event.target.tagName !== 'SCRIPT') return
+          report(event.message || (source ? 'resource-load: ' + source.split('/').pop().split('?')[0] : 'startup-error'))
+          setTimeout(showRecovery, 0)
+        }, true)
+        window.addEventListener('unhandledrejection', function (event) {
+          var root = document.getElementById('root')
+          if (root && root.childElementCount) return
+          report(event.reason && event.reason.message || 'startup-promise-rejected')
+          setTimeout(showRecovery, 0)
+        })
+        setTimeout(showRecovery, 10000)
+      })()
+    </script>
     <meta name="theme-color" content="#4ADE80" />
 <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
