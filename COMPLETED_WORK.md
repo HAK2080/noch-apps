@@ -1463,3 +1463,10 @@ To find if something's been done:
 - **Evidence**: Live mobile startup capture reported React error 130 on `/pos`; the existing live build reproduced the blank staff screen with mocked representative grants. Live account/RLS probes returned the staff profile, POS grant, and active branch successfully. Server HTTPS and certificate checks passed.
 - **Verification**: Production build, targeted lint, and 12 focused access/recovery/worker tests passed. Four Android/desktop staff/owner saved-session, navigation and search browser checks passed against the repaired preview, then all four passed against the production site. Test account/API responses are mocked and no sale or customer record is written.
 - **Deployment**: Fix commit `1938f3dd3fce5a3a1308efc0c70567a50b1331ce` pushed to GitHub main. Production workflow [38934183896](https://github.com/HAK2080/noch-apps/actions/runs/38934183896) completed successfully; the repaired live build passed all four browser checks. Existing phones can use the recovery button or reopen the login URL to load the updated build.
+
+## 2026-10-16 — Correct Arabic app name
+
+- **Agent**: Codex.
+- **Change**: Set the shared Arabic application name to the owner's exact wording, `نوتش كافيه`, replacing `نوخ أومني`. This also feeds automatic translation of the app's visible branding.
+- **Files**: `apps/pos/src/lib/i18n.js`.
+- **Verification / deployment**: Targeted lint, production build, GitHub publication and live Arabic-brand verification performed for this wording change; release receipt follows.

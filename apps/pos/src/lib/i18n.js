@@ -75,7 +75,7 @@ export const translations = {
     expenseSubmitterPaidCard: 'المُرسل: مدفوع بالبطاقة',
 
     // App
-    appName: 'نوخ أومني',
+    appName: 'نوتش كافيه',
     appTagline: 'إدارة متكاملة',
 
     // Auth
