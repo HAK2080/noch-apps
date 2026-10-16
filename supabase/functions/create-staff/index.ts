@@ -128,6 +128,8 @@ Deno.serve(async (req: Request) => {
     // boundary is explicit.
     is_employee: true,
     payroll_enabled: true,
+    // No email still creates a Team/POS employee; web access needs Auth.
+    access_enabled: Boolean(authUserId),
   }
   if (authUserId) profileRow.auth_user_id = authUserId
   if (email) profileRow.email = email
