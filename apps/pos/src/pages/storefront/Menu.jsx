@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { getCustomerSaleAvailability } from '../../modules/pos/lib/global-stock'
 import { formatFixed } from '../../lib/numbers'
 import { buildStoredProductImageUrl } from '../../lib/product-images'
+import { menuMediaUrl } from '../../lib/menu-media-url'
 import { productBelongsToCategory } from '../../lib/product-categories'
 import { getProductMenuBadge, normalizeProductMenuBadgeAnimation } from '../../lib/product-menu-badges'
 import nochLogo from '../../assets/noch-logo-menu.webp'
@@ -139,6 +140,7 @@ function MenuProductImage({ src, videoSrc, alt, className, fallback, priority = 
 function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, priority, detail }) {
   const [shouldLoad, setShouldLoad] = useState(false)
   const [status, setStatus] = useState('loading')
+  const [useOriginVideo, setUseOriginVideo] = useState(false)
   const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData === true
 
   // A visible card should fetch only its photo. Attach the video source only
@@ -183,8 +185,8 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
     <div className={`${className} menu-product-image-shell${status === 'loaded' ? ' is-loaded' : ''}`}>
       <span className="menu-product-image-skeleton" aria-hidden="true" />
       <video
-        src={videoSrc}
-        poster={posterSrc ? buildStoredProductImageUrl(posterSrc, detail ? 'full' : 'card') : undefined}
+        src={useOriginVideo ? videoSrc : menuMediaUrl(videoSrc)}
+        poster={posterSrc ? menuMediaUrl(posterSrc) : undefined}
         aria-label={alt}
         className="menu-product-video-media"
         muted
@@ -195,7 +197,13 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
         onClick={event => event.stopPropagation()}
         preload="none"
         onLoadedData={() => setStatus('loaded')}
-        onError={() => setStatus('failed')}
+        onError={() => {
+          if (!useOriginVideo && menuMediaUrl(videoSrc) !== videoSrc) {
+            setUseOriginVideo(true)
+            return
+          }
+          setStatus('failed')
+        }}
       />
     </div>
   )
@@ -203,12 +211,14 @@ function MenuProductVideoState({ videoSrc, posterSrc, alt, className, fallback, 
 
 function MenuProductImageState({ src, alt, className, fallback, priority, detail }) {
   const optimizedSource = buildStoredProductImageUrl(src, detail ? 'full' : 'card')
-  const [currentSource, setCurrentSource] = useState(optimizedSource)
+  const sources = [...new Set([menuMediaUrl(optimizedSource), menuMediaUrl(src), src].filter(Boolean))]
+  const [sourceIndex, setSourceIndex] = useState(0)
   const [status, setStatus] = useState(src ? 'loading' : 'failed')
+  const currentSource = sources[sourceIndex]
 
   const handleError = () => {
-    if (currentSource !== src) {
-      setCurrentSource(src)
+    if (sourceIndex + 1 < sources.length) {
+      setSourceIndex(sourceIndex + 1)
       setStatus('loading')
       return
     }
