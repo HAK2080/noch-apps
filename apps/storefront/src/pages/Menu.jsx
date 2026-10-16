@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getCustomerAvailableProductIds } from '../lib/stock-availability'
+import { menuMediaUrl } from '../lib/menu-media-url'
 
 const CAT_EMOJI = {
   'hot coffee': '☕', 'coffee': '☕',
@@ -28,6 +29,8 @@ function ProductMedia({ item, fallback }) {
   const videoRef = useRef(null)
   const [shouldLoad, setShouldLoad] = useState(false)
   const [videoFailed, setVideoFailed] = useState(false)
+  const [useOriginVideo, setUseOriginVideo] = useState(false)
+  const [useOriginImage, setUseOriginImage] = useState(false)
   const saveData = typeof navigator !== 'undefined' && navigator.connection?.saveData === true
 
   useEffect(() => {
@@ -52,8 +55,8 @@ function ProductMedia({ item, fallback }) {
       <div className="card-illus card-media">
         <video
           ref={videoRef}
-          src={shouldLoad ? item.video_url : undefined}
-          poster={item.image_url || undefined}
+          src={shouldLoad ? (useOriginVideo ? item.video_url : menuMediaUrl(item.video_url)) : undefined}
+          poster={item.image_url ? menuMediaUrl(item.image_url) : undefined}
           className="card-menu-video"
           aria-label={item.name}
           muted
@@ -61,7 +64,10 @@ function ProductMedia({ item, fallback }) {
           playsInline
           autoPlay
           preload="none"
-          onError={() => setVideoFailed(true)}
+          onError={() => {
+            if (!useOriginVideo && menuMediaUrl(item.video_url) !== item.video_url) setUseOriginVideo(true)
+            else setVideoFailed(true)
+          }}
         />
       </div>
     )
@@ -70,7 +76,7 @@ function ProductMedia({ item, fallback }) {
   return (
     <div className="card-illus card-media">
       {item.image_url
-        ? <img src={item.image_url} alt={item.name} className="card-menu-image" loading="lazy" decoding="async" />
+        ? <img src={useOriginImage ? item.image_url : menuMediaUrl(item.image_url)} alt={item.name} className="card-menu-image" loading="lazy" decoding="async" onError={() => setUseOriginImage(true)} />
         : fallback}
     </div>
   )

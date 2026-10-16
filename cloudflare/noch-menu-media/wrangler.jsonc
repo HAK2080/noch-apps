@@ -1,0 +1,11 @@
+{
+  "name": "noch-menu-media",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-16",
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "noch-menu-media"
+    }
+  ]
+}
