@@ -17,6 +17,7 @@ import {
   replaceProductCostComponents,
 } from '../modules/pos/lib/pos-supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { menuMediaUrl } from '../lib/menu-media-url'
 import BarcodeScanner from '../modules/pos/components/BarcodeScanner'
 import CoffeeConsumptionField from '../modules/pos/components/CoffeeConsumptionField'
 import ProductCostComponents from '../modules/pos/components/ProductCostComponents'
@@ -84,9 +85,9 @@ function ProductCard({ product, stats, onEdit, onDelete }) {
       {/* Image */}
       <div className="relative aspect-[4/3] overflow-hidden" style={{ background: 'var(--surface)' }}>
         {product.video_url ? (
-          <video src={product.video_url} poster={product.image_url || undefined} muted loop playsInline preload="none" className="w-full h-full object-contain bg-[#f8f3e8]" />
+          <video src={menuMediaUrl(product.video_url)} poster={menuMediaUrl(product.image_url) || undefined} muted loop playsInline preload="none" className="w-full h-full object-contain bg-[#f8f3e8]" />
         ) : product.image_url ? (
-          <img src={product.image_url} alt={product.name} className="w-full h-full object-contain bg-[#f8f3e8]" />
+          <img src={menuMediaUrl(product.image_url)} alt={product.name} className="w-full h-full object-contain bg-[#f8f3e8]" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 opacity-40">
             <ShoppingBag size={26} className="text-zinc-500" />
@@ -520,7 +521,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
             <div className="flex items-start gap-4">
               <div className="w-20 aspect-[4/5] rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#f8f3e8', border: '1px solid var(--border)' }}>
                 {(pendingPreview || form.image_url)
-                  ? <img src={pendingPreview || form.image_url} alt="" className="w-full h-full object-contain" />
+                  ? <img src={pendingPreview || menuMediaUrl(form.image_url)} alt="" className="w-full h-full object-contain" />
                   : <div className="w-full h-full flex items-center justify-center"><Image size={22} className="text-zinc-600" /></div>
                 }
               </div>
@@ -559,7 +560,7 @@ function ProductModal({ product, products, categories, branches, canEditCost, on
               <div className="flex items-start gap-4">
                 <div className="w-20 aspect-[4/5] rounded-xl overflow-hidden flex-shrink-0 bg-black" style={{ border: '1px solid var(--border)' }}>
                   {(pendingVideoPreview || form.video_url)
-                    ? <video src={pendingVideoPreview || form.video_url} poster={pendingPreview || form.image_url || undefined} muted loop playsInline controls preload="metadata" className="w-full h-full object-contain" />
+                    ? <video src={pendingVideoPreview || menuMediaUrl(form.video_url)} poster={pendingPreview || menuMediaUrl(form.image_url) || undefined} muted loop playsInline controls preload="metadata" className="w-full h-full object-contain" />
                     : <div className="w-full h-full flex items-center justify-center"><Video size={22} className="text-zinc-600" /></div>
                   }
                 </div>

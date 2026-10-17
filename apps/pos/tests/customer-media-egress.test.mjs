@@ -79,13 +79,13 @@ test('both deployed video components make zero video elements until tapped', asy
       source: pos.slice(pos.indexOf('function MenuProductVideoState'), pos.indexOf('function MenuProductImageState')),
       name: 'MenuProductVideoState',
       props: {videoSrc: `${base}clip.mp4`, posterSrc: `${base}photo.webp`, alt: 'Matcha', className: 'photo'},
-      extras: {MenuProductImageState: () => null, buildStoredProductImageUrl: value => value},
+      extras: {MenuProductImageState: () => null, buildStoredProductImageUrl: value => value, menuMediaUrl: value => value},
     },
     {
       source: website.slice(website.indexOf('function ProductMenuMedia'), website.indexOf('// 10 Nochi poses')),
       name: 'ProductMenuMedia',
       props: {product: {video_url: `${base}clip.mp4`, image_url: `${base}photo.webp`}, name: 'Matcha'},
-      extras: {MenuPhoto: () => null, storedMenuPhoto: value => value},
+      extras: {MenuPhoto: () => null, storedMenuPhoto: value => value, publicProductMedia: value => value},
     },
   ]
   for (const sample of samples) {

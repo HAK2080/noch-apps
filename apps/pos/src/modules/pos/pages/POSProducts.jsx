@@ -28,6 +28,7 @@ import { NEW_PRODUCT_VISIBILITY } from '../lib/product-visibility'
 import { formatImageBytes, generatedImageFileFromBase64, optimizeProductImageSet } from '../lib/product-image-processing'
 import { PRODUCT_VIDEO_ACCEPT, validateProductVideo } from '../lib/product-video'
 import { buildStoredProductImageUrl } from '../../../lib/product-images'
+import { menuMediaUrl } from '../../../lib/menu-media-url'
 import {
   changeProductPrimaryCategory,
   getProductCategoryIds,
@@ -496,7 +497,7 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                     {(pendingPreview || form.image_url) && (
                       <div className="relative mb-2">
                         <img
-                          src={pendingPreview || buildStoredProductImageUrl(form.image_url, 'card')}
+                          src={pendingPreview || menuMediaUrl(buildStoredProductImageUrl(form.image_url, 'card'))}
                           alt=""
                           className="w-full max-h-80 aspect-[4/5] object-contain bg-[#f8f3e8] rounded-lg border border-noch-border"
                           onError={e => {
@@ -586,8 +587,8 @@ function ProductModal({ product, products, categories, branchId, onSave, onClose
                     </div>
                     {(pendingVideoPreview || form.video_url) && (
                       <video
-                        src={pendingVideoPreview || form.video_url}
-                        poster={pendingPreview || form.image_url || undefined}
+                        src={pendingVideoPreview || menuMediaUrl(form.video_url)}
+                        poster={pendingPreview || menuMediaUrl(form.image_url) || undefined}
                         className="mt-3 w-full max-h-72 aspect-[4/5] rounded-lg bg-black object-contain"
                         muted
                         loop
@@ -726,7 +727,7 @@ function CategoryModal({ branchId, category, branches = [], onSave, onClose }) {
         <div className="flex items-center gap-3 mb-4">
           <div className="w-16 h-16 rounded-xl border-2 border-noch-border overflow-hidden bg-noch-bg flex items-center justify-center flex-shrink-0">
             {imageUrl
-              ? <img src={imageUrl} alt="category" className="w-full h-full object-cover" />
+              ? <img src={menuMediaUrl(imageUrl)} alt="category" className="w-full h-full object-cover" />
               : <span className="text-2xl">🌿</span>
             }
           </div>
@@ -1306,7 +1307,7 @@ export default function POSProducts() {
                     <GripVertical size={16} />
                   </div>
                   {c.image_url
-                    ? <img src={c.image_url} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-noch-border" />
+                    ? <img src={menuMediaUrl(c.image_url)} alt={c.name} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-noch-border" />
                     : <div className="w-3 h-8 rounded-sm shrink-0" style={{ backgroundColor: c.color }} />
                   }
                   <div className="flex-1">

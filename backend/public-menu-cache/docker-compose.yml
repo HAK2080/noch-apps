@@ -1,0 +1,21 @@
+services:
+  noch-menu-cache:
+    image: node:22-alpine
+    container_name: noch-menu-cache
+    restart: unless-stopped
+    user: node
+    read_only: true
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    env_file: .env
+    command: [node, --max-old-space-size=64, /app/server.mjs]
+    volumes:
+      - ./server.mjs:/app/server.mjs:ro
+    networks:
+      - apps-site_default
+networks:
+  apps-site_default:
+    external: true

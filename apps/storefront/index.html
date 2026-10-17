@@ -1200,11 +1200,22 @@ function storedMenuPhoto(source, variant='card'){
   }catch{ return source; }
 }
 
+function publicProductMedia(source){
+  try{
+    const url = new URL(source);
+    const prefix = '/storage/v1/object/public/product-images/';
+    if(url.origin !== 'https://kxqjasdvoohiexedtfqw.supabase.co' || !url.pathname.startsWith(prefix)) return source;
+    const key = url.pathname.slice(prefix.length);
+    return /^(?:products\/)?[0-9a-f-]{36}\/[a-z0-9._-]+\.(?:webp|png|jpe?g|mp4|webm)$/i.test(key)
+      ? 'https://apps.noch.cloud/media/' + key + url.search : source;
+  }catch{ return source; }
+}
+
 function MenuPhoto({source, name='', detail=false, thumb=false}){
   const [failed, setFailed] = useState(false);
   const photo = detail || failed ? source : storedMenuPhoto(source, thumb ? 'thumb' : 'card');
   return source
-    ? <img src={photo} alt={name} loading={detail ? 'eager' : 'lazy'} decoding="async"
+    ? <img src={publicProductMedia(photo)} alt={name} loading={detail ? 'eager' : 'lazy'} decoding="async"
            onError={()=>{ if(photo !== source) setFailed(true); }}/>
     : <img className="placeholder" src="assets/nochi-shopping.png" alt=""/>;
 }
@@ -1215,8 +1226,8 @@ function ProductMenuMedia({ product, name, detail=false }){
   const saveData = typeof navigator !== 'undefined' && navigator.connection && navigator.connection.saveData === true;
 
   if(product.video_url && !saveData && !videoFailed && shouldLoad){
-    return <video src={product.video_url}
-                  poster={detail ? product.image_url : storedMenuPhoto(product.image_url)}
+    return <video src={publicProductMedia(product.video_url)}
+                  poster={publicProductMedia(detail ? product.image_url : storedMenuPhoto(product.image_url))}
                   aria-label={name}
                   muted loop playsInline autoPlay controls preload="none"
                   onClick={e=>e.stopPropagation()}

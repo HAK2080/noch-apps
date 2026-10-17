@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { getSharedPublicMenu } from '../../lib/public-menu-cache'
 import { getCustomerSaleAvailability } from '../../modules/pos/lib/global-stock'
 import { formatFixed } from '../../lib/numbers'
 import { buildStoredProductImageUrl } from '../../lib/product-images'
@@ -42,7 +43,7 @@ function CatIcon({ name, imageUrl, size = 16 }) {
   // Category uploads do not have the stored variants generated for products.
   if (imageUrl && failedImageUrl !== imageUrl) return (
     <img
-      src={imageUrl}
+      src={menuMediaUrl(imageUrl)}
       alt={name}
       onError={() => setFailedImageUrl(imageUrl)}
       loading="lazy"
@@ -764,6 +765,15 @@ export default function Menu() {
     try {
       setLoading(true)
       setError(null)
+      try {
+        const menu = await getSharedPublicMenu(branchParam)
+        setBranchId(menu.branch.id)
+        setBranch(menu.branch)
+        setCategories(menu.categories)
+        setProducts(menu.products)
+        writeCachedMenu(branchParam, menu.branch, menu.categories, menu.products)
+        return
+      } catch { /* Preserve the existing direct source if shared hosting is unavailable. */ }
       // Resolve branch by UUID or slug first, then load its menu by real id.
       const isUuid = BRANCH_UUID_RE.test(branchParam)
       const branchQ = supabase.from('pos_branches')

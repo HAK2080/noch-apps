@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
+import { schedulePublicMenuRefresh } from './public-menu-cache'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    fetch: async (input, init) => {
+      const response = await fetch(input, init)
+      schedulePublicMenuRefresh(input, init, response)
+      return response
+    },
+  },
   auth: {
     // Refresh tokens silently so kiosk devices stay logged in indefinitely
     // and regular staff don't get bounced after the 1h access-token TTL.

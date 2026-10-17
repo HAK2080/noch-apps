@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getSharedPublicMenu } from '../lib/public-menu-cache'
 import { getCustomerAvailableProductIds } from '../lib/stock-availability'
 import { menuMediaUrl } from '../lib/menu-media-url'
 
@@ -94,7 +95,10 @@ export default function Menu() {
   useEffect(() => {
     async function load() {
       try {
-        const [catRes, prodRes, availableIds] = await Promise.all([
+        const shared = await getSharedPublicMenu().catch(() => null)
+        const [catRes, prodRes, availableIds] = shared ? [
+          { data: shared.categories }, { data: shared.products }, new Set(shared.products.map(product => product.id)),
+        ] : await Promise.all([
           supabase.from('pos_categories').select('id,name,name_ar').eq('is_active', true).eq('show_on_website', true).order('sort_order'),
           supabase.from('pos_products')
             .select('id,name,name_ar,price,description,menu_description,menu_description_ar,show_description_on_website,visible_on_website,category_id,image_url,video_url')

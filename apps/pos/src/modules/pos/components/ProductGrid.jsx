@@ -10,6 +10,7 @@ import { AlertTriangle, Ban } from 'lucide-react'
 import { format } from '../lib/money'
 import { formatStockQuantity } from '../lib/inventory-units'
 import { buildStoredProductImageUrl } from '../../../lib/product-images'
+import { menuMediaUrl } from '../../../lib/menu-media-url'
 import { productBelongsToCategory } from '../../../lib/product-categories'
 
 const LONG_PRESS_MS = 500
@@ -176,13 +177,15 @@ function ProductGrid({
               >
                 {product.image_url ? (
                   <img
-                    src={buildStoredProductImageUrl(product.image_url, 'card')}
+                    src={menuMediaUrl(buildStoredProductImageUrl(product.image_url, 'card'))}
                     alt=""
                     className="absolute inset-0 w-full h-full object-contain"
                     loading="lazy"
                     decoding="async"
                     onError={e => {
-                      if (e.currentTarget.src !== product.image_url) e.currentTarget.src = product.image_url
+                      const original = menuMediaUrl(product.image_url)
+                      if (e.currentTarget.src !== original && e.currentTarget.src !== product.image_url) e.currentTarget.src = original
+                      else if (e.currentTarget.src !== product.image_url) e.currentTarget.src = product.image_url
                     }}
                   />
                 ) : (
