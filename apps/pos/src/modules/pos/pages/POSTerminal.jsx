@@ -1072,7 +1072,7 @@ function POSTerminalContent() {
     <div lang={posLanguage(tileLang)} dir={posLanguage(tileLang) === 'ar' ? 'rtl' : 'ltr'} className="flex flex-col h-screen h-[100dvh] bg-noch-dark overflow-hidden">
       <PrintHostBadge branchId={branchId} />
       {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-3 bg-noch-card border-b border-noch-border shrink-0">
+      <header className="flex flex-wrap items-center gap-2 px-3 py-3 sm:flex-nowrap sm:gap-3 sm:px-4 bg-noch-card border-b border-noch-border shrink-0">
         <button onClick={() => navigate(isKioskMode() ? '/kiosk' : '/pos')} className="text-noch-muted hover:text-white p-1">
           <ArrowLeft size={18} />
         </button>
@@ -1102,7 +1102,7 @@ function POSTerminalContent() {
         )}
 
         {/* Search */}
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative order-3 w-full basis-full min-w-0 sm:order-none sm:w-auto sm:basis-auto sm:flex-1 sm:max-w-xs">
           <Search size={14} className={`absolute top-1/2 -translate-y-1/2 text-noch-muted ${tileLang === 'ar' ? 'right-3' : 'left-3'}`} />
           <input
             type="text"
@@ -1114,6 +1114,7 @@ function POSTerminalContent() {
           />
         </div>
 
+        <div className="order-2 flex w-full shrink-0 items-center justify-between gap-1 sm:order-none sm:w-auto sm:justify-start sm:gap-2">
         {/* Online Orders badge */}
         {(() => {
           const hasPending = onlineOrders.some(o => o.awaiting_staff_confirm)
@@ -1173,14 +1174,21 @@ function POSTerminalContent() {
         </div>
 
         {/* ⋮ More menu — secondary actions */}
-        <div className="relative">
-          <button onClick={() => setShowMore(v => !v)} className="p-2 text-noch-muted hover:text-white">
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setShowMore(v => !v)}
+            aria-label={posLanguage(tileLang) === 'ar' ? 'قائمة نقطة البيع' : 'POS menu'}
+            aria-expanded={showMore}
+            aria-controls="pos-terminal-actions"
+            className="flex items-center gap-1 rounded-lg border border-noch-border px-2 py-2 text-noch-muted hover:text-white"
+          >
             <MoreVertical size={18} />
+            <span className="text-xs">{posLanguage(tileLang) === 'ar' ? 'القائمة' : 'Menu'}</span>
           </button>
           {showMore && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowMore(false)} />
-              <div className="absolute right-0 top-full mt-1 z-40 bg-noch-card border border-noch-border rounded-xl shadow-xl py-1 min-w-[180px]">
+              <div id="pos-terminal-actions" className="absolute end-0 top-full mt-1 z-40 bg-noch-card border border-noch-border rounded-xl shadow-xl py-1 min-w-[180px] max-w-[calc(100vw-2rem)]">
                 <button onClick={() => { cycleTileLang(); setShowMore(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-noch-muted hover:text-white hover:bg-noch-dark transition-colors">
                   <span className="text-[10px] font-bold uppercase w-10">{tileLang === 'both' ? 'EN+AR' : tileLang === 'en' ? 'EN' : 'AR'}</span>
@@ -1211,6 +1219,7 @@ function POSTerminalContent() {
               </div>
             </>
           )}
+        </div>
         </div>
       </header>
 

@@ -1470,3 +1470,11 @@ To find if something's been done:
 - **Change**: Set the shared Arabic application name to the owner's exact wording, `نوتش كافيه`, replacing `نوخ أومني`. This also feeds automatic translation of the app's visible branding.
 - **Files**: `apps/pos/src/lib/i18n.js`.
 - **Verification / deployment**: Targeted lint and production build passed. Commit `e39557b` is on GitHub main; production workflow [38935046827](https://github.com/HAK2080/noch-apps/actions/runs/38935046827) succeeded. A fresh 390px mobile browser session verified the live Arabic login heading is exactly `نوتش كافيه`.
+
+## 2026-10-17 — Keep POS controls and closing menu visible on mobile
+
+- **Agent**: Codex.
+- **Cause**: The terminal toolbar was a single non-wrapping row inside an overflow-hidden screen. With a serving-staff chip, a 390px Arabic live probe measured an action control at x=-30. The dropdown also used physical `right: 0` despite the Arabic menu button sitting at the left edge. The controls had not been removed by the prior workspace navigation repair.
+- **Change**: Keep terminal information, action controls and search on separate rows on narrow screens, retain the compact desktop row, use direction-aware dropdown alignment, and label the menu button `القائمة` / `Menu` with an accessible expanded state. Existing close/settings routes, permissions, sales and session data are unchanged.
+- **Files**: `apps/pos/src/modules/pos/pages/POSTerminal.jsx`, `apps/pos/playwright.pos-menu.config.js`, and `apps/pos/tests/pos-menu-visibility.spec.js`.
+- **Verification**: Existing live mobile failure reproduced with mocked staff data. Production build and targeted lint passed. Arabic and English phone/tablet/desktop checks verify every toolbar button is on-screen and Settings/End of Day are visible and tappable; screenshots were inspected. Release/live verification recorded after publication.
