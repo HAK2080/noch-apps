@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import {
   getPOSBranch, getOpenShift, closeShift, getShiftSummary,
-  getCashMovements, getShiftControl, recordCashMovement,
+  getCashMovements, getShiftControl, recordCashMovement, getSalesControlSummary,
 } from '../lib/pos-supabase'
 import { normalizeShiftControl } from '../lib/sales-control'
 import { printReceipt } from '../lib/escpos'
@@ -21,6 +21,8 @@ import { useLanguage } from '../../../contexts/LanguageContext'
 import toast from 'react-hot-toast'
 import { format } from '../lib/money'
 import { getCashCloseState } from '../lib/end-of-day-close'
+import { closeoutDays } from '../lib/closeout-days'
+import { withPOSNetworkTimeout } from '../lib/pos-offline'
 
 const MOVEMENT_TYPES = [
   { key: 'paid_in', labelKey: 'eodPaidIn', icon: ArrowDownCircle, color: 'text-noch-green', hintKey: 'eodPaidInHint' },
@@ -199,6 +201,9 @@ export default function POSEndOfDay() {
   const [shift, setShift] = useState(null)
   const [summary, setSummary] = useState(null)
   const [shiftControl, setShiftControl] = useState(null)
+  const [dailyDate, setDailyDate] = useState('')
+  const [dailyControl, setDailyControl] = useState(null)
+  const [dailyError, setDailyError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -212,21 +217,22 @@ export default function POSEndOfDay() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [b, s] = await Promise.all([
+        const [b, s] = await withPOSNetworkTimeout(Promise.all([
           getPOSBranch(branchId),
           getOpenShift(branchId),
-        ])
+        ]), 15000)
         setBranch(b)
         setShift(s)
         if (s) {
-          const [sum, movs, control] = await Promise.all([
+          const [sum, movs, control] = await withPOSNetworkTimeout(Promise.all([
             getShiftSummary(s.id),
             getCashMovements(s.id),
             getShiftControl(s.id),
-          ])
+          ]), 15000)
           setSummary(sum)
           setCashMovements(movs)
           setShiftControl(normalizeShiftControl(control))
+          setDailyDate(closeoutDays(s, sum.orders).latestDay)
         }
       } catch (err) {
         setLoadFailed(true)
@@ -237,6 +243,17 @@ export default function POSEndOfDay() {
     }
     load()
   }, [branchId, t, retry])
+
+  useEffect(() => {
+    if (!dailyDate || !allowed) return
+    let cancelled = false
+    setDailyControl(null)
+    setDailyError(false)
+    withPOSNetworkTimeout(getSalesControlSummary(branchId, dailyDate, dailyDate), 15000)
+      .then(row => { if (!cancelled) { setDailyControl(row); setDailyError(!row) } })
+      .catch(() => { if (!cancelled) setDailyError(true) })
+    return () => { cancelled = true }
+  }, [branchId, dailyDate, allowed, retry])
 
   const expectedCash = shiftControl?.expected_drawer_cash
     ?? (shift ? parseFloat(shift.expected_cash) : 0)
@@ -350,6 +367,30 @@ export default function POSEndOfDay() {
 
         {shift && summary && !loadFailed && (
           <>
+            <section className="card mb-5" data-testid="daily-closeout">
+              <label className="text-white font-semibold text-sm block mb-2" htmlFor="closeout-day">
+                {lang === 'ar' ? 'مبيعات يوم العمل — ليست إجمالي الوردية' : 'Business-day sales — not the whole shift'}
+              </label>
+              <input id="closeout-day" className="input w-full mb-3" type="date" value={dailyDate} onChange={event => { setDailyControl(null); setDailyError(false); setDailyDate(event.target.value) }} />
+              {dailyControl ? <div className="grid grid-cols-2 gap-3 text-sm">
+                {[
+                  [t('eodTotalSales'), dailyControl.net_sales],
+                  [t('eodOrders'), dailyControl.order_count],
+                  [t('eodCashSales'), dailyControl.period_cash_movement],
+                  [t('eodCardSales'), dailyControl.period_card_movement],
+                ].map(([label, value]) => <div key={label}><p className="text-noch-muted">{label}</p><p className="text-noch-green font-bold">{label === t('eodOrders') ? value : format(value)}</p></div>)}
+              </div> : <p role="status" className="text-noch-muted text-sm">{dailyError
+                ? (lang === 'ar' ? 'تعذر تحميل مبيعات اليوم — أعد المحاولة' : 'Daily sales unavailable — retry')
+                : t('eodLoading')}</p>}
+              {dailyError && <button className="btn-secondary mt-2" onClick={() => setRetry(value => value + 1)}>{lang === 'ar' ? 'أعد المحاولة' : 'Retry'}</button>}
+            </section>
+            <div className="mb-4 text-sm" data-testid="shift-period">
+              <h2 className="text-white font-semibold">{lang === 'ar' ? 'إجمالي الوردية بالكامل' : 'Whole-shift totals'}</h2>
+              <p className="text-noch-muted">{lang === 'ar' ? 'منذ' : 'Since'} {new Date(shift.opened_at).toLocaleString(lang === 'ar' ? 'ar-LY' : 'en-GB', { timeZone: 'Africa/Tripoli' })}</p>
+              {closeoutDays(shift, summary.orders).multiDay && <p role="alert" className="mt-2 text-amber-300">{lang === 'ar'
+                ? 'الوردية تشمل أكثر من يوم. لا تعتبر إجماليها مبيعات اليوم. طابق النقدية وأقفلها قبل بدء وردية جديدة؛ لن تُحذف أي مبيعات.'
+                : 'This shift spans more than one day. Its total is not today’s sales. Reconcile the drawer and close it before opening a new shift; sales are preserved.'}</p>}
+            </div>
             {shiftControl && (
               shiftControl.counterStatus === 'warning'
               || shiftControl.dataStatus !== 'complete'

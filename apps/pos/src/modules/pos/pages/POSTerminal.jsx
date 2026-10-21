@@ -369,14 +369,19 @@ function POSTerminalContent() {
 
       if (!isOnline()) return
 
-      const request = promise => withPOSNetworkTimeout(promise, 10000)
+      // Render each successful resource immediately. A slow category/settings
+      // request must not hold an already downloaded menu behind allSettled.
+      const request = (promise, apply) => withPOSNetworkTimeout(promise, 10000).then(value => {
+        if (!cancelled) apply(value)
+        return value
+      })
       const [branchResult, shiftResult, settingsResult, productsResult, categoriesResult] =
         await Promise.allSettled([
-          request(getPOSBranch(branchId)),
-          request(getOpenShift(branchId)),
-          request(getPOSSettings(branchId)),
-          request(getPOSProducts(branchId)),
-          request(getPOSCategories(branchId, { posOnly: true })),
+          request(getPOSBranch(branchId), setBranch),
+          request(getOpenShift(branchId), setShift),
+          request(getPOSSettings(branchId), setSettings),
+          request(getPOSProducts(branchId), setProducts),
+          request(getPOSCategories(branchId, { posOnly: true }), setCategories),
         ])
 
       if (cancelled) return
