@@ -13,10 +13,48 @@ import {
   listStaffLoans, createStaffLoan, cancelStaffLoan, listLoanRepayments, listBranches,
 } from '../lib/finance-supabase'
 import { getAllTeamMembers } from '../../../lib/profiles'
-import { netOf, overtimeCostOf } from '../lib/payroll-calculations'
+import { absenceOf, derivedOvertimeHoursOf, netOf, overtimeCostOf } from '../lib/payroll-calculations'
 import { openPayrollPdf } from '../lib/payroll-pdf'
 import { lyd } from '../lib/thresholds'
 import toast from 'react-hot-toast'
+
+// Read-only summary of what the run measured, so a number can be traced to its
+// evidence instead of being taken on trust.
+function EvidenceStrip({ item }) {
+  const absence = absenceOf(item)
+  const overtimeHours = derivedOvertimeHoursOf(item)
+  const cells = [
+    ['Days worked', absence.workedDays || 0],
+    ['Days scheduled', absence.measurable ? absence.scheduledDays : 'no schedule'],
+    ['Hours attended', Number(item.source_hours || 0)],
+    ['Standard hours', Number(item.standard_hours || 0)],
+    ['Overtime hours', overtimeHours],
+  ]
+
+  return (
+    <div className="mb-3 rounded-lg border border-noch-border/40 bg-noch-dark/40 p-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {cells.map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <p className="truncate text-[10px] uppercase tracking-wide text-noch-muted">{label}</p>
+            <p className="font-mono text-sm text-white">{value}</p>
+          </div>
+        ))}
+      </div>
+      {absence.absenceDays > 0 && (
+        <p className="mt-2 text-[11px] text-amber-300">
+          {absence.absenceDays} scheduled {absence.absenceDays === 1 ? 'day' : 'days'} not worked
+          — {lyd(absence.deduction)} already removed from base pay.
+        </p>
+      )}
+      {!absence.measurable && (
+        <p className="mt-2 text-[11px] text-noch-muted">
+          No published schedule this month, so absence could not be measured and nothing was deducted.
+        </p>
+      )}
+    </div>
+  )
+}
 
 const MANUAL_MONEY_FIELDS = ['base_lyd', 'bonus_lyd', 'deduction_lyd', 'loan_repayment_lyd', 'other_lyd']
 const MONEY_LABELS = {
@@ -462,6 +500,11 @@ The posted payroll journal will be reversed with a full audit trail. You can ame
                       </button>
                     </div>
                   </div>
+
+                  {/* Where the money came from. Read-only: the editable
+                      overrides sit below, so a derived figure and a typed one
+                      are never mistaken for each other. */}
+                  <EvidenceStrip item={it} />
 
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-11">
                     {HOURS_FIELDS.map(([field, label]) => (
