@@ -1,3 +1,12 @@
+## 2026-10-23 — Staff setup simplified and reconnected to payroll
+
+- **Agent**: Claude
+- **Status**: Implemented and verified locally. Not deployed. No database change required.
+- **Files**: `apps/pos/src/pages/Staff.jsx`; new `apps/pos/tests/staff-payroll-integration.test.mjs`.
+- **Description**: Fixed a silent integration bug: `profiles.is_employee` and `profiles.payroll_enabled` both default to false and payroll only includes a profile with both on, but the staff edit path never wrote either field. Only the `create-staff` and `approve-staff-request` edge functions set them, so any profile created by another route — or predating those columns — was invisible to payroll permanently, with nothing on screen explaining the absence. Both flags are now written on every save, including edits, and surfaced as an "Include in payroll" switch seeded from the saved profile. Added a live readiness panel that mirrors the exact conditions `payroll_generate_run` blocks on (start date, a salary or hourly rate, a branch or payroll allocation), so a gap appears while the person is being set up instead of at month end. Simplified adding a person: the main form now carries only employment facts (name, department, employment type, start date, branch, role, pay, allocation, days off), while PIN, email/password provisioning, phone and Telegram moved into a collapsed "App & POS access — optional" section that states it can be left empty entirely. Only the full name was, and remains, mandatory; the PIN format is validated only when one is actually typed.
+- **Verification**: `node tests/staff-payroll-integration.test.mjs` — 7/7, covering enrolment flags in the shared payload, edit-form seeding, the visible switch, readiness mirroring payroll's blockers, name-only requirement with no mandatory contact or sign-in detail, the optional section's contents, and that create-staff still enrols. Full `apps/pos` sweep by exit code: 65/66, the only failure `system-acceptance-privacy`, pre-existing on `origin/main` and unrelated. Production build passed; ESLint 0 errors on the changed file (four pre-existing hook warnings). NOT verified in a browser: the app cannot start locally without Supabase credentials, so the rearranged form has not been seen rendered or exercised against a real profile.
+- **Commit / deployment**: Committed to `main`. Not pushed or deployed.
+
 ## 2026-10-23 — Sales/POS/CEO reporting cross-check and payroll attendance module
 
 - **Agent**: Claude

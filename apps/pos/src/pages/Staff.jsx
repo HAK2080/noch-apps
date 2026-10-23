@@ -19,6 +19,55 @@ const ROLE_COLORS = {
   limited_staff: 'text-noch-muted bg-noch-muted/10 border-noch-muted/30',
 }
 
+// Mirrors the conditions payroll_generate_run blocks an employee on, so a gap
+// shows up while the person is being set up rather than at the end of the month.
+function payrollBlockers(form, canSeeSalaries) {
+  const blockers = []
+  if (!form.start_date) blockers.push('a start date')
+  if (canSeeSalaries) {
+    const salary = parseFloat(form.monthly_salary) || 0
+    const hourly = parseFloat(form.hourly_rate) || 0
+    if (salary <= 0 && hourly <= 0) blockers.push('a monthly salary or an hourly rate')
+    if (!form.branch_id && !form.payroll_cost_center_id) blockers.push('a branch or payroll allocation')
+  }
+  return blockers
+}
+
+function PayrollReadiness({ form, canSeeSalaries, onToggle }) {
+  const included = !!form.in_payroll
+  const blockers = included ? payrollBlockers(form, canSeeSalaries) : []
+
+  return (
+    <div className="rounded-xl border border-noch-border/60 bg-noch-dark/20 p-3">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={included}
+          onChange={e => onToggle(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-noch-green"
+        />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-white">Include in payroll</p>
+          <p className="mt-0.5 text-xs text-noch-muted">
+            {included
+              ? 'This person appears in the monthly payroll run.'
+              : 'This person is left out of payroll runs entirely.'}
+          </p>
+        </div>
+      </label>
+
+      {included && blockers.length > 0 && (
+        <p className="mt-2 text-[11px] text-amber-300">
+          Payroll will flag this employee until you add {blockers.join(', ')}.
+        </p>
+      )}
+      {included && blockers.length === 0 && (
+        <p className="mt-2 text-[11px] text-noch-green">Ready for the next payroll run.</p>
+      )}
+    </div>
+  )
+}
+
 function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose, canSeeSalaries, canEditRole, fromRequest }) {
   const isEdit = !!staff?.id
   const isApproval = !!fromRequest
@@ -42,11 +91,16 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
     is_active: staff.is_active !== false,
     days_off: Array.isArray(staff.days_off) ? staff.days_off : [],
     overtime_exempt: staff.overtime_exempt === true,
+    // Payroll only ever sees a profile with both flags on, and both columns
+    // default to false. Editing used to leave them untouched, so anyone whose
+    // profile was not created by this form stayed invisible to payroll with
+    // nothing on screen to say so.
+    in_payroll: staff.is_employee !== false && staff.payroll_enabled !== false,
   } : {
     full_name: fromRequest?.full_name || '', telegram_chat_id: '', phone: fromRequest?.phone || '', photo_url: '',
     monthly_salary: '', monthly_hours: 208, payroll_cost_center_id: '', hourly_rate: '', employment_type: 'full_time',
     start_date: '', pin_code: '', department: '', branch_id: '', role: 'staff', is_active: true,
-    days_off: [], overtime_exempt: false,
+    days_off: [], overtime_exempt: false, in_payroll: true,
   })
 
   // ISO day-of-week (matches the shift_labor_cost view's extract(isodow))
@@ -148,6 +202,10 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
         department: form.department.trim() || null,
         branch_id: form.branch_id || null,
         is_active: form.is_active,
+        // Written on every save, including edits, so an existing profile can
+        // actually be brought into payroll from this screen.
+        is_employee: !!form.in_payroll,
+        payroll_enabled: !!form.in_payroll,
       }
       if (canSeeSalaries) {
         const hourlyRate = hasMonthlySalary
@@ -288,11 +346,9 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
             <input className="input" value={form.full_name} onChange={e => set('full_name', e.target.value)} placeholder="Ahmed Mohamed" required />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Phone</label>
-              <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+218 9XX XXX XXXX" type="tel" />
-            </div>
+          <PayrollReadiness form={form} canSeeSalaries={canSeeSalaries} onToggle={value => set('in_payroll', value)} />
+
+          <div className="grid grid-cols-1 gap-3">
             <div>
               <label className="label">Department</label>
               <input className="input" value={form.department} onChange={e => set('department', e.target.value)} placeholder="Barista, Kitchen..." />
@@ -420,6 +476,26 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
               </label>
             </>
           )}
+
+          {/* Everything below is about signing in and being contacted, not
+              about employing someone. A person can be paid without any of it,
+              so it stays folded away until it is actually wanted. */}
+          <details className="rounded-xl border border-noch-border/60 bg-noch-dark/20">
+            <summary className="cursor-pointer select-none px-3 py-2.5 text-sm text-white">
+              App &amp; POS access
+              <span className="ml-2 text-xs font-normal text-noch-muted">
+                optional — PIN, login, phone, Telegram
+              </span>
+            </summary>
+            <div className="space-y-4 border-t border-noch-border/60 p-3">
+              <p className="text-xs text-noch-muted">
+                Leave all of this empty for someone who only needs to be scheduled and paid.
+              </p>
+
+              <div>
+                <label className="label">Phone</label>
+                <input className="input" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+218 9XX XXX XXXX" type="tel" />
+              </div>
 
           {/* PIN Code */}
           <div>
@@ -623,6 +699,8 @@ function StaffModal({ staff, branches, payrollCostCenters = [], onSave, onClose,
               </div>
             </label>
           )}
+            </div>
+          </details>
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-noch-border mt-4">
