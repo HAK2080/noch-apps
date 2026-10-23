@@ -1,10 +1,15 @@
-name: Weekly Supabase backup
+# Filename kept as weekly-supabase-backup.yml so the existing run history stays
+# attached to this workflow; the schedule below is the authority, not the name.
+name: Daily Supabase backup
 
 on:
   workflow_dispatch:
   schedule:
-    # Sunday 04:00 Tripoli (02:00 UTC).
-    - cron: '0 2 * * 0'
+    # 04:00 Tripoli (02:00 UTC), every day. The Free plan includes no Supabase
+    # backups at all, so this is the only copy of the business data. Weekly left
+    # up to seven days of orders, expenses and payroll recoverable only by
+    # retyping them.
+    - cron: '0 2 * * *'
 
 permissions:
   contents: read
@@ -53,3 +58,46 @@ jobs:
             tmp/noch-supabase-backup.tar.gz.enc.sha256
           if-no-files-found: error
           retention-days: 35
+
+      # Second copy on the VPS. GitHub artifacts expire after 35 days and are
+      # reachable only through a GitHub account; the VPS copy survives both and
+      # keeps the data recoverable if the GitHub account is ever lost.
+      - name: Copy backup to the VPS
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          BACKUP_HOST: 72.60.203.107
+          BACKUP_USER: root
+          BACKUP_DIR: /var/backups/noch
+          KEEP: '14'
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/backup_key"
+          chmod 600 "$HOME/.ssh/backup_key"
+          SSH="ssh -i $HOME/.ssh/backup_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20"
+          STAMP="$(date -u +%Y-%m-%dT%H%M%SZ)"
+          NAME="noch-supabase-$STAMP.tar.gz.enc"
+
+          $SSH "$BACKUP_USER@$BACKUP_HOST" "install -d -m 700 $BACKUP_DIR"
+          # Upload beside the final name, then rename, so an interrupted
+          # transfer never leaves a truncated file that looks like a backup.
+          scp -i "$HOME/.ssh/backup_key" -o StrictHostKeyChecking=accept-new \
+            tmp/noch-supabase-backup.tar.gz.enc "$BACKUP_USER@$BACKUP_HOST:$BACKUP_DIR/$NAME.part"
+          $SSH "$BACKUP_USER@$BACKUP_HOST" "mv -f $BACKUP_DIR/$NAME.part $BACKUP_DIR/$NAME"
+
+          # Verify the bytes that landed, not the bytes we sent.
+          LOCAL_SUM="$(sha256sum tmp/noch-supabase-backup.tar.gz.enc | cut -d' ' -f1)"
+          REMOTE_SUM="$($SSH "$BACKUP_USER@$BACKUP_HOST" "sha256sum $BACKUP_DIR/$NAME | cut -d' ' -f1")"
+          if [ "$LOCAL_SUM" != "$REMOTE_SUM" ]; then
+            echo "Checksum mismatch: local $LOCAL_SUM, remote $REMOTE_SUM" >&2
+            $SSH "$BACKUP_USER@$BACKUP_HOST" "rm -f $BACKUP_DIR/$NAME"
+            exit 1
+          fi
+
+          # Rotate only after the new copy is verified, so a failed run never
+          # costs an older good backup.
+          $SSH "$BACKUP_USER@$BACKUP_HOST" \
+            "ls -1t $BACKUP_DIR/noch-supabase-*.tar.gz.enc | tail -n +$((KEEP + 1)) | xargs -r rm -f"
+          $SSH "$BACKUP_USER@$BACKUP_HOST" \
+            "echo 'kept backups:'; ls -1t $BACKUP_DIR/noch-supabase-*.tar.gz.enc | wc -l; df -h $BACKUP_DIR | tail -1"
