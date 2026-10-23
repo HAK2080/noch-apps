@@ -56,13 +56,19 @@
           var source = event.target && (event.target.src || event.target.href)
           if (!event.message && event.target && event.target.tagName !== 'SCRIPT') return
           report(event.message || (source ? 'resource-load: ' + source.split('/').pop().split('?')[0] : 'startup-error'))
-          setTimeout(showRecovery, 0)
+          // Grace period, not an immediate verdict: a single failed request or
+          // rejected promise is survivable if the app still mounts. showRecovery
+          // re-checks for a mounted app, so a recovered startup shows nothing.
+          setTimeout(showRecovery, 2500)
         }, true)
         window.addEventListener('unhandledrejection', function (event) {
           var root = document.getElementById('root')
           if (root && root.childElementCount) return
           report(event.reason && event.reason.message || 'startup-promise-rejected')
-          setTimeout(showRecovery, 0)
+          // Grace period, not an immediate verdict: a single failed request or
+          // rejected promise is survivable if the app still mounts. showRecovery
+          // re-checks for a mounted app, so a recovered startup shows nothing.
+          setTimeout(showRecovery, 2500)
         })
         setTimeout(showRecovery, 10000)
       })()

@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getProfile } from '../lib/profiles'
 import { cacheProfile, getCachedProfile } from '../lib/profile-cache'
+import { withAuthBootstrapTimeout } from '../lib/auth-bootstrap'
 
 const AuthContext = createContext({})
 
@@ -32,7 +33,13 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // getSession had no rejection handler. When Supabase is unreachable it
+    // rejects, which left loading stuck on true AND raised an unhandled
+    // rejection — the exact condition index.html answers with the
+    // "Noch could not open" recovery screen. A transient backend problem must
+    // not cost the staff their login form, so failure now simply means
+    // "no session yet" and the app opens.
+    withAuthBootstrapTimeout(supabase.auth.getSession()).then(async ({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
         const cached = getCachedProfile(session.user.id)
@@ -44,6 +51,10 @@ export function AuthProvider({ children }) {
         }
         await loadProfile(session.user.id, { cached })
       }
+      setLoading(false)
+    }).catch(() => {
+      // onAuthStateChange still fires if the connection recovers, so a signed-in
+      // device picks its session back up without a reload.
       setLoading(false)
     })
 
